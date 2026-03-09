@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:staff_work_track/Models/auditlog.dart';
 import 'package:staff_work_track/Models/getusers.dart';
+import 'package:staff_work_track/core/widgets/loading.dart';
 import 'package:staff_work_track/services/auth_service.dart';
 import 'package:staff_work_track/services/superadmin_service.dart';
 import 'package:staff_work_track/utils/jwt_helper.dart';
@@ -76,9 +77,9 @@ class _AuditLogPageState extends State<AuditLogPage> {
     if (role == "manager") {
       return logs.where((log) {
         final editedUser = users[log.editedById];
-        if (editedUser == null) return false;
+        if (editedUser == null) return true;
 
-        return editedUser.role.toLowerCase() == "manager" &&
+        return editedUser.role.toLowerCase() == "staff" &&
             editedUser.department.toLowerCase() == dept;
       }).toList();
     }
@@ -92,7 +93,6 @@ class _AuditLogPageState extends State<AuditLogPage> {
         return const Color.fromARGB(255, 25, 77, 38);
       case 'delete':
         return Colors.red;
-        ;
       case 'logout':
         return Colors.red;
       case 'login':
@@ -119,48 +119,26 @@ class _AuditLogPageState extends State<AuditLogPage> {
   }
 
   String getTaskName(AuditLogGroupModel log) {
-    if (log.action.toLowerCase() == "delete") {
-      for (final c in log.changes) {
-        final field = c.fieldChanged!.toLowerCase();
-
-        if ((field.contains("taskname") || field == "name") &&
-            c.oldValue != null &&
-            c.oldValue!.trim().isNotEmpty) {
-          return c.oldValue!;
-        }
-      }
-
-      for (final c in log.changes) {
-        if (c.oldValue != null && c.oldValue!.trim().isNotEmpty) {
-          return c.oldValue!;
-        }
-      }
-
-      return "";
-    }
-
     if (log.taskName != null && log.taskName!.trim().isNotEmpty) {
       return log.taskName!;
     }
 
     for (final c in log.changes) {
-      final field = c.fieldChanged!.toLowerCase();
-
-      if (field.contains("taskname") || field == "name") {
-        if (c.newValue != null && c.newValue!.trim().isNotEmpty) {
+      final field = c.fieldChanged?.toLowerCase() ?? "";
+      if (field.contains("task") || field.contains("name")) {
+        if (c.newValue != null && c.newValue!.trim().isNotEmpty)
           return c.newValue!;
-        }
-        if (c.oldValue != null && c.oldValue!.trim().isNotEmpty) {
+        if (c.oldValue != null && c.oldValue!.trim().isNotEmpty)
           return c.oldValue!;
-        }
       }
     }
+
+    if (log.action.toLowerCase() == "delete") return "Unknown Task";
 
     return "";
   }
 
   Widget buildTitle(AuditLogGroupModel log) {
-    final color = actionColor(log.action);
 
     if (log.entityType == "Task") {
       final taskName = getTaskName(log);
@@ -168,12 +146,12 @@ class _AuditLogPageState extends State<AuditLogPage> {
       if (log.action.toLowerCase() == "delete") {
         return RichText(
           text: TextSpan(
-            style: const TextStyle(fontSize: 13, color: Colors.black87),
+            style: Theme.of(context).textTheme.labelSmall,
             children: [
               const TextSpan(text: "Task "),
               TextSpan(
                 text: taskName,
-                style: TextStyle(color: color),
+                style: Theme.of(context).textTheme.labelSmall,
               ),
               const TextSpan(text: " deleted permanently"),
             ],
@@ -183,13 +161,34 @@ class _AuditLogPageState extends State<AuditLogPage> {
 
       return Text(
         "Task : $taskName",
-        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+        style: Theme.of(context).textTheme.labelMedium,
       );
     }
-
+    if (log.action.toLowerCase() == "login" ||
+        log.action.toLowerCase() == "logout") {
+      final userName = log.editedByName.isNotEmpty
+          ? log.editedByName
+          : "System";
+      return RichText(
+        text: TextSpan(
+          style: Theme.of(context).textTheme.labelMedium,
+          children: [
+            TextSpan(
+              text: "$userName",
+             style: Theme.of(context).textTheme.labelMedium,
+            ),
+            TextSpan(
+              text: log.action.toLowerCase() == "login"
+                  ? " logged in"
+                  : " logged out",
+            ),
+          ],
+        ),
+      );
+    }
     return Text(
       "${log.entityType} : ${log.entityId}",
-      style: const TextStyle(fontSize: 13),
+      style: Theme.of(context).textTheme.labelMedium,
     );
   }
 
@@ -226,7 +225,7 @@ class _AuditLogPageState extends State<AuditLogPage> {
   @override
   Widget build(BuildContext context) {
     if (isLoadingUser) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const Scaffold(body: Center(child: RotatingFlower()));
     }
 
     return Scaffold(
@@ -238,7 +237,7 @@ class _AuditLogPageState extends State<AuditLogPage> {
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.calendar_month, color: Colors.white),
+            icon: const Icon(Icons.calendar_month),
             onPressed: () async {
               final now = DateTime.now();
 
@@ -303,6 +302,9 @@ class _AuditLogPageState extends State<AuditLogPage> {
                   widget.highlightid != null &&
                   (log.taskCode == widget.highlightid ||
                       log.entityId == widget.highlightid);
+              final displayName = log.editedByName.isNotEmpty
+                  ? log.editedByName
+                  : "System";
 
               return Padding(
                 padding: const EdgeInsets.only(bottom: 14),
@@ -373,9 +375,7 @@ class _AuditLogPageState extends State<AuditLogPage> {
                                       radius: 18,
                                       backgroundColor: color.withOpacity(0.1),
                                       child: Text(
-                                        log.editedByName.isNotEmpty
-                                            ? log.editedByName[0].toUpperCase()
-                                            : "?",
+                                        displayName[0].toUpperCase(),
                                         style: TextStyle(
                                           color: color,
                                           fontWeight: FontWeight.bold,

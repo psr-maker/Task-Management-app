@@ -33,10 +33,7 @@ class _PendingApprovalsState extends State<PendingApprovals> {
 
   @override
   Widget build(BuildContext context) {
-    return
-    // Scaffold(
-    //   body:
-    FutureBuilder<List<UserModel>>(
+    return FutureBuilder<List<UserModel>>(
       future: pendingFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
@@ -56,10 +53,11 @@ class _PendingApprovalsState extends State<PendingApprovals> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              "Approvals",
+              "Pending Approvals",
               style: Theme.of(context).textTheme.displaySmall,
             ),
-            const SizedBox(height: 15),
+            const SizedBox(height: 20),
+
             ListView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
@@ -68,148 +66,150 @@ class _PendingApprovalsState extends State<PendingApprovals> {
                 final user = users[index];
 
                 return Container(
-                  margin: const EdgeInsets.only(bottom: 14),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(16),
-                    color:Theme.of(context).colorScheme.onPrimary,
-                    border: Border.all(color:Theme.of(context).colorScheme.primary ,width: 1),
-                  
+                  margin: const EdgeInsets.only(bottom: 10),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 12,
                   ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(10),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            CircleAvatar(
-                              radius: 15,
-                              backgroundColor: Colors.green.shade100,
-                              child: Text(
-                                user.name[0].toUpperCase(),
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.green,
-                                  fontSize: 13,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 15),
-
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    user.name,
-                                    style: Theme.of(context).textTheme.headlineLarge
-                                  ),
-                                  const SizedBox(height: 5),
-
-                                  Text(
-                                    user.department,
-                                      style: Theme.of(context).textTheme.headlineMedium
-                                  ),
-                                  const SizedBox(height: 5),
-                                  Text(
-                                    user.email,
-                                    style: Theme.of(context).textTheme.headlineSmall
-                                  ),
-                                ],
-                              ),
-                            ),
-
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 6,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.blue.shade50,
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Text(
-                                user.role,
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  color: Colors.blue.shade700,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            OutlinedButton(
-                              style: OutlinedButton.styleFrom(
-                                minimumSize: const Size(70, 30),
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                ),
-                                side: BorderSide(color: Colors.red.shade300),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                              ),
-
-                              onPressed: () async {
-                                bool? confirmed = await showConfirmDialog(
-                                  context,
-                                  "Reject",
-                                  "user"
-                                );
-                                if (confirmed != null && confirmed) {
-                                  await handleAction(user.userId, false);
-                                }
-                              },
-                              child: const Text(
-                                "Reject",
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: Colors.red,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            OutlinedButton(
-                              style: OutlinedButton.styleFrom(
-                                minimumSize: const Size(70, 30),
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                ),
-                                side: BorderSide(color: Colors.green.shade400),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                              ),
-
-                              onPressed: () async {
-                                bool? confirmed = await showConfirmDialog(
-                                  context,
-                                  "Approve",
-                                  "user"
-                                );
-                                if (confirmed != null && confirmed) {
-                                  await handleAction(user.userId, true);
-                                }
-                              },
-                              child: const Text(
-                                "Approve",
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: Colors.green,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
+                  decoration: BoxDecoration(
+                    color: Colors.transparent,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: Theme.of(context).dividerColor.withOpacity(0.2),
                     ),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      // Minimal Avatar
+                      CircleAvatar(
+                        radius: 18,
+                        backgroundColor: Theme.of(
+                          context,
+                        ).colorScheme.primary,
+                        child: Text(
+                          user.name[0].toUpperCase(),
+                          style: Theme.of(context).textTheme.labelLarge,
+                        ),
+                      ),
+
+                      const SizedBox(width: 12),
+
+                      // User Info
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Row(
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    user.name,
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.headlineLarge,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+
+                                // Role pill small
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.blue.withOpacity(0.08),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    user.role,
+                                    style: const TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w500,
+                                      color: Colors.blue,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              user.department,
+                              style: Theme.of(context).textTheme.titleLarge,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              user.email,
+                              style: Theme.of(context).textTheme.titleLarge,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(width: 8),
+
+                      // Compact Action Buttons
+                      Row(
+                        children: [
+                          InkWell(
+                            borderRadius: BorderRadius.circular(8),
+                            onTap: () async {
+                              bool? confirmed = await showConfirmDialog(
+                                context,
+                                "Reject",
+                                "user",
+                              );
+                              if (confirmed == true) {
+                                await handleAction(user.userId, false);
+                              }
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: Colors.red.withOpacity(0.08),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Icon(
+                                Icons.close,
+                                size: 16,
+                                color: Colors.red,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          InkWell(
+                            borderRadius: BorderRadius.circular(8),
+                            onTap: () async {
+                              bool? confirmed = await showConfirmDialog(
+                                context,
+                                "Approve",
+                                "user",
+                              );
+                              if (confirmed == true) {
+                                await handleAction(user.userId, true);
+                              }
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: Colors.green.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Icon(
+                                Icons.check,
+                                size: 16,
+                                color: Colors.green,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 );
               },
@@ -217,7 +217,6 @@ class _PendingApprovalsState extends State<PendingApprovals> {
           ],
         );
       },
-      // ),
     );
   }
 }

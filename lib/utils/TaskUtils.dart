@@ -60,10 +60,10 @@ class TaskUtils {
   }
 
   static Color getPriorityColor(String priority) {
-    switch (priority.toLowerCase()) {
-      case "high":
+    switch (priority) {
+      case "High":
         return Colors.red;
-      case "medium":
+      case "Medium":
         return Colors.orange;
       default:
         return Colors.green;

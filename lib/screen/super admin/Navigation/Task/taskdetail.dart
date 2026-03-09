@@ -34,6 +34,7 @@ class _TaskDetailsState extends State<TaskDetails> {
   Map<String, dynamic>? reviewData;
   bool isReviewLoading = false;
   bool permissionLoaded = false;
+
   @override
   void initState() {
     super.initState();
@@ -112,7 +113,6 @@ class _TaskDetailsState extends State<TaskDetails> {
     }
   }
 
-
   Future<void> _checkTaskPermission(TaskModel task) async {
     final token = await AuthService.getToken();
     if (token == null) return;
@@ -134,13 +134,6 @@ class _TaskDetailsState extends State<TaskDetails> {
     final isSuperAdmin = loginUserRole == "director";
 
     final canEdit = isSuperAdmin || (loginUserId == createdById);
-
-    debugPrint("=== PERMISSION CHECK ===");
-    debugPrint("LOGIN ROLE: $loginUserRole");
-    debugPrint("LOGIN ID: $loginUserId");
-    debugPrint("TARGET CREATED BY: $createdById");
-    debugPrint("CAN EDIT: $canEdit");
-    debugPrint("========================");
 
     if (mounted) {
       setState(() {
@@ -219,14 +212,14 @@ class _TaskDetailsState extends State<TaskDetails> {
                 value: 'edit',
                 child: Text(
                   "Edit",
-                   style: Theme.of(context).textTheme.headlineMedium,
+                  style: Theme.of(context).textTheme.headlineMedium,
                 ),
               ),
               PopupMenuItem(
                 value: 'delete',
                 child: Text(
                   "Delete",
-                   style: Theme.of(context).textTheme.headlineMedium,
+                  style: Theme.of(context).textTheme.headlineMedium,
                 ),
               ),
             ],
@@ -253,7 +246,7 @@ class _TaskDetailsState extends State<TaskDetails> {
                           final role = JwtHelper.getRole(
                             token!,
                           )?.toLowerCase().trim();
-                          if (role == "Director") {
+                          if (role == "director") {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
@@ -285,7 +278,7 @@ class _TaskDetailsState extends State<TaskDetails> {
                       ),
                   ],
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 15),
 
                 Row(
                   children: [
@@ -307,16 +300,13 @@ class _TaskDetailsState extends State<TaskDetails> {
                 _infoCard(),
                 const SizedBox(height: 15),
 
-                 Text(
+                Text(
                   "Assignment Summary",
                   style: Theme.of(context).textTheme.headlineLarge,
                 ),
                 const SizedBox(height: 10),
                 if (memberRoles.isNotEmpty) ...[
-                  const Text(
-                    "Roles",
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
-                  ),
+                  Text("Role", style: Theme.of(context).textTheme.labelMedium),
                   const SizedBox(height: 5),
                   Wrap(
                     spacing: 5,
@@ -328,9 +318,9 @@ class _TaskDetailsState extends State<TaskDetails> {
                 ],
                 const SizedBox(height: 10),
                 if (departments.isNotEmpty) ...[
-                  const Text(
+                  Text(
                     "Departments",
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                    style: Theme.of(context).textTheme.labelMedium,
                   ),
                   const SizedBox(height: 5),
                   Wrap(
@@ -344,7 +334,7 @@ class _TaskDetailsState extends State<TaskDetails> {
 
                 const SizedBox(height: 15),
 
-                 Text(
+                Text(
                   "Assigned Members",
                   style: Theme.of(context).textTheme.headlineLarge,
                 ),
@@ -377,21 +367,21 @@ class _TaskDetailsState extends State<TaskDetails> {
                 ),
                 const SizedBox(height: 15),
 
-                 Text(
+                Text(
                   "Task Description",
-                 style: Theme.of(context).textTheme.headlineLarge,
+                  style: Theme.of(context).textTheme.headlineLarge,
                 ),
                 const SizedBox(height: 10),
                 Text(
                   task!.description,
-                  style: Theme.of(context).textTheme.headlineSmall,
+                  style: Theme.of(context).textTheme.labelMedium,
                 ),
-                const SizedBox(height: 25),
+                const SizedBox(height: 15),
 
                 if (task!.status.toLowerCase() == "completed") ...[
-                   Text(
+                  Text(
                     "Review Details",
-                   style: Theme.of(context).textTheme.headlineLarge,
+                    style: Theme.of(context).textTheme.headlineLarge,
                   ),
                   const SizedBox(height: 10),
 
@@ -424,6 +414,9 @@ class _TaskDetailsState extends State<TaskDetails> {
                   context,
                   message: _topMessage!,
                   isError: _isErrorMessage,
+                  backgroundColor: Theme.of(context).colorScheme.primary,
+                  iconColor: Theme.of(context).colorScheme.onPrimary,
+                  textColor: Theme.of(context).colorScheme.onPrimary,
                 ),
               ),
           ],
@@ -476,68 +469,117 @@ class _TaskDetailsState extends State<TaskDetails> {
   Widget _infoRow(IconData icon, String title, String value) {
     return Row(
       children: [
-        Icon(icon, ),
+        Icon(icon),
         const SizedBox(width: 10),
         Expanded(
-          child: Text(
-            title,
-            style: Theme.of(context).textTheme.headlineMedium,
-          ),
+          child: Text(title, style: Theme.of(context).textTheme.headlineMedium),
         ),
-        Text(value,   style: Theme.of(context).textTheme.headlineSmall,),
+        Text(value, style: Theme.of(context).textTheme.headlineSmall),
       ],
     );
   }
 
   Widget _buildReviewCard() {
-    final points = reviewData!['points'];
+    if (reviewData == null) return const SizedBox();
+
+    final systemPoints = reviewData!['systemPoints'] ?? 0;
+    final finalPoints = reviewData!['finalPoints'] ?? 0;
     final comment = reviewData!['comment'];
+    final delayReason = reviewData!['delayReason'];
+    final isDelayJustified = reviewData!['isDelayJustified'];
+
     final reviewedByRaw = reviewData!['reviewedBy'] ?? "";
-    final reviewedAtRaw = reviewData!['reviewedAt'];
-
-    String reviewerName = reviewedByRaw.toString().contains('-')
-        ? reviewedByRaw.split('-')[1]
-        : reviewedByRaw;
-
-    String formattedDate = "";
-    if (reviewedAtRaw != null) {
-      final date = DateTime.parse(reviewedAtRaw);
-      formattedDate =
-          "${date.day}/${date.month}/${date.year} ${date.hour}:${date.minute}";
-    }
+    final reviewedAtRaw = AppHelpers.formatDate(reviewData!['reviewedAt']);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
-            const Icon(Icons.star, color: Color(0xfff2b705)),
+            const Icon(Icons.star, color: Colors.amber),
             const SizedBox(width: 6),
             Text(
-              "$points Points",
+              "$finalPoints Points",
               style: const TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
-                color: Color(0xfff2b705),
+                color: Colors.amber,
               ),
             ),
           ],
         ),
-        const SizedBox(height: 12),
-        Text("comments", style: Theme.of(context).textTheme.titleLarge,),
-         const SizedBox(height: 12),
-        Text(comment, style: const TextStyle(fontSize: 14, height: 1.5)),
-        const SizedBox(height: 5),
-        Divider(color: Colors.grey.shade300),
-        const SizedBox(height: 8),
-        Text(
-          "Reviewed by - $reviewerName",
-        style: Theme.of(context).textTheme.titleLarge,
+
+        const SizedBox(height: 10),
+
+        Row(
+          children: [
+            const Icon(Icons.auto_graph_outlined),
+            const SizedBox(width: 6),
+            Text(
+              "System Points : $systemPoints",
+              style: Theme.of(context).textTheme.labelMedium,
+            ),
+          ],
         ),
-        const SizedBox(height: 3),
-        Text(
-          formattedDate,
-         style: Theme.of(context).textTheme.titleLarge,
+
+        const SizedBox(height: 8),
+
+        Row(
+          children: [
+            const Icon(Icons.rule),
+            const SizedBox(width: 6),
+            Text(
+              "Delay Justified : ${isDelayJustified == true ? "Yes" : "No"}",
+              style: Theme.of(context).textTheme.labelMedium,
+            ),
+          ],
+        ),
+
+        const SizedBox(height: 12),
+
+        if (delayReason != null &&
+            delayReason.toString().trim().isNotEmpty) ...[
+          Text("Delay Reason :"),
+          const SizedBox(height: 6),
+          Text(delayReason, style: Theme.of(context).textTheme.labelMedium),
+          const SizedBox(height: 5),
+        ],
+
+        if (comment != null && comment.toString().trim().isNotEmpty) ...[
+          Text("Comment", style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: 6),
+          Text(comment, style: const TextStyle(fontSize: 14, height: 1.5)),
+          const SizedBox(height: 5),
+        ],
+
+        Divider(color: Colors.grey.shade300),
+
+        const SizedBox(height: 5),
+
+        Row(
+          children: [
+            const Icon(Icons.person_outline),
+            const SizedBox(width: 6),
+            Text(
+              "Reviewed by : $reviewedByRaw",
+              style: Theme.of(context).textTheme.labelMedium,
+            ),
+          ],
+        ),
+
+        const SizedBox(height: 5),
+
+        Row(
+          children: [
+            const Icon(Icons.access_time),
+            const SizedBox(width: 6),
+            Text(
+              "Reviewe At :",
+              style: Theme.of(context).textTheme.labelMedium,
+            ),
+            const SizedBox(width: 6),
+            Text(reviewedAtRaw, style: Theme.of(context).textTheme.labelMedium),
+          ],
         ),
       ],
     );

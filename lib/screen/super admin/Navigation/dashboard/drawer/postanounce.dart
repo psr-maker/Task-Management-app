@@ -81,7 +81,13 @@ class _PostAnnouncementPageState extends State<PostAnnouncementPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Post Announcement")),
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text("Post Announcement"),
+      ),
       body: Stack(
         children: [
           Padding(
@@ -116,7 +122,7 @@ class _PostAnnouncementPageState extends State<PostAnnouncementPage> {
                   CustomFormWidgets.dropdown(
                     context: context,
                     value: targetRole,
-                    items: const ["All", "Manager"],
+                    items: const ["All", "Manager", "Staff"],
                     onChanged: (v) => setState(() => targetRole = v),
                     hint: "Select target",
                   ),
@@ -155,6 +161,9 @@ class _PostAnnouncementPageState extends State<PostAnnouncementPage> {
                 context,
                 message: _topMessage!,
                 isError: _isErrorMessage,
+                backgroundColor: Theme.of(context).colorScheme.primary,
+                iconColor: Theme.of(context).colorScheme.onPrimary,
+                textColor: Theme.of(context).colorScheme.onPrimary,
               ),
             ),
         ],

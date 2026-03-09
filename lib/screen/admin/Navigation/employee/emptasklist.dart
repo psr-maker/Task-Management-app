@@ -136,7 +136,7 @@ class _EmptasklistState extends State<Emptasklist> {
         padding: const EdgeInsets.all(10),
         child: Stack(
           children: [
-            Column( 
+            Column(
               children: [
                 /// 🔹 Top Bar
                 Row(
@@ -149,18 +149,17 @@ class _EmptasklistState extends State<Emptasklist> {
                         );
                       },
                       child: Chip(
-                        backgroundColor: const Color.fromARGB(255, 25, 77, 38),
+                        backgroundColor: Theme.of(
+                          context,
+                        ).colorScheme.secondary,
                         label: Text(
                           "Add Task",
-                         style: Theme.of(context).textTheme.titleMedium,
+                          style: Theme.of(context).textTheme.titleMedium,
                         ),
                       ),
                     ),
                     IconButton(
-                      icon: Icon(
-                        showFilter ? Icons.close : Icons.filter_list,
-                    
-                      ),
+                      icon: Icon(showFilter ? Icons.close : Icons.filter_list),
                       onPressed: () {
                         setState(() => showFilter = !showFilter);
                       },
@@ -170,8 +169,10 @@ class _EmptasklistState extends State<Emptasklist> {
                         child: TextField(
                           controller: searchController,
                           decoration: InputDecoration(
-                            hintText: 'Search tasks...',
-                            hintStyle: Theme.of(context).textTheme.titleLarge,
+                            hintText: 'Search tasks',
+                            hintStyle: Theme.of(
+                              context,
+                            ).textTheme.headlineSmall,
                             // prefixIcon: Icon(Icons.search),
                             border: InputBorder.none,
                             enabledBorder: InputBorder.none,
@@ -182,10 +183,7 @@ class _EmptasklistState extends State<Emptasklist> {
                       ),
 
                     IconButton(
-                      icon: Icon(
-                        isSearching ? Icons.close : Icons.search,
-                       
-                      ),
+                      icon: Icon(isSearching ? Icons.close : Icons.search),
                       onPressed: () {
                         setState(() {
                           isSearching = !isSearching;
@@ -196,6 +194,7 @@ class _EmptasklistState extends State<Emptasklist> {
                     ),
                   ],
                 ),
+                SizedBox(height: 5),
 
                 /// 🔹 Task List
                 Expanded(

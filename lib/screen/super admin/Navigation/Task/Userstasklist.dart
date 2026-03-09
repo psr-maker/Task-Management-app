@@ -149,10 +149,10 @@ class _TaskListPageState extends State<UsersTasklist> {
             ? TextField(
                 controller: searchController,
                 autofocus: true,
-              
+
                 decoration: InputDecoration(
                   hintText: "Search task / user",
-                  hintStyle:  Theme.of(context).textTheme.titleMedium,
+                  hintStyle: Theme.of(context).textTheme.titleMedium,
                   border: InputBorder.none,
                 ),
                 onChanged: (_) => applySearchAndFilter(),
@@ -160,7 +160,7 @@ class _TaskListPageState extends State<UsersTasklist> {
             : Text("All Users Tasks ($totalTasks)"),
         actions: [
           IconButton(
-            icon: Icon(isSearching ? Icons.close : Icons.search,),
+            icon: Icon(isSearching ? Icons.close : Icons.search),
             onPressed: () {
               setState(() {
                 isSearching = !isSearching;
@@ -202,10 +202,10 @@ class _TaskListPageState extends State<UsersTasklist> {
                       backgroundColor: Theme.of(context).primaryColor,
                       label: Text(
                         "Add Task +",
-                       style: Theme.of(context).textTheme.titleMedium,
+                        style: Theme.of(context).textTheme.titleMedium,
                       ),
                     ),
-                  ), 
+                  ),
 
                   isLoading
                       ? const Center(child: RotatingFlower())
@@ -274,13 +274,17 @@ class _TaskListPageState extends State<UsersTasklist> {
                                             task.task,
                                             maxLines: 1,
                                             overflow: TextOverflow.ellipsis,
-                                             style: Theme.of(context).textTheme.headlineLarge,
+                                            style: Theme.of(
+                                              context,
+                                            ).textTheme.headlineLarge,
                                           ),
                                           const SizedBox(height: 6),
 
                                           Text(
                                             "${task.assignerRole ?? "N/A"} • ${AppHelpers.extractName(task.assignedBy)}",
-                                           style: Theme.of(context).textTheme.bodyMedium,
+                                            style: Theme.of(
+                                              context,
+                                            ).textTheme.bodyMedium,
                                           ),
 
                                           const SizedBox(height: 6),
@@ -295,7 +299,9 @@ class _TaskListPageState extends State<UsersTasklist> {
                                               const SizedBox(width: 6),
                                               Text(
                                                 "Due: ${AppHelpers.formatDate(task.dueDate)}",
-                                                style: Theme.of(context).textTheme.bodyMedium,
+                                                style: Theme.of(
+                                                  context,
+                                                ).textTheme.bodyMedium,
                                               ),
                                               const SizedBox(width: 12),
                                               const Icon(
@@ -306,7 +312,9 @@ class _TaskListPageState extends State<UsersTasklist> {
                                               const SizedBox(width: 4),
                                               Text(
                                                 "${task.totalMembers}",
-                                               style: Theme.of(context).textTheme.bodyMedium,
+                                                style: Theme.of(
+                                                  context,
+                                                ).textTheme.bodyMedium,
                                               ),
                                             ],
                                           ),

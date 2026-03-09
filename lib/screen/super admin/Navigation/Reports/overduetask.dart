@@ -24,16 +24,16 @@ class OverdueTaskList extends StatelessWidget {
     return Column(
       children: [
         if (data != null) _buildCriticalAlert(data!),
-        const SizedBox(height: 12),
+    
         ListView.builder(
           shrinkWrap: true,
           physics: const AlwaysScrollableScrollPhysics(),
-          itemCount: overdueTasks.length,   
+          itemCount: overdueTasks.length,
           itemBuilder: (context, index) {
             final task = overdueTasks[index];
-            final assignedList = task["assignedTo"] as List?;
+            // final assignedList = task["assignedTo"] as List?;
+            final assignedList = (task["assignedTo"] ?? task["members"] ?? []) as List;
 
-          
             final statusEnum = TaskUtils.parseStatus(task["status"] ?? "");
             return GestureDetector(
               onTap: () {
@@ -46,10 +46,10 @@ class OverdueTaskList extends StatelessWidget {
                 );
               },
               child: Container(
-                margin: const EdgeInsets.only(bottom: 12),
-                padding: const EdgeInsets.all(14),
+                margin: const EdgeInsets.only(bottom: 10),
+                padding: const EdgeInsets.all(15),
                 decoration: BoxDecoration(
-                  color: theme.cardTheme.color, // <-- uses theme card color
+                  color: theme.cardTheme.color,
                   borderRadius: theme.cardTheme.shape is RoundedRectangleBorder
                       ? (theme.cardTheme.shape as RoundedRectangleBorder)
                             .borderRadius
@@ -86,14 +86,13 @@ class OverdueTaskList extends StatelessWidget {
 
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
-                            children: assignedList!.map<Widget>((member) {
+                            children: assignedList.map<Widget>((member) {
                               return Text(
-                                "${member["role"] ?? "N/A"} • ${AppHelpers.extractName(member["userId"])}",
+                                "${member["role"] ?? "N/A"} • ${AppHelpers.extractName(member["userId"] ?? "")}",
                                 style: Theme.of(context).textTheme.bodyMedium,
                               );
                             }).toList(),
                           ),
-
                           const SizedBox(height: 6),
 
                           Row(
@@ -116,7 +115,7 @@ class OverdueTaskList extends StatelessWidget {
                               ),
                               const SizedBox(width: 4),
                               Text(
-                                "${task["totalMembers"]}",
+                              "${task["totalMembers"] ?? assignedList.length}",
                                 style: Theme.of(context).textTheme.bodyMedium,
                               ),
                             ],
@@ -139,8 +138,8 @@ class OverdueTaskList extends StatelessWidget {
                       children: [
                         _buildChip(
                           icon: Icons.flag,
-                          text: task["priority"],
-                          color: TaskUtils.getPriorityColor(task["priority"]),
+                          text:  task["priority"] ?? "N/A",
+                        color: TaskUtils.getPriorityColor(task["priority"] ?? ""),
                         ),
                         const SizedBox(height: 8),
                         _buildChip(

@@ -85,7 +85,7 @@ class _EmployeeReportsListState extends State<EmployeeReportsList> {
                       margin: const EdgeInsets.only(bottom: 14),
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(16),
-                        color: const Color.fromARGB(255, 134, 170, 136),
+                         color:  Theme.of(context).colorScheme.background,
                       ),
                       child: Padding(
                         padding: const EdgeInsets.all(10),
@@ -94,12 +94,7 @@ class _EmployeeReportsListState extends State<EmployeeReportsList> {
                             // ✅ Existing UI
                             CircleAvatar(
                               radius: 18,
-                              backgroundColor: const Color.fromARGB(
-                                255,
-                                50,
-                                99,
-                                49,
-                              ),
+                              backgroundColor:  Theme.of(context).colorScheme.secondary,
                               child: Text(
                                 user.name[0].toUpperCase(),
                                 style: Theme.of(context).textTheme.labelLarge,
@@ -114,12 +109,12 @@ class _EmployeeReportsListState extends State<EmployeeReportsList> {
                                     user.name,
                                     style: Theme.of(
                                       context,
-                                    ).textTheme.labelLarge,
+                                    ).textTheme.labelMedium,
                                   ),
                                   const SizedBox(height: 3),
                                   Text(
                                     user.department,
-                                    style: Theme.of(context).textTheme.titleMedium,
+                                    style: Theme.of(context).textTheme.labelSmall,
                                   ),
                                 ],
                               ),
@@ -141,8 +136,7 @@ class _EmployeeReportsListState extends State<EmployeeReportsList> {
                                 padding: const EdgeInsets.all(8.0),
                                 child: Icon(
                                   Icons.arrow_forward_ios,
-                                  size: 16,
-                                  color: Color.fromARGB(255, 25, 77, 38),
+                                 
                                 ),
                               ),
                             ),

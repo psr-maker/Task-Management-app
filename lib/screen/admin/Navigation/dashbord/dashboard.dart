@@ -1,18 +1,23 @@
 import 'package:flutter/material.dart';
+import 'package:staff_work_track/Models/warning_model.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
+import 'package:staff_work_track/screen/admin/Navigation/dashbord/drawer/anouncement.dart';
 import 'package:staff_work_track/screen/admin/Navigation/dashbord/drawer/auditlog.dart';
+import 'package:staff_work_track/screen/admin/Navigation/dashbord/drawer/staffworklog.dart';
 import 'package:staff_work_track/screen/admin/Navigation/dashbord/drawer/task%20points/emptaskreview.dart';
 import 'package:staff_work_track/screen/admin/Navigation/dashbord/empreports.dart';
-
 import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/drawer/anouncement.dart';
+import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/notifi.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/settings/settings.dart';
-import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/warning.dart';
+import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/warnings/warning.dart';
+import 'package:staff_work_track/services/announ_service.dart';
 import 'package:staff_work_track/services/dashboard_service.dart';
+import 'package:staff_work_track/services/notification_service.dart';
 import 'package:staff_work_track/utils/TaskUtils.dart';
 import 'package:staff_work_track/utils/enum.dart';
 import 'package:staff_work_track/widgets/StatCard.dart';
 import 'package:staff_work_track/widgets/monthlytrend.dart';
-import 'package:staff_work_track/widgets/progressoverview.dart';
+import 'package:staff_work_track/widgets/kpicard.dart';
 
 class AdminDashboard extends StatefulWidget {
   final DateTime? fromDate;
@@ -32,11 +37,31 @@ class AdminDashboard extends StatefulWidget {
 class _AdminState extends State<AdminDashboard> {
   late Future<Map<String, dynamic>> deptFuture;
   int overdueCount = 0;
+  int apiWarningCount = 0;
+  int notificationCount = 0;
+  List<WarningModel> apiWarnings = [];
   List<Map<String, dynamic>> overdueList = [];
   @override
   void initState() {
     super.initState();
     _fetchReport();
+    _fetchWarnings();
+    _fetchNotifications();
+  }
+
+  void _fetchWarnings() async {
+    try {
+      final warnings = await AnnouncementService.getWarnings();
+
+      if (!mounted) return;
+
+      setState(() {
+        apiWarnings = warnings;
+        apiWarningCount = warnings.length;
+      });
+    } catch (e) {
+      print("Warning fetch error: $e");
+    }
   }
 
   void _fetchReport() {
@@ -63,6 +88,20 @@ class _AdminState extends State<AdminDashboard> {
     });
   }
 
+  void _fetchNotifications() async {
+    try {
+      final data = await NotificationService.getMyNotifications();
+
+      if (!mounted) return;
+
+      setState(() {
+        notificationCount = data.where((n) => n["isRead"] == false).length;
+      });
+    } catch (e) {
+      print("Notification fetch error: $e");
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -78,11 +117,15 @@ class _AdminState extends State<AdminDashboard> {
         ),
         title: Text('Manager Dashboard'),
         actions: [
-          if (overdueCount > 0)
+          if (overdueCount > 0 || apiWarningCount > 0)
             Stack(
               children: [
                 IconButton(
-                  icon: const Icon(Icons.warning, color: Colors.red),
+                  icon: Icon(
+                    Icons.warning,
+                    color: Theme.of(context).colorScheme.error,
+                    size: 20,
+                  ),
                   onPressed: () {
                     Navigator.push(
                       context,
@@ -92,48 +135,72 @@ class _AdminState extends State<AdminDashboard> {
                     );
                   },
                 ),
+
+                Positioned(
+                  right: 8,
+                  top: 8,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.onPrimary,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Text(
+                      (overdueCount + apiWarningCount).toString(),
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          Stack(
+            children: [
+              IconButton(
+                icon: const Icon(
+                  Icons.notifications,
+                  color: Colors.amber,
+                  size: 20,
+                ),
+                onPressed: () async {
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => NotificationPage()),
+                  );
+
+                  // Refresh count when coming back
+                  _fetchNotifications();
+                },
+              ),
+
+              if (notificationCount > 0)
                 Positioned(
                   right: 8,
                   top: 8,
                   child: Container(
                     padding: const EdgeInsets.all(4),
                     decoration: const BoxDecoration(
-                      color: Colors.white,
+                      color: Colors.red,
                       shape: BoxShape.circle,
                     ),
+                    // constraints: const BoxConstraints(
+                    //   minWidth: 18,
+                    //   minHeight: 18,
+                    // ),
                     child: Text(
-                      overdueCount.toString(),
-                      style: const TextStyle(
-                        color: Colors.red,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                      ),
+                      notificationCount.toString(),
+                      style: Theme.of(context).textTheme.titleMedium,
+                      textAlign: TextAlign.center,
                     ),
                   ),
                 ),
-              ],
-            ),
-          IconButton(
-            icon: const Icon(Icons.notifications, color: Colors.amber),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => Settings()),
-              );
-            },
+            ],
           ),
-          // IconButton(
-          //   onPressed: () {
-          //     Navigator.push(
-          //       context,
-          //       MaterialPageRoute(
-          //         builder: (context) =>
-          //             ReportsTable(department: widget.department),
-          //       ),
-          //     );
-          //   },
-          //   icon: const Icon(Icons.bar_chart_rounded),
-          // ),
+
           IconButton(
             icon: const Icon(Icons.settings),
             onPressed: () {
@@ -188,8 +255,9 @@ class _AdminState extends State<AdminDashboard> {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) =>
-                                  ReportsTable(department: widget.department),
+                              builder: (context) => empReportsTable(
+                                department: widget.department,
+                              ),
                             ),
                           );
                         },
@@ -325,23 +393,12 @@ class _AdminState extends State<AdminDashboard> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 15),
-
-                _buildPerformanceSection(data),
-
-                const SizedBox(height: 15),
-
-                Text(
-                  "Monthly Trend",
-                  style: Theme.of(context).textTheme.displaySmall,
-                ),
-                const SizedBox(height: 10),
-
                 MonthlyTrendChart(
                   monthlyData: (data["monthlyTrend"] as List)
                       .map((e) => e as Map<String, dynamic>)
                       .toList(),
                 ),
+                _buildPerformanceSection(data),
               ],
             ),
           );
@@ -354,37 +411,43 @@ class _AdminState extends State<AdminDashboard> {
     final top = data["topPerformer"];
     final low = data["lowPerformer"];
 
+    final showTop = top != null && (top["completed"] ?? 0) > 0;
+    final showLow = low != null && (low["completed"] ?? 0) > 0;
+
+    if (!showTop && !showLow) return const SizedBox.shrink();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        const SizedBox(height: 25),
         Text(
           "Performance Metrics",
           style: Theme.of(context).textTheme.displaySmall,
         ),
         const SizedBox(height: 10),
 
-        // Top Performer Card
-        _advancedPerformerCard(
-          title: "Top Performer",
-          name: top?["user"] ?? "-",
-          completedCount: top?["completed"] ?? 0,
-          totalTasks: top?["totalTasks"] ?? 0,
-          startColor: Theme.of(context).colorScheme.primary,
-          endColor: Theme.of(context).colorScheme.secondary,
-          icon: Icons.emoji_events,
-        ),
-        const SizedBox(height: 5),
+        if (showTop)
+          _advancedPerformerCard(
+            title: "Top Performer",
+            name: top!["user"] ?? "-",
+            completedCount: top["completed"] ?? 0,
+            totalTasks: top["totalTasks"] ?? 0,
+            startColor: Theme.of(context).colorScheme.primary,
+            endColor: Theme.of(context).colorScheme.secondary,
+            icon: Icons.emoji_events,
+          ),
+        if (showTop) const SizedBox(height: 5),
 
-        // Low Performer Card
-        _advancedPerformerCard(
-          title: "Low Performer",
-          name: low?["user"] ?? "-",
-          completedCount: low?["completed"] ?? 0,
-          totalTasks: low?["totalTasks"] ?? 0,
-          startColor: Colors.redAccent,
-          endColor: Colors.red,
-          icon: Icons.thumb_down,
-        ),
+        if (showLow)
+          _advancedPerformerCard(
+            title: "Low Performer",
+            name: low!["user"] ?? "-",
+            completedCount: low["completed"] ?? 0,
+            totalTasks: low["totalTasks"] ?? 0,
+            startColor: Colors.redAccent,
+            endColor: Colors.red,
+            icon: Icons.thumb_down,
+          ),
       ],
     );
   }
@@ -411,20 +474,12 @@ class _AdminState extends State<AdminDashboard> {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        // boxShadow: [
-        //   BoxShadow(
-        //     color: Colors.black.withOpacity(0.05),
-        //     blurRadius: 8,
-        //     offset: const Offset(0, 4),
-        //   ),
-        // ],
       ),
       child: Padding(
         padding: const EdgeInsets.all(10),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Title & Icon Row
             Row(
               children: [
                 Container(
@@ -432,27 +487,25 @@ class _AdminState extends State<AdminDashboard> {
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     gradient: LinearGradient(colors: [startColor, endColor]),
-                    // boxShadow: [
-                    //   BoxShadow(
-                    //     color: endColor,
-                    //     blurRadius: 6,
-                    //     offset: const Offset(0, 2),
-                    //   ),
-                    // ],
                   ),
                   child: Icon(icon, color: Colors.white, size: 15),
                 ),
                 const SizedBox(width: 12),
-                Text(title, style: Theme.of(context).textTheme.headlineLarge),
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: endColor,
+                    fontSize: 14,
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 5),
 
-            // Name
             Text(name, style: Theme.of(context).textTheme.labelMedium),
             const SizedBox(height: 5),
 
-            // Progress bar with gradient
             Stack(
               children: [
                 Container(
@@ -488,13 +541,12 @@ class _AdminState extends State<AdminDashboard> {
             ),
             const SizedBox(height: 5),
 
-            // Task count + percentage badge
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
                   "$completedCount / $totalTasks tasks completed",
-                  style: Theme.of(context).textTheme.labelSmall,
+                  style: Theme.of(context).textTheme.labelMedium,
                 ),
                 Container(
                   padding: const EdgeInsets.symmetric(
@@ -528,8 +580,6 @@ class _AdminState extends State<AdminDashboard> {
     required String title,
     required VoidCallback onTap,
   }) {
-    final theme = Theme.of(context);
-
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       child: Material(
@@ -549,11 +599,7 @@ class _AdminState extends State<AdminDashboard> {
                     style: Theme.of(context).textTheme.headlineMedium,
                   ),
                 ),
-                Icon(
-                  Icons.arrow_forward_ios,
-                  size: 14,
-                  color: theme.colorScheme.onSurface.withOpacity(0.5),
-                ),
+                Icon(Icons.arrow_forward_ios),
               ],
             ),
           ),
@@ -633,13 +679,25 @@ class _AdminState extends State<AdminDashboard> {
           ),
           _buildDrawerItem(
             context,
-            icon: Icons.history_toggle_off_rounded,
+            icon: Icons.message,
             title: "Anouncements",
             onTap: () {
               Navigator.pop(context);
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => Anounce()),
+                MaterialPageRoute(builder: (_) => ManagerAnounce()),
+              );
+            },
+          ),
+            _buildDrawerItem(
+            context,
+            icon:  Icons.access_time_sharp,
+            title: "Worklog",
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => Staffworklog()),
               );
             },
           ),

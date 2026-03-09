@@ -4,18 +4,19 @@ import 'package:staff_work_track/core/widgets/buttons.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
 import 'package:staff_work_track/services/reports_service.dart';
 import 'package:staff_work_track/utils/TaskUtils.dart';
+import 'package:staff_work_track/utils/app_helper.dart';
 
-class empReportsTable extends StatefulWidget {
+class Reportsstaff extends StatefulWidget {
   final int? userId;
   final String? department;
 
-  const empReportsTable({super.key, this.userId, this.department});
+  const Reportsstaff({super.key, this.userId, this.department});
 
   @override
-  State<empReportsTable> createState() => _DeadlineReportsTabState();
+  State<Reportsstaff> createState() => _DeadlineReportsTabState();
 }
 
-class _DeadlineReportsTabState extends State<empReportsTable> {
+class _DeadlineReportsTabState extends State<Reportsstaff> {
   final ReportsService _service = ReportsService();
   bool _isLoading = false;
   List<ReportTask> allTasks = [];
@@ -77,10 +78,8 @@ class _DeadlineReportsTabState extends State<empReportsTable> {
 
         // 🔥 DATE FILTER
         if (startDate != null && endDate != null) {
-          if (task.createdAt == null) return false;
-
-          if (task.createdAt!.isBefore(startDate!) ||
-              task.createdAt!.isAfter(endDate!)) {
+          if (task.createdAt.isBefore(startDate!) ||
+              task.createdAt.isAfter(endDate!)) {
             return false;
           }
         }
@@ -99,7 +98,6 @@ class _DeadlineReportsTabState extends State<empReportsTable> {
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text("Reports Table"),
-
         actions: [
           IconButton(
             icon: const Icon(Icons.filter_alt),
@@ -237,23 +235,31 @@ class _DeadlineReportsTabState extends State<empReportsTable> {
                                       Theme.of(context).colorScheme.primary,
                                     ),
                                     columns: const [
-                                      DataColumn(label: Text("User")),
-
+                                      // DataColumn(label: Text("User")),
+                                      // DataColumn(label: Text("Department")),
                                       DataColumn(label: Text("Task")),
-
+                                      DataColumn(label: Text("Assigner")),
                                       DataColumn(label: Text("Status")),
                                       DataColumn(label: Text("Priority")),
-
+                                      DataColumn(label: Text("Members")),
                                       DataColumn(label: Text("Start Date")),
                                       DataColumn(label: Text("Due Date")),
+                                      DataColumn(label: Text("Completed Date")),
+                                      DataColumn(label: Text("Overdue")),
                                     ],
                                     rows: filteredTasks.map((task) {
                                       return DataRow(
                                         cells: [
-                                          DataCell(Text(task.name ?? "")),
-
-                                          DataCell(Text(task.task ?? "")),
-
+                                          // DataCell(Text(task.name)),
+                                          // DataCell(Text(task.department)),
+                                          DataCell(Text(task.task)),
+                                          DataCell(
+                                            Text(
+                                              AppHelpers.extractName(
+                                                task.assignBy,
+                                              ),
+                                            ),
+                                          ),
                                           DataCell(
                                             Text(
                                               task.status,
@@ -279,21 +285,44 @@ class _DeadlineReportsTabState extends State<empReportsTable> {
                                               ),
                                             ),
                                           ),
-
+                                          DataCell(
+                                            Text(task.members.toString()),
+                                          ),
                                           DataCell(
                                             Text(
-                                              task.createdAt?.toString().split(
-                                                    " ",
-                                                  )[0] ??
-                                                  "",
+                                              task.createdAt.toString().split(
+                                                " ",
+                                              )[0],
                                             ),
                                           ),
                                           DataCell(
                                             Text(
-                                              task.dueDate?.toString().split(
-                                                    " ",
-                                                  )[0] ??
-                                                  "",
+                                              task.dueDate.toString().split(
+                                                " ",
+                                              )[0],
+                                            ),
+                                          ),
+                                          DataCell(
+                                            Text(
+                                              task.status == "completed"
+                                                  ? task.completedDate
+                                                            ?.toString()
+                                                            .split(" ")[0] ??
+                                                        "-"
+                                                  : "-",
+                                            ),
+                                          ),
+                                          DataCell(
+                                            Text(
+                                              task.isOverdue == true
+                                                  ? "Yes"
+                                                  : "No",
+                                              style: TextStyle(
+                                                color: task.isOverdue == true
+                                                    ? Colors.red
+                                                    : Colors.green,
+                                                fontWeight: FontWeight.bold,
+                                              ),
                                             ),
                                           ),
                                         ],

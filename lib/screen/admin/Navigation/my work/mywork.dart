@@ -66,16 +66,15 @@ class _MyworkState extends State<Mywork> {
         children: [
           SizedBox(height: 50),
           TabBar(
-            
             indicatorSize: TabBarIndicatorSize.tab,
             indicatorPadding: const EdgeInsets.all(10),
             indicator: BoxDecoration(
-              color: const Color.fromARGB(255, 25, 77, 38),
+              color: Theme.of(context).colorScheme.secondary,
               borderRadius: BorderRadius.circular(30),
             ),
-            labelColor: Colors.white,
-            unselectedLabelColor: Colors.black,
-            labelStyle: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+            labelColor: Theme.of(context).colorScheme.onPrimary,
+            unselectedLabelColor: Theme.of(context).colorScheme.secondary,
+            labelStyle: Theme.of(context).textTheme.headlineMedium,
             tabs: const [
               Tab(text: 'ALL'),
               Tab(text: 'Pending/Pause'),
@@ -96,26 +95,33 @@ class _MyworkState extends State<Mywork> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.end,
                           children: [
-                            SizedBox(height: 5),
-                            if (isSearching)
-                              Expanded(
-                                child: TextField(
-                                  controller: searchController,
-                                  decoration: const InputDecoration(
-                                    hintText: "Search employee...",
-                                    // prefixIcon: Icon(Icons.search),
-                                    border: InputBorder.none,
-                                    enabledBorder: InputBorder.none,
-                                    focusedBorder: InputBorder.none,
-                                  ),
-                                  onChanged: (_) => setState(() {}),
-                                ),
-                              ),
-                    
+                            Expanded(
+                              child: isSearching
+                                  ? TextField(
+                                      controller: searchController,
+                                      decoration: InputDecoration(
+                                        hintText: "Search Task",
+                                        hintStyle: Theme.of(
+                                          context,
+                                        ).textTheme.headlineSmall,
+                                        // prefixIcon: Icon(Icons.search),
+                                        border: InputBorder.none,
+                                        enabledBorder: InputBorder.none,
+                                        focusedBorder: InputBorder.none,
+                                      ),
+                                      onChanged: (_) => setState(() {}),
+                                    )
+                                  : Text(
+                                      "My Task List",
+                                      style: Theme.of(
+                                        context,
+                                      ).textTheme.displaySmall,
+                                    ),
+                            ),
+
                             IconButton(
                               icon: Icon(
                                 isSearching ? Icons.close : Icons.search,
-                                color: const Color.fromARGB(255, 25, 77, 38),
                               ),
                               onPressed: () {
                                 setState(() {
@@ -134,22 +140,25 @@ class _MyworkState extends State<Mywork> {
                                   ),
                                 );
                               },
-                              child: const Chip(
-                                backgroundColor: Color.fromARGB(255, 25, 77, 38),
+                              child: Chip(
+                                backgroundColor: Theme.of(
+                                  context,
+                                ).colorScheme.secondary,
                                 label: Text(
                                   "Add Task",
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
-                                  ),
+                                  style: Theme.of(
+                                    context,
+                                  ).textTheme.titleMedium,
                                 ),
                               ),
                             ),
                           ],
                         ),
                         SizedBox(height: 10),
-                        Alltasklist(adminId: adminId!, searchQuery: searchController.text),
+                        Alltasklist(
+                          adminId: adminId!,
+                          searchQuery: searchController.text,
+                        ),
                       ],
                     ),
                   ),

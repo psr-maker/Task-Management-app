@@ -53,7 +53,7 @@ class _EmployeeListState extends State<EmployeeList> {
     });
   }
 
-  void _toggleSelection(int userId) { 
+  void _toggleSelection(int userId) {
     setState(() {
       if (selectedEmpIds.contains(userId)) {
         selectedEmpIds.remove(userId);
@@ -69,129 +69,125 @@ class _EmployeeListState extends State<EmployeeList> {
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<List<UserModel>>(
-      future: employeesFuture,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: RotatingFlower());
-        }
-
-        if (snapshot.hasError) {
-          return Center(
-            child: Text(
-              snapshot.error.toString(),
-              style: const TextStyle(color: Colors.red),
-            ),
-          );
-        }
-
-        if (!snapshot.hasData || snapshot.data!.isEmpty) {
-          return const Center(child: Text("No Employees Found"));
-        }
-
-        final employees = snapshot.data!;
-
-        final filteredEmployees = employees.where((emp) {
-          // final query = widget.searchQuery.trim().toLowerCase();
-          final query = searchController.text.trim().toLowerCase().isNotEmpty
-              ? searchController.text.toLowerCase()
-              : widget.searchQuery;
-
-          if (query.isEmpty) return true;
-
-          return emp.name.toLowerCase().contains(query) ||
-              emp.email.toLowerCase().contains(query) ||
-              emp.department.toLowerCase().contains(query);
-        }).toList();
-
-        return SingleChildScrollView(
-          scrollDirection: Axis.vertical,
-          child: Padding(
-            padding: const EdgeInsets.all(15),
-            child: Column(
+    return Padding(
+      padding: const EdgeInsets.all(10),
+      child: Column(
+        children: [
+          if (isAdmin)
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                if (isAdmin)
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      Expanded(
-                        child: isSearching
-                            ? TextField(
-                                controller: searchController,
-                                decoration: InputDecoration(
-                                  hintText: "Search employee...",
-                                  hintStyle: Theme.of(
-                                    context,
-                                  ).textTheme.bodyMedium,
-                                  // prefixIcon: Icon(Icons.search),
-                                  border: InputBorder.none,
-                                  enabledBorder: InputBorder.none,
-                                  focusedBorder: InputBorder.none,
-                                ),
-                                onChanged: (_) => setState(() {}),
-                              )
-                            : Text(
-                                "Staff List",
-                                style: Theme.of(context).textTheme.displaySmall,
-                              ),
-                      ),
-
-                      IconButton(
-                        icon: Icon(
-                          isSearching ? Icons.close : Icons.search,
-                         
-                        ),
-                        onPressed: () {
-                          setState(() {
-                            isSearching = !isSearching;
-                            searchController.clear();
-                          });
-                        },
-                      ),
-
-                      GestureDetector(
-                        onTap: () async {
-                          if (selectedEmpIds.isNotEmpty) {
-                            Navigator.push(
+                Expanded(
+                  child: isSearching
+                      ? TextField(
+                          controller: searchController,
+                          decoration: InputDecoration(
+                            hintText: "Search employee",
+                            hintStyle: Theme.of(
                               context,
-                              MaterialPageRoute(
-                                builder: (_) => Createtask(
-                                  assignedToIds: selectedEmpIds.toList(),
-                                ),
-                              ),
-                            );
-                          } else {
-                            final result = await Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => CreateUsers(role: selectedRole),
-                              ),
-                            );
-                            if (result == true) {
-                              setState(() {
-                                employeesFuture =
-                                    AdminService.getEmployeesByDepartment(
-                                      widget.department,
-                                    );
-                              });
-                            }
-                          }
-                        },
+                            ).textTheme.headlineSmall,
 
-                        child:   Chip(
-                         backgroundColor: const Color.fromARGB(255, 25, 77, 38),
-                        label: Text(
-                          selectedEmpIds.isNotEmpty
-                              ? "Add Task"
-                              : "Staff +",
-                          style: Theme.of(context).textTheme.titleMedium,
+                            border: InputBorder.none,
+                            enabledBorder: InputBorder.none,
+                            focusedBorder: InputBorder.none,
+                          ),
+                          onChanged: (_) => setState(() {}),
+                        )
+                      : Text(
+                          "Staff List",
+                          style: Theme.of(context).textTheme.displaySmall,
                         ),
-                      ),
-                      ),
-                    ],
+                ),
+
+                IconButton(
+                  icon: Icon(isSearching ? Icons.close : Icons.search),
+                  onPressed: () {
+                    setState(() {
+                      isSearching = !isSearching;
+                      searchController.clear();
+                    });
+                  },
+                ),
+
+                GestureDetector(
+                  onTap: () async {
+                    if (selectedEmpIds.isNotEmpty) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => Createtask(
+                            assignedToIds: selectedEmpIds.toList(),
+                          ),
+                        ),
+                      );
+                    } else {
+                      final result = await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => CreateUsers(role: selectedRole),
+                        ),
+                      );
+                      if (result == true) {
+                        setState(() {
+                          employeesFuture =
+                              AdminService.getEmployeesByDepartment(
+                                widget.department,
+                              );
+                        });
+                      }
+                    }
+                  },
+
+                  child: Chip(
+                    backgroundColor: Theme.of(context).colorScheme.secondary,
+                    label: Text(
+                      selectedEmpIds.isNotEmpty ? "Add Task" : "Staff +",
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
                   ),
+                ),
+              ],
+            ),
+          SizedBox(height: 10),
+          FutureBuilder<List<UserModel>>(
+            future: employeesFuture,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: RotatingFlower());
+              }
 
-                ListView.builder(
+              if (snapshot.hasError) {
+                return Center(
+                  child: Text(
+                    snapshot.error.toString(),
+                    style: const TextStyle(color: Colors.red),
+                  ),
+                );
+              }
+
+              if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                return const Center(child: Text("No Employees Found"));
+              }
+
+              final employees = snapshot.data!;
+
+              final filteredEmployees = employees.where((emp) {
+                // final query = widget.searchQuery.trim().toLowerCase();
+                final query =
+                    searchController.text.trim().toLowerCase().isNotEmpty
+                    ? searchController.text.toLowerCase()
+                    : widget.searchQuery;
+
+                if (query.isEmpty) return true;
+
+                return emp.name.toLowerCase().contains(query) ||
+                    emp.email.toLowerCase().contains(query) ||
+                    emp.department.toLowerCase().contains(query);
+              }).toList();
+
+              return SingleChildScrollView(
+                scrollDirection: Axis.vertical,
+                child: ListView.builder(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
 
@@ -202,7 +198,7 @@ class _EmployeeListState extends State<EmployeeList> {
                     final isSelected = selectedEmpIds.contains(emp.userId);
 
                     return Card(
-                      color: const Color.fromARGB(255, 134, 170, 136),
+                      color:  Theme.of(context).colorScheme.background,
                       elevation: 2,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -213,45 +209,32 @@ class _EmployeeListState extends State<EmployeeList> {
                         leading: isSelectionMode
                             ? Checkbox(
                                 value: isSelected,
-                                activeColor: const Color.fromARGB(
-                                  255,
-                                  25,
-                                  77,
-                                  38,
-                                ),
+                                activeColor:  Theme.of(context).colorScheme.secondary,
                                 onChanged: (_) => _toggleSelection(emp.userId),
                               )
                             : CircleAvatar(
-                                backgroundColor: const Color.fromARGB(
-                                  255,
-                                  25,
-                                  77,
-                                  38,
-                                ),
+                                backgroundColor: Theme.of(context).colorScheme.secondary,
                                 child: Text(
                                   emp.name.isNotEmpty
                                       ? emp.name[0].toUpperCase()
                                       : "?",
-                                  style: const TextStyle(color: Colors.white),
+                                   style: Theme.of(context).textTheme.labelLarge,
                                 ),
                               ),
 
                         title: Text(
                           emp.name,
-                          style: Theme.of(context).textTheme.labelLarge,
+                          style: Theme.of(context).textTheme.labelMedium,
                         ),
 
                         subtitle: Text(
                           emp.email,
-                           style: Theme.of(context).textTheme.titleMedium,
+                          style: Theme.of(context).textTheme.labelMedium,
                         ),
 
                         trailing: isSelectionMode
                             ? null
-                            : Icon(
-                                Icons.arrow_forward_ios,
-                                
-                              ),
+                            : Icon(Icons.arrow_forward_ios),
 
                         onTap: () {
                           if (isSelectionMode) {
@@ -269,11 +252,11 @@ class _EmployeeListState extends State<EmployeeList> {
                     );
                   },
                 ),
-              ],
-            ),
+              );
+            },
           ),
-        );
-      },
+        ],
+      ),
     );
   }
 }

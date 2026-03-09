@@ -69,10 +69,8 @@ class AdmintabState extends State<Admintab> {
                           controller: searchController,
                           decoration: InputDecoration(
                             hintText: "Search Manager...",
-                              hintStyle: Theme.of(
-                                    context,
-                                  ).textTheme.bodyMedium,
-                               
+                            hintStyle: Theme.of(context).textTheme.bodyMedium,
+
                             // prefixIcon: Icon(Icons.search),
                             border: InputBorder.none,
                             enabledBorder: InputBorder.none,
@@ -90,10 +88,7 @@ class AdmintabState extends State<Admintab> {
                 Row(
                   children: [
                     IconButton(
-                      icon: Icon(
-                        isSearching ? Icons.close : Icons.search,
-                    
-                      ),
+                      icon: Icon(isSearching ? Icons.close : Icons.search),
                       onPressed: () {
                         setState(() {
                           isSearching = !isSearching;
@@ -103,7 +98,6 @@ class AdmintabState extends State<Admintab> {
                       },
                     ),
                     GestureDetector(
-                      
                       onTap: () async {
                         if (selectedAdminIds.isNotEmpty) {
                           await Navigator.push(
@@ -137,7 +131,6 @@ class AdmintabState extends State<Admintab> {
                       },
 
                       child: Chip(
-                         backgroundColor: const Color.fromARGB(255, 25, 77, 38),
                         label: Text(
                           selectedAdminIds.isNotEmpty
                               ? "Add Task"
@@ -170,7 +163,7 @@ class AdmintabState extends State<Admintab> {
                       itemBuilder: (context, index) {
                         final admin = admins[index];
                         return GestureDetector(
-                          onLongPress: () { 
+                          onLongPress: () {
                             setState(() {
                               isSelectionMode = true;
                               selectedAdminIds.add(admin.userId);
@@ -180,7 +173,7 @@ class AdmintabState extends State<Admintab> {
                             margin: const EdgeInsets.only(bottom: 14),
                             decoration: BoxDecoration(
                               borderRadius: BorderRadius.circular(16),
-                              color: const Color.fromARGB(255, 134, 170, 136),
+                              color: Theme.of(context).colorScheme.background,
                             ),
                             child: Padding(
                               padding: const EdgeInsets.all(10),
@@ -191,12 +184,9 @@ class AdmintabState extends State<Admintab> {
                                       value: selectedAdminIds.contains(
                                         admin.userId,
                                       ),
-                                      activeColor: const Color.fromARGB(
-                                            255,
-                                            50,
-                                            99,
-                                            49,
-                                          ),
+                                      activeColor: Theme.of(
+                                        context,
+                                      ).colorScheme.secondary,
                                       onChanged: (bool? value) {
                                         setState(() {
                                           if (value == true) {
@@ -216,15 +206,14 @@ class AdmintabState extends State<Admintab> {
                                   // ✅ Existing UI
                                   CircleAvatar(
                                     radius: 18,
-                                    backgroundColor: const Color.fromARGB(
-                                            255,
-                                            50,
-                                            99,
-                                            49,
-                                          ),
+                                    backgroundColor: Theme.of(
+                                      context,
+                                    ).colorScheme.secondary,
                                     child: Text(
                                       admin.name[0].toUpperCase(),
-                                      style: Theme.of(context).textTheme.labelLarge,
+                                      style: Theme.of(
+                                        context,
+                                      ).textTheme.labelLarge,
                                     ),
                                   ),
                                   const SizedBox(width: 15),
@@ -235,12 +224,16 @@ class AdmintabState extends State<Admintab> {
                                       children: [
                                         Text(
                                           admin.name,
-                                          style: Theme.of(context).textTheme.labelLarge,
+                                          style: Theme.of(
+                                            context,
+                                          ).textTheme.labelMedium,
                                         ),
-                                        const SizedBox(height: 3),
+                                        const SizedBox(height: 5),
                                         Text(
                                           admin.department,
-                                          style: Theme.of(context).textTheme.titleMedium,
+                                          style: Theme.of(
+                                            context,
+                                          ).textTheme.labelSmall,
                                         ),
                                       ],
                                     ),
@@ -261,11 +254,7 @@ class AdmintabState extends State<Admintab> {
                                     },
                                     child: Padding(
                                       padding: const EdgeInsets.all(8.0),
-                                      child: Icon(
-                                        Icons.arrow_forward_ios,
-                                        size: 16,
-                                        color:Color.fromARGB(255, 25, 77, 38),
-                                      ),
+                                      child: Icon(Icons.arrow_forward_ios),
                                     ),
                                   ),
                                 ],

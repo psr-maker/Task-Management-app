@@ -140,10 +140,11 @@ class TaskCard extends StatelessWidget {
                     const SizedBox(width: 6),
                     Text(
                       task["priority"] ?? "",
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 11,
-                      ),
+                       style: theme.textTheme.bodySmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: priorityColor,
+                      fontSize: 11,
+                    ),
                     ),
                   ],
                 ),

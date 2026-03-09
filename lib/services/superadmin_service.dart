@@ -244,20 +244,23 @@ class SuperAdminService {
     }
   }
 
-  static Future<void> deleteUser(int userId) async {
-    final token = await AuthService.getToken();
-    final response = await http.delete(
-      Uri.parse('$baseUrl/Director/user-delete/$userId'),
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": "Bearer $token",
-      },
-    );
+ static Future<bool> deleteUser(int userId) async {
+  final token = await AuthService.getToken();
 
-    if (response.statusCode != 200) {
-      throw Exception("Failed to delete user");
-    }
+  final response = await http.delete(
+    Uri.parse('$baseUrl/Director/user-delete/$userId'),
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": "Bearer $token",
+    },
+  );
+
+  if (response.statusCode == 200) {
+    return true;
+  } else {
+    return false;
   }
+}
 
   static Future<List<AuditLogModel>> getAuditLogs() async {
     // final token = await AuthService.getToken();
@@ -279,10 +282,10 @@ class SuperAdminService {
     }
   }
 
-
-
   Future<List<Department>> getDepartments() async {
-    final response = await http.get(Uri.parse("$baseUrl/Director/getdepartments"));
+    final response = await http.get(
+      Uri.parse("$baseUrl/Director/getdepartments"),
+    );
 
     if (response.statusCode == 200) {
       List jsonData = json.decode(response.body);
@@ -293,30 +296,26 @@ class SuperAdminService {
   }
 
   Future<Department> addDepartment(Department department) async {
-  final response = await http.post(
-    Uri.parse("$baseUrl/Director/adddepartment"),
-    headers: {
-      'Content-Type': 'application/json',
-      // add Authorization if your API requires it
-    },
-    body: json.encode(department.toJson()),
-  );
+    final response = await http.post(
+      Uri.parse("$baseUrl/Director/adddepartment"),
+      headers: {
+        'Content-Type': 'application/json',
+        // add Authorization if your API requires it
+      },
+      body: json.encode(department.toJson()),
+    );
 
-  print("POST JSON: ${json.encode(department.toJson())}");
-  print("Response status: ${response.statusCode}, body: ${response.body}");
+    print("POST JSON: ${json.encode(department.toJson())}");
+    print("Response status: ${response.statusCode}, body: ${response.body}");
 
-  if (response.statusCode == 201) {
-    return Department.fromJson(json.decode(response.body));
-  } else if (response.statusCode == 400) {
-    // Show validation errors
-    final error = jsonDecode(response.body);
-    throw Exception("Validation error: $error");
-  } else {
-    throw Exception('Failed to add department');
+    if (response.statusCode == 201) {
+      return Department.fromJson(json.decode(response.body));
+    } else if (response.statusCode == 400) {
+      // Show validation errors
+      final error = jsonDecode(response.body);
+      throw Exception("Validation error: $error");
+    } else {
+      throw Exception('Failed to add department');
+    }
   }
 }
-
-
-}
-
-

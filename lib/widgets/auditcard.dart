@@ -1,50 +1,10 @@
-// import 'package:flutter/material.dart';
-
-// class GlassAuditCard extends StatelessWidget {
-//   final Color color;
-//   final Widget child;
-
-//   const GlassAuditCard({
-//     super.key,
-//     required this.color,
-//     required this.child,
-//   });
-
-//   @override
-//   Widget build(BuildContext context) {
-//     return ClipRRect(
-//       borderRadius: BorderRadius.circular(18),
-//       child: Container(
-//         decoration: BoxDecoration(
-//           gradient: LinearGradient(
-//             colors: [
-//               color.withOpacity(0.25),
-//               color.withOpacity(0.05),
-//             ],
-//           ),
-//           border: Border.all(
-//             color: color.withOpacity(0.4),
-//           ),
-//         ),
-//         child: child,
-//       ),
-//     );
-//   }
-// }
-
-
-
-
 import 'package:flutter/material.dart';
+
 class AuditCard extends StatelessWidget {
   final Color color;
   final Widget child;
 
-  const AuditCard({
-    super.key,
-    required this.color,
-    required this.child,
-  });
+  const AuditCard({super.key, required this.color, required this.child});
 
   @override
   Widget build(BuildContext context) {
@@ -67,7 +27,7 @@ class AuditCard extends StatelessWidget {
             // LEFT COLOR STRIPE
             Container(
               width: 6,
-             
+
               decoration: BoxDecoration(
                 color: color,
                 borderRadius: const BorderRadius.only(
@@ -76,7 +36,7 @@ class AuditCard extends StatelessWidget {
                 ),
               ),
             ),
-        
+
             Expanded(child: child),
           ],
         ),
@@ -84,6 +44,3 @@ class AuditCard extends StatelessWidget {
     );
   }
 }
-
-
-

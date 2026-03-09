@@ -28,24 +28,54 @@ class _MonthlyTrendChartState extends State<MonthlyTrendChart> {
       ].reduce((a, b) => a > b ? a : b);
     }
 
-    return (maxY / 5).ceilToDouble();
+    if (maxY <= 0) return 1;
+
+    final interval = (maxY / 5).ceilToDouble();
+
+    return interval <= 0 ? 1 : interval;
+  }
+
+  double _getSafeMaxY() {
+    if (widget.monthlyData.isEmpty) return 5;
+
+    double maxY = 0;
+
+    for (var data in widget.monthlyData) {
+      maxY = [
+        maxY,
+        (data["completed"] ?? 0).toDouble(),
+        (data["pending"] ?? 0).toDouble(),
+        (data["overdue"] ?? 0).toDouble(),
+      ].reduce((a, b) => a > b ? a : b);
+    }
+
+    return maxY <= 0 ? 5 : maxY + 2;
   }
 
   @override
   Widget build(BuildContext context) {
+    final hasData = widget.monthlyData.any((data) {
+      return (data["completed"] ?? 0) > 0 ||
+          (data["pending"] ?? 0) > 0 ||
+          (data["overdue"] ?? 0) > 0;
+    });
+
+    if (!hasData) {
+      return const SizedBox.shrink();
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        /// Segmented Status Selector
-        /// Segmented Status Selector - Advanced Version
-        /// Advanced Status Selector with Status Colors
+        const SizedBox(height: 15),
+        Text("Monthly Trend", style: Theme.of(context).textTheme.displaySmall),
+        const SizedBox(height: 15),
         SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           child: Row(
             children: ["All", "Completed", "Pending", "Overdue"].map((status) {
               final bool isSelected = selectedStatus == status;
 
-              // Assign colors based on status
               Color statusColor;
               switch (status) {
                 case "Completed":
@@ -58,7 +88,7 @@ class _MonthlyTrendChartState extends State<MonthlyTrendChart> {
                   statusColor = Colors.red;
                   break;
                 default:
-                  statusColor = Colors.blue; // "All" or unknown
+                  statusColor = Colors.blue;
               }
 
               return GestureDetector(
@@ -116,7 +146,6 @@ class _MonthlyTrendChartState extends State<MonthlyTrendChart> {
 
         const SizedBox(height: 30),
 
-        /// Chart
         SizedBox(
           height: 230,
           child: LineChart(
@@ -126,10 +155,10 @@ class _MonthlyTrendChartState extends State<MonthlyTrendChart> {
                   ? 0
                   : widget.monthlyData.length.toDouble() - 1,
               minY: 0,
+              maxY: _getSafeMaxY(),
               gridData: FlGridData(show: false),
               borderData: FlBorderData(show: false),
 
-              /// Axis Titles
               titlesData: FlTitlesData(
                 leftTitles: AxisTitles(
                   sideTitles: SideTitles(
@@ -197,24 +226,31 @@ class _MonthlyTrendChartState extends State<MonthlyTrendChart> {
                 ),
               ),
 
-              /// Dynamic Lines
               lineBarsData: _buildWaveLines(),
-
-              /// Tooltip
               lineTouchData: LineTouchData(
+                handleBuiltInTouches: true,
                 touchTooltipData: LineTouchTooltipData(
-                  //  tooltipRoundedRadius: 8,
+                  getTooltipColor: (spot) => Colors.black87,
                   getTooltipItems: (spots) {
                     return spots.map((spot) {
-                      final data = widget.monthlyData[spot.x.toInt()];
+                      final index = spot.x.toInt();
+                      final data = widget.monthlyData[index];
+
+                      String label = "";
+                      Color color =
+                          spot.bar.gradient?.colors.first ?? Colors.white;
+
+                      if (spot.barIndex == 0) {
+                        label = "Completed: ${data['completed'] ?? 0}";
+                      } else if (spot.barIndex == 1) {
+                        label = "Pending: ${data['pending'] ?? 0}";
+                      } else if (spot.barIndex == 2) {
+                        label = "Overdue: ${data['overdue'] ?? 0}";
+                      }
+
                       return LineTooltipItem(
-                        "Completed: ${data['completed'] ?? 0}\n"
-                        "Pending: ${data['pending'] ?? 0}\n"
-                        "Overdue: ${data['overdue'] ?? 0}",
-                        const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w500,
-                        ),
+                        "$label\n",
+                        TextStyle(color: color, fontWeight: FontWeight.w600),
                       );
                     }).toList();
                   },
@@ -227,7 +263,6 @@ class _MonthlyTrendChartState extends State<MonthlyTrendChart> {
     );
   }
 
-  /// Build Multiple Lines Based On Selected Status
   List<LineChartBarData> _buildWaveLines() {
     List<LineChartBarData> lines = [];
 
@@ -256,7 +291,6 @@ class _MonthlyTrendChartState extends State<MonthlyTrendChart> {
     return lines;
   }
 
-  /// Create Single Wave Line
   LineChartBarData _createWaveLine(String key, Color color) {
     return LineChartBarData(
       isCurved: true,
@@ -287,108 +321,6 @@ class _MonthlyTrendChartState extends State<MonthlyTrendChart> {
         final value = (widget.monthlyData[i][key] ?? 0).toDouble();
         return FlSpot(i.toDouble(), value);
       }),
-    );
-  }
-}
-
-class MonthlyTrendCharts extends StatelessWidget {
-  final List<Map<String, dynamic>> monthlyTrend;
-
-  const MonthlyTrendCharts({super.key, required this.monthlyTrend});
-
-  static const List<String> _months = [
-    "Jan",
-    "Feb",
-    "Mar",
-    "Apr",
-    "May",
-    "Jun",
-    "Jul",
-    "Aug",
-    "Sep",
-    "Oct",
-    "Nov",
-    "Dec",
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 180,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: List.generate(monthlyTrend.length, (index) {
-          final data = monthlyTrend[index];
-
-          final completed = (data['completed'] ?? 0).toDouble();
-          final pending = (data['pending'] ?? 0).toDouble();
-          final notStarted = (data['notStarted'] ?? 0).toDouble();
-          final overdue = (data['overdue'] ?? 0).toDouble();
-          final inprogress = (data['inProgress'] ?? 0).toDouble();
-          return _buildMonthColumn(
-            month: _months[index],
-            completed: completed,
-            pending: pending,
-            notStarted: notStarted,
-            overdue: overdue,
-            inprogress: inprogress,
-          );
-        }),
-      ),
-    );
-  }
-
-  Widget _buildMonthColumn({
-    required String month,
-    required double completed,
-    required double pending,
-    required double notStarted,
-    required double overdue,
-    required double inprogress,
-  }) {
-    List<Widget> items = [];
-
-    void addBar(double value, Color color) {
-      if (value > 0) {
-        items.add(_buildBar(value, color));
-        items.add(const SizedBox(height: 4));
-        items.add(
-          Text(value.toInt().toString(), style: const TextStyle(fontSize: 11)),
-        );
-        items.add(const SizedBox(height: 14));
-      }
-    }
-
-    addBar(completed, Colors.green);
-    addBar(pending, Colors.orange);
-    addBar(notStarted, Colors.grey);
-    addBar(inprogress, Colors.deepOrange);
-    addBar(overdue, Colors.red);
-
-    if (items.isNotEmpty) {
-      items.removeLast();
-    }
-
-    items.add(const SizedBox(height: 12));
-    items.add(
-      Text(
-        month,
-        style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 12),
-      ),
-    );
-
-    return Column(mainAxisAlignment: MainAxisAlignment.end, children: items);
-  }
-
-  Widget _buildBar(double value, Color color) {
-    return Container(
-      width: 40,
-      height: 10,
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(6),
-      ),
     );
   }
 }

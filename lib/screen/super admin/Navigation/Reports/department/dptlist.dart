@@ -12,11 +12,15 @@ class DepartmentListPage extends StatefulWidget {
 
 class _DepartmentListPageState extends State<DepartmentListPage> {
   late Future<List<String>> departmentsFuture;
-
+  final TextEditingController searchController = TextEditingController();
+  List<String> allDepartments = [];
   @override
   void initState() {
     super.initState();
-    departmentsFuture = ReportsService.getAllDepartments();
+    departmentsFuture = ReportsService.getAllDepartments().then((list) {
+      allDepartments = list;
+      return list;
+    });
   }
 
   @override
@@ -34,40 +38,64 @@ class _DepartmentListPageState extends State<DepartmentListPage> {
 
         final departments = snapshot.data ?? [];
 
-        if (departments.isEmpty) {
+        // Filter based on search text
+        final searchText = searchController.text.toLowerCase();
+        final filteredDepartments = allDepartments
+            .where((dept) => dept.toLowerCase().contains(searchText))
+            .toList();
+
+        if (filteredDepartments.isEmpty) {
           return const Center(child: Text("No Departments Found"));
         }
-
-        return ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: departments.length,
-          itemBuilder: (context, index) {
-            final dept = departments[index];
-
-            return Container(
-              margin: const EdgeInsets.only(bottom: 14),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16),
-                color: const Color.fromARGB(255, 134, 170, 136),
-              ),
-              child: ListTile(
-                leading: const Icon(Icons.apartment),
-                title: Text(
-                  dept,
-                  style: Theme.of(context).textTheme.labelLarge,
+        return Padding(
+          padding: const EdgeInsets.all(10),
+          child: Column(
+            children: [
+              TextField(
+                controller: searchController,
+                decoration: InputDecoration(
+                  hintText: "Search Department...",
+                  hintStyle: Theme.of(context).textTheme.bodyMedium,
+                  border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
                 ),
-                trailing: const Icon(Icons.arrow_forward_ios),
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => DepartmentReportsTab(department: dept),
-                    ),
-                  );
-                },
+                onChanged: (_) => setState(() {}),
               ),
-            );
-          },
+              Expanded(
+                child: ListView.builder(
+                  itemCount: filteredDepartments.length,
+                  itemBuilder: (context, index) {
+                    final dept = filteredDepartments[index];
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 14),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(16),
+                        color: Theme.of(context).colorScheme.background,
+                      ),
+                      child: ListTile(
+                        leading: const Icon(Icons.apartment),
+                        title: Text(
+                          dept,
+                          style: Theme.of(context).textTheme.labelMedium,
+                        ),
+                        trailing: const Icon(Icons.arrow_forward_ios),
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  DepartmentReportsTab(department: dept),
+                            ),
+                          );
+                        },
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
         );
       },
     );

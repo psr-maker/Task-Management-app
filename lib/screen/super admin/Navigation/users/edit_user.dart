@@ -23,6 +23,7 @@ class _EditUserState extends State<EditUser> {
   String? _topMessage;
   bool _isErrorMessage = true;
   bool _showTopMessage = false;
+  List<String> departments = [];
 
   void showTopMessage(String message, {bool isError = true}) {
     setState(() {
@@ -37,21 +38,25 @@ class _EditUserState extends State<EditUser> {
     });
   }
 
-  final List<String> departments = [
-    'HR Department',
-    'Production Department',
-    'R&D Department',
-    'Marketing Department',
-    'Sales Department',
-  ];
-
   @override
   void initState() {
     super.initState();
-
+    _fetchDepartments();
     usernameController = TextEditingController(text: widget.user.name);
     emailController = TextEditingController(text: widget.user.email);
     selectedDepartment = widget.user.department;
+  }
+
+  void _fetchDepartments() async {
+    try {
+      final deptList = await SuperAdminService().getDepartments();
+      setState(() {
+        departments = deptList.map((d) => d.departmentName).toSet().toList();
+      });
+    } catch (e) {
+      debugPrint("Failed to fetch departments: $e");
+      showTopMessage("Failed to load departments", isError: true);
+    }
   }
 
   Future<void> updateUser() async {
@@ -137,7 +142,12 @@ class _EditUserState extends State<EditUser> {
                                 .map(
                                   (d) => DropdownMenuItem(
                                     value: d,
-                                    child: Text(d, style: Theme.of(context).textTheme.headlineSmall),
+                                    child: Text(
+                                      d,
+                                      style: Theme.of(
+                                        context,
+                                      ).textTheme.headlineSmall,
+                                    ),
                                   ),
                                 )
                                 .toList(),

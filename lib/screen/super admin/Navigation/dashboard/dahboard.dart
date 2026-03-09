@@ -1,17 +1,22 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
+import 'package:staff_work_track/Models/warning_model.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/admin_approval.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/drawer/anouncement.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/drawer/auditlog.dart';
+import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/drawer/usersworklog.dart';
+import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/notifi.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/settings/settings.dart';
-import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/warning.dart';
+import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/warnings/warning.dart';
+import 'package:staff_work_track/services/announ_service.dart';
+import 'package:staff_work_track/services/notification_service.dart';
 import 'package:staff_work_track/services/reports_service.dart';
 import 'package:staff_work_track/utils/TaskUtils.dart';
 import 'package:staff_work_track/utils/enum.dart';
 import 'package:staff_work_track/widgets/StatCard.dart';
 import 'package:staff_work_track/widgets/monthlytrend.dart';
-import 'package:staff_work_track/widgets/progressoverview.dart';
+import 'package:staff_work_track/widgets/kpicard.dart';
 
 class SuperAdminDashboard extends StatefulWidget {
   final DateTime? fromDate;
@@ -27,22 +32,16 @@ class _OverallReportsTabState extends State<SuperAdminDashboard> {
   String selectedStatus = "All";
   int overdueCount = 0;
   List<Map<String, dynamic>> overdueList = [];
-
+  int apiWarningCount = 0;
+  List<WarningModel> apiWarnings = [];
+  int notificationCount = 0;
   @override
   void initState() {
     super.initState();
-
     _fetchReport();
+    _fetchWarnings();
+    _fetchNotifications();
   }
-
-  // void _fetchReport() {
-  //   setState(() {
-  //     reportFuture = ReportsService.fetchReport(
-  //       fromDate: widget.fromDate,
-  //       toDate: widget.toDate,
-  //     );
-  //   });
-  // }
 
   void _fetchReport() {
     reportFuture = ReportsService.fetchReport(
@@ -96,6 +95,35 @@ class _OverallReportsTabState extends State<SuperAdminDashboard> {
     return ranked;
   }
 
+  void _fetchWarnings() async {
+    try {
+      final warnings = await AnnouncementService.getWarnings();
+
+      if (!mounted) return;
+
+      setState(() {
+        apiWarnings = warnings;
+        apiWarningCount = warnings.length;
+      });
+    } catch (e) {
+      print("Warning fetch error: $e");
+    }
+  }
+
+  void _fetchNotifications() async {
+    try {
+      final data = await NotificationService.getMyNotifications();
+
+      if (!mounted) return;
+
+      setState(() {
+        notificationCount = data.where((n) => n["isRead"] == false).length;
+      });
+    } catch (e) {
+      print("Notification fetch error: $e");
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -103,11 +131,15 @@ class _OverallReportsTabState extends State<SuperAdminDashboard> {
       appBar: AppBar(
         title: const Text('Director Dashboard'),
         actions: [
-          if (overdueCount > 0)
+          if (overdueCount > 0 || apiWarningCount > 0)
             Stack(
               children: [
                 IconButton(
-                  icon: const Icon(Icons.warning, color: Colors.red, size: 20),
+                  icon: Icon(
+                    Icons.warning,
+                    color: Theme.of(context).colorScheme.error,
+                    size: 20,
+                  ),
                   onPressed: () {
                     Navigator.push(
                       context,
@@ -128,7 +160,7 @@ class _OverallReportsTabState extends State<SuperAdminDashboard> {
                       shape: BoxShape.circle,
                     ),
                     child: Text(
-                      overdueCount.toString(),
+                      (overdueCount + apiWarningCount).toString(),
                       style: const TextStyle(
                         color: Colors.red,
                         fontSize: 10,
@@ -139,19 +171,47 @@ class _OverallReportsTabState extends State<SuperAdminDashboard> {
                 ),
               ],
             ),
-          IconButton(
-            icon: const Icon(
-              Icons.notifications,
-              color: Colors.yellow,
-              size: 20,
-            ),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => Settings()),
-              );
-            },
+          Stack(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.notifications, color: Colors.amber),
+                onPressed: () async {
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => NotificationPage()),
+                  );
+                  _fetchNotifications();
+                },
+              ),
+
+              if (notificationCount > 0)
+                Positioned(
+                  right: 6,
+                  top: 6,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: const BoxDecoration(
+                      color: Colors.red,
+                      shape: BoxShape.circle,
+                    ),
+                    constraints: const BoxConstraints(
+                      minWidth: 18,
+                      minHeight: 18,
+                    ),
+                    child: Text(
+                      notificationCount.toString(),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+            ],
           ),
+
           IconButton(
             icon: const Icon(Icons.settings),
             onPressed: () {
@@ -183,7 +243,7 @@ class _OverallReportsTabState extends State<SuperAdminDashboard> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  "Users Summary",
+                  "Summary",
                   style: Theme.of(context).textTheme.displaySmall,
                 ),
                 const SizedBox(height: 10),
@@ -218,10 +278,7 @@ class _OverallReportsTabState extends State<SuperAdminDashboard> {
                   ],
                 ),
                 const SizedBox(height: 10),
-                Text(
-                  "Task Summary",
-                  style: Theme.of(context).textTheme.displaySmall,
-                ),
+
                 const SizedBox(height: 10),
                 Row(
                   children: [
@@ -302,7 +359,7 @@ class _OverallReportsTabState extends State<SuperAdminDashboard> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 15),
                 Text(
                   "Performance Overview",
                   style: Theme.of(context).textTheme.displaySmall,
@@ -330,7 +387,7 @@ class _OverallReportsTabState extends State<SuperAdminDashboard> {
                     const SizedBox(width: 10),
                     Expanded(
                       child: KpiCircleCard(
-                        title: "Growth",
+                        title: "Task Growth",
                         value: _toDouble(data["growthPercentage"]),
 
                         icon: Icons.trending_up,
@@ -348,12 +405,7 @@ class _OverallReportsTabState extends State<SuperAdminDashboard> {
                 _buildDepartmentChart(departments),
                 const SizedBox(height: 15),
                 _buildDepartmentRanking(departments),
-                const SizedBox(height: 15),
-                Text(
-                  "Monthly Completion Trend",
-                  style: Theme.of(context).textTheme.displaySmall,
-                ),
-                const SizedBox(height: 15),
+              
                 MonthlyTrendChart(
                   monthlyData:
                       (data["monthlyTrend"] as List<dynamic>?)
@@ -369,7 +421,7 @@ class _OverallReportsTabState extends State<SuperAdminDashboard> {
           );
         },
       ),
-    ); 
+    );
   }
 
   Widget _buildDrawer(BuildContext context) {
@@ -402,22 +454,18 @@ class _OverallReportsTabState extends State<SuperAdminDashboard> {
                   ],
                 ),
                 const SizedBox(width: 20),
-                const Column(
+                Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    SizedBox(height: 40),
+                    const SizedBox(height: 40),
                     Text(
                       "Super Admin",
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
+                      style: Theme.of(context).textTheme.bodySmall,
                     ),
-
+                    const SizedBox(height: 5),
                     Text(
                       "Admin Panel",
-                      style: TextStyle(color: Colors.white70, fontSize: 13),
+                      style: Theme.of(context).textTheme.titleMedium,
                     ),
                   ],
                 ),
@@ -428,10 +476,13 @@ class _OverallReportsTabState extends State<SuperAdminDashboard> {
           const SizedBox(height: 10),
 
           ListTile(
-            leading: const Icon(Icons.history),
+            leading: Icon(
+              Icons.history,
+              color: Theme.of(context).colorScheme.secondary,
+            ),
             title: Text(
               "Audit Log",
-              style: Theme.of(context).textTheme.displaySmall,
+              style: Theme.of(context).textTheme.headlineMedium,
             ),
             onTap: () {
               Navigator.pop(context);
@@ -442,16 +493,36 @@ class _OverallReportsTabState extends State<SuperAdminDashboard> {
             },
           ),
           ListTile(
-            leading: const Icon(Icons.speaker_notes_rounded),
+            leading: Icon(
+              Icons.speaker_notes_rounded,
+              color: Theme.of(context).colorScheme.secondary,
+            ),
             title: Text(
               "Anouncements",
-              style: Theme.of(context).textTheme.displaySmall,
+              style: Theme.of(context).textTheme.headlineMedium,
             ),
             onTap: () {
               Navigator.pop(context);
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => Anounce()),
+              );
+            },
+          ),
+          ListTile(
+            leading: Icon(
+              Icons.access_time_sharp,
+              color: Theme.of(context).colorScheme.secondary,
+            ), 
+            title: Text(
+              "Worklog",
+              style: Theme.of(context).textTheme.headlineMedium,
+            ),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => UsersWorklog()),
               );
             },
           ),
@@ -463,30 +534,67 @@ class _OverallReportsTabState extends State<SuperAdminDashboard> {
   Widget _buildDepartmentRanking(List departments) {
     final ranked = _getRankedDepartments(departments);
 
+    final hasPerformance = ranked.any(
+      (dept) => (dept["completionRate"] as double) > 0,
+    );
+
+    if (!hasPerformance) {
+      return Container(
+        padding: const EdgeInsets.symmetric(vertical: 30),
+        alignment: Alignment.center,
+        child: Column(
+          children: const [
+            Icon(Icons.bar_chart, size: 40, color: Colors.grey),
+            SizedBox(height: 10),
+            Text(
+              "No performance data available",
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: Colors.grey,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final topDepartments = ranked
+        .where((dept) => (dept["completionRate"] as double) > 0)
+        .take(3)
+        .toList();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: List.generate(ranked.length, (index) {
-        final dept = ranked[index];
+      children: List.generate(topDepartments.length, (index) {
+        final dept = topDepartments[index];
         final rank = index + 1;
-        final completionRate = (dept["completionRate"] as double);
+        final completionRate = dept["completionRate"] as double;
         final percent = (completionRate * 100).toStringAsFixed(0);
 
         Color rankColor;
         IconData rankIcon;
 
-        if (rank == 1) {
-          rankColor = Colors.amber;
-          rankIcon = Icons.emoji_events;
-        } else if (rank == 2) {
-          rankColor = Colors.grey;
-          rankIcon = Icons.emoji_events;
-        } else if (rank == 3) {
-          rankColor = Colors.brown;
-          rankIcon = Icons.emoji_events;
-        } else {
-          rankColor = Colors.blueGrey;
-          rankIcon = Icons.trending_up;
+        switch (rank) {
+          case 1:
+            rankColor = Colors.amber;
+            rankIcon = Icons.emoji_events;
+            break;
+          case 2:
+            rankColor = Colors.grey;
+            rankIcon = Icons.emoji_events;
+            break;
+          case 3:
+            rankColor = Colors.brown;
+            rankIcon = Icons.emoji_events;
+            break;
+          default:
+            rankColor = Colors.blueGrey;
+            rankIcon = Icons.trending_up;
         }
+
+        final completedTasks = dept["completed"] ?? 0;
+        final totalTasks = dept["total"] ?? 0;
 
         return Container(
           margin: const EdgeInsets.only(bottom: 12),
@@ -497,22 +605,18 @@ class _OverallReportsTabState extends State<SuperAdminDashboard> {
             border: Border.all(color: rankColor.withAlpha(60)),
           ),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 children: [
                   Icon(rankIcon, color: rankColor, size: 22),
                   const SizedBox(width: 10),
-
                   Expanded(
                     child: Text(
-                      dept["department"],
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14,
-                      ),
+                      "${dept["department"]}",
+                      style: Theme.of(context).textTheme.labelMedium,
                     ),
                   ),
-
                   Text(
                     "$percent%",
                     style: TextStyle(
@@ -523,16 +627,18 @@ class _OverallReportsTabState extends State<SuperAdminDashboard> {
                   ),
                 ],
               ),
-
+              const SizedBox(height: 4),
+              Text(
+                "Completed: $completedTasks / $totalTasks tasks",
+                 style: Theme.of(context).textTheme.labelSmall,
+              ),
               const SizedBox(height: 8),
-
-              // Progress Bar
               ClipRRect(
                 borderRadius: BorderRadius.circular(8),
                 child: LinearProgressIndicator(
                   value: completionRate,
                   minHeight: 6,
-                  backgroundColor: Colors.grey.shade200,
+                  backgroundColor: Colors.grey,
                   valueColor: AlwaysStoppedAnimation(rankColor),
                 ),
               ),
@@ -624,10 +730,11 @@ class _OverallReportsTabState extends State<SuperAdminDashboard> {
 
                 return BarTooltipItem(
                   "${dept["department"]}\n\n"
+                  "Total Task: $total\n"
                   "Completed: $completed\n"
                   "Pending: $pending\n"
-                  "Overdue: $overdue\n"
-                  "Total: $total",
+                  "Overdue: $overdue",
+
                   const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.w500,

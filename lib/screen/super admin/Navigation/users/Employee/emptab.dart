@@ -118,14 +118,9 @@ class _EmployeetabState extends State<Employeetab> {
                         }
                       },
                       child: Chip(
-                        backgroundColor: const Color.fromARGB(255, 25, 77, 38),
                         label: Text(
                           selectedempIds.isNotEmpty ? "Add Task" : "Staff +",
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                          ),
+                          style: Theme.of(context).textTheme.titleMedium,
                         ),
                       ),
                     ),
@@ -163,7 +158,7 @@ class _EmployeetabState extends State<Employeetab> {
                             margin: const EdgeInsets.only(bottom: 14),
                             decoration: BoxDecoration(
                               borderRadius: BorderRadius.circular(16),
-                              color: const Color.fromARGB(255, 134, 170, 136),
+                              color: Theme.of(context).colorScheme.background,
                             ),
                             child: Padding(
                               padding: const EdgeInsets.all(10),
@@ -177,12 +172,9 @@ class _EmployeetabState extends State<Employeetab> {
                                           value: selectedempIds.contains(
                                             emp.userId,
                                           ),
-                                          activeColor: const Color.fromARGB(
-                                            255,
-                                            50,
-                                            99,
-                                            49,
-                                          ),
+                                          activeColor: Theme.of(
+                                            context,
+                                          ).colorScheme.secondary,
                                           onChanged: (bool? value) {
                                             setState(() {
                                               if (value == true) {
@@ -200,12 +192,9 @@ class _EmployeetabState extends State<Employeetab> {
                                         ),
                                       CircleAvatar(
                                         radius: 18,
-                                        backgroundColor: const Color.fromARGB(
-                                          255,
-                                          25,
-                                          77,
-                                          38,
-                                        ),
+                                        backgroundColor: Theme.of(
+                                          context,
+                                        ).colorScheme.secondary,
                                         child: Text(
                                           emp.name[0].toUpperCase(),
                                           style: Theme.of(
@@ -224,7 +213,7 @@ class _EmployeetabState extends State<Employeetab> {
                                               emp.name,
                                               style: Theme.of(
                                                 context,
-                                              ).textTheme.labelLarge,
+                                              ).textTheme.labelMedium,
                                             ),
                                             const SizedBox(height: 5),
 
@@ -232,7 +221,7 @@ class _EmployeetabState extends State<Employeetab> {
                                               emp.department,
                                               style: Theme.of(
                                                 context,
-                                              ).textTheme.titleMedium,
+                                              ).textTheme.labelSmall,
                                             ),
                                             const SizedBox(height: 5),
 
@@ -242,7 +231,7 @@ class _EmployeetabState extends State<Employeetab> {
                                                   "Creator - ",
                                                   style: Theme.of(
                                                     context,
-                                                  ).textTheme.titleMedium,
+                                                  ).textTheme.labelSmall,
                                                 ),
                                                 Text(
                                                   emp.createdBy
@@ -253,11 +242,9 @@ class _EmployeetabState extends State<Employeetab> {
                                                           '-',
                                                         )[1]
                                                       : emp.createdBy,
-                                                  style: const TextStyle(
-                                                    fontSize: 12,
-
-                                                    color: Colors.black,
-                                                  ),
+                                                  style: Theme.of(
+                                                    context,
+                                                  ).textTheme.labelSmall,
                                                 ),
                                               ],
                                             ),
@@ -279,8 +266,7 @@ class _EmployeetabState extends State<Employeetab> {
                                           padding: EdgeInsets.all(8.0),
                                           child: Icon(
                                             Icons.arrow_forward_ios,
-                                            size: 16,
-                                            color: Colors.black,
+                                         
                                           ),
                                         ),
                                       ),

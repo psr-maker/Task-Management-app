@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:staff_work_track/Models/auditlog.dart';
 import 'package:staff_work_track/Models/getusers.dart';
+import 'package:staff_work_track/core/widgets/loading.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/Task/taskdetail.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/users/Admin/admin_detail.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/users/Employee/empdetails.dart';
 import 'package:staff_work_track/services/superadmin_service.dart';
-import 'package:staff_work_track/widgets/classmorphism.dart';
+import 'package:staff_work_track/widgets/auditcard.dart';
 
 class AuditLogPage extends StatefulWidget {
   final String? highlightid;
@@ -16,18 +17,16 @@ class AuditLogPage extends StatefulWidget {
 }
 
 class _AuditLogPageState extends State<AuditLogPage> {
- 
   Color actionColor(String action) {
     switch (action.toLowerCase()) {
       case 'edit':
-        return const Color.fromARGB(255, 25, 77, 38);
+        return Colors.orange;
       case 'delete':
-        return Colors.red;
-        ;
+        return Theme.of(context).colorScheme.error;
       case 'logout':
-        return Colors.red;
+        return Theme.of(context).colorScheme.error;
       case 'login':
-        return Color.fromARGB(255, 25, 77, 38);
+        return Theme.of(context).colorScheme.secondary;
       default:
         return Colors.grey;
     }
@@ -48,7 +47,6 @@ class _AuditLogPageState extends State<AuditLogPage> {
         return Icons.info;
     }
   }
-
 
   List<AuditLogGroupModel> groupLogs(
     List<AuditLogModel> logs,
@@ -81,42 +79,21 @@ class _AuditLogPageState extends State<AuditLogPage> {
   }
 
   String getTaskName(AuditLogGroupModel log) {
-    if (log.action.toLowerCase() == "delete") {
-      for (final c in log.changes) {
-        final field = c.fieldChanged!.toLowerCase();
-
-        if ((field.contains("taskname") || field == "name") &&
-            c.oldValue != null &&
-            c.oldValue!.trim().isNotEmpty) {
-          return c.oldValue!;
-        }
-      }
-
-      for (final c in log.changes) {
-        if (c.oldValue != null && c.oldValue!.trim().isNotEmpty) {
-          return c.oldValue!;
-        }
-      }
-
-      return "";
-    }
-
     if (log.taskName != null && log.taskName!.trim().isNotEmpty) {
       return log.taskName!;
     }
 
     for (final c in log.changes) {
-      final field = c.fieldChanged!.toLowerCase();
-
-      if (field.contains("taskname") || field == "name") {
-        if (c.newValue != null && c.newValue!.trim().isNotEmpty) {
+      final field = c.fieldChanged?.toLowerCase() ?? "";
+      if (field.contains("task") || field.contains("name")) {
+        if (c.newValue != null && c.newValue!.trim().isNotEmpty)
           return c.newValue!;
-        }
-        if (c.oldValue != null && c.oldValue!.trim().isNotEmpty) {
+        if (c.oldValue != null && c.oldValue!.trim().isNotEmpty)
           return c.oldValue!;
-        }
       }
     }
+
+    if (log.action.toLowerCase() == "delete") return "Unknown Task";
 
     return "";
   }
@@ -309,7 +286,7 @@ class _AuditLogPageState extends State<AuditLogPage> {
         ]),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return const Center(child: RotatingFlower());
           }
 
           if (snapshot.hasError) {
@@ -348,11 +325,12 @@ class _AuditLogPageState extends State<AuditLogPage> {
                   logDate.isBefore(end.add(const Duration(seconds: 1)));
             }).toList();
           }
-        final groupedLogs = filteredLogs.isNotEmpty
-    ? groupLogs(filteredLogs, users)
-    : [];
-    filteredLogs.sort((a, b) =>
-    b.changeDateTime.compareTo(a.changeDateTime));
+          final groupedLogs = filteredLogs.isNotEmpty
+              ? groupLogs(filteredLogs, users)
+              : [];
+          filteredLogs.sort(
+            (a, b) => b.changeDateTime.compareTo(a.changeDateTime),
+          );
           if (groupedLogs.isEmpty) {
             return const Center(child: Text("No audit logs found"));
           }

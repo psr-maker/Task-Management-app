@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
 import 'package:staff_work_track/screen/staff/navigation/worklog/addworklog.dart';
 import 'package:staff_work_track/core/widgets/buttons.dart';
+import 'package:staff_work_track/screen/staff/navigation/worklog/edit_worklog.dart';
+import 'package:staff_work_track/services/announ_service.dart';
 
 class Worklog extends StatefulWidget {
   const Worklog({super.key});
@@ -12,25 +15,56 @@ class Worklog extends StatefulWidget {
 
 class _WorklogState extends State<Worklog> {
   bool _isLoading = false;
+  bool get hasDrafts {
+    return logs.any((log) => log["status"] == "Draft");
+  }
 
+  String? _topMessage;
+  bool _isErrorMessage = true;
+  bool _showTopMessage = false;
   DateTime selectedDate = DateTime.now();
 
   List<Map<String, dynamic>> logs = [];
- 
+  @override
+  void initState() {
+    super.initState();
+    _loadLogs();
+  }
+
+  void showTopMessage(String message, {bool isError = true}) {
+    setState(() {
+      _topMessage = message;
+      _isErrorMessage = isError;
+      _showTopMessage = true;
+    });
+
+    Future.delayed(const Duration(seconds: 3), () {
+      if (!mounted) return;
+      setState(() {
+        _showTopMessage = false;
+      });
+    });
+  }
+
   Duration calculateDuration(TimeOfDay start, TimeOfDay end) {
     final startMinutes = start.hour * 60 + start.minute;
     final endMinutes = end.hour * 60 + end.minute;
     return Duration(minutes: endMinutes - startMinutes);
   }
 
-  String formatDuration(Duration d) {
-    return "${d.inHours}h ${d.inMinutes % 60}m";
+  String formatHoursToHM(double hours) {
+    int totalMinutes = (hours * 60).round();
+
+    int h = totalMinutes ~/ 60;
+    int m = totalMinutes % 60;
+
+    return "${h}h ${m}m";
   }
 
-  Duration totalDuration() {
-    Duration total = Duration.zero;
+  double totalDuration() {
+    double total = 0;
     for (var log in logs) {
-      total += calculateDuration(log["start"], log["end"]);
+      total += log["totalHours"] ?? 0;
     }
     return total;
   }
@@ -182,11 +216,14 @@ class _WorklogState extends State<Worklog> {
                     child: AppButton(
                       text: "Apply",
                       isLoading: _isLoading,
-                      onPressed: () {
+                      onPressed: () async {
                         setState(() {
                           selectedDate = DateTime(tempYear, tempMonth, tempDay);
                         });
+
                         Navigator.pop(context);
+
+                        await _loadLogs();
                       },
 
                       color: Colors.white,
@@ -207,47 +244,155 @@ class _WorklogState extends State<Worklog> {
       MaterialPageRoute(builder: (_) => const AddWorklogPage()),
     );
 
-    if (result != null && result is Map<String, dynamic>) {
-      setState(() {
-        logs.add(result);
-      });
+    if (result == true) {
+      await _loadLogs();
     }
   }
 
+  Future<void> _loadLogs() async {
+    setState(() => _isLoading = true);
+
+    try {
+      final data = await AnnouncementService.getMyWorkLogs(selectedDate);
+
+      setState(() {
+        logs = data.map((item) {
+          final startDateTime = DateTime.parse(item["startTime"]);
+          final endDateTime = DateTime.parse(item["endTime"]);
+
+          return {
+            "start": TimeOfDay(
+              hour: startDateTime.hour,
+              minute: startDateTime.minute,
+            ),
+            "end": TimeOfDay(
+              hour: endDateTime.hour,
+              minute: endDateTime.minute,
+            ),
+            "description": item["description"],
+            "title": item["title"],
+            "status": item["status"],
+            "id": item["id"],
+            "totalHours": (item["totalHours"] as num).toDouble(),
+          };
+        }).toList();
+      });
+    } catch (e) {
+      print(e);
+    }
+
+    setState(() => _isLoading = false);
+  }
+
+  Future<void> _submitDrafts() async {
+    if (!canSubmit) return;
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(
+          "Submit Drafts",
+          style: Theme.of(context).textTheme.displaySmall,
+        ),
+        content: const Text(
+          "Are you sure you want to submit all draft worklogs for this day?",
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text("Cancel"),
+          ),
+
+          AppButton(
+            text: "Submit",
+            isLoading: _isLoading,
+            onPressed: () => Navigator.pop(context, true),
+            color: Theme.of(context).colorScheme.secondary,
+            txtcolor: Theme.of(context).colorScheme.onPrimary,
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      final response = await AnnouncementService.updateWorkLogStatus(
+        workDate: selectedDate,
+        status: "Submitted",
+      );
+
+      if (response["updatedCount"] != null && response["updatedCount"] > 0) {
+        showTopMessage("Drafts submitted successfully.", isError: false);
+        await _loadLogs();
+      }
+    } catch (e) {
+      print(e);
+
+      showTopMessage("Failed to submit drafts.", isError: true);
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  String get appBarButtonText {
+    if (logs.isEmpty) return "No Worklogs";
+    if (logs.any((log) => log["status"] == "Draft")) return "Draft";
+    return "Submitted";
+  }
+
+  bool get canSubmit => logs.any((log) => log["status"] == "Draft");
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-    
-        title: const Text(
-          "Daily Worklog",
-         
-        ),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios),
-          onPressed: () => Navigator.pop(context),
-        ),
-        
+        title: const Text("Daily Worklog"),
+        actions: [
+          if (logs.isNotEmpty)
+            TextButton(
+              onPressed: canSubmit ? _submitDrafts : null,
+              child: Text(
+                appBarButtonText,
+                style: Theme.of(context).textTheme.labelLarge,
+              ),
+            ),
+        ],
       ),
       body: Padding(
         padding: const EdgeInsets.all(15),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Stack(
           children: [
-           
-           
-            _weekHeader(),
-            SizedBox(height: 10),
-            _totalHours(),
-            SizedBox(height: 10),
-            Expanded(child: _timelineLogs()),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _weekHeader(),
+                SizedBox(height: 10),
+                _totalHours(),
+                SizedBox(height: 10),
+                Expanded(child: _timelineLogs()),
+              ],
+            ),
+            if (_topMessage != null)
+              AnimatedPositioned(
+                top: _showTopMessage ? 0 : -120,
+                left: 16,
+                right: 16,
+                duration: const Duration(milliseconds: 300),
+                child: Msgsnackbar(
+                  context,
+                  message: _topMessage!,
+                  isError: _isErrorMessage,
+                ),
+              ),
           ],
         ),
       ),
       floatingActionButton: FloatingActionButton(
-        backgroundColor: const Color.fromARGB(255, 25, 77, 38),
+        backgroundColor: Theme.of(context).colorScheme.secondary,
         onPressed: _addWorklog,
-        child: const Icon(Icons.add, color: Colors.white),
+        child: const Icon(Icons.add),
       ),
     );
   }
@@ -258,7 +403,7 @@ class _WorklogState extends State<Worklog> {
     );
 
     return Container(
-      color: Colors.white,
+      color: Theme.of(context).colorScheme.onPrimary,
       child: Column(
         children: [
           Row(
@@ -269,29 +414,19 @@ class _WorklogState extends State<Worklog> {
                 children: [
                   Text(
                     DateFormat('EEEE').format(selectedDate),
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: const Color.fromARGB(255, 25, 77, 38),
-                    ),
+                    style: Theme.of(context).textTheme.displaySmall,
                   ),
+                  SizedBox(height: 5),
                   Text(
                     DateFormat('dd MMM yyyy').format(selectedDate),
-                    style: TextStyle(
-                      color: const Color.fromARGB(255, 25, 77, 38),
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold
-                    ),
+                    style: Theme.of(context).textTheme.titleLarge,
                   ),
                 ],
               ),
 
               IconButton(
                 onPressed: _pickYearMonthDate,
-                icon: Icon(
-                  Icons.edit_calendar_outlined,
-                  color: const Color.fromARGB(255, 25, 77, 38),
-                ),
+                icon: Icon(Icons.edit_calendar_outlined),
               ),
             ],
           ),
@@ -311,12 +446,15 @@ class _WorklogState extends State<Worklog> {
                     day.day == selectedDate.day;
 
                 return GestureDetector(
-                  onTap: () => setState(() => selectedDate = day),
+                  onTap: () async {
+                    setState(() => selectedDate = day);
+                    await _loadLogs();
+                  },
                   child: Container(
                     width: 45,
                     decoration: BoxDecoration(
                       color: isSelected
-                          ? Color.fromARGB(255, 62, 98, 64)
+                          ? Theme.of(context).colorScheme.primary
                           : Colors.transparent,
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -327,8 +465,8 @@ class _WorklogState extends State<Worklog> {
                           DateFormat('E').format(day).substring(0, 1),
                           style: TextStyle(
                             color: isSelected
-                                ? Colors.white
-                                : const Color.fromARGB(255, 108, 143, 117),
+                                ? Theme.of(context).colorScheme.onPrimary
+                                : Theme.of(context).colorScheme.primary,
                             fontWeight: FontWeight.bold,
                             fontSize: 13,
                           ),
@@ -340,8 +478,8 @@ class _WorklogState extends State<Worklog> {
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
                             color: isSelected
-                                ? Colors.white
-                                : const Color.fromARGB(255, 25, 77, 38),
+                                ? Theme.of(context).colorScheme.onPrimary
+                                : Theme.of(context).colorScheme.primary,
                           ),
                         ),
                       ],
@@ -362,94 +500,110 @@ class _WorklogState extends State<Worklog> {
     }
 
     return ListView.builder(
-    
       itemCount: logs.length,
       itemBuilder: (context, index) {
         final log = logs[index];
-        final duration = calculateDuration(log["start"], log["end"]);
+        final double hours = log["totalHours"] ?? 0;
 
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-           
-            SizedBox(
-              width: 50,
-              height: 72,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        return GestureDetector(
+          onLongPress: () async {
+            if (log["status"] != "Draft") {
+              showTopMessage("Cannot edit a submitted worklog.", isError: true);
+
+              return;
+            }
+
+            final int? worklogId = log["id"] as int?;
+            if (worklogId == null) return;
+
+            final result = await Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => EditWorklogPage(
+                  worklogId: worklogId,
+                  title: log["title"] ?? "",
+                  description: log["description"] ?? "",
+                  startTime: log["start"],
+                  endTime: log["end"],
+                  workDate: selectedDate,
+                ),
+              ),
+            );
+
+            if (result == true) {
+              await _loadLogs();
+            }
+          },
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(
+                width: 50,
+                height: 72,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      log["start"].format(context),
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                    Text(
+                      log["end"].format(context),
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                  ],
+                ),
+              ),
+              Column(
                 children: [
-                  Text(
-                    log["start"].format(context),
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: Color.fromARGB(255, 10, 54, 12),
-                      fontSize: 12,
+                  Container(
+                    width: 12,
+                    height: 12,
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.secondary,
+                      shape: BoxShape.circle,
                     ),
                   ),
-                  Text(
-                    log["end"].format(context),
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: Color.fromARGB(255, 10, 54, 12),
-                      fontSize: 12,
-                    ),
+                  Container(
+                    width: 2,
+                    height: 60,
+                    color: Theme.of(context).colorScheme.primary,
                   ),
                 ],
               ),
-            ),
-
-            Column(
-              children: [
-                Container(
-                  width: 12,
-                  height: 12,
-                  decoration: const BoxDecoration(
-                    color: Color.fromARGB(255, 10, 54, 12),
-                    shape: BoxShape.circle,
+              const SizedBox(width: 10),
+              Expanded(
+                child: Card(
+                  color: Theme.of(context).colorScheme.background,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                ),
-                Container(
-                  width: 2,
-                  height: 60,
-                  color: Color.fromARGB(255, 74, 117, 77),
-                ),
-              ],
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Card(
-                color: Color.fromARGB(255, 134, 170, 136),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        log["description"] ?? "No description",
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.bold,
-                          color: Color.fromARGB(255, 10, 54, 12),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          log["title"] ?? "",
+                          style: Theme.of(context).textTheme.labelMedium,
                         ),
-                      ),
-
-                      const SizedBox(height: 8),
-                      Text(
-                        "Duration: ${formatDuration(duration)}",
-                        style: TextStyle(
-                          color: const Color.fromARGB(255, 7, 53, 1),
-                          fontSize: 12,
+                        const SizedBox(height: 5),
+                        Text(
+                          log["description"] ?? " ",
+                          style: Theme.of(context).textTheme.labelSmall,
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 8),
+                        Text(
+                          "Duration: ${formatHoursToHM(hours)}",
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         );
       },
     );
@@ -457,30 +611,23 @@ class _WorklogState extends State<Worklog> {
 
   Widget _totalHours() {
     final total = totalDuration();
+
     return Container(
       padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
-        color: const Color.fromARGB(255, 25, 77, 38),
+        color: Theme.of(context).colorScheme.secondary,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          const Text(
+          Text(
             "Total Work Time",
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 12,
-              color: Colors.white,
-            ),
+            style: Theme.of(context).textTheme.labelLarge,
           ),
           Text(
-            formatDuration(total),
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 15,
-              color: Colors.white,
-            ),
+            formatHoursToHM(total),
+            style: Theme.of(context).textTheme.labelLarge,
           ),
         ],
       ),

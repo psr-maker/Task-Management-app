@@ -7,7 +7,7 @@ import 'package:staff_work_track/utils/TaskUtils.dart';
 import 'package:staff_work_track/utils/enum.dart';
 import 'package:staff_work_track/widgets/StatCard.dart';
 import 'package:staff_work_track/widgets/monthlytrend.dart';
-import 'package:staff_work_track/widgets/progressoverview.dart';
+import 'package:staff_work_track/widgets/kpicard.dart';
 
 class DepartmentReportsTab extends StatefulWidget {
   final DateTime? fromDate;
@@ -30,7 +30,7 @@ class _DepartmentReportsTabState extends State<DepartmentReportsTab> {
 
   @override
   void initState() {
-    super.initState(); 
+    super.initState();
     _fetchReport();
   }
 
@@ -47,28 +47,25 @@ class _DepartmentReportsTabState extends State<DepartmentReportsTab> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-       appBar: AppBar(
-          leading: IconButton(
+      appBar: AppBar(
+        leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios),
           onPressed: () => Navigator.pop(context),
         ),
-        title:  Text(widget.department), 
+        title: Text(widget.department),
         actions: [
-           IconButton(
+          IconButton(
             onPressed: () {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => ReportsTable(department: widget.department),
+                  builder: (context) =>
+                      ReportsTable(department: widget.department),
                 ),
               );
             },
             icon: Icon(Icons.bar_chart_rounded),
           ),
-          //   IconButton(
-          //   icon: const Icon(Icons.date_range_outlined),
-          //   onPressed: () {},
-          // ),
         ],
       ),
       body: FutureBuilder<Map<String, dynamic>>(
@@ -93,10 +90,9 @@ class _DepartmentReportsTabState extends State<DepartmentReportsTab> {
                   "Task summary",
                   style: Theme.of(context).textTheme.displaySmall,
                 ),
-                 const SizedBox(height: 10),
-           
+                const SizedBox(height: 10),
+
                 Row(
-                
                   children: [
                     Expanded(
                       child: SmallStatCard(
@@ -106,7 +102,7 @@ class _DepartmentReportsTabState extends State<DepartmentReportsTab> {
                         color: Colors.blue,
                       ),
                     ),
-                    SizedBox(width: 10,),
+                    SizedBox(width: 10),
                     Expanded(
                       child: SmallStatCard(
                         title: "Completed",
@@ -115,7 +111,7 @@ class _DepartmentReportsTabState extends State<DepartmentReportsTab> {
                         color: TaskUtils.getStatusColor(TaskStatus.completed),
                       ),
                     ),
-                      SizedBox(width: 10,),
+                    SizedBox(width: 10),
                     Expanded(
                       child: SmallStatCard(
                         title: "Pending",
@@ -124,7 +120,7 @@ class _DepartmentReportsTabState extends State<DepartmentReportsTab> {
                         color: TaskUtils.getStatusColor(TaskStatus.pending),
                       ),
                     ),
-                      SizedBox(width: 10,),
+                    SizedBox(width: 10),
                     Expanded(
                       child: SmallStatCard(
                         title: "In Progress",
@@ -137,17 +133,16 @@ class _DepartmentReportsTabState extends State<DepartmentReportsTab> {
                 ),
                 const SizedBox(height: 10),
                 Row(
-                 
                   children: [
                     Expanded(
                       child: SmallStatCard(
                         title: "Not Started",
                         value: (data["notStarted"] ?? 0).toString(),
                         icon: Icons.task_outlined,
-                         color: TaskUtils.getStatusColor(TaskStatus.NotStarted),
+                        color: TaskUtils.getStatusColor(TaskStatus.NotStarted),
                       ),
                     ),
-                      SizedBox(width: 10,),
+                    SizedBox(width: 10),
                     Expanded(
                       child: SmallStatCard(
                         title: "Avg completed days",
@@ -156,7 +151,7 @@ class _DepartmentReportsTabState extends State<DepartmentReportsTab> {
                         color: Colors.teal,
                       ),
                     ),
-                      SizedBox(width: 10,),
+                    SizedBox(width: 10),
                     Expanded(
                       child: SmallStatCard(
                         title: "Late completed",
@@ -165,7 +160,7 @@ class _DepartmentReportsTabState extends State<DepartmentReportsTab> {
                         color: Colors.deepOrange,
                       ),
                     ),
-                      SizedBox(width: 10,),
+                    SizedBox(width: 10),
                     Expanded(
                       child: SmallStatCard(
                         title: "Overdue Task",
@@ -177,11 +172,11 @@ class _DepartmentReportsTabState extends State<DepartmentReportsTab> {
                   ],
                 ),
                 const SizedBox(height: 20),
-                 Text(
-                  "Performance Oveview",
+                Text(
+                  "Performance Overview",
                   style: Theme.of(context).textTheme.displaySmall,
                 ),
-                 const SizedBox(height: 10),
+                const SizedBox(height: 10),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
@@ -206,39 +201,13 @@ class _DepartmentReportsTabState extends State<DepartmentReportsTab> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 25),
-
-                _buildPerformanceSection(data),
-
-               const SizedBox(height: 15),
-
-                Text(
-                  "Monthly Trend",
-                  style: Theme.of(context).textTheme.displaySmall,
-                ),
-                const SizedBox(height: 10),
 
                 MonthlyTrendChart(
                   monthlyData: (data["monthlyTrend"] as List)
                       .map((e) => e as Map<String, dynamic>)
                       .toList(),
                 ),
-
-                // const SizedBox(height: 25),
-
-                //  Text(
-                //   "Overdue Tasks",
-                //   style: Theme.of(context).textTheme.displayMedium,
-                // ),
-                // const SizedBox(height: 10),
-                // OverdueTaskList(
-                //   overdueTasks: data['overdueTaskList'] != null
-                //       ? (data['overdueTaskList'] as List<dynamic>)
-                //             .map((e) => e as Map<String, dynamic>)
-                //             .toList()
-                //       : [], 
-                //      // data: data,
-                // ),
+                _buildPerformanceSection(data),
                 const SizedBox(height: 25),
                 Text(
                   "Staffs List",
@@ -258,177 +227,166 @@ class _DepartmentReportsTabState extends State<DepartmentReportsTab> {
     final top = data["topPerformer"];
     final low = data["lowPerformer"];
 
+    final showTop = top != null && (top["completed"] ?? 0) > 0;
+    final showLow = low != null && (low["completed"] ?? 0) > 0;
+
+    if (!showTop && !showLow) return const SizedBox.shrink();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        const SizedBox(height: 25),
         Text(
           "Performance Metrics",
           style: Theme.of(context).textTheme.displaySmall,
         ),
         const SizedBox(height: 10),
 
-        // Top Performer Card
-        _advancedPerformerCard(
-          title: "Top Performer",
-          name: top?["user"] ?? "-",
-          completedCount: top?["completed"] ?? 0,
-          totalTasks: top?["totalTasks"] ?? 0,
-          startColor: Theme.of(context).colorScheme.primary,
-          endColor: Theme.of(context).colorScheme.secondary,
-          icon: Icons.emoji_events,
-        ),
-        const SizedBox(height: 5),
+        if (showTop)
+          _advancedPerformerCard(
+            title: "Top Performer",
+            name: top!["user"] ?? "-",
+            completedCount: top["completed"] ?? 0,
+            totalTasks: top["totalTasks"] ?? 0,
+            startColor: Theme.of(context).colorScheme.primary,
+            endColor: Theme.of(context).colorScheme.secondary,
+            icon: Icons.emoji_events,
+          ),
+        if (showTop) const SizedBox(height: 5),
 
-        // Low Performer Card
-        _advancedPerformerCard(
-          title: "Low Performer",
-          name: low?["user"] ?? "-",
-          completedCount: low?["completed"] ?? 0,
-          totalTasks: low?["totalTasks"] ?? 0,
-          startColor: Colors.redAccent,
-          endColor: Colors.red,
-          icon: Icons.thumb_down,
-        ),
+        if (showLow)
+          _advancedPerformerCard(
+            title: "Low Performer",
+            name: low!["user"] ?? "-",
+            completedCount: low["completed"] ?? 0,
+            totalTasks: low["totalTasks"] ?? 0,
+            startColor: Colors.redAccent,
+            endColor: Colors.red,
+            icon: Icons.thumb_down,
+          ),
       ],
     );
   }
 
+  Widget _advancedPerformerCard({
+    required String title,
+    required String name,
+    required int completedCount,
+    required int totalTasks,
+    required Color startColor,
+    required Color endColor,
+    required IconData icon,
+  }) {
+    final double progress = totalTasks > 0 ? (completedCount / totalTasks) : 0;
+    final int percentage = (progress * 100).round();
 
-Widget _advancedPerformerCard({
-  required String title,
-  required String name,
-  required int completedCount,
-  required int totalTasks,
-  required Color startColor,
-  required Color endColor,
-  required IconData icon,
-}) {
-  final double progress = totalTasks > 0 ? (completedCount / totalTasks) : 0;
-  final int percentage = (progress * 100).round();
-
-  return Container(
-    height: 100,
-    margin: const EdgeInsets.symmetric(vertical: 4),
-    decoration: BoxDecoration(
-      borderRadius: BorderRadius.circular(20),
-      gradient: LinearGradient(
-        colors: [startColor.withOpacity(0.2), endColor.withOpacity(0.1)],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
+    return Container(
+      height: 100,
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        gradient: LinearGradient(
+          colors: [startColor.withOpacity(0.2), endColor.withOpacity(0.1)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
       ),
-      // boxShadow: [
-      //   BoxShadow(
-      //     color: Colors.black.withOpacity(0.05),
-      //     blurRadius: 8,
-      //     offset: const Offset(0, 4),
-      //   ),
-      // ],
-    ),
-    child: Padding(
-      padding: const EdgeInsets.all(10),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Title & Icon Row
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(2),
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: LinearGradient(colors: [startColor, endColor]),
-                  // boxShadow: [
-                  //   BoxShadow(
-                  //     color: endColor,
-                  //     blurRadius: 6,
-                  //     offset: const Offset(0, 2),
-                  //   ),
-                  // ],
-                ),
-                child: Icon(icon, color: Colors.white, size: 15),
-              ),
-              const SizedBox(width: 12),
-              Text(
-                title,
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: endColor,
-                  fontSize: 14,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 5),
-
-          // Name
-          Text(
-            name,
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
-          const SizedBox(height: 5),
-
-          // Progress bar with gradient
-          Stack(
-            children: [
-              Container(
-                height: 8,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(6),
-                  color: Colors.grey.shade300,
-                ),
-              ),
-              LayoutBuilder(builder: (context, constraints) {
-                return AnimatedContainer(
-                  duration: const Duration(milliseconds: 800),
-                  height: 8,
-                  width: constraints.maxWidth * progress,
+      child: Padding(
+        padding: const EdgeInsets.all(10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(2),
                   decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(6),
+                    shape: BoxShape.circle,
                     gradient: LinearGradient(colors: [startColor, endColor]),
-                    boxShadow: [
-                      BoxShadow(
-                        color: endColor.withOpacity(0.3),
-                        blurRadius: 4,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
                   ),
-                );
-              }),
-            ],
-          ),
-          const SizedBox(height: 5),
-
-          // Task count + percentage badge
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                "$completedCount / $totalTasks tasks completed",
-                style: const TextStyle(fontSize: 12, color: Colors.grey),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(
-                  color: endColor.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(12),
+                  child: Icon(icon, color: Colors.white, size: 15),
                 ),
-                child: Text(
-                  "$percentage%",
+                const SizedBox(width: 12),
+                Text(
+                  title,
                   style: TextStyle(
-                    fontSize: 12,
                     fontWeight: FontWeight.bold,
                     color: endColor,
+                    fontSize: 14,
                   ),
                 ),
-              ),
-            ],
-          ),
-        ],
+              ],
+            ),
+            const SizedBox(height: 5),
+
+            Text(name, style: Theme.of(context).textTheme.labelMedium),
+            const SizedBox(height: 5),
+
+            Stack(
+              children: [
+                Container(
+                  height: 8,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(6),
+                    color: Colors.grey.shade300,
+                  ),
+                ),
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    return AnimatedContainer(
+                      duration: const Duration(milliseconds: 800),
+                      height: 8,
+                      width: constraints.maxWidth * progress,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(6),
+                        gradient: LinearGradient(
+                          colors: [startColor, endColor],
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: endColor.withOpacity(0.3),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+            const SizedBox(height: 5),
+
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  "$completedCount / $totalTasks tasks completed",
+                  style: Theme.of(context).textTheme.labelMedium,
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: endColor.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    "$percentage%",
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: endColor,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
-    ),
-  );
-}
-
-
+    );
+  }
 }

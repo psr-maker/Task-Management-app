@@ -78,10 +78,8 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
 
         // 🔥 DATE FILTER
         if (startDate != null && endDate != null) {
-          if (task.createdAt == null) return false;
-
-          if (task.createdAt!.isBefore(startDate!) ||
-              task.createdAt!.isAfter(endDate!)) {
+          if (task.createdAt.isBefore(startDate!) ||
+              task.createdAt.isAfter(endDate!)) {
             return false;
           }
         }
@@ -100,7 +98,6 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text("Reports Table"),
-
         actions: [
           IconButton(
             icon: const Icon(Icons.filter_alt),
@@ -108,16 +105,14 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
               showModalBottomSheet(
                 context: context,
                 isScrollControlled: true,
-                backgroundColor: Color.fromARGB(255, 30, 45, 38),
                 shape: const RoundedRectangleBorder(
                   borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
                 ),
                 builder: (context) {
-                  return Padding(
-                    padding: EdgeInsets.only(
-                      bottom: MediaQuery.of(context).viewInsets.bottom,
-                    ),
-                    child: buildFilterDropdowns(),
+                  return StatefulBuilder(
+                    builder: (context, modalSetState) {
+                      return buildFilterSheet(modalSetState);
+                    },
                   );
                 },
               );
@@ -241,7 +236,7 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
                                     ),
                                     columns: const [
                                       DataColumn(label: Text("User")),
-                                      DataColumn(label: Text("Department")),
+                                      //  DataColumn(label: Text("Department")),
                                       DataColumn(label: Text("Task")),
                                       DataColumn(label: Text("Assigner")),
                                       DataColumn(label: Text("Status")),
@@ -255,15 +250,14 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
                                     rows: filteredTasks.map((task) {
                                       return DataRow(
                                         cells: [
-                                          DataCell(Text(task.name ?? "")),
-                                          DataCell(Text(task.department ?? "")),
-                                          DataCell(Text(task.task ?? "")),
+                                          DataCell(Text(task.name)),
+                                          // DataCell(Text(task.department)),
+                                          DataCell(Text(task.task)),
                                           DataCell(
                                             Text(
                                               AppHelpers.extractName(
-                                                    task.assignBy,
-                                                  ) ??
-                                                  "",
+                                                task.assignBy,
+                                              ),
                                             ),
                                           ),
                                           DataCell(
@@ -296,18 +290,16 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
                                           ),
                                           DataCell(
                                             Text(
-                                              task.createdAt?.toString().split(
-                                                    " ",
-                                                  )[0] ??
-                                                  "",
+                                              task.createdAt.toString().split(
+                                                " ",
+                                              )[0],
                                             ),
                                           ),
                                           DataCell(
                                             Text(
-                                              task.dueDate?.toString().split(
-                                                    " ",
-                                                  )[0] ??
-                                                  "",
+                                              task.dueDate.toString().split(
+                                                " ",
+                                              )[0],
                                             ),
                                           ),
                                           DataCell(
@@ -327,8 +319,8 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
                                                   : "No",
                                               style: TextStyle(
                                                 color: task.isOverdue == true
-                                                    ? Colors.red
-                                                    : Colors.green,
+                                                    ?  Theme.of(context).colorScheme.error
+                                                    :  Theme.of(context).colorScheme.secondary,
                                                 fontWeight: FontWeight.bold,
                                               ),
                                             ),
@@ -356,181 +348,134 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
     );
   }
 
-  Color _getDropdownItemColor(BuildContext context, String value) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    switch (value.toLowerCase()) {
-      /// STATUS COLORS
-      case "completed":
-        return Colors.green;
-      case "inprogress":
-        return Colors.amber;
-      case "pending":
-        return Colors.red;
-      case "pause":
-        return Colors.purple;
-      case "not started":
-        return Colors.grey;
-
-      /// PRIORITY COLORS
-      case "high":
-        return Colors.red;
-      case "medium":
-        return Colors.orange;
-      case "normal":
-        return Colors.green;
-
-      default:
-        return isDark ? Colors.white : Colors.black;
-    }
-  }
-
-  Widget _buildDropdown({
-    required BuildContext context,
-    required String label,
-    required String? value,
-    required List<String> items,
-    required Function(String?) onChanged,
-  }) {
+  Widget buildFilterSheet(void Function(void Function()) modalSetState) {
     final theme = Theme.of(context);
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: theme.dividerColor),
+        color: theme.cardColor,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      child: DropdownButton<String>(
-        value: value,
-        hint: Text(
-          label,
-          style: TextStyle(
-            color: theme.colorScheme.onSurface.withOpacity(0.6),
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        isExpanded: true,
-        underline: const SizedBox(),
-        dropdownColor: theme.colorScheme.surface,
-        style: TextStyle(
-          color: value != null
-              ? _getDropdownItemColor(context, value)
-              : theme.colorScheme.onSurface,
-          fontSize: 14,
-          fontWeight: FontWeight.w700,
-        ),
-        iconEnabledColor: theme.colorScheme.onSurface,
-        items: items.map((e) {
-          return DropdownMenuItem<String>(
-            value: e,
-            child: Text(
-              e,
-              style: TextStyle(
-                color: _getDropdownItemColor(context, e),
-                fontWeight: FontWeight.w700,
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            /// 🔹 STATUS
+            _buildHeading("Status"),
+            const SizedBox(height: 12),
+            _buildChoiceChips(
+              values: [
+                "Not Started",
+                "InProgress",
+                "Completed",
+                "Pending",
+                "Pause",
+              ],
+              selectedValue: selectedStatus,
+              activeColor: Colors.blue,
+              modalSetState: modalSetState,
+              onSelected: (value) {
+                selectedStatus = selectedStatus == value ? null : value;
+                applyFilters();
+              },
+            ),
+
+            const SizedBox(height: 24),
+
+            /// 🔹 PRIORITY
+            _buildHeading("Priority"),
+            const SizedBox(height: 12),
+            _buildChoiceChips(
+              values: ["Normal", "Medium", "High"],
+              selectedValue: selectedPriority,
+              activeColor: Colors.orange,
+              modalSetState: modalSetState,
+              onSelected: (value) {
+                selectedPriority = selectedPriority == value ? null : value;
+                applyFilters();
+              },
+            ),
+
+            const SizedBox(height: 24),
+
+            /// 🔹 OVERDUE
+            _buildHeading("Overdue"),
+            const SizedBox(height: 12),
+            _buildChoiceChips(
+              values: ["Yes", "No"],
+              selectedValue: selectedOverdue,
+              activeColor:  Theme.of(context).colorScheme.error,
+              modalSetState: modalSetState,
+              onSelected: (value) {
+                selectedOverdue = selectedOverdue == value ? null : value;
+                applyFilters();
+              },
+            ),
+
+            const SizedBox(height: 30),
+
+            Center(
+              child: AppButton(
+                text: "Clear Filters",
+                isLoading: _isLoading,
+                onPressed: () {
+                  modalSetState(() {
+                    selectedStatus = null;
+                    selectedPriority = null;
+                    selectedOverdue = null;
+                  });
+
+                  applyFilters();
+                },
+                color: Theme.of(context).colorScheme.secondary,
+                txtcolor: Theme.of(context).colorScheme.onPrimary,
               ),
             ),
-          );
-        }).toList(),
-        onChanged: onChanged,
+          ],
+        ),
       ),
     );
   }
 
-  Widget buildFilterDropdowns() {
-    return StatefulBuilder(
-      builder: (context, setLocalState) {
-        final theme = Theme.of(context);
+  Widget _buildHeading(String title) {
+    return Text(title, style: Theme.of(context).textTheme.headlineMedium);
+  }
 
-        return Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: theme.cardColor,
-            borderRadius: BorderRadius.circular(16),
+  Widget _buildChoiceChips({
+    required List<String> values,
+    required String? selectedValue,
+    required Color activeColor,
+    required void Function(void Function()) modalSetState,
+    required Function(String) onSelected,
+  }) {
+    return Wrap(
+      spacing: 10,
+      runSpacing: 10,
+      children: values.map((value) {
+        final isSelected = selectedValue == value;
+
+        return ChoiceChip(
+          label: Text(value),
+          selected: isSelected,
+          onSelected: (_) {
+            modalSetState(() {
+              onSelected(value);
+            });
+          },
+          selectedColor: activeColor,
+          backgroundColor: Colors.grey.shade200,
+          labelStyle: TextStyle(
+            color: isSelected ?  Theme.of(context).colorScheme.onPrimary : Colors.black87,
+            fontWeight: FontWeight.w600,
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              /// STATUS
-              _buildDropdown(
-                context: context,
-                label: "Status",
-                value: selectedStatus,
-                items: [
-                  "Not Started",
-                  "InProgress",
-                  "Completed",
-                  "Pending",
-                  "Pause",
-                ],
-                onChanged: (value) {
-                  setLocalState(() => selectedStatus = value);
-                  applyFilters();
-                },
-              ),
-
-              const SizedBox(height: 16),
-
-              /// PRIORITY
-              _buildDropdown(
-                context: context,
-                label: "Priority",
-                value: selectedPriority,
-                items: ["Normal", "Medium", "High"],
-                onChanged: (value) {
-                  setLocalState(() => selectedPriority = value);
-                  applyFilters();
-                },
-              ),
-
-              const SizedBox(height: 16),
-
-              /// OVERDUE
-              _buildDropdown(
-                context: context,
-                label: "Overdue",
-                value: selectedOverdue,
-                items: ["Yes", "No"],
-                onChanged: (value) {
-                  setLocalState(() => selectedOverdue = value);
-                  applyFilters();
-                },
-              ),
-
-              const SizedBox(height: 20),
-              Center(
-                child: AppButton(
-                  text: "Clear Filters",
-                  isLoading: _isLoading,
-                  onPressed: () {
-                    setLocalState(() {
-                      selectedStatus = null;
-                      selectedPriority = null;
-                      selectedOverdue = null;
-                    });
-                    applyFilters();
-                  },
-                  color: Theme.of(context).colorScheme.secondary,
-                  txtcolor: Theme.of(context).colorScheme.onPrimary,
-                ),
-              ),
-              // /// CLEAR BUTTON
-              // ElevatedButton(
-              //   onPressed: () {
-              //     setLocalState(() {
-              //       selectedStatus = null;
-              //       selectedPriority = null;
-              //       selectedOverdue = null;
-              //     });
-              //     applyFilters();
-              //   },
-              //   child: const Text("Clear Filters"),
-              // ),
-            ],
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
           ),
+          elevation: isSelected ? 4 : 0,
+          shadowColor: activeColor.withOpacity(0.4),
         );
-      },
+      }).toList(),
     );
   }
 }

@@ -51,7 +51,7 @@ class AuthService {
   Future<Map<String, dynamic>> createUser({
     required String name,
     required String email,
-     required String department,
+    required String department,
     required String role,
   }) async {
     final token = await getToken();
@@ -66,7 +66,12 @@ class AuthService {
         "Content-Type": "application/json",
         "Authorization": "Bearer $token",
       },
-      body: jsonEncode({"name": name, "email": email, "department":department,"role": role}),
+      body: jsonEncode({
+        "name": name,
+        "email": email,
+        "department": department,
+        "role": role,
+      }),
     );
 
     print("Status Code: ${response.statusCode}");
@@ -86,6 +91,50 @@ class AuthService {
       throw Exception(decoded["message"] ?? "Failed to create user");
     }
   }
+
+  static Future<void> updateProfile(String name, String email) async {
+    final token = await AuthService.getToken();
+
+    final response = await http.put(
+      Uri.parse("$baseUrl/auth/update-profile"),
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer $token",
+      },
+      body: jsonEncode({"name": name, "email": email}),
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception("Failed to update profile");
+    }
+  }
+
+
+
+
+
+
+ static Future<Map<String, dynamic>> getMyProfile() async {
+    final token = await AuthService.getToken();
+
+    final response = await http.get(
+      Uri.parse("$baseUrl/auth/my-profile"),
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer $token",
+      },
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      throw Exception("Failed to load profile");
+    }
+  }
+
+
+
+
 
   static Future<String?> checkEmailRole(String email) async {
     final response = await http.get(
@@ -111,29 +160,26 @@ class AuthService {
   }
 
   /// GET TOKEN (USED IN SPLASH)
- static Future<String?> getToken() async {
+  static Future<String?> getToken() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString(_tokenKey);
   }
 
-  /// LOGOUT
-  // static Future<void> logout() async {
-  //   final prefs = await SharedPreferences.getInstance();
-  //   await prefs.remove(_tokenKey);
-  // }
-
   static Future<void> logout() async {
-  final prefs = await SharedPreferences.getInstance();
-  final token = prefs.getString('token');
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString(_tokenKey);
 
-  if (token != null) {
-    await http.post(
-      Uri.parse('$baseUrl/auth/logout'),
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
-    );
+    if (token != null) {
+      await http.post(
+        Uri.parse('$baseUrl/auth/logout'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+    }
+
+    // Always remove token locally
+    await prefs.remove(_tokenKey);
   }
-}
 }

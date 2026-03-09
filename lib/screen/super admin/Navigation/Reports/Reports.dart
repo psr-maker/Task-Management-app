@@ -34,8 +34,8 @@ class _ReportsState extends State<Reports>
         title: const Text("Reports"),
         bottom: TabBar(
           controller: _tabController,
-          indicatorColor: Colors.white,
-           labelColor: Colors.white,
+          indicatorColor:   Theme.of(context).colorScheme.onPrimary,
+           labelColor:  Theme.of(context).colorScheme.onPrimary,
           labelStyle:Theme.of(context).textTheme.labelLarge ,
           unselectedLabelStyle: TextStyle(color:Colors.grey),
           tabs: tabs.map((e) => Tab(text: e)).toList(),

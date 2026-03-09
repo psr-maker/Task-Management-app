@@ -5,6 +5,7 @@ import 'package:staff_work_track/common/search_filter_page.dart';
 import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
 import 'package:staff_work_track/screen/admin/Navigation/employee/emp_list.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/drawer/auditlog.dart';
+import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/warnings/craete_warnings.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/users/Admin/admintask.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/users/Admin/assignedtask.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/Task/create_task.dart';
@@ -34,11 +35,8 @@ class _AdmindetailsState extends State<Admindetails> {
   bool showAssignedTasks = false;
   bool _statusInitialized = false;
   UsersDetails? _admin;
-
   bool isSearching = false;
   TextEditingController searchController = TextEditingController();
-
-  // common
   String searchQuery = "";
   final TaskFilterModel taskFilter = TaskFilterModel();
   bool showFilter = false;
@@ -46,6 +44,9 @@ class _AdmindetailsState extends State<Admindetails> {
   List<String> usersList = [];
   bool permissionLoaded = false;
   bool canEditadmin = false;
+  String? _topMessage;
+  bool _isErrorMessage = true;
+  bool _showTopMessage = false;
   @override
   void dispose() {
     searchController.dispose();
@@ -142,6 +143,19 @@ class _AdmindetailsState extends State<Admindetails> {
     });
   }
 
+  void showTopMessage(String message, {bool isError = true}) {
+    setState(() {
+      _topMessage = message;
+      _isErrorMessage = isError;
+      _showTopMessage = true;
+    });
+
+    Future.delayed(const Duration(seconds: 3), () {
+      if (!mounted) return;
+      setState(() => _showTopMessage = false);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -164,17 +178,11 @@ class _AdmindetailsState extends State<Admindetails> {
                   setState(() => searchQuery = value);
                 },
               )
-            : const Text(
-                "Manager Details",
-              
-              ),
+            : const Text("Manager Details"),
         actions: [
           if (showAdminTasks || showAssignedTasks || showEmployees)
             IconButton(
-              icon: Icon(
-                isSearching ? Icons.close : Icons.search,
-               
-              ),
+              icon: Icon(isSearching ? Icons.close : Icons.search),
               onPressed: () {
                 setState(() {
                   isSearching = !isSearching;
@@ -185,10 +193,7 @@ class _AdmindetailsState extends State<Admindetails> {
             ),
           if (showAdminTasks || showAssignedTasks)
             IconButton(
-              icon: Icon(
-                showFilter ? Icons.close : Icons.filter_list,
-              
-              ),
+              icon: Icon(showFilter ? Icons.close : Icons.filter_list),
               onPressed: () {
                 setState(() => showFilter = !showFilter);
               },
@@ -230,8 +235,51 @@ class _AdmindetailsState extends State<Admindetails> {
                       );
 
                       if (confirm == true) {
-                        await SuperAdminService.deleteUser(_admin!.userId);
-                        Navigator.pop(context, true);
+                        try {
+                          final success = await SuperAdminService.deleteUser(
+                            _admin!.userId,
+                          );
+
+                          if (success) {
+                            showTopMessage(
+                              "User deleted successfully",
+                              isError: false,
+                            );
+
+                            Future.delayed(const Duration(seconds: 2), () {
+                              if (mounted) {
+                                Navigator.pop(context, true);
+                              }
+                            });
+                          } else {
+                            showTopMessage(
+                              "Failed to delete user",
+                              isError: true,
+                            );
+                          }
+                        } catch (e) {
+                          showTopMessage("Something went wrong", isError: true);
+                        }
+                      }
+                    }
+                    if (value == 'send warning') {
+                      final result = await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => SendWarningPage(
+                            receiverId: _admin!.userId,
+                            receivername: _admin!.name,
+                          ),
+                        ),
+                      );
+
+                      if (result == true) {
+                        setState(() {
+                          adminFuture = SuperAdminService.getAdminDetails(
+                            widget.adminId,
+                          );
+                          _admin = null;
+                        });
                       }
                     }
                   }
@@ -241,14 +289,21 @@ class _AdmindetailsState extends State<Admindetails> {
                 value: 'edit',
                 child: Text(
                   "Edit",
-                style: Theme.of(context).textTheme.headlineMedium,
+                  style: Theme.of(context).textTheme.headlineMedium,
                 ),
               ),
               PopupMenuItem(
                 value: 'delete',
                 child: Text(
                   "Delete",
-                   style: Theme.of(context).textTheme.headlineMedium,
+                  style: Theme.of(context).textTheme.headlineMedium,
+                ),
+              ),
+              PopupMenuItem(
+                value: 'send warning',
+                child: Text(
+                  "Send Warning",
+                  style: Theme.of(context).textTheme.headlineMedium,
                 ),
               ),
             ],
@@ -342,6 +397,21 @@ class _AdmindetailsState extends State<Admindetails> {
                       ),
                     ),
                   ),
+                if (_topMessage != null)
+                  AnimatedPositioned(
+                    top: _showTopMessage ? 0 : -120,
+                    left: 16,
+                    right: 16,
+                    duration: const Duration(milliseconds: 300),
+                    child: Msgsnackbar(
+                      context,
+                      message: _topMessage!,
+                      isError: _isErrorMessage,
+                      backgroundColor: Theme.of(context).colorScheme.primary,
+                      iconColor: Theme.of(context).colorScheme.onPrimary,
+                      textColor: Theme.of(context).colorScheme.onPrimary,
+                    ),
+                  ),
               ],
             ),
           );
@@ -354,13 +424,10 @@ class _AdmindetailsState extends State<Admindetails> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row( 
+        Row(
           mainAxisAlignment: MainAxisAlignment.start,
           children: [
-            Icon(
-              Icons.person,
-             
-            ),
+            Icon(Icons.person),
             const SizedBox(width: 10),
             Expanded(
               child: Text(
@@ -373,7 +440,7 @@ class _AdmindetailsState extends State<Admindetails> {
                 onPressed: () async {
                   final token = await AuthService.getToken();
                   final role = JwtHelper.getRole(token!)?.toLowerCase().trim();
-                  if (role == "Director") {
+                  if (role == "director") {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
@@ -383,10 +450,7 @@ class _AdmindetailsState extends State<Admindetails> {
                     );
                   }
                 },
-                icon: Icon(
-                  Icons.edit_outlined,
-                 
-                ),
+                icon: Icon(Icons.edit_outlined),
               ),
             // ),
           ],
@@ -405,7 +469,9 @@ class _AdmindetailsState extends State<Admindetails> {
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
-                color: isActive ? Theme.of(context).colorScheme.secondary : Colors.red,
+                color: isActive
+                    ? Theme.of(context).colorScheme.secondary
+                    : Colors.red,
               ),
             ),
             const SizedBox(width: 8),
@@ -419,7 +485,7 @@ class _AdmindetailsState extends State<Admindetails> {
                     scale: 0.8,
                     child: Switch(
                       value: isActive,
-                      activeColor:Theme.of(context).colorScheme.secondary,
+                      activeColor: Theme.of(context).colorScheme.secondary,
                       onChanged: (value) async {
                         setState(() {
                           isActive = value;
@@ -455,20 +521,17 @@ class _AdmindetailsState extends State<Admindetails> {
           ],
         ),
 
-         Divider(height: 10, color: Theme.of(context).colorScheme.secondary,),
+        Divider(height: 10, color: Theme.of(context).colorScheme.secondary),
 
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-             Text(
-              "Created By",
-            style: Theme.of(context).textTheme.titleLarge
-            ),
+            Text("Created By", style: Theme.of(context).textTheme.titleLarge),
             Text(
               admin.createdBy.split('-').length > 1
                   ? admin.createdBy.split('-')[1]
                   : admin.createdBy,
-           style: Theme.of(context).textTheme.headlineMedium,
+              style: Theme.of(context).textTheme.headlineMedium,
             ),
           ],
         ),
@@ -479,13 +542,10 @@ class _AdmindetailsState extends State<Admindetails> {
   Widget _row(IconData icon, String value) {
     return Row(
       children: [
-        Icon(icon,),
+        Icon(icon),
         const SizedBox(width: 10),
         Expanded(
-          child: Text(
-            value,
-           style: Theme.of(context).textTheme.headlineLarge,
-          ),
+          child: Text(value, style: Theme.of(context).textTheme.headlineLarge),
         ),
       ],
     );
@@ -569,7 +629,7 @@ class _AdmindetailsState extends State<Admindetails> {
               ),
             ),
           ],
-        ), 
+        ),
         SizedBox(height: 10),
         if (showEmployees)
           EmployeeList(department: admin.department, searchQuery: searchQuery),
@@ -631,13 +691,10 @@ class _AdmindetailsState extends State<Admindetails> {
               ),
             ),
             const SizedBox(height: 4),
-            Text(
-              title,
-             style: Theme.of(context).textTheme.labelSmall,
-            ),
+            Text(title, style: Theme.of(context).textTheme.labelSmall),
           ],
         ),
       ),
     );
-  } 
+  }
 }

@@ -18,7 +18,7 @@ class AdminService {
 
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
-      final List employeesJson = data['employees']??[];
+      final List employeesJson = data['employees'] ?? [];
       return employeesJson.map((e) => UserModel.fromJson(e)).toList();
     } else {
       throw Exception("Failed to load employees");
@@ -119,7 +119,7 @@ class AdminService {
       final token = await AuthService.getToken();
 
       final response = await http.get(
-        Uri.parse("$baseUrl/Manager/completed-task-points"),
+        Uri.parse("$baseUrl/Manager/completed-task"),
         headers: {
           "Content-Type": "application/json",
           "Authorization": "Bearer $token",
@@ -139,7 +139,9 @@ class AdminService {
 
   static Future<bool> submitReview({
     required String taskCode,
-    required int points,
+    required int managerPoints,
+    required bool isDelayJustified,
+    required String delayReason,
     required String comment,
   }) async {
     final token = await AuthService.getToken();
@@ -153,39 +155,24 @@ class AdminService {
       },
       body: jsonEncode({
         "taskCode": taskCode,
-        "points": points,
+        "managerPoints": managerPoints,
+        "isDelayJustified": isDelayJustified,
+        "delayReason": delayReason,
         "comment": comment,
       }),
     );
 
     if (response.statusCode == 200) {
       return true;
-    } else if (response.statusCode == 403) {
-      throw Exception(
-        "Forbidden: you don't have permission to review this task",
-      );
     } else {
-      // decode safely
-      try {
-        final error = jsonDecode(response.body);
-        throw Exception(error["message"] ?? "Failed to submit review");
-      } catch (_) {
-        throw Exception(
-          "Failed to submit review: ${response.statusCode} ${response.body}",
-        );
-      }
+      throw Exception("Failed to submit review");
     }
   }
 
   static Future<Map<String, dynamic>?> getReview(String taskCode) async {
-    final token = await AuthService.getToken();
-    if (token == null) throw Exception("Token not found");
     final response = await http.get(
-      Uri.parse('$baseUrl/Manager/getreview-task/$taskCode'),
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": "Bearer $token",
-      },
+      Uri.parse('$baseUrl/Manager/getreview/$taskCode'),
+      headers: {"Content-Type": "application/json"},
     );
 
     if (response.statusCode == 200) {

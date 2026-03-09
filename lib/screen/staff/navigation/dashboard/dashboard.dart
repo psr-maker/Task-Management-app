@@ -1,25 +1,23 @@
-import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
-import 'package:staff_work_track/screen/super%20admin/Navigation/Reports/reports_table.dart';
+import 'package:staff_work_track/Models/warning_model.dart';
+import 'package:staff_work_track/core/widgets/loading.dart';
+import 'package:staff_work_track/screen/staff/navigation/dashboard/reports.dart';
+import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/notifi.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/settings/settings.dart';
-import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/warning.dart';
+import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/warnings/warning.dart';
+import 'package:staff_work_track/services/announ_service.dart';
+import 'package:staff_work_track/services/notification_service.dart';
 import 'package:staff_work_track/services/reports_service.dart';
 import 'package:staff_work_track/utils/TaskUtils.dart';
 import 'package:staff_work_track/utils/enum.dart';
 import 'package:staff_work_track/widgets/StatCard.dart';
 import 'package:staff_work_track/widgets/monthlytrend.dart';
-import 'package:staff_work_track/widgets/progressoverview.dart';
+import 'package:staff_work_track/widgets/kpicard.dart';
 
 class StaffDashboard extends StatefulWidget {
   final int userid;
-  final String username;
   final String role;
-  const StaffDashboard({
-    super.key,
-    required this.userid,
-    required this.username,
-    required this.role,
-  });
+  const StaffDashboard({super.key, required this.userid, required this.role});
 
   @override
   State<StaffDashboard> createState() => _EmployeeReportPageState();
@@ -28,37 +26,112 @@ class StaffDashboard extends StatefulWidget {
 class _EmployeeReportPageState extends State<StaffDashboard> {
   Map<String, dynamic>? data;
   bool isLoading = true;
- int overdueCount = 0;
+  int overdueCount = 0;
+  int notificationCount = 0;
+  int apiWarningCount = 0;
+  List<WarningModel> apiWarnings = [];
   List<Map<String, dynamic>> overdueList = [];
   @override
   void initState() {
     super.initState();
     fetchReport();
+    _fetchNotifications();
+    _fetchWarnings();
   }
 
- Future<void> fetchReport() async {
-  try {
-    final result = await ReportsService.getEmployeeReport(widget.userid);
+  void _fetchNotifications() async {
+    try {
+      final data = await NotificationService.getMyNotifications();
 
-    setState(() {
-      data = result;
-      overdueCount = result["overdueCount"] ?? 0;
-      overdueList = (result["overdueTasks"] as List? ?? [])
-          .map((e) => Map<String, dynamic>.from(e))
-          .toList();
-      isLoading = false;
-    });
-  } catch (e) {
-    setState(() {
-      isLoading = false;
-    });
-    print(e);
+      if (!mounted) return;
+
+      setState(() {
+        notificationCount = data.where((n) => n["isRead"] == false).length;
+      });
+    } catch (e) {
+      print("Notification fetch error: $e");
+    }
   }
-}
+
+  void _fetchWarnings() async {
+    try {
+      final warnings = await AnnouncementService.getWarnings();
+
+      if (!mounted) return;
+
+      setState(() {
+        apiWarnings = warnings;
+        apiWarningCount = warnings.length;
+      });
+    } catch (e) {
+      print("Warning fetch error: $e");
+    }
+  }
+
+  Future<void> fetchReport() async {
+    try {
+      final result = await ReportsService.getEmployeeReport(widget.userid);
+
+      setState(() {
+        data = result;
+        isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        isLoading = false;
+      });
+      print(e);
+    }
+  }
+
+  void showTaskDetails(Map task) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        String? delayReason = task["delayReason"];
+        String? comment = task["comment"];
+
+        return Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                task["taskName"] ?? "",
+                style: Theme.of(context).textTheme.labelMedium,
+              ),
+
+              const SizedBox(height: 20),
+
+              buildInfoRow("System Points", task["systemPoints"]),
+              buildInfoRow("Final Points", task["finalPoints"]),
+
+              buildInfoRow(
+                "Delay Justified",
+                task["isDelayJustified"] == true ? "Yes" : "No",
+              ),
+
+              if (delayReason != null &&
+                  delayReason.toString().trim().isNotEmpty)
+                buildInfoRow("Delay Reason", delayReason),
+
+              if (comment != null && comment.toString().trim().isNotEmpty)
+                buildInfoRow("Comment", comment),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (isLoading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const Scaffold(body: Center(child: RotatingFlower()));
     }
 
     if (data == null) {
@@ -66,25 +139,21 @@ class _EmployeeReportPageState extends State<StaffDashboard> {
     }
 
     double completionPercentage = (data?["completionPercent"] ?? 0).toDouble();
-
-    List taskReviews = data?["taskReviewDetails"] ?? [];
-    List<FlSpot> spots = [];
-
-    for (int i = 0; i < taskReviews.length; i++) {
-      double point = (taskReviews[i]["points"] ?? 0).toDouble();
-      spots.add(FlSpot(i.toDouble(), point));
-    }
-
+    final List reviews = (data?["reviews"] ?? []) as List;
     return Scaffold(
       appBar: AppBar(
-        title: Text("${widget.username} - Dashboard"),
-      
-         actions: [
-          if (overdueCount > 0)
+        title: Text("Dashboard"),
+
+        actions: [
+          if (overdueCount > 0 || apiWarningCount > 0)
             Stack(
               children: [
                 IconButton(
-                  icon: const Icon(Icons.warning, color: Colors.red),
+                  icon: Icon(
+                    Icons.warning,
+                    color: Theme.of(context).colorScheme.error,
+                    size: 20,
+                  ),
                   onPressed: () {
                     Navigator.push(
                       context,
@@ -94,43 +163,77 @@ class _EmployeeReportPageState extends State<StaffDashboard> {
                     );
                   },
                 ),
+
+                Positioned(
+                  right: 8,
+                  top: 8,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.onPrimary,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Text(
+                      (overdueCount + apiWarningCount).toString(),
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          Stack(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.notifications, color: Colors.amber),
+                onPressed: () async {
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => NotificationPage()),
+                  );
+
+                  // Refresh count when coming back
+                  _fetchNotifications();
+                },
+              ),
+
+              if (notificationCount > 0)
                 Positioned(
                   right: 8,
                   top: 8,
                   child: Container(
                     padding: const EdgeInsets.all(4),
                     decoration: const BoxDecoration(
-                      color: Colors.white,
+                      color: Colors.red,
                       shape: BoxShape.circle,
                     ),
+                    constraints: const BoxConstraints(
+                      minWidth: 15,
+                      minHeight: 15,
+                    ),
                     child: Text(
-                      overdueCount.toString(),
+                      notificationCount.toString(),
                       style: const TextStyle(
-                        color: Colors.red,
-                        fontSize: 10,
+                        color: Colors.white,
+                        fontSize: 8,
                         fontWeight: FontWeight.bold,
                       ),
+                      textAlign: TextAlign.center,
                     ),
                   ),
                 ),
-              ],
-            ),
-          IconButton(
-            icon: const Icon(Icons.notifications, color: Colors.amber),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => Settings()),
-              );
-            },
+            ],
           ),
           IconButton(
             onPressed: () {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) =>
-                      ReportsTable(userId: widget.userid),
+                  builder: (context) => Reportsstaff(userId: widget.userid),
                 ),
               );
             },
@@ -150,11 +253,11 @@ class _EmployeeReportPageState extends State<StaffDashboard> {
       body: SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.all(15),
-          child: Column( 
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                "Task Performance",
+                "Task Summary",
                 style: Theme.of(context).textTheme.displaySmall,
               ),
               SizedBox(height: 10),
@@ -192,7 +295,7 @@ class _EmployeeReportPageState extends State<StaffDashboard> {
                       title: "IN Progress",
                       value: (data?["inProgressCount"] ?? 0).toString(),
                       icon: Icons.pending_outlined,
-                      color: TaskUtils.getStatusColor(TaskStatus.pending),
+                      color: TaskUtils.getStatusColor(TaskStatus.inProgress),
                     ),
                   ),
                 ],
@@ -205,7 +308,7 @@ class _EmployeeReportPageState extends State<StaffDashboard> {
                       title: "Not Started",
                       value: (data?["notStartedCount"] ?? 0).toString(),
                       icon: Icons.pending_outlined,
-                      color: TaskUtils.getStatusColor(TaskStatus.pending),
+                      color: TaskUtils.getStatusColor(TaskStatus.NotStarted),
                     ),
                   ),
                   SizedBox(width: 10),
@@ -214,7 +317,7 @@ class _EmployeeReportPageState extends State<StaffDashboard> {
                       title: "Avg Completed days",
                       value: (data?["avgCompletionTime"] ?? 0).toString(),
                       icon: Icons.schedule_outlined,
-                      color: Colors.orange,
+                      color: Colors.teal,
                     ),
                   ),
                   SizedBox(width: 10),
@@ -223,7 +326,7 @@ class _EmployeeReportPageState extends State<StaffDashboard> {
                       title: "Late Completed",
                       value: (data?["lateCompleted"] ?? 0).toString(),
                       icon: Icons.schedule_outlined,
-                      color: Colors.orange,
+                      color: Colors.deepOrange,
                     ),
                   ),
                   SizedBox(width: 10),
@@ -237,19 +340,13 @@ class _EmployeeReportPageState extends State<StaffDashboard> {
                   ),
                 ],
               ),
-              SizedBox(height: 15),
-              Row(
-                children: [
-                  Text(
-                    "Performance Overview",
-                    style: Theme.of(context).textTheme.displaySmall,
-                  ),
-                  SizedBox(width: 10),
-                  buildPerformanceBadge(completionPercentage),
-                ],
+
+              const SizedBox(height: 20),
+              Text(
+                "Performance Overview",
+                style: Theme.of(context).textTheme.displaySmall,
               ),
               const SizedBox(height: 10),
-
               Row(
                 children: [
                   Expanded(
@@ -272,44 +369,15 @@ class _EmployeeReportPageState extends State<StaffDashboard> {
                   SizedBox(width: 10),
                   Expanded(
                     child: KpiCircleCard(
-                      title: "Productivity",
-                      value: (data?["productivityPercent"] ?? 0).toDouble(),
-                      icon: Icons.trending_up,
-                      isPercentage: true,
+                      title: "Quality Score",
+                      value: (data?["finalAveragePoints"] ?? 0).toDouble(),
+                      icon: Icons.star_border,
+                      isPercentage: false,
                     ),
                   ),
                   SizedBox(width: 10),
                 ],
               ),
-
-              const SizedBox(height: 15),
-              Text(
-                "Task Performance points",
-                style: Theme.of(context).textTheme.displaySmall,
-              ),
-              const SizedBox(height: 10),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  buildPerformanceCircle(
-                    totalTasks: data?["totalTasks"] ?? 0,
-                    completedTasks: data?["completedCount"] ?? 0,
-                    totalPoints: data?["totalPoints"] ?? 0,
-                  ),
-                  SizedBox(width: 10),
-                  Expanded(
-                    child: buildTaskProgress(data?["taskReviewDetails"] ?? []),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 15),
-
-              Text(
-                "Monthly Trend",
-                style: Theme.of(context).textTheme.displaySmall,
-              ),
-              const SizedBox(height: 10),
 
               MonthlyTrendChart(
                 monthlyData:
@@ -318,6 +386,28 @@ class _EmployeeReportPageState extends State<StaffDashboard> {
                         .toList() ??
                     [],
               ),
+
+              if (reviews.isNotEmpty) ...[
+                const SizedBox(height: 20),
+                Text(
+                  "Task Performance Points",
+                  style: Theme.of(context).textTheme.displaySmall,
+                ),
+                const SizedBox(height: 15),
+
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    buildPerformanceCircle(
+                      avgPoints: (data?["finalAveragePoints"] ?? 0).toDouble(),
+                    ),
+
+                    const SizedBox(width: 15),
+
+                    Expanded(child: buildTaskProgress(reviews)),
+                  ],
+                ),
+              ],
             ],
           ),
         ),
@@ -325,18 +415,78 @@ class _EmployeeReportPageState extends State<StaffDashboard> {
     );
   }
 
-  Widget buildPerformanceCircle({
-    required int totalTasks,
-    required int completedTasks,
-    required int totalPoints,
-  }) {
-    int maxPossiblePoints = totalTasks * 100;
+  Widget buildTaskProgress(List taskReviews) {
+    return Column(
+      children: taskReviews.map<Widget>((task) {
+        int finalPoints = task["finalPoints"] ?? 0;
 
-    double percent = maxPossiblePoints > 0
-        ? (totalPoints / maxPossiblePoints)
-        : 0.0;
+        double progress = (finalPoints / 100).clamp(0.0, 1.0);
 
-    percent = percent.clamp(0.0, 1.0);
+        Color barColor;
+        if (finalPoints >= 75) {
+          barColor = Theme.of(context).colorScheme.secondary;
+        } else if (finalPoints >= 50) {
+          barColor = Colors.orange;
+        } else {
+          barColor = Theme.of(context).colorScheme.error;
+        }
+
+        return GestureDetector(
+          onTap: () {
+            showTaskDetails(task);
+          },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 5),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                /// Task Name
+                Text(
+                  task["taskName"] ?? "",
+                  style: Theme.of(context).textTheme.headlineLarge,
+                ),
+
+                const SizedBox(height: 5),
+
+                Row(
+                  children: [
+                    Expanded(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: LinearProgressIndicator(
+                          value: progress,
+                          minHeight: 8,
+                          backgroundColor: Colors.grey.shade300,
+                          valueColor: AlwaysStoppedAnimation(barColor),
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(width: 10),
+
+                    /// Final Points
+                    Row(
+                      children: [
+                        Text(
+                          finalPoints.toString(),
+                          style: Theme.of(context).textTheme.headlineLarge,
+                        ),
+                        const SizedBox(width: 4),
+                        Icon(Icons.star, color: barColor),
+                      ],
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget buildPerformanceCircle({required double avgPoints}) {
+    double percent = (avgPoints / 100).clamp(0.0, 1.0);
 
     return SizedBox(
       width: 100,
@@ -358,26 +508,19 @@ class _EmployeeReportPageState extends State<StaffDashboard> {
           Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
+              const SizedBox(height: 15),
               Text(
-                "${totalPoints.toString()} points",
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.yellow,
-                ),
+                "Avg Points",
+                style: Theme.of(context).textTheme.headlineLarge,
               ),
-
-              // const SizedBox(height: 4),
-
-              // Text(
-              //   "${(percent * 100).toStringAsFixed(0)}%",
-              //   style: const TextStyle(fontSize: 14,  color: Colors.white),
-              // ),
-              const SizedBox(height: 6),
-
+              const SizedBox(height: 5),
               Text(
-                "$completedTasks / $totalTasks Completed",
-                style: const TextStyle(fontSize: 10, color: Colors.white),
+                avgPoints.toStringAsFixed(1),
+                style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.amber,
+                ),
               ),
             ],
           ),
@@ -386,97 +529,25 @@ class _EmployeeReportPageState extends State<StaffDashboard> {
     );
   }
 
-  Widget buildTaskProgress(List taskReviews) {
-    return Column(
-      children: taskReviews.map<Widget>((task) {
-        int points = task["points"] ?? 0;
-
-        double progress = (points / 100).clamp(0.0, 1.0);
-        Color barColor;
-
-        if (points >= 75) {
-          barColor = Colors.green;
-        } else if (points >= 50) {
-          barColor = Colors.orange;
-        } else {
-          barColor = Colors.red;
-        }
-
-        return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                task["taskName"] ?? "",
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Row(
-                children: [
-                  Expanded(
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(10),
-                      child: LinearProgressIndicator(
-                        value: progress,
-                        minHeight: 8,
-                        backgroundColor: Colors.grey.shade300,
-                        valueColor: AlwaysStoppedAnimation(barColor),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Row(
-                    children: [
-                      Text(
-                        points.toString(),
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(width: 4),
-                      Icon(Icons.star, size: 18, color: barColor),
-                    ],
-                  ),
-                ],
-              ),
-            ],
+  Widget buildInfoRow(String title, dynamic value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 130,
+            child: Text(
+              title,
+              style: Theme.of(context).textTheme.headlineLarge,
+            ),
           ),
-        );
-      }).toList(),
-    );
-  }
-
-  Widget buildPerformanceBadge(double completionPercent) {
-    String grade;
-    Color color;
-
-    if (completionPercent >= 85) {
-      grade = "Excellent";
-      color = Colors.green;
-    } else if (completionPercent >= 60) {
-      grade = "Average";
-      color = Colors.orange;
-    } else {
-      grade = "Needs Improvement";
-      color = Colors.red;
-    }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color),
-      ),
-      child: Text(
-        grade,
-        style: TextStyle(
-          color: color,
-          fontWeight: FontWeight.bold,
-          fontSize: 12,
-        ),
+          Expanded(
+            child: Text(
+              value.toString(),
+              style: Theme.of(context).textTheme.headlineLarge,
+            ),
+          ),
+        ],
       ),
     );
   }

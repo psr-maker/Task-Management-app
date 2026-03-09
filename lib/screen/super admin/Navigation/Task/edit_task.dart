@@ -89,25 +89,23 @@ class _EditTaskState extends State<EditTask> {
     });
   }
 
-Future<void> _assignUsers() async {
-  final users = await SuperAdminService.getAllUsers();
+  Future<void> _assignUsers() async {
+    final users = await SuperAdminService.getAllUsers();
 
-  final result = await Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (_) => AssignUsersPage(
-        users: users,
-        selectedUsers: assignedUsers,
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) =>
+            AssignUsersPage(users: users, selectedUsers: assignedUsers),
       ),
-    ),
-  );
+    );
 
-  if (result != null && result is List<UserModel>) {
-    setState(() {
-      assignedUsers = result;
-    });
+    if (result != null && result is List<UserModel>) {
+      setState(() {
+        assignedUsers = result;
+      });
+    }
   }
-}
 
   @override
   Widget build(BuildContext context) {
@@ -132,11 +130,8 @@ Future<void> _assignUsers() async {
                     children: [
                       TextButton.icon(
                         onPressed: _assignUsers,
-                        icon: const Icon(
-                          Icons.person_add,
-                       
-                        ),
-                        label:  Text(
+                        icon: const Icon(Icons.person_add),
+                        label: Text(
                           "Assign Users",
                           style: Theme.of(context).textTheme.titleLarge,
                         ),
@@ -185,7 +180,10 @@ Future<void> _assignUsers() async {
                     children: assignedUsers.map((user) {
                       return Chip(
                         label: Text(user.name),
-                        deleteIcon: const Icon(Icons.close,color: Colors.white,),
+                        deleteIcon: const Icon(
+                          Icons.close,
+                          color: Colors.white,
+                        ),
                         onDeleted: () {
                           setState(() {
                             assignedUsers.removeWhere(
@@ -237,8 +235,8 @@ Future<void> _assignUsers() async {
                         }
                       },
 
-                   color: Theme.of(context).colorScheme.secondary,
-                                txtcolor: Theme.of(context).colorScheme.onPrimary,
+                      color: Theme.of(context).colorScheme.secondary,
+                      txtcolor: Theme.of(context).colorScheme.onPrimary,
                     ),
                   ),
                 ],
@@ -256,6 +254,9 @@ Future<void> _assignUsers() async {
                 context,
                 message: _topMessage!,
                 isError: _isErrorMessage,
+                backgroundColor: Theme.of(context).colorScheme.primary,
+                iconColor: Theme.of(context).colorScheme.onPrimary,
+                textColor: Theme.of(context).colorScheme.onPrimary,
               ),
             ),
         ],

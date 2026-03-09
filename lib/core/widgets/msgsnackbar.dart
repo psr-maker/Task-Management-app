@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 
-
 class Msgsnackbar extends StatelessWidget {
   final String message;
   final bool isError;
-  final Color? backgroundColor;  
-  final Color? textColor;        
-  final Color? iconColor;         
+  final Color? backgroundColor;
+  final Color? textColor;
+  final Color? iconColor;
 
+  // ✅ Keep context parameter (but don’t use it)
   const Msgsnackbar(
-    BuildContext context, {
+    BuildContext _, { // ← use "_" to ignore it
     super.key,
     required this.message,
     required this.isError,
@@ -46,9 +46,7 @@ class Msgsnackbar extends StatelessWidget {
               ),
               padding: const EdgeInsets.all(8),
               child: Icon(
-                isError
-                    ? Icons.error_outline
-                    : Icons.check_circle_outline,
+                isError ? Icons.error_outline : Icons.check_circle_outline,
                 color: icColor,
                 size: 28,
               ),
@@ -57,10 +55,7 @@ class Msgsnackbar extends StatelessWidget {
             Expanded(
               child: Text(
                 message,
-                style: TextStyle(
-                  color: txtColor,
-                  fontWeight: FontWeight.w500,
-                ),
+                style: TextStyle(color: txtColor, fontWeight: FontWeight.w500),
               ),
             ),
           ],
@@ -70,8 +65,11 @@ class Msgsnackbar extends StatelessWidget {
   }
 }
 
-
-Future<bool?> showConfirmDialog(BuildContext context, String action,String entitytype) {
+Future<bool?> showConfirmDialog(
+  BuildContext context,
+  String action,
+  String entitytype,
+) {
   return showDialog<bool>(
     context: context,
     builder: (context) {
@@ -98,9 +96,11 @@ Future<bool?> showConfirmDialog(BuildContext context, String action,String entit
             child: Text(
               action,
               style: TextStyle(
-                color: action == "Approve" ? const Color.fromARGB(255, 25, 77, 38): Colors.red,
+                color: action == "Approve"
+                    ? const Color.fromARGB(255, 25, 77, 38)
+                    : Colors.red,
                 fontWeight: FontWeight.bold,
-                  fontSize: 15,
+                fontSize: 15,
               ),
             ),
           ),

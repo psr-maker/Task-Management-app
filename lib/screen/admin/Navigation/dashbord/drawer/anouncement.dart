@@ -2,18 +2,18 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:staff_work_track/Models/announcement.dart';
 import 'package:staff_work_track/core/constant/apiurl.dart';
-import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/drawer/postanounce.dart';
+import 'package:staff_work_track/core/widgets/loading.dart';
 import 'package:staff_work_track/services/announ_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-class Anounce extends StatefulWidget {
-  const Anounce({super.key});
+class ManagerAnounce extends StatefulWidget {
+  const ManagerAnounce({super.key});
 
   @override
-  State<Anounce> createState() => _AnounceState();
+  State<ManagerAnounce> createState() => _AnounceState();
 }
 
-class _AnounceState extends State<Anounce> {
+class _AnounceState extends State<ManagerAnounce> {
   late Future<List<Announcement>> futureAnnouncements;
 
   @override
@@ -31,23 +31,13 @@ class _AnounceState extends State<Anounce> {
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text("Announcements"),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.add),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const PostAnnouncementPage()),
-              );
-            },
-          ),
-        ],
+     
       ),
       body: FutureBuilder<List<Announcement>>(
         future: futureAnnouncements,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return const Center(child: RotatingFlower());
           }
 
           if (snapshot.hasError) {

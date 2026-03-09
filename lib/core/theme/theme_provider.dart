@@ -56,6 +56,8 @@ class ThemeProvider extends ChangeNotifier {
         secondary: deepGreen,
         tertiary: Colors.white54,
         onPrimary: Colors.white,
+        background: Color.fromARGB(255, 134, 170, 136),
+        error: Colors.red,
       ),
 
       splashColor: Colors.white.withOpacity(0.3),
@@ -109,7 +111,7 @@ class ThemeProvider extends ChangeNotifier {
         ),
         titleMedium: TextStyle(
           fontSize: 10,
-          fontWeight: FontWeight.w600,
+          fontWeight: FontWeight.w700,
           color: Colors.white,
         ),
 
@@ -166,18 +168,21 @@ class ThemeProvider extends ChangeNotifier {
           fontSize: 18,
           fontWeight: FontWeight.bold,
         ),
-         iconTheme: IconThemeData(color: Colors.white, size: 20),
+        iconTheme: IconThemeData(color: Colors.white, size: 20),
       ),
-       iconTheme: const IconThemeData(color: Colors.white, size: 18),
+      iconTheme: const IconThemeData(color: Colors.white, size: 18),
       primaryColor: deepGreen,
       colorScheme: const ColorScheme.dark(
         primary: Color.fromARGB(255, 68, 99, 80),
+        onPrimary: Colors.white,
         secondary: Color.fromARGB(255, 97, 124, 95),
         tertiary: Colors.white54,
+        background: Color.fromARGB(255, 134, 170, 136),
+        error: Colors.red,
       ),
       splashColor: deepGreen.withOpacity(0.3),
       highlightColor: deepGreen.withOpacity(0.1),
-     
+
       cardTheme: const CardThemeData(
         color: Color.fromARGB(255, 15, 35, 20), // dark card background
         elevation: 2,
@@ -226,7 +231,7 @@ class ThemeProvider extends ChangeNotifier {
         titleMedium: TextStyle(
           fontSize: 10,
           fontWeight: FontWeight.w600,
-          color: Colors.white,
+          color: deepGreen,
         ),
 
         bodySmall: TextStyle(
