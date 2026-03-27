@@ -1,12 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:staff_work_track/Models/warning_model.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
-import 'package:staff_work_track/screen/super%20admin/Navigation/Reports/overduetask.dart';
+import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/warnings/overduetask.dart';
 import 'package:staff_work_track/services/announ_service.dart';
 
 class Warning extends StatefulWidget {
   final List<Map<String, dynamic>> overdueTasks;
-  const Warning({super.key, required this.overdueTasks});
+  final List<Map<String, dynamic>> overdueGoals;
+  const Warning({
+    super.key,
+    required this.overdueTasks,
+    required this.overdueGoals,
+  });
 
   @override
   State<Warning> createState() => _WarningState();
@@ -52,14 +57,14 @@ class _WarningState extends State<Warning> {
 
   @override
   Widget build(BuildContext context) {
-       final theme = Theme.of(context);
+    final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text("Warning"),
+        title: const Text("Warnings"),
       ),
 
       body: isLoading
@@ -68,7 +73,6 @@ class _WarningState extends State<Warning> {
               slivers: [
                 SliverToBoxAdapter(
                   child: Container(
-                    height: 150,
                     padding: const EdgeInsets.all(20),
                     decoration: const BoxDecoration(
                       gradient: LinearGradient(
@@ -82,10 +86,11 @@ class _WarningState extends State<Warning> {
                       ),
                     ),
                     child: Column(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(
+                        Icon(
                           Icons.warning_amber_rounded,
-                          color: Colors.white,
+                          color: Theme.of(context).colorScheme.onPrimary,
                           size: 50,
                         ),
                         const SizedBox(height: 5),
@@ -106,7 +111,7 @@ class _WarningState extends State<Warning> {
                             borderRadius: BorderRadius.circular(30),
                           ),
                           child: Text(
-                            "${warnings.length + widget.overdueTasks.length} Active Alerts",
+                            "${warnings.length + widget.overdueTasks.length + widget.overdueGoals.length} Active Alerts",
                             style: Theme.of(context).textTheme.titleMedium,
                           ),
                         ),
@@ -128,7 +133,15 @@ class _WarningState extends State<Warning> {
                         OverdueTaskList(overdueTasks: widget.overdueTasks),
                         const SizedBox(height: 20),
                       ],
-
+                      if (widget.overdueGoals.isNotEmpty) ...[
+                        Text(
+                          "Overdue Goals",
+                          style: Theme.of(context).textTheme.displaySmall,
+                        ),
+                        const SizedBox(height: 15),
+                        OverdueGoalList(overdueGoals: widget.overdueGoals),
+                        const SizedBox(height: 20),
+                      ],
                       if (warnings.isNotEmpty) ...[
                         Text(
                           "Warnings",
@@ -188,9 +201,13 @@ class _WarningState extends State<Warning> {
                                             Expanded(
                                               child: Text(
                                                 warning.title,
-                                                style: Theme.of(
-                                                  context,
-                                                ).textTheme.headlineLarge,
+                                                style: TextStyle(
+                                                  color: Theme.of(
+                                                    context,
+                                                  ).colorScheme.error,
+                                                  fontSize: 15,
+                                                  fontWeight: FontWeight.bold
+                                                ),
                                               ),
                                             ),
                                             const SizedBox(width: 8),
@@ -213,14 +230,15 @@ class _WarningState extends State<Warning> {
                                           ).textTheme.labelMedium,
                                         ),
 
-                                        /// Bottom Info
+                                  
+                                        const SizedBox(height: 8),
                                         Row(
                                           children: [
                                             Text(
                                               "${warning.receiverName} • ${warning.receiverRole}",
                                               style: Theme.of(
                                                 context,
-                                              ).textTheme.labelSmall,
+                                              ).textTheme.headlineSmall,
                                             ),
                                             const Spacer(),
                                             Container(
@@ -255,27 +273,6 @@ class _WarningState extends State<Warning> {
                           );
                         }).toList(),
                       ],
-
-                      if (warnings.isEmpty && widget.overdueTasks.isEmpty)
-                        const Padding(
-                          padding: EdgeInsets.only(top: 60),
-                          child: Center(
-                            child: Column(
-                              children: [
-                                Icon(
-                                  Icons.check_circle,
-                                  size: 60,
-                                  color: Colors.green,
-                                ),
-                                SizedBox(height: 12),
-                                Text(
-                                  "No Active Warnings 🎉",
-                                  style: TextStyle(fontSize: 16),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
                     ]),
                   ),
                 ),

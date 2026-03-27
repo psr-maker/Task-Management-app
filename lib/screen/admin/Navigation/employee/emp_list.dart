@@ -25,14 +25,11 @@ class EmployeeList extends StatefulWidget {
 class _EmployeeListState extends State<EmployeeList> {
   late Future<List<UserModel>> employeesFuture;
   String selectedRole = "Staff";
-
   bool isSelectionMode = false;
   bool isAdmin = false;
   Set<int> selectedEmpIds = {};
-
   bool isSearching = false;
   final TaskFilterModel activeFilter = TaskFilterModel();
-
   final TextEditingController searchController = TextEditingController();
 
   @override
@@ -155,7 +152,6 @@ class _EmployeeListState extends State<EmployeeList> {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const Center(child: RotatingFlower());
               }
-
               if (snapshot.hasError) {
                 return Center(
                   child: Text(
@@ -164,48 +160,39 @@ class _EmployeeListState extends State<EmployeeList> {
                   ),
                 );
               }
-
               if (!snapshot.hasData || snapshot.data!.isEmpty) {
                 return const Center(child: Text("No Employees Found"));
               }
-
               final employees = snapshot.data!;
-
               final filteredEmployees = employees.where((emp) {
                 // final query = widget.searchQuery.trim().toLowerCase();
                 final query =
                     searchController.text.trim().toLowerCase().isNotEmpty
                     ? searchController.text.toLowerCase()
                     : widget.searchQuery;
-
                 if (query.isEmpty) return true;
-
                 return emp.name.toLowerCase().contains(query) ||
                     emp.email.toLowerCase().contains(query) ||
                     emp.department.toLowerCase().contains(query);
               }).toList();
-
               return SingleChildScrollView(
                 scrollDirection: Axis.vertical,
                 child: ListView.builder(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
-
                   itemCount: filteredEmployees.length,
                   itemBuilder: (context, index) {
                     final emp = filteredEmployees[index];
-
                     final isSelected = selectedEmpIds.contains(emp.userId);
-
                     return Card(
                       color:  Theme.of(context).colorScheme.background,
                       elevation: 2,
+                      margin: EdgeInsets.only(bottom: 10),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: ListTile(
                         onLongPress: () => _toggleSelection(emp.userId),
-
                         leading: isSelectionMode
                             ? Checkbox(
                                 value: isSelected,
@@ -221,21 +208,17 @@ class _EmployeeListState extends State<EmployeeList> {
                                    style: Theme.of(context).textTheme.labelLarge,
                                 ),
                               ),
-
                         title: Text(
                           emp.name,
                           style: Theme.of(context).textTheme.labelMedium,
                         ),
-
                         subtitle: Text(
                           emp.email,
                           style: Theme.of(context).textTheme.labelMedium,
                         ),
-
                         trailing: isSelectionMode
                             ? null
                             : Icon(Icons.arrow_forward_ios),
-
                         onTap: () {
                           if (isSelectionMode) {
                             _toggleSelection(emp.userId);

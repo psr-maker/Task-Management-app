@@ -44,6 +44,7 @@ dependencies:
   percent_indicator: ^4.2.5
   file_picker: ^10.3.10
   url_launcher: ^6.3.2
+  flutter_secure_storage: ^10.0.0
 
 dev_dependencies:
   flutter_test:

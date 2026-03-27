@@ -20,6 +20,8 @@ class _TaskpointsState extends State<Taskpoints> {
   String? _topMessage;
   bool _isErrorMessage = true;
   bool _showTopMessage = false;
+  bool showPending = true;
+  bool showSubmitted = true;
 
   void showTopMessage(String message, {bool isError = true}) {
     setState(() {
@@ -103,34 +105,65 @@ class _TaskpointsState extends State<Taskpoints> {
             .where((t) => t['finalPoints'] != null)
             .toList();
 
+        // return ListView(
+        //   children: [
+        //     if (pendingTasks.isNotEmpty) ...[
+        //       _buildSectionTitle("Pending Reviews"),
+        //       ...pendingTasks
+        //           .asMap()
+        //           .entries
+        //           .map((entry) => _buildTaskCard(entry.value, entry.key))
+        //           .toList(),
+        //     ],
+
+        //     if (submittedTasks.isNotEmpty) ...[
+        //       const SizedBox(height: 20),
+        //       _buildSectionTitle("Submitted Reviews"),
+        //       ...submittedTasks
+        //           .asMap()
+        //           .entries
+        //           .map((entry) => _buildTaskCard(entry.value, entry.key + 1000))
+        //           .toList(),
+        //     ],
+        //   ],
+        // );
         return ListView(
           children: [
-            if (pendingTasks.isNotEmpty) ...[
-              _buildSectionTitle("Pending Reviews"),
-              ...pendingTasks
-                  .asMap()
-                  .entries
-                  .map((entry) => _buildTaskCard(entry.value, entry.key))
-                  .toList(),
-            ],
+            if (pendingTasks.isNotEmpty)
+              _buildDropdownSection(
+                title: "Pending Reviews...⭐",
+                isOpen: showPending,
+                onTap: () {
+                  setState(() => showPending = !showPending);
+                },
+                children: pendingTasks
+                    .asMap()
+                    .entries
+                    .map((entry) => _buildTaskCard(entry.value, entry.key))
+                    .toList(),
+              ),
 
-            if (submittedTasks.isNotEmpty) ...[
-              const SizedBox(height: 20),
-              _buildSectionTitle("Submitted Reviews"),
-              ...submittedTasks
-                  .asMap()
-                  .entries
-                  .map((entry) => _buildTaskCard(entry.value, entry.key + 1000))
-                  .toList(),
-            ],
+            const SizedBox(height: 16),
+
+            if (submittedTasks.isNotEmpty)
+              _buildDropdownSection(
+                title: "Submitted Reviews",
+                isOpen: showSubmitted,
+                onTap: () {
+                  setState(() => showSubmitted = !showSubmitted);
+                },
+                children: submittedTasks
+                    .asMap()
+                    .entries
+                    .map(
+                      (entry) => _buildTaskCard(entry.value, entry.key + 1000),
+                    )
+                    .toList(),
+              ),
           ],
         );
       },
     );
-  }
-
-  Widget _buildSectionTitle(String title) {
-    return Text(title, style: Theme.of(context).textTheme.displaySmall);
   }
 
   Widget _buildTaskCard(Map<String, dynamic> task, int index) {
@@ -247,6 +280,55 @@ class _TaskpointsState extends State<Taskpoints> {
               ],
             ),
           ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDropdownSection({
+    required String title,
+    required bool isOpen,
+    required VoidCallback onTap,
+    required List<Widget> children,
+  }) {
+    return Column(
+      children: [
+        GestureDetector(
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              color: Theme.of(context).colorScheme.primary,
+              // border: Border.all(
+              //   color: Theme.of(context).colorScheme.secondary,
+              // ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(title, style: Theme.of(context).textTheme.labelLarge),
+                AnimatedRotation(
+                  turns: isOpen ? 0.5 : 0,
+                  duration: const Duration(milliseconds: 200),
+                  child: Icon(
+                    Icons.keyboard_arrow_down,
+                    color: Theme.of(context).colorScheme.onPrimary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+
+        // 👇 CONTENT
+        AnimatedCrossFade(
+          firstChild: const SizedBox(),
+          secondChild: Column(children: children),
+          crossFadeState: isOpen
+              ? CrossFadeState.showSecond
+              : CrossFadeState.showFirst,
+          duration: const Duration(milliseconds: 250),
         ),
       ],
     );

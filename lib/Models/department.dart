@@ -24,4 +24,6 @@ class Department {
         'subDepartment': subDepartment,
         'zone': zone,
       };
+
+  void operator [](String other) {}
 }

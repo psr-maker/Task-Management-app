@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:jwt_decoder/jwt_decoder.dart';
-import 'package:staff_work_track/screen/admin/Navigation/my%20work/Task%20status%20tab/admintask_list.dart';
+import 'package:staff_work_track/core/widgets/loading.dart';
+import 'package:staff_work_track/screen/admin/Navigation/my%20work/Task%20status%20tab/allgoals.dart';
 import 'package:staff_work_track/screen/admin/Navigation/my%20work/Task%20status%20tab/completedtask.dart';
 import 'package:staff_work_track/screen/admin/Navigation/my%20work/Task%20status%20tab/pendingtask.dart';
 import 'package:staff_work_track/screen/admin/Navigation/my%20work/Task%20status%20tab/progresstask.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/Task/create_task.dart';
 import 'package:staff_work_track/services/auth_service.dart';
-import 'package:staff_work_track/core/widgets/loading.dart';
 
 class Mywork extends StatefulWidget {
   const Mywork({super.key});
@@ -58,7 +58,7 @@ class _MyworkState extends State<Mywork> {
   @override
   Widget build(BuildContext context) {
     if (isLoading || adminId == null) {
-      return const Center(child: RotatingFlower(size: 30));
+      return const Center(child: RotatingFlower());
     }
     return DefaultTabController(
       length: 4,
@@ -87,82 +87,69 @@ class _MyworkState extends State<Mywork> {
             child: TabBarView(
               children: [
                 Padding(
-                  padding: const EdgeInsets.all(15),
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.vertical,
-                    child: Column(
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            Expanded(
-                              child: isSearching
-                                  ? TextField(
-                                      controller: searchController,
-                                      decoration: InputDecoration(
-                                        hintText: "Search Task",
-                                        hintStyle: Theme.of(
-                                          context,
-                                        ).textTheme.headlineSmall,
-                                        // prefixIcon: Icon(Icons.search),
-                                        border: InputBorder.none,
-                                        enabledBorder: InputBorder.none,
-                                        focusedBorder: InputBorder.none,
-                                      ),
-                                      onChanged: (_) => setState(() {}),
-                                    )
-                                  : Text(
-                                      "My Task List",
-                                      style: Theme.of(
-                                        context,
-                                      ).textTheme.displaySmall,
+                  padding: const EdgeInsets.only(left: 15,right: 15,top: 10),
+                  child: Column(
+                    children: [
+                      // Top Row: Search + Add Task
+                      Row(
+                        children: [
+                          Expanded(
+                            child: isSearching
+                                ? TextField(
+                                    controller: searchController,
+                                    decoration: InputDecoration(
+                                      hintText: "Search Goal",
+                                      border: InputBorder.none,
                                     ),
-                            ),
-
-                            IconButton(
-                              icon: Icon(
-                                isSearching ? Icons.close : Icons.search,
-                              ),
-                              onPressed: () {
-                                setState(() {
-                                  isSearching = !isSearching;
-                                  searchController.clear();
-                                });
-                              },
-                            ),
-                            GestureDetector(
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) =>
-                                        Createtask(assignedToIds: [adminId!]),
+                                    onChanged: (_) => setState(() {}),
+                                  )
+                                : Text(
+                                    "My Goals",
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.displaySmall,
                                   ),
-                                );
-                              },
-                              child: Chip(
-                                backgroundColor: Theme.of(
-                                  context,
-                                ).colorScheme.secondary,
-                                label: Text(
-                                  "Add Task",
-                                  style: Theme.of(
-                                    context,
-                                  ).textTheme.titleMedium,
+                          ),
+                          IconButton(
+                            icon: Icon(
+                              isSearching ? Icons.close : Icons.search,
+                            ),
+                            onPressed: () {
+                              setState(() {
+                                isSearching = !isSearching;
+                                searchController.clear();
+                              });
+                            },
+                          ),
+                          GestureDetector(
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      Createtask(assignedToIds: [adminId!]),
                                 ),
+                              );
+                            },
+                            child: Chip(
+                              backgroundColor: Theme.of(
+                                context,
+                              ).colorScheme.secondary,
+                              label: Text(
+                                "Add Goal/Task",
+                                style: Theme.of(context).textTheme.titleMedium,
                               ),
                             ),
-                          ],
-                        ),
-                        SizedBox(height: 10),
-                        Alltasklist(
-                          adminId: adminId!,
-                          searchQuery: searchController.text,
-                        ),
-                      ],
-                    ),
+                          ),
+                        ],
+                      ),
+                      Expanded(
+                        child: Allgoals(searchQuery: searchController.text),
+                      ),
+                    ],
                   ),
                 ),
+
                 PendingTab(adminId: adminId!),
                 InProcessTab(adminId: adminId!),
                 CompletedTab(adminId: adminId!),

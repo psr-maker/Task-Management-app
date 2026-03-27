@@ -133,7 +133,7 @@ class AdmintabState extends State<Admintab> {
                       child: Chip(
                         label: Text(
                           selectedAdminIds.isNotEmpty
-                              ? "Add Task"
+                              ? "Add Goal/Task"
                               : "Manager +",
                           style: Theme.of(context).textTheme.titleMedium,
                         ),

@@ -119,7 +119,7 @@ class _EmployeetabState extends State<Employeetab> {
                       },
                       child: Chip(
                         label: Text(
-                          selectedempIds.isNotEmpty ? "Add Task" : "Staff +",
+                          selectedempIds.isNotEmpty ? "Add Goal/Task" : "Staff +",
                           style: Theme.of(context).textTheme.titleMedium,
                         ),
                       ),

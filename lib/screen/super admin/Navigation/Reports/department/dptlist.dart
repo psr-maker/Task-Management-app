@@ -36,8 +36,6 @@ class _DepartmentListPageState extends State<DepartmentListPage> {
           return Center(child: Text("Error: ${snapshot.error}"));
         }
 
-        final departments = snapshot.data ?? [];
-
         // Filter based on search text
         final searchText = searchController.text.toLowerCase();
         final filteredDepartments = allDepartments

@@ -19,7 +19,7 @@ class _AnounceState extends State<Anouncestaff> {
   late Future<List<Announcement>> futureAnnouncements;
 
   @override
-  void initState() {
+  void initState() { 
     super.initState();
     futureAnnouncements = AnnouncementService.fetchAnnouncements();
   }
@@ -62,10 +62,10 @@ class _AnounceState extends State<Anouncestaff> {
                           height: 14,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            gradient: const LinearGradient(
+                            gradient:  LinearGradient(
                               colors: [
-                                Colors.green,
-                                Color.fromARGB(255, 17, 67, 18),
+                                Theme.of(context).colorScheme.background,
+                                Theme.of(context).colorScheme.secondary,
                               ],
                             ),
                           ),
@@ -73,7 +73,7 @@ class _AnounceState extends State<Anouncestaff> {
                         Container(
                           width: 2,
                           height: 120,
-                          color: Colors.grey.shade300,
+                          color: Colors.grey,
                         ),
                       ],
                     ),
@@ -82,10 +82,10 @@ class _AnounceState extends State<Anouncestaff> {
 
                     Expanded(
                       child: Container(
-                        padding: const EdgeInsets.all(18),
+                        padding: const EdgeInsets.all(15),
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: Colors.green.shade200),
+                          border: Border.all(color:  Theme.of(context).colorScheme.secondary,),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -124,20 +124,20 @@ class _AnounceState extends State<Anouncestaff> {
                               ],
                             ),
 
-                            const SizedBox(height: 6),
+                            const SizedBox(height: 10),
 
                             Row(
                               children: [
                                 Icon(
                                   Icons.schedule,
                                   size: 14,
-                                  color: Colors.grey.shade600,
+                                  color: Colors.grey,
                                 ),
                                 const SizedBox(width: 4),
                                 Text(
                                   "${item.createdDate.toLocal()}".split(' ')[0],
                                   style: const TextStyle(
-                                    fontSize: 12,
+                                    fontSize: 13,
                                     color: Colors.grey,
                                   ),
                                 ),
@@ -145,7 +145,7 @@ class _AnounceState extends State<Anouncestaff> {
                                 Icon(
                                   Icons.person,
                                   size: 14,
-                                  color: Colors.grey.shade600,
+                                  color: Colors.grey,
                                 ),
                                 const SizedBox(width: 4),
                                 Text(
@@ -163,7 +163,7 @@ class _AnounceState extends State<Anouncestaff> {
                             if (item.description != null)
                               Text(
                                 item.description!,
-                                style: Theme.of(context).textTheme.titleLarge,
+                                style: Theme.of(context).textTheme.labelMedium,
                               ),
 
                             const SizedBox(height: 14),

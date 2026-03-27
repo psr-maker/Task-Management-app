@@ -3,8 +3,6 @@ import 'package:staff_work_track/core/widgets/loading.dart';
 import 'package:staff_work_track/screen/admin/Navigation/employee/emp_list.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/Reports/reports_table.dart';
 import 'package:staff_work_track/services/reports_service.dart';
-import 'package:staff_work_track/utils/TaskUtils.dart';
-import 'package:staff_work_track/utils/enum.dart';
 import 'package:staff_work_track/widgets/StatCard.dart';
 import 'package:staff_work_track/widgets/monthlytrend.dart';
 import 'package:staff_work_track/widgets/kpicard.dart';
@@ -27,21 +25,43 @@ class DepartmentReportsTab extends StatefulWidget {
 
 class _DepartmentReportsTabState extends State<DepartmentReportsTab> {
   late Future<Map<String, dynamic>> reportFuture;
-
+  Map<String, dynamic>? data;
+  bool isLoading = true;
+  DateTime selectedYear = DateTime.now();
   @override
   void initState() {
     super.initState();
     _fetchReport();
+    loadData();
   }
 
   void _fetchReport() {
+    final fromDate = DateTime(selectedYear.year, 1, 1);
+    final toDate = DateTime(selectedYear.year, 12, 31, 23, 59, 59);
+
     setState(() {
       reportFuture = ReportsService.fetchDepartmentReport(
         widget.department,
-        fromDate: widget.fromDate,
-        toDate: widget.toDate,
+        fromDate: fromDate,
+        toDate: toDate,
       );
     });
+  }
+
+  Future<void> loadData() async {
+    try {
+      final res = await ReportsService.getdeptMonthlyProductivity(
+        widget.department,
+        selectedYear.year,
+      );
+
+      setState(() {
+        data = res;
+        isLoading = false;
+      });
+    } catch (e) {
+      setState(() => isLoading = false);
+    }
   }
 
   @override
@@ -66,6 +86,28 @@ class _DepartmentReportsTabState extends State<DepartmentReportsTab> {
             },
             icon: Icon(Icons.bar_chart_rounded),
           ),
+          IconButton(
+            onPressed: () async {
+              final picked = await showDatePicker(
+                context: context,
+                initialDate: selectedYear,
+                firstDate: DateTime(2020),
+                lastDate: DateTime.now(),
+                initialDatePickerMode: DatePickerMode.year,
+              );
+
+              if (picked != null) {
+                setState(() {
+                  selectedYear = picked;
+                  isLoading = true;
+                });
+
+                _fetchReport();
+                await loadData();
+              }
+            },
+            icon: Icon(Icons.calendar_month),
+          ),
         ],
       ),
       body: FutureBuilder<Map<String, dynamic>>(
@@ -80,53 +122,43 @@ class _DepartmentReportsTabState extends State<DepartmentReportsTab> {
           }
 
           final data = snapshot.data!;
-
+          final monthlyData = (this.data?["monthlyData"] as List? ?? []);
           return SingleChildScrollView(
             padding: const EdgeInsets.all(15),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  "Task summary",
+                  "Goal & Task Summary",
                   style: Theme.of(context).textTheme.displaySmall,
                 ),
                 const SizedBox(height: 10),
-
                 Row(
                   children: [
                     Expanded(
                       child: SmallStatCard(
-                        title: "Total Tasks",
-                        value: (data["totalTasks"] ?? 0).toString(),
+                        title: "Total Employees",
+                        value: (data["totalUsers"] ?? 0).toString(),
                         icon: Icons.task_outlined,
-                        color: Colors.blue,
+                        color: Colors.brown,
                       ),
                     ),
                     SizedBox(width: 10),
                     Expanded(
                       child: SmallStatCard(
-                        title: "Completed",
-                        value: (data["completed"] ?? 0).toString(),
+                        title: "Total Goal",
+                        value: (data["totalGoals"] ?? 0).toString(),
                         icon: Icons.check_circle_outlined,
-                        color: TaskUtils.getStatusColor(TaskStatus.completed),
+                        color: Colors.deepPurple,
                       ),
                     ),
                     SizedBox(width: 10),
                     Expanded(
                       child: SmallStatCard(
-                        title: "Pending",
-                        value: (data["pending"] ?? 0).toString(),
-                        icon: Icons.pending_outlined,
-                        color: TaskUtils.getStatusColor(TaskStatus.pending),
-                      ),
-                    ),
-                    SizedBox(width: 10),
-                    Expanded(
-                      child: SmallStatCard(
-                        title: "In Progress",
-                        value: (data["inProgress"] ?? 0).toString(),
-                        icon: Icons.warning_outlined,
-                        color: TaskUtils.getStatusColor(TaskStatus.inProgress),
+                        title: "Total Task",
+                        value: (data["totalTasks"] ?? 0).toString(),
+                        icon: Icons.check_circle_outlined,
+                        color: Colors.blue,
                       ),
                     ),
                   ],
@@ -136,37 +168,59 @@ class _DepartmentReportsTabState extends State<DepartmentReportsTab> {
                   children: [
                     Expanded(
                       child: SmallStatCard(
-                        title: "Not Started",
-                        value: (data["notStarted"] ?? 0).toString(),
+                        title: "Completed Goal",
+                        value: (data["completedGoals"] ?? 0).toString(),
                         icon: Icons.task_outlined,
-                        color: TaskUtils.getStatusColor(TaskStatus.NotStarted),
+                        color: Colors.green,
                       ),
                     ),
                     SizedBox(width: 10),
                     Expanded(
                       child: SmallStatCard(
-                        title: "Avg completed days",
-                        value: (data["averageCompletionDays"] ?? 0).toString(),
+                        title: "Pending Goal",
+                        value: (data["pendingGoals"] ?? 0).toString(),
                         icon: Icons.check_circle_outlined,
+                        color: Colors.orange,
+                      ),
+                    ),
+                    SizedBox(width: 10),
+                    Expanded(
+                      child: SmallStatCard(
+                        title: "Overdue Goal",
+                        value: (data["overdueGoals"] ?? 0).toString(),
+                        icon: Icons.pending_outlined,
+                        color: Colors.red,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: SmallStatCard(
+                        title: "Completed Tasks",
+                        value: (data["completedTasks"] ?? 0).toString(),
+                        icon: Icons.task_outlined,
                         color: Colors.teal,
                       ),
                     ),
                     SizedBox(width: 10),
                     Expanded(
                       child: SmallStatCard(
-                        title: "Late completed",
-                        value: (data["lateCompleted"] ?? 0).toString(),
-                        icon: Icons.pending_outlined,
-                        color: Colors.deepOrange,
+                        title: "Pending Tasks",
+                        value: (data["pendingTasks"] ?? 0).toString(),
+                        icon: Icons.check_circle_outlined,
+                        color: const Color.fromARGB(255, 235, 211, 0),
                       ),
                     ),
                     SizedBox(width: 10),
                     Expanded(
                       child: SmallStatCard(
-                        title: "Overdue Task",
-                        value: (data["overdue"] ?? 0).toString(),
-                        icon: Icons.warning_outlined,
-                        color: Colors.red,
+                        title: "Overdue Tasks",
+                        value: (data["overdueTasks"] ?? 0).toString(),
+                        icon: Icons.pending_outlined,
+                        color: Colors.redAccent,
                       ),
                     ),
                   ],
@@ -181,30 +235,42 @@ class _DepartmentReportsTabState extends State<DepartmentReportsTab> {
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
                     KpiCircleCard(
-                      title: "Completion Rate",
-                      value: (data["completionPercentage"] ?? 0).toDouble(),
+                      title: "Completion %",
+                      value: (data["goalCompletionPercentage"] ?? 0).toDouble(),
                       icon: Icons.verified_outlined,
                       isPercentage: true,
                     ),
 
                     KpiCircleCard(
-                      title: "On-Time",
-                      value: (data["slaPercentage"] ?? 0).toDouble(),
+                      title: "On-Time Completion%",
+                      value: (data["onTimeGoalCompletionPercentage"] ?? 0)
+                          .toDouble(),
                       icon: Icons.verified_outlined,
                       isPercentage: true,
                     ),
                     KpiCircleCard(
-                      title: "Growth",
-                      value: (data["growthPercentage"] ?? 0).toDouble(),
-                      icon: Icons.trending_up,
+                      title: "Delayed %",
+                      value: (data["delayedGoalPercentage"] ?? 0).toDouble(),
+                      icon: Icons.timer,
                       isPercentage: true,
                     ),
                   ],
                 ),
 
-                MonthlyTrendChart(
-                  monthlyData: (data["monthlyTrend"] as List)
-                      .map((e) => e as Map<String, dynamic>)
+                const SizedBox(height: 20),
+
+                ProductivityBarChart(
+                  data: monthlyData
+                      .map(
+                        (e) => {
+                          "month": e["month"],
+                          "productivity": e["productivity"],
+                          "taskPoints": e["taskPoints"],
+                          "goalPoints": e["goalPoints"],
+                          "fiveSPoints": e["fiveSPoints"],
+                          "warrantyPoints": e["warrantyPoints"],
+                        },
+                      )
                       .toList(),
                 ),
                 _buildPerformanceSection(data),
@@ -227,8 +293,8 @@ class _DepartmentReportsTabState extends State<DepartmentReportsTab> {
     final top = data["topPerformer"];
     final low = data["lowPerformer"];
 
-    final showTop = top != null && (top["completed"] ?? 0) > 0;
-    final showLow = low != null && (low["completed"] ?? 0) > 0;
+    final showTop = top != null && (top["completedTasks"] ?? 0) > 0;
+    final showLow = low != null && (low["completedTasks"] ?? 0) > 0;
 
     if (!showTop && !showLow) return const SizedBox.shrink();
 
@@ -246,19 +312,20 @@ class _DepartmentReportsTabState extends State<DepartmentReportsTab> {
           _advancedPerformerCard(
             title: "Top Performer",
             name: top!["user"] ?? "-",
-            completedCount: top["completed"] ?? 0,
-            totalTasks: top["totalTasks"] ?? 0,
+            completedCount: top["completedTasks"] ?? 0,
+            totalTasks: top["totalTasks"] ?? 0, // we will fix below
             startColor: Theme.of(context).colorScheme.primary,
             endColor: Theme.of(context).colorScheme.secondary,
             icon: Icons.emoji_events,
           ),
+
         if (showTop) const SizedBox(height: 5),
 
         if (showLow)
           _advancedPerformerCard(
             title: "Low Performer",
             name: low!["user"] ?? "-",
-            completedCount: low["completed"] ?? 0,
+            completedCount: low["completedTasks"] ?? 0,
             totalTasks: low["totalTasks"] ?? 0,
             startColor: Colors.redAccent,
             endColor: Colors.red,
@@ -281,7 +348,6 @@ class _DepartmentReportsTabState extends State<DepartmentReportsTab> {
     final int percentage = (progress * 100).round();
 
     return Container(
-      height: 100,
       margin: const EdgeInsets.symmetric(vertical: 4),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(20),
@@ -295,6 +361,7 @@ class _DepartmentReportsTabState extends State<DepartmentReportsTab> {
         padding: const EdgeInsets.all(10),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
             Row(
               children: [

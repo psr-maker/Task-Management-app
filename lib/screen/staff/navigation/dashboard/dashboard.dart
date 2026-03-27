@@ -1,15 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:staff_work_track/Models/warning_model.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
-import 'package:staff_work_track/screen/staff/navigation/dashboard/reports.dart';
+import 'package:staff_work_track/screen/staff/navigation/dashboard/drawer/leave.dart';
+import 'package:staff_work_track/screen/super%20admin/Navigation/Reports/reports_table.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/notifi.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/settings/settings.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/warnings/warning.dart';
 import 'package:staff_work_track/services/announ_service.dart';
 import 'package:staff_work_track/services/notification_service.dart';
 import 'package:staff_work_track/services/reports_service.dart';
-import 'package:staff_work_track/utils/TaskUtils.dart';
-import 'package:staff_work_track/utils/enum.dart';
 import 'package:staff_work_track/widgets/StatCard.dart';
 import 'package:staff_work_track/widgets/monthlytrend.dart';
 import 'package:staff_work_track/widgets/kpicard.dart';
@@ -17,24 +16,36 @@ import 'package:staff_work_track/widgets/kpicard.dart';
 class StaffDashboard extends StatefulWidget {
   final int userid;
   final String role;
-  const StaffDashboard({super.key, required this.userid, required this.role});
+  final VoidCallback? onBackToManager;
+  const StaffDashboard({
+    super.key,
+    required this.userid,
+    required this.role,
+    this.onBackToManager,
+  });
 
   @override
-  State<StaffDashboard> createState() => _EmployeeReportPageState();
+  State<StaffDashboard> createState() => _StaffDashboardState();
 }
 
-class _EmployeeReportPageState extends State<StaffDashboard> {
+class _StaffDashboardState extends State<StaffDashboard> {
   Map<String, dynamic>? data;
   bool isLoading = true;
-  int overdueCount = 0;
-  int notificationCount = 0;
+  int overdueTaskCount = 0;
+  int overdueGoalCount = 0;
+
+  List<Map<String, dynamic>> overdueTaskList = [];
+  List<Map<String, dynamic>> overdueGoalList = [];
   int apiWarningCount = 0;
   List<WarningModel> apiWarnings = [];
-  List<Map<String, dynamic>> overdueList = [];
+  int notificationCount = 0;
+  DateTime selectedYear = DateTime.now();
+  List<dynamic> monthlyData = [];
+
   @override
   void initState() {
     super.initState();
-    fetchReport();
+    fetchAllData();
     _fetchNotifications();
     _fetchWarnings();
   }
@@ -68,13 +79,31 @@ class _EmployeeReportPageState extends State<StaffDashboard> {
     }
   }
 
-  Future<void> fetchReport() async {
+  Future<void> fetchAllData() async {
     try {
-      final result = await ReportsService.getEmployeeReport(widget.userid);
+      final report = await ReportsService.getEmployeeReport(
+        widget.userid,
+        selectedYear.year,
+      );
+      final monthly = await ReportsService.getMonthlyProductivity(
+        widget.userid,
+        selectedYear.year,
+      );
 
       setState(() {
-        data = result;
+        data = report;
+        monthlyData = monthly;
         isLoading = false;
+        overdueTaskCount = report["overdueTasks"] ?? 0;
+        overdueGoalCount = report["overdueGoals"] ?? 0;
+
+        overdueTaskList = List<Map<String, dynamic>>.from(
+          report["overdueTaskList"] ?? [],
+        );
+
+        overdueGoalList = List<Map<String, dynamic>>.from(
+          report["overdueGoalList"] ?? [],
+        );
       });
     } catch (e) {
       setState(() {
@@ -82,50 +111,6 @@ class _EmployeeReportPageState extends State<StaffDashboard> {
       });
       print(e);
     }
-  }
-
-  void showTaskDetails(Map task) {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) {
-        String? delayReason = task["delayReason"];
-        String? comment = task["comment"];
-
-        return Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                task["taskName"] ?? "",
-                style: Theme.of(context).textTheme.labelMedium,
-              ),
-
-              const SizedBox(height: 20),
-
-              buildInfoRow("System Points", task["systemPoints"]),
-              buildInfoRow("Final Points", task["finalPoints"]),
-
-              buildInfoRow(
-                "Delay Justified",
-                task["isDelayJustified"] == true ? "Yes" : "No",
-              ),
-
-              if (delayReason != null &&
-                  delayReason.toString().trim().isNotEmpty)
-                buildInfoRow("Delay Reason", delayReason),
-
-              if (comment != null && comment.toString().trim().isNotEmpty)
-                buildInfoRow("Comment", comment),
-            ],
-          ),
-        );
-      },
-    );
   }
 
   @override
@@ -138,14 +123,16 @@ class _EmployeeReportPageState extends State<StaffDashboard> {
       return const Scaffold(body: Center(child: Text("No data found")));
     }
 
-    double completionPercentage = (data?["completionPercent"] ?? 0).toDouble();
-    final List reviews = (data?["reviews"] ?? []) as List;
+    double completionPercentage = (data?["goalCompletionPercent"] ?? 0)
+        .toDouble();
+    double onTimePercentage = (data?["goalOnTimePercent"] ?? 0).toDouble();
+    double delayedGoalPercent = (data?["delayedGoalPercent"] ?? 0).toDouble();
     return Scaffold(
+      drawer: _buildDrawer(context),
       appBar: AppBar(
         title: Text("Dashboard"),
-
         actions: [
-          if (overdueCount > 0 || apiWarningCount > 0)
+          if ((overdueTaskCount + overdueGoalCount) > 0 || apiWarningCount > 0)
             Stack(
               children: [
                 IconButton(
@@ -158,7 +145,10 @@ class _EmployeeReportPageState extends State<StaffDashboard> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => Warning(overdueTasks: overdueList),
+                        builder: (_) => Warning(
+                          overdueTasks: overdueTaskList,
+                          overdueGoals: overdueGoalList,
+                        ),
                       ),
                     );
                   },
@@ -174,7 +164,8 @@ class _EmployeeReportPageState extends State<StaffDashboard> {
                       shape: BoxShape.circle,
                     ),
                     child: Text(
-                      (overdueCount + apiWarningCount).toString(),
+                      (overdueTaskCount + overdueGoalCount + apiWarningCount)
+                          .toString(),
                       style: TextStyle(
                         color: Theme.of(context).colorScheme.error,
                         fontSize: 10,
@@ -233,7 +224,7 @@ class _EmployeeReportPageState extends State<StaffDashboard> {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => Reportsstaff(userId: widget.userid),
+                  builder: (context) => ReportsTable(userId: widget.userid),
                 ),
               );
             },
@@ -250,302 +241,246 @@ class _EmployeeReportPageState extends State<StaffDashboard> {
           ),
         ],
       ),
+
       body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(15),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                "Task Summary",
-                style: Theme.of(context).textTheme.displaySmall,
-              ),
-              SizedBox(height: 10),
-              Row(
+        scrollDirection: Axis.vertical,
+        child: Stack(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(15),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: SmallStatCard(
-                      title: "Total Tasks",
-                      value: (data?["totalTasks"] ?? 0).toString(),
-                      icon: Icons.task_outlined,
-                      color: Colors.blue,
-                    ),
+                  Text(
+                    "Goal & Task Summary",
+                    style: Theme.of(context).textTheme.displaySmall,
                   ),
-                  SizedBox(width: 10),
-                  Expanded(
-                    child: SmallStatCard(
-                      title: "Completed",
-                      value: (data?["completedCount"] ?? 0).toString(),
-                      icon: Icons.check_circle_outlined,
-                      color: TaskUtils.getStatusColor(TaskStatus.completed),
-                    ),
+                  SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: SmallStatCard(
+                          title: "Total Goals",
+                          value: (data?["totalGoals"] ?? 0).toString(),
+                          icon: Icons.emoji_events_outlined,
+                          color: Colors.deepPurple,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: SmallStatCard(
+                          title: "Total Tasks",
+                          value: (data?["totalTasks"] ?? 0).toString(),
+                          icon: Icons.task_outlined,
+                          color: Colors.blue,
+                        ),
+                      ),
+                    ],
                   ),
-                  SizedBox(width: 10),
-                  Expanded(
-                    child: SmallStatCard(
-                      title: "Pending",
-                      value: (data?["pendingCount"] ?? 0).toString(),
-                      icon: Icons.pending_outlined,
-                      color: TaskUtils.getStatusColor(TaskStatus.pending),
-                    ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: SmallStatCard(
+                          title: "Goals Completed",
+                          value: (data?["completedGoals"] ?? 0).toString(),
+                          icon: Icons.check_circle_outline,
+                          color: Colors.green,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: SmallStatCard(
+                          title: "Goals Pending",
+                          value: (data?["pendingGoals"] ?? 0).toString(),
+                          icon: Icons.pending_actions,
+                          color: Colors.orange,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: SmallStatCard(
+                          title: "Goals Overdue",
+                          value: (data?["overdueGoals"] ?? 0).toString(),
+                          icon: Icons.warning_amber_outlined,
+                          color: Colors.red,
+                        ),
+                      ),
+                    ],
                   ),
-                  SizedBox(width: 10),
-                  Expanded(
-                    child: SmallStatCard(
-                      title: "IN Progress",
-                      value: (data?["inProgressCount"] ?? 0).toString(),
-                      icon: Icons.pending_outlined,
-                      color: TaskUtils.getStatusColor(TaskStatus.inProgress),
-                    ),
+                  const SizedBox(height: 10),
+
+                  // Task Status
+                  Row(
+                    children: [
+                      Expanded(
+                        child: SmallStatCard(
+                          title: "Tasks Completed",
+                          value: (data?["completedTasks"] ?? 0).toString(),
+                          icon: Icons.check_circle_outline,
+                          color: Colors.teal,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: SmallStatCard(
+                          title: "Tasks Pending",
+                          value: (data?["pendingTasks"] ?? 0).toString(),
+                          icon: Icons.pending_actions,
+                          color: const Color.fromARGB(255, 235, 211, 0),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: SmallStatCard(
+                          title: "Tasks Overdue",
+                          value: (data?["overdueTasks"] ?? 0).toString(),
+                          icon: Icons.warning_amber_outlined,
+                          color: Colors.redAccent,
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  // Goal Status
+                  const SizedBox(height: 20),
+                  Text(
+                    "Performance Overview",
+                    style: Theme.of(context).textTheme.displaySmall,
+                  ),
+                  const SizedBox(height: 15),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: KpiCircleCard(
+                          title: "Goal Completion %",
+                          value: completionPercentage,
+                          icon: Icons.verified_outlined,
+                          isPercentage: true,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: KpiCircleCard(
+                          title: "On-Time Completion %",
+                          value: onTimePercentage,
+                          icon: Icons.verified_outlined,
+                          isPercentage: true,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: KpiCircleCard(
+                          title: "Delayed %",
+                          value: delayedGoalPercent,
+                          icon: Icons.verified_outlined,
+                          isPercentage: true,
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  (data?["year"] ?? 0) == DateTime.now().year
+                      ? const SizedBox() // hide
+                      : YearlyProductivityPage(
+                          year: data?["year"],
+                          yearlyProductivity: (data?["yearlyProductivity"] ?? 0)
+                              .toDouble(),
+                        ),
+                  const SizedBox(height: 10),
+                  CapsuleBarChart(data: monthlyData),
+                  const SizedBox(height: 20),
+                  MonthlyTrendChart(
+                    monthlyData: (data?["monthlyTrend"] as List? ?? [])
+                        .map((e) => Map<String, dynamic>.from(e))
+                        .toList(),
                   ),
                 ],
               ),
-              SizedBox(height: 10),
-              Row(
-                children: [
-                  Expanded(
-                    child: SmallStatCard(
-                      title: "Not Started",
-                      value: (data?["notStartedCount"] ?? 0).toString(),
-                      icon: Icons.pending_outlined,
-                      color: TaskUtils.getStatusColor(TaskStatus.NotStarted),
-                    ),
-                  ),
-                  SizedBox(width: 10),
-                  Expanded(
-                    child: SmallStatCard(
-                      title: "Avg Completed days",
-                      value: (data?["avgCompletionTime"] ?? 0).toString(),
-                      icon: Icons.schedule_outlined,
-                      color: Colors.teal,
-                    ),
-                  ),
-                  SizedBox(width: 10),
-                  Expanded(
-                    child: SmallStatCard(
-                      title: "Late Completed",
-                      value: (data?["lateCompleted"] ?? 0).toString(),
-                      icon: Icons.schedule_outlined,
-                      color: Colors.deepOrange,
-                    ),
-                  ),
-                  SizedBox(width: 10),
-                  Expanded(
-                    child: SmallStatCard(
-                      title: "Overdue",
-                      value: (data?["overdueCount"] ?? 0).toString(),
-                      icon: Icons.warning_outlined,
-                      color: Colors.red,
-                    ),
-                  ),
-                ],
-              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
-              const SizedBox(height: 20),
-              Text(
-                "Performance Overview",
-                style: Theme.of(context).textTheme.displaySmall,
-              ),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  Expanded(
-                    child: KpiCircleCard(
-                      title: "Completion Rate",
-                      value: completionPercentage,
-                      icon: Icons.verified_outlined,
-                      isPercentage: true,
-                    ),
+  Widget _buildDrawerItem(
+    BuildContext context, {
+    required IconData icon,
+    required String title,
+    required VoidCallback onTap,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      child: Material(
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: Row(
+              children: [
+                Icon(icon),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: Theme.of(context).textTheme.headlineMedium,
                   ),
-                  SizedBox(width: 10),
-                  Expanded(
-                    child: KpiCircleCard(
-                      title: "On-Time",
-                      value: (data?["onTimePercent"] ?? 0).toDouble(),
-                      icon: Icons.verified_outlined,
-                      isPercentage: true,
-                    ),
-                  ),
-                  SizedBox(width: 10),
-                  Expanded(
-                    child: KpiCircleCard(
-                      title: "Quality Score",
-                      value: (data?["finalAveragePoints"] ?? 0).toDouble(),
-                      icon: Icons.star_border,
-                      isPercentage: false,
-                    ),
-                  ),
-                  SizedBox(width: 10),
-                ],
-              ),
-
-              MonthlyTrendChart(
-                monthlyData:
-                    (data?["monthlyTrend"] as List?)
-                        ?.map((e) => Map<String, dynamic>.from(e))
-                        .toList() ??
-                    [],
-              ),
-
-              if (reviews.isNotEmpty) ...[
-                const SizedBox(height: 20),
-                Text(
-                  "Task Performance Points",
-                  style: Theme.of(context).textTheme.displaySmall,
                 ),
-                const SizedBox(height: 15),
-
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    buildPerformanceCircle(
-                      avgPoints: (data?["finalAveragePoints"] ?? 0).toDouble(),
-                    ),
-
-                    const SizedBox(width: 15),
-
-                    Expanded(child: buildTaskProgress(reviews)),
-                  ],
-                ),
+                Icon(Icons.arrow_forward_ios),
               ],
-            ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget buildTaskProgress(List taskReviews) {
-    return Column(
-      children: taskReviews.map<Widget>((task) {
-        int finalPoints = task["finalPoints"] ?? 0;
+  Widget _buildDrawer(BuildContext context) {
+    final theme = Theme.of(context);
 
-        double progress = (finalPoints / 100).clamp(0.0, 1.0);
-
-        Color barColor;
-        if (finalPoints >= 75) {
-          barColor = Theme.of(context).colorScheme.secondary;
-        } else if (finalPoints >= 50) {
-          barColor = Colors.orange;
-        } else {
-          barColor = Theme.of(context).colorScheme.error;
-        }
-
-        return GestureDetector(
-          onTap: () {
-            showTaskDetails(task);
-          },
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 5),
+    return Drawer(
+      backgroundColor: theme.colorScheme.onPrimary,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          /// 🔹 HEADER
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
+            decoration: BoxDecoration(color: theme.colorScheme.secondary),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                /// Task Name
-                Text(
-                  task["taskName"] ?? "",
-                  style: Theme.of(context).textTheme.headlineLarge,
+                Icon(
+                  Icons.dashboard_rounded,
+                  color: theme.colorScheme.onPrimary,
+                  size: 32,
                 ),
-
-                const SizedBox(height: 5),
-
-                Row(
-                  children: [
-                    Expanded(
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(10),
-                        child: LinearProgressIndicator(
-                          value: progress,
-                          minHeight: 8,
-                          backgroundColor: Colors.grey.shade300,
-                          valueColor: AlwaysStoppedAnimation(barColor),
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(width: 10),
-
-                    /// Final Points
-                    Row(
-                      children: [
-                        Text(
-                          finalPoints.toString(),
-                          style: Theme.of(context).textTheme.headlineLarge,
-                        ),
-                        const SizedBox(width: 4),
-                        Icon(Icons.star, color: barColor),
-                      ],
-                    ),
-                  ],
+                const SizedBox(height: 12),
+                Text(
+                  "Staff Panel",
+                  style: Theme.of(context).textTheme.bodySmall,
                 ),
               ],
             ),
           ),
-        );
-      }).toList(),
-    );
-  }
 
-  Widget buildPerformanceCircle({required double avgPoints}) {
-    double percent = (avgPoints / 100).clamp(0.0, 1.0);
+          const SizedBox(height: 10),
 
-    return SizedBox(
-      width: 100,
-      height: 100,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          SizedBox(
-            width: 100,
-            height: 100,
-            child: CircularProgressIndicator(
-              value: percent,
-              strokeWidth: 7,
-              backgroundColor: Colors.grey.shade300,
-              valueColor: const AlwaysStoppedAnimation<Color>(Colors.amber),
-            ),
-          ),
-
-          Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const SizedBox(height: 15),
-              Text(
-                "Avg Points",
-                style: Theme.of(context).textTheme.headlineLarge,
-              ),
-              const SizedBox(height: 5),
-              Text(
-                avgPoints.toStringAsFixed(1),
-                style: const TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.amber,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget buildInfoRow(String title, dynamic value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 130,
-            child: Text(
-              title,
-              style: Theme.of(context).textTheme.headlineLarge,
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value.toString(),
-              style: Theme.of(context).textTheme.headlineLarge,
-            ),
+          _buildDrawerItem(
+            context,
+            icon: Icons.task_alt_rounded,
+            title: "Leave Request",
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => StaffLeave()),
+              );
+            },
           ),
         ],
       ),

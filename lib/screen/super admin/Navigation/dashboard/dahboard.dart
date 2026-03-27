@@ -10,8 +10,8 @@ import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/notif
 import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/settings/settings.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/warnings/warning.dart';
 import 'package:staff_work_track/services/announ_service.dart';
+import 'package:staff_work_track/services/dashboard_service.dart';
 import 'package:staff_work_track/services/notification_service.dart';
-import 'package:staff_work_track/services/reports_service.dart';
 import 'package:staff_work_track/utils/TaskUtils.dart';
 import 'package:staff_work_track/utils/enum.dart';
 import 'package:staff_work_track/widgets/StatCard.dart';
@@ -28,71 +28,24 @@ class SuperAdminDashboard extends StatefulWidget {
 }
 
 class _OverallReportsTabState extends State<SuperAdminDashboard> {
-  late Future<Map<String, dynamic>> reportFuture;
-  String selectedStatus = "All";
-  int overdueCount = 0;
-  List<Map<String, dynamic>> overdueList = [];
+  late Future<Map<String, dynamic>> dashboard;
+  final DashboardService _service = DashboardService();
+  int selectedType = 0;
+  int overdueTaskCount = 0;
+  int overdueGoalCount = 0;
+
+  List<Map<String, dynamic>> overdueTaskList = [];
+  List<Map<String, dynamic>> overdueGoalList = [];
   int apiWarningCount = 0;
   List<WarningModel> apiWarnings = [];
   int notificationCount = 0;
   @override
   void initState() {
     super.initState();
-    _fetchReport();
+
     _fetchWarnings();
     _fetchNotifications();
-  }
-
-  void _fetchReport() {
-    reportFuture = ReportsService.fetchReport(
-      fromDate: widget.fromDate,
-      toDate: widget.toDate,
-    );
-
-    reportFuture.then((data) {
-      if (!mounted) return;
-
-      setState(() {
-        overdueCount = data["overdueTasks"] ?? 0;
-
-        overdueList =
-            (data['overdueTasksList'] as List<dynamic>?)
-                ?.map((e) => e as Map<String, dynamic>)
-                .toList() ??
-            [];
-      });
-    });
-  }
-
-  double _toDouble(dynamic value) {
-    if (value == null) return 0.0;
-    if (value is int) return value.toDouble();
-    if (value is double) return value;
-    return 0.0;
-  }
-
-  List<Map<String, dynamic>> _getRankedDepartments(List departments) {
-    List<Map<String, dynamic>> ranked = [];
-
-    for (var dept in departments) {
-      final total = (dept["total"] ?? 0);
-      final completed = (dept["completed"] ?? 0);
-
-      double completionRate = 0;
-      if (total > 0) {
-        completionRate = completed / total;
-      }
-
-      ranked.add({...dept, "completionRate": completionRate});
-    }
-
-    ranked.sort(
-      (a, b) => (b["completionRate"] as double).compareTo(
-        a["completionRate"] as double,
-      ),
-    );
-
-    return ranked;
+    dashboard = loadDashboard();
   }
 
   void _fetchWarnings() async {
@@ -124,14 +77,30 @@ class _OverallReportsTabState extends State<SuperAdminDashboard> {
     }
   }
 
+  double _toDouble(dynamic value) {
+    if (value == null) return 0.0;
+    if (value is int) return value.toDouble();
+    if (value is double) return value;
+    return 0.0;
+  }
+
+  Future<Map<String, dynamic>> loadDashboard() async {
+    try {
+      var data = await _service.getDashboardSummary();
+      return data;
+    } catch (e) {
+      throw Exception(e);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       drawer: _buildDrawer(context),
       appBar: AppBar(
-        title: const Text('Director Dashboard'),
+        title: const Text('Dashboard'),
         actions: [
-          if (overdueCount > 0 || apiWarningCount > 0)
+          if ((overdueTaskCount + overdueGoalCount) > 0 || apiWarningCount > 0)
             Stack(
               children: [
                 IconButton(
@@ -144,7 +113,10 @@ class _OverallReportsTabState extends State<SuperAdminDashboard> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => Warning(overdueTasks: overdueList),
+                        builder: (_) => Warning(
+                          overdueTasks: overdueTaskList,
+                          overdueGoals: overdueGoalList,
+                        ),
                       ),
                     );
                   },
@@ -160,7 +132,8 @@ class _OverallReportsTabState extends State<SuperAdminDashboard> {
                       shape: BoxShape.circle,
                     ),
                     child: Text(
-                      (overdueCount + apiWarningCount).toString(),
+                      (overdueTaskCount + overdueGoalCount + apiWarningCount)
+                          .toString(),
                       style: const TextStyle(
                         color: Colors.red,
                         fontSize: 10,
@@ -180,7 +153,7 @@ class _OverallReportsTabState extends State<SuperAdminDashboard> {
                     context,
                     MaterialPageRoute(builder: (_) => NotificationPage()),
                   );
-                  _fetchNotifications();
+                  //  _fetchNotifications();
                 },
               ),
 
@@ -223,30 +196,41 @@ class _OverallReportsTabState extends State<SuperAdminDashboard> {
           ),
         ],
       ),
+
       body: FutureBuilder<Map<String, dynamic>>(
-        future: reportFuture,
+        future: dashboard,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: RotatingFlower());
           }
+
           if (snapshot.hasError) {
             return Center(child: Text("Error: ${snapshot.error}"));
           }
 
           final data = snapshot.data!;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            setState(() {
+              overdueTaskList = List<Map<String, dynamic>>.from(
+                data["overdueTaskslist"] ?? [],
+              );
+              overdueGoalList = List<Map<String, dynamic>>.from(
+                data["overdueGoalsList"] ?? [],
+              );
 
-          final departments = data["departmentSummary"] as List<dynamic>? ?? [];
+              overdueTaskCount = overdueTaskList.length;
+              overdueGoalCount = overdueGoalList.length;
+            });
+          });
+
+          final tasks = data["tasks"] ?? {};
+          final goals = data["goals"] ?? {};
 
           return SingleChildScrollView(
             padding: const EdgeInsets.all(15),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  "Summary",
-                  style: Theme.of(context).textTheme.displaySmall,
-                ),
-                const SizedBox(height: 10),
                 Row(
                   children: [
                     Expanded(
@@ -254,16 +238,16 @@ class _OverallReportsTabState extends State<SuperAdminDashboard> {
                         title: "Managers",
                         value: data["totalManagers"].toString(),
                         icon: Icons.person,
-                        color: Colors.green,
+                        color: Theme.of(context).colorScheme.secondary,
                       ),
                     ),
                     const SizedBox(width: 10),
                     Expanded(
                       child: SmallStatCard(
-                        title: "Staff",
+                        title: "Staff's",
                         value: data["totalStaff"].toString(),
                         icon: Icons.people,
-                        color: Colors.green,
+                        color: Theme.of(context).colorScheme.secondary,
                       ),
                     ),
                     const SizedBox(width: 10),
@@ -271,22 +255,65 @@ class _OverallReportsTabState extends State<SuperAdminDashboard> {
                       child: SmallStatCard(
                         title: "Departments",
                         value: data["totalDepartments"].toString(),
-                        icon: Icons.people,
-                        color: Colors.green,
+                        icon: Icons.apartment,
+                        color: Theme.of(context).colorScheme.secondary,
                       ),
                     ),
                   ],
                 ),
+                const SizedBox(height: 20),
+                Text(
+                  "Goal & Task Summary",
+                  style: Theme.of(context).textTheme.displaySmall,
+                ),
                 const SizedBox(height: 10),
-
+                Row(
+                  children: [
+                    Expanded(
+                      child: SmallStatCard(
+                        title: "Total Goals",
+                        value: goals["total"].toString(),
+                        icon: Icons.flag,
+                        color: Colors.deepPurple,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: SmallStatCard(
+                        title: "Completed",
+                        value: goals["completed"].toString(),
+                        icon: Icons.check_circle,
+                        color: Colors.green,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: SmallStatCard(
+                        title: "Pending",
+                        value: goals["pending"].toString(),
+                        icon: Icons.pending_actions,
+                        color: Colors.orange,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: SmallStatCard(
+                        title: "Overdue",
+                        value: goals["overdue"].toString(),
+                        icon: Icons.error,
+                        color: Colors.red,
+                      ),
+                    ),
+                  ],
+                ),
                 const SizedBox(height: 10),
                 Row(
                   children: [
                     Expanded(
                       child: SmallStatCard(
                         title: "Total Tasks",
-                        value: (data["totalTasks"] ?? 0).toString(),
-                        icon: Icons.task_outlined,
+                        value: tasks["total"].toString(),
+                        icon: Icons.list_alt,
                         color: Colors.blue,
                       ),
                     ),
@@ -294,83 +321,43 @@ class _OverallReportsTabState extends State<SuperAdminDashboard> {
                     Expanded(
                       child: SmallStatCard(
                         title: "Completed",
-                        value: (data["completedTasks"] ?? 0).toString(),
-                        icon: Icons.check_circle_outlined,
-                        color: TaskUtils.getStatusColor(TaskStatus.completed),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: SmallStatCard(
-                        title: "Pending",
-                        value: (data["pendingTasks"] ?? 0).toString(),
-                        icon: Icons.pending_outlined,
-                        color: TaskUtils.getStatusColor(TaskStatus.pending),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: SmallStatCard(
-                        title: "In Progress",
-                        value: (data["inProgressTasks"] ?? 0).toString(),
-                        icon: Icons.warning_outlined,
-                        color: Colors.blueAccent,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Expanded(
-                      child: SmallStatCard(
-                        title: "Not Started",
-                        value: (data["notStartedTasks"] ?? 0).toString(),
-                        icon: Icons.task_outlined,
-                        color: Colors.grey,
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: SmallStatCard(
-                        title: "Avg completed days",
-                        value: (data["averageCompletionDays"] ?? 0).toString(),
-                        icon: Icons.check_circle_outlined,
+                        value: tasks["completed"].toString(),
+                        icon: Icons.check_circle,
                         color: Colors.teal,
                       ),
                     ),
                     const SizedBox(width: 10),
                     Expanded(
                       child: SmallStatCard(
-                        title: "Late completed",
-                        value: (data["lateCompletedTasks"] ?? 0).toString(),
-                        icon: Icons.pending_outlined,
-                        color: Colors.deepOrange,
+                        title: "Pending",
+                        value: tasks["pending"].toString(),
+                        icon: Icons.pending,
+                        color: const Color.fromARGB(255, 235, 211, 0),
                       ),
                     ),
                     const SizedBox(width: 10),
                     Expanded(
                       child: SmallStatCard(
-                        title: "Overdue Task",
-                        value: (data["overdueTasks"] ?? 0).toString(),
-                        icon: Icons.warning_outlined,
-                        color: Colors.red,
+                        title: "Overdue",
+                        value: tasks["overdue"].toString(),
+                        icon: Icons.warning,
+                        color: Colors.redAccent,
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 15),
+                const SizedBox(height: 20),
                 Text(
                   "Performance Overview",
                   style: Theme.of(context).textTheme.displaySmall,
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 15),
                 Row(
                   children: [
                     Expanded(
                       child: KpiCircleCard(
-                        title: "Completion Rate",
-                        value: _toDouble(data["completionPercentage"]),
+                        title: "Completion %",
+                        value: _toDouble(goals["completionPercentage"]),
                         icon: Icons.verified_outlined,
                         isPercentage: true,
                       ),
@@ -378,43 +365,36 @@ class _OverallReportsTabState extends State<SuperAdminDashboard> {
                     const SizedBox(width: 10),
                     Expanded(
                       child: KpiCircleCard(
-                        title: "On-Time",
-                        value: _toDouble(data["slaPercentage"]),
-                        icon: Icons.verified_outlined,
+                        title: "On-Time Completed %",
+                        value: _toDouble(goals["onTimeCompletionPercentage"]),
+                        icon: Icons.timelapse_rounded,
                         isPercentage: true,
                       ),
                     ),
                     const SizedBox(width: 10),
                     Expanded(
                       child: KpiCircleCard(
-                        title: "Task Growth",
-                        value: _toDouble(data["growthPercentage"]),
-
-                        icon: Icons.trending_up,
+                        title: "Delayed %",
+                        value: _toDouble(goals["delayedPercentage"]),
+                        icon: Icons.access_time_rounded,
                         isPercentage: true,
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 15),
+                const SizedBox(height: 20),
+
                 Text(
-                  "Department Ranking",
+                  "Department Performance",
                   style: Theme.of(context).textTheme.displaySmall,
                 ),
                 const SizedBox(height: 15),
-                _buildDepartmentChart(departments),
+                _buildToggle(),
                 const SizedBox(height: 15),
-                _buildDepartmentRanking(departments),
-              
-                MonthlyTrendChart(
-                  monthlyData:
-                      (data["monthlyTrend"] as List<dynamic>?)
-                          ?.map((e) => e as Map<String, dynamic>)
-                          .toList() ??
-                      [],
-                ),
-
-                const SizedBox(height: 15),
+                _buildDepartmentChart(data["departmentData"]),
+                const SizedBox(height: 20),
+                Alldeptproducticity(),
+                const SizedBox(height: 20),
                 PendingApprovals(),
               ],
             ),
@@ -513,7 +493,7 @@ class _OverallReportsTabState extends State<SuperAdminDashboard> {
             leading: Icon(
               Icons.access_time_sharp,
               color: Theme.of(context).colorScheme.secondary,
-            ), 
+            ),
             title: Text(
               "Worklog",
               style: Theme.of(context).textTheme.headlineMedium,
@@ -531,121 +511,45 @@ class _OverallReportsTabState extends State<SuperAdminDashboard> {
     );
   }
 
-  Widget _buildDepartmentRanking(List departments) {
-    final ranked = _getRankedDepartments(departments);
-
-    final hasPerformance = ranked.any(
-      (dept) => (dept["completionRate"] as double) > 0,
+  Widget _buildToggle() {
+    return Container(
+      height: 40,
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade200,
+        borderRadius: BorderRadius.circular(25),
+      ),
+      child: Row(children: [_toggleItem("Task", 0), _toggleItem("Goal", 1)]),
     );
+  }
 
-    if (!hasPerformance) {
-      return Container(
-        padding: const EdgeInsets.symmetric(vertical: 30),
-        alignment: Alignment.center,
-        child: Column(
-          children: const [
-            Icon(Icons.bar_chart, size: 40, color: Colors.grey),
-            SizedBox(height: 10),
-            Text(
-              "No performance data available",
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: Colors.grey,
-              ),
-            ),
-          ],
-        ),
-      );
-    }
+  Widget _toggleItem(String text, int index) {
+    final isSelected = selectedType == index;
 
-    final topDepartments = ranked
-        .where((dept) => (dept["completionRate"] as double) > 0)
-        .take(3)
-        .toList();
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: List.generate(topDepartments.length, (index) {
-        final dept = topDepartments[index];
-        final rank = index + 1;
-        final completionRate = dept["completionRate"] as double;
-        final percent = (completionRate * 100).toStringAsFixed(0);
-
-        Color rankColor;
-        IconData rankIcon;
-
-        switch (rank) {
-          case 1:
-            rankColor = Colors.amber;
-            rankIcon = Icons.emoji_events;
-            break;
-          case 2:
-            rankColor = Colors.grey;
-            rankIcon = Icons.emoji_events;
-            break;
-          case 3:
-            rankColor = Colors.brown;
-            rankIcon = Icons.emoji_events;
-            break;
-          default:
-            rankColor = Colors.blueGrey;
-            rankIcon = Icons.trending_up;
-        }
-
-        final completedTasks = dept["completed"] ?? 0;
-        final totalTasks = dept["total"] ?? 0;
-
-        return Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          padding: const EdgeInsets.all(14),
+    return Expanded(
+      child: GestureDetector(
+        onTap: () {
+          setState(() => selectedType = index);
+        },
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 250),
+          alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: rankColor.withAlpha(20),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: rankColor.withAlpha(60)),
+            color: isSelected
+                ? Theme.of(context).colorScheme.primary
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(20),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(rankIcon, color: rankColor, size: 22),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      "${dept["department"]}",
-                      style: Theme.of(context).textTheme.labelMedium,
-                    ),
-                  ),
-                  Text(
-                    "$percent%",
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                      color: rankColor,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 4),
-              Text(
-                "Completed: $completedTasks / $totalTasks tasks",
-                 style: Theme.of(context).textTheme.labelSmall,
-              ),
-              const SizedBox(height: 8),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: LinearProgressIndicator(
-                  value: completionRate,
-                  minHeight: 6,
-                  backgroundColor: Colors.grey,
-                  valueColor: AlwaysStoppedAnimation(rankColor),
-                ),
-              ),
-            ],
+          child: Text(
+            text,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: isSelected ? Colors.white : Colors.black87,
+            ),
           ),
-        );
-      }),
+        ),
+      ),
     );
   }
 
@@ -670,7 +574,12 @@ class _OverallReportsTabState extends State<SuperAdminDashboard> {
                   }
 
                   final dept = departments[value.toInt()];
-                  final total = (dept["total"] ?? 0).toString();
+
+                  final data = selectedType == 0
+                      ? dept["tasks"]
+                      : dept["goals"];
+
+                  final total = (data["total"] ?? 0).toString();
 
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 6),
@@ -701,7 +610,7 @@ class _OverallReportsTabState extends State<SuperAdminDashboard> {
                     padding: const EdgeInsets.only(top: 8),
                     child: Text(
                       deptName,
-                      style: Theme.of(context).textTheme.headlineLarge,
+                      style: Theme.of(context).textTheme.headlineSmall,
                     ),
                   );
                 },
@@ -723,22 +632,22 @@ class _OverallReportsTabState extends State<SuperAdminDashboard> {
               getTooltipItem: (group, groupIndex, rod, rodIndex) {
                 final dept = departments[groupIndex];
 
-                final completed = dept["completed"] ?? 0;
-                final pending = dept["pending"] ?? 0;
-                final overdue = dept["overdue"] ?? 0;
-                final total = dept["total"] ?? 0;
+                final data = selectedType == 0 ? dept["tasks"] : dept["goals"];
+
+                final completed = data["completed"] ?? 0;
+                final pending = data["pending"] ?? 0;
+                final overdue = data["overdue"] ?? 0;
+                final total = data["total"] ?? 0;
+
+                final title = selectedType == 0 ? "Task" : "Goal";
 
                 return BarTooltipItem(
                   "${dept["department"]}\n\n"
-                  "Total Task: $total\n"
+                  "Total $title: $total\n"
                   "Completed: $completed\n"
                   "Pending: $pending\n"
                   "Overdue: $overdue",
-
-                  const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w500,
-                  ),
+                  const TextStyle(color: Colors.white),
                 );
               },
             ),
@@ -754,9 +663,12 @@ class _OverallReportsTabState extends State<SuperAdminDashboard> {
     return List.generate(departments.length, (index) {
       final dept = departments[index];
 
-      final completed = (dept["completed"] ?? 0).toDouble();
-      final pending = (dept["pending"] ?? 0).toDouble();
-      final overdue = (dept["overdue"] ?? 0).toDouble();
+      final data = selectedType == 0 ? dept["tasks"] : dept["goals"];
+
+      final completed = (data["completed"] ?? 0).toDouble();
+      final pending = (data["pending"] ?? 0).toDouble();
+      final overdue = (data["overdue"] ?? 0).toDouble();
+
       final total = completed + pending + overdue;
 
       return BarChartGroupData(

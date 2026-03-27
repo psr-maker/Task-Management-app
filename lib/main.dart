@@ -1,10 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:staff_work_track/core/theme/theme_provider.dart';
-import 'package:staff_work_track/screen/admin/admin.dart';
 import 'package:staff_work_track/screen/splashscreen.dart';
-import 'package:staff_work_track/screen/staff/staff.dart';
-import 'package:staff_work_track/screen/super%20admin/superadmin.dart';
 
 void main() {
   runApp(const MyApp());
@@ -26,11 +23,6 @@ class MyApp extends StatelessWidget {
             themeMode: themeProvider.isDarkMode
                 ? ThemeMode.dark
                 : ThemeMode.light,
-
-            // home: const Staff(),
-            // home: const Admin(),
-
-            // home: const SuperAdmin(),
             home: const SplashScreen(),
           );
         },

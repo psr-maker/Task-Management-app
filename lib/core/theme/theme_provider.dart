@@ -173,8 +173,8 @@ class ThemeProvider extends ChangeNotifier {
       iconTheme: const IconThemeData(color: Colors.white, size: 18),
       primaryColor: deepGreen,
       colorScheme: const ColorScheme.dark(
-        primary: Color.fromARGB(255, 68, 99, 80),
-        onPrimary: Colors.white,
+        primary: Colors.white,
+        onPrimary: Color.fromARGB(255, 68, 99, 80),
         secondary: Color.fromARGB(255, 97, 124, 95),
         tertiary: Colors.white54,
         background: Color.fromARGB(255, 134, 170, 136),
@@ -242,7 +242,7 @@ class ThemeProvider extends ChangeNotifier {
         labelLarge: TextStyle(
           fontSize: 15,
           fontWeight: FontWeight.w700,
-          color: deepGreen,
+          color: deepGreen
         ),
         labelMedium: TextStyle(
           fontSize: 14,

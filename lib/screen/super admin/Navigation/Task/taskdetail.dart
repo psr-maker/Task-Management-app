@@ -152,6 +152,9 @@ class _TaskDetailsState extends State<TaskDetails> {
     if (task == null) {
       return const Scaffold(body: Center(child: Text("Task not found")));
     }
+    final isCompleted = (task!.status).toLowerCase().trim() == "completed";
+
+    final canEditMenu = _canEditTask && !isCompleted;
     final statusEnum = TaskUtils.parseStatus(task!.status);
 
     return Scaffold(
@@ -163,12 +166,12 @@ class _TaskDetailsState extends State<TaskDetails> {
         ),
         actions: [
           PopupMenuButton<String>(
-            enabled: _canEditTask,
+            enabled: canEditMenu,
             icon: Icon(
               Icons.more_vert,
-              color: _canEditTask ? Colors.white : Colors.grey,
+              color: canEditMenu ? Colors.white : Colors.grey,
             ),
-            onSelected: _canEditTask
+            onSelected: canEditMenu
                 ? (value) async {
                     if (value == 'edit') {
                       Navigator.push(
@@ -449,6 +452,14 @@ class _TaskDetailsState extends State<TaskDetails> {
             "Due Date",
             AppHelpers.formatDate(task!.dueDate),
           ),
+          if (task!.status.toLowerCase() == "completed") ...[
+            const SizedBox(height: 14),
+            _infoRow(
+              Icons.event,
+              "Completed Date",
+              AppHelpers.formatDate(task!.completed_date),
+            ),
+          ],
           const Divider(height: 24),
           _infoRow(
             Icons.person,

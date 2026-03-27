@@ -1,14 +1,12 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:staff_work_track/core/constant/apiurl.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class AuthService {
   static const String baseUrl = ApiConstants.apiurl;
   static const String _tokenKey = "auth_token";
-
-  // SEND OTP
-
+  static const _storage = FlutterSecureStorage();
   Future<int> sendOtp(String identifier) async {
     final url = Uri.parse("$baseUrl/auth/send-otp");
     final response = await http.post(
@@ -16,7 +14,6 @@ class AuthService {
       headers: {"Content-Type": "application/json"},
       body: jsonEncode(identifier),
     );
-
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
       return data["attempts"];
@@ -26,27 +23,20 @@ class AuthService {
     }
   }
 
-  // VERIFY OTP
-
   Future<Map<String, dynamic>> verifyOtp(String email, String otp) async {
     final url = Uri.parse("$baseUrl/auth/verify-otp");
-
     final response = await http.post(
       url,
       headers: {"Content-Type": "application/json"},
       body: jsonEncode({"EmailorName": email, "Otp": otp}),
     );
-
     final decoded = jsonDecode(response.body);
-
     if (response.statusCode == 200) {
       return decoded;
     } else {
       throw Exception(decoded["message"]);
     }
   }
-
-  /// CREATE USER
 
   Future<Map<String, dynamic>> createUser({
     required String name,
@@ -56,10 +46,8 @@ class AuthService {
   }) async {
     final token = await getToken();
     if (token == null) throw Exception("User not logged in");
-
     final url = Uri.parse("$baseUrl/auth/create-user");
     print("JWT token: $token");
-
     final response = await http.post(
       url,
       headers: {
@@ -73,18 +61,14 @@ class AuthService {
         "role": role,
       }),
     );
-
     print("Status Code: ${response.statusCode}");
     print("Response Body: '${response.body}'");
-
     if (response.body.isEmpty) {
       throw Exception(
         "Server returned empty response. Status code: ${response.statusCode}",
       );
     }
-
     final decoded = jsonDecode(response.body);
-
     if (response.statusCode == 200) {
       return decoded;
     } else {
@@ -94,7 +78,6 @@ class AuthService {
 
   static Future<void> updateProfile(String name, String email) async {
     final token = await AuthService.getToken();
-
     final response = await http.put(
       Uri.parse("$baseUrl/auth/update-profile"),
       headers: {
@@ -103,20 +86,13 @@ class AuthService {
       },
       body: jsonEncode({"name": name, "email": email}),
     );
-
     if (response.statusCode != 200) {
       throw Exception("Failed to update profile");
     }
   }
 
-
-
-
-
-
- static Future<Map<String, dynamic>> getMyProfile() async {
+  static Future<Map<String, dynamic>> getMyProfile() async {
     final token = await AuthService.getToken();
-
     final response = await http.get(
       Uri.parse("$baseUrl/auth/my-profile"),
       headers: {
@@ -124,7 +100,6 @@ class AuthService {
         "Authorization": "Bearer $token",
       },
     );
-
     if (response.statusCode == 200) {
       return jsonDecode(response.body);
     } else {
@@ -132,16 +107,11 @@ class AuthService {
     }
   }
 
-
-
-
-
   static Future<String?> checkEmailRole(String email) async {
     final response = await http.get(
       Uri.parse("$baseUrl/auth/check-email-role?email=$email"),
       headers: {"Content-Type": "application/json"},
     );
-
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
       if (data["exists"] == true) {
@@ -153,22 +123,16 @@ class AuthService {
     }
   }
 
-  /// SAVE TOKEN
   static Future<void> saveToken(String token) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_tokenKey, token);
+    await _storage.write(key: _tokenKey, value: token);
   }
 
-  /// GET TOKEN (USED IN SPLASH)
   static Future<String?> getToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_tokenKey);
+    return await _storage.read(key: _tokenKey);
   }
 
   static Future<void> logout() async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString(_tokenKey);
-
+    final token = await getToken();
     if (token != null) {
       await http.post(
         Uri.parse('$baseUrl/auth/logout'),
@@ -178,8 +142,6 @@ class AuthService {
         },
       );
     }
-
-    // Always remove token locally
-    await prefs.remove(_tokenKey);
+    await _storage.delete(key: _tokenKey);
   }
 }

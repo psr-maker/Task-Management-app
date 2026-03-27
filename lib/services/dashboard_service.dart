@@ -6,6 +6,50 @@ import 'package:staff_work_track/core/constant/apiurl.dart';
 class DashboardService {
 
   static const String baseUrl = ApiConstants.apiurl;
+
+
+  Future<Map<String, dynamic>> getDashboardSummary() async {
+    final response = await http.get(
+      Uri.parse("$baseUrl/Dashboard/dashboard-summary"),
+      headers: {
+        "Content-Type": "application/json",
+      },
+    );
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else {
+      throw Exception("Failed to load dashboard data");
+    }
+  }
+
+  static Future<List<Map<String, dynamic>>> allgetDepartmentsProductivity({
+    required int year,
+    int? month,
+    int? quarter,
+  }) async {
+    try {
+      // Build query params
+      final queryParams = <String, String>{'year': year.toString()};
+      if (month != null) queryParams['month'] = month.toString();
+      if (quarter != null) queryParams['quarter'] = quarter.toString();
+
+      final uri = Uri.parse('$baseUrl/Dashboard/all-departments-productivity')
+          .replace(queryParameters: queryParams);
+
+      final response = await http.get(uri);
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return List<Map<String, dynamic>>.from(data['data']);
+      } else {
+        throw Exception('Failed to load productivity');
+      }
+    } catch (e) {
+      throw Exception('Error: $e');
+    }
+  }
+
  static Future<Map<String, dynamic>> fetchmanagerDepartment(
     String department, {
     DateTime? fromDate,
@@ -20,7 +64,7 @@ class DashboardService {
     ).replace(queryParameters: queryParams);
 
     final response = await http.get(uri);
-
+ 
     if (response.statusCode == 200) {
       return json.decode(response.body);
     } else {
@@ -28,20 +72,20 @@ class DashboardService {
     }
   }
 
- static Future<List<dynamic>> getDepartmentSummary() async {
-   final response = await http.get(
-      Uri.parse("$baseUrl/Dashboard/department-summary"),
-      headers: {
-        "Content-Type": "application/json",
-      },
-    );
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      return data["data"];
-    } else {
-      throw Exception("Failed to load department summary");
-    }
-  }
+//  static Future<List<dynamic>> getDepartmentSummary() async {
+//    final response = await http.get(
+//       Uri.parse("$baseUrl/Dashboard/department-summary"),
+//       headers: {
+//         "Content-Type": "application/json",
+//       },
+//     );
+//     if (response.statusCode == 200) {
+//       final data = jsonDecode(response.body);
+//       return data["data"];
+//     } else {
+//       throw Exception("Failed to load department summary");
+//     }
+//   }
    /// get pending users
   
   static Future<List<UserModel>> getPendingUsers() async {

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:staff_work_track/core/widgets/buttons.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
 import 'package:staff_work_track/services/announ_service.dart';
+import 'package:staff_work_track/utils/app_helper.dart';
 
 class UsersWorklog extends StatefulWidget {
   const UsersWorklog({super.key});
@@ -27,12 +29,6 @@ class _UsersWorklogState extends State<UsersWorklog> {
   void initState() {
     super.initState();
     fetchData();
-  }
-
-  String formatTime(String? dateTime) {
-    if (dateTime == null) return "";
-    final time = DateTime.parse(dateTime);
-    return "${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}";
   }
 
   String formatHours(double hours) {
@@ -111,7 +107,12 @@ class _UsersWorklogState extends State<UsersWorklog> {
           child: ListView(
             children: [
               ListTile(
-                title: const Text("All Departments"),
+                title: Center(
+                  child: Text(
+                    "All Departments",
+                    style: Theme.of(context).textTheme.displaySmall,
+                  ),
+                ),
                 onTap: () {
                   setState(() {
                     selectedDepartment = null;
@@ -122,7 +123,10 @@ class _UsersWorklogState extends State<UsersWorklog> {
               ),
               ...departments.map(
                 (d) => ListTile(
-                  title: Text(d),
+                  title: Text(
+                    d,
+                    style: Theme.of(context).textTheme.headlineMedium,
+                  ),
                   onTap: () {
                     setState(() {
                       selectedDepartment = d;
@@ -152,18 +156,22 @@ class _UsersWorklogState extends State<UsersWorklog> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text(
+              Text(
                 "Select Date or Month",
-                style: TextStyle(fontWeight: FontWeight.bold),
+                style: Theme.of(context).textTheme.displaySmall,
               ),
               const SizedBox(height: 16),
               // Year picker
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text("Year"),
+                  Text(
+                    "Year",
+                    style: Theme.of(context).textTheme.headlineLarge,
+                  ),
                   DropdownButton<int>(
                     value: tempYear,
+                    style: Theme.of(context).textTheme.headlineSmall,
                     items: List.generate(10, (i) => DateTime.now().year - i)
                         .map(
                           (y) => DropdownMenuItem(value: y, child: Text("$y")),
@@ -177,9 +185,13 @@ class _UsersWorklogState extends State<UsersWorklog> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text("Month"),
+                  Text(
+                    "Month",
+                    style: Theme.of(context).textTheme.headlineLarge,
+                  ),
                   DropdownButton<int>(
                     value: tempMonth,
+                    style: Theme.of(context).textTheme.headlineSmall,
                     items: List.generate(12, (i) {
                       return DropdownMenuItem(
                         value: i + 1,
@@ -197,9 +209,10 @@ class _UsersWorklogState extends State<UsersWorklog> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text("Day (optional)"),
+                  Text("Day", style: Theme.of(context).textTheme.headlineLarge),
                   DropdownButton<int>(
                     value: tempDay,
+                    style: Theme.of(context).textTheme.headlineSmall,
                     items:
                         List.generate(
                               DateTime(tempYear, tempMonth + 1, 0).day,
@@ -215,15 +228,20 @@ class _UsersWorklogState extends State<UsersWorklog> {
                 ],
               ),
               const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: () {
-                  setState(() {
-                    selectedDate = DateTime(tempYear, tempMonth, tempDay);
-                    applyFilter();
-                  });
-                  Navigator.pop(context);
-                },
-                child: const Text("Apply"),
+              Center(
+                child: AppButton(
+                  text: "Apply",
+                  isLoading: isLoading,
+                  onPressed: () {
+                    setState(() {
+                      selectedDate = DateTime(tempYear, tempMonth, tempDay);
+                      applyFilter();
+                    });
+                    Navigator.pop(context);
+                  },
+                  color: Theme.of(context).colorScheme.secondary,
+                  txtcolor: Theme.of(context).colorScheme.onPrimary,
+                ),
               ),
             ],
           ),
@@ -345,9 +363,13 @@ class _UsersWorklogState extends State<UsersWorklog> {
                                   ),
                                 ),
                               ),
-                              DataCell(Text(formatTime(log["startTime"]))),
+                              DataCell(
+                                Text(AppHelpers.formatDate(log["startTime"])),
+                              ),
 
-                              DataCell(Text(formatTime(log["endTime"]))),
+                              DataCell(
+                                Text(AppHelpers.formatDate(log["endTime"])),
+                              ),
 
                               DataCell(
                                 Text(

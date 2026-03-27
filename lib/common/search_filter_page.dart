@@ -6,7 +6,7 @@ import 'package:staff_work_track/core/widgets/buttons.dart';
 class TaskFilterDropdown extends StatelessWidget {
   final TaskFilterModel filter;
   final List<String> departments;
-  final List<String> users;
+  // final List<String> users;
   final VoidCallback onApply;
   final VoidCallback onClear;
 
@@ -14,7 +14,7 @@ class TaskFilterDropdown extends StatelessWidget {
     super.key,
     required this.filter,
     required this.departments,
-    required this.users,
+    // required this.users,
     required this.onApply,
     required this.onClear,
   });
@@ -31,7 +31,7 @@ class TaskFilterDropdown extends StatelessWidget {
             _statusDropdown(context),
             _priorityDropdown(context),
             _departmentDropdown(context),
-           _assignedDropdown(context),
+          //  _assignedDropdown(context),
 
             const SizedBox(height: 14),
             Row(
@@ -69,18 +69,7 @@ Widget _departmentDropdown(BuildContext context) {
     ),
   );
 }
-Widget _assignedDropdown(BuildContext context) {
-  return _styledDropdown(
-    label: "Assigned To",
-    value: filter.assignedTo,
-    items: users,
-    onChanged: (v) => filter.assignedTo = v,
-    itemBuilder: (e) => Text(
-      e,
-      style: Theme.of(context).textTheme.headlineSmall
-    ),
-  );
-}
+
   // ---------------- STATUS ----------------
 Widget _statusDropdown(BuildContext context) {
   return _styledDropdown(
@@ -187,7 +176,7 @@ Widget _styledDropdown({
           value: null,
           child: Text(
             "All",
-            style: TextStyle(fontWeight: FontWeight.w500),
+            style: TextStyle(fontWeight: FontWeight.w500, color: Color.fromARGB(255, 25, 77, 38),),
           ),
         ),
         ...items.map(

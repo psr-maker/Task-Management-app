@@ -38,8 +38,44 @@ class SuperAdminService {
     }
   }
 
-  // get all admin
+  static Future<List<dynamic>> getGoals() async {
+    try {
+      final token = await AuthService.getToken();
 
+      final response = await http.get(
+        Uri.parse("$baseUrl/Director/GetGoalsWithTasks"),
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer $token",
+        },
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        throw Exception("Failed to load goals");
+      }
+    } catch (e) {
+      throw Exception(e.toString());
+    }
+  }
+  // get all admin
+ static Future<List<dynamic>> getGoalsname() async {
+   final token = await AuthService.getToken();
+    final response = await http.get(
+      Uri.parse("$baseUrl/Director/GetGoals"),
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer $token",
+      },
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      throw Exception("Failed to load goals");
+    }
+  }
   static Future<List<UserModel>> getAdmins() async {
     final response = await http.get(
       Uri.parse("$baseUrl/Director/getAllManager"),
@@ -106,9 +142,42 @@ class SuperAdminService {
 
   // create task to users
 
+  static Future<bool> createGoal({
+    required String title,
+    required String priority,
+    required DateTime startDate,
+    required DateTime dueDate,
+    required String assignTo,
+  }) async {
+    final token = await AuthService.getToken();
+    if (token == null) throw Exception("User not logged in");
+    print("JWT token: $token");
+    final response = await http.post(
+      Uri.parse("$baseUrl/Director/CreateGoal"),
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer $token",
+      },
+      body: jsonEncode({
+        "title": title,
+        "priority": priority,
+        "startDate": startDate.toIso8601String(),
+        "dueDate": dueDate.toIso8601String(),
+        "assign_To": assignTo,
+      }),
+    );
+
+    if (response.statusCode == 200) {
+      return true;
+    } else {
+      return false;
+    }
+  }
+
   static Future<bool> createTask({
     required String task,
     required String description,
+    required String goalCode,
     required String priority,
     required DateTime assignedAt,
     required DateTime dueDate,
@@ -128,6 +197,7 @@ class SuperAdminService {
         body: jsonEncode({
           "task": task,
           "description": description,
+          "goalCode": goalCode,
           "priority": priority,
           "start_date": assignedAt.toIso8601String(),
           "due_Date": dueDate.toIso8601String(),
@@ -244,23 +314,23 @@ class SuperAdminService {
     }
   }
 
- static Future<bool> deleteUser(int userId) async {
-  final token = await AuthService.getToken();
+  static Future<bool> deleteUser(int userId) async {
+    final token = await AuthService.getToken();
 
-  final response = await http.delete(
-    Uri.parse('$baseUrl/Director/user-delete/$userId'),
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": "Bearer $token",
-    },
-  );
+    final response = await http.delete(
+      Uri.parse('$baseUrl/Director/user-delete/$userId'),
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer $token",
+      },
+    );
 
-  if (response.statusCode == 200) {
-    return true;
-  } else {
-    return false;
+    if (response.statusCode == 200) {
+      return true;
+    } else {
+      return false;
+    }
   }
-}
 
   static Future<List<AuditLogModel>> getAuditLogs() async {
     // final token = await AuthService.getToken();

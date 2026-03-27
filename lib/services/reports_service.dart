@@ -48,6 +48,23 @@ class ReportsService {
     }
   }
 
+  static Future<Map<String, dynamic>> getdeptMonthlyProductivity(
+    String department,
+    int year,
+  ) async {
+    final url = Uri.parse(
+      "$baseUrl/Reports/department-monthly-productivity/$department?year=$year",
+    );
+
+    final response = await http.get(url);
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      throw Exception("Failed to load department productivity");
+    }
+  }
+
   static Future<Map<String, dynamic>> fetchDepartmentReport(
     String department, {
     DateTime? fromDate,
@@ -70,9 +87,12 @@ class ReportsService {
     }
   }
 
-  static Future<Map<String, dynamic>> getEmployeeReport(int employeeId) async {
+  static Future<Map<String, dynamic>> getEmployeeReport(
+    int employeeId,
+    int year,
+  ) async {
     final response = await http.get(
-      Uri.parse("$baseUrl/Reports/Staff/$employeeId"),
+      Uri.parse("$baseUrl/Reports/Staff/$employeeId/Year/$year"),
     );
 
     if (response.statusCode == 200) {
@@ -82,12 +102,27 @@ class ReportsService {
     }
   }
 
+  static Future<List<dynamic>> getMonthlyProductivity(
+    int userId,
+    int year,
+  ) async {
+    final response = await http.get(
+      Uri.parse("$baseUrl/Reports/monthly-productivity/$userId?year=$year"),
+    );
 
-   Future<List<ReportTask>> getFilteredTasks({
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return data["monthlyData"]; // 🔥 important
+    } else {
+      throw Exception("Failed to load monthly productivity");
+    }
+  }
+
+  Future<Map<String, dynamic>> getFullReport({
     int? userId,
     String? department,
   }) async {
-    String url = "$baseUrl/Reports/FilteredTasks";
+    String url = "$baseUrl/Reports/FilteredFullReport";
 
     final queryParams = {
       if (userId != null) "userId": userId.toString(),
@@ -99,15 +134,43 @@ class ReportsService {
     final response = await http.get(uri);
 
     if (response.statusCode == 200) {
-  final decoded = jsonDecode(response.body);
+      final decoded = jsonDecode(response.body);
 
-  final List data =
-      decoded is List ? decoded : decoded['data'];
+      return {
+        "tasks": decoded["tasks"],
 
-  print("Decoded list length: ${data.length}");
+        "goals": decoded["goals"], // keep raw for now
+      };
+    } else {
+      throw Exception("Failed to load report");
+    }
+  }
+  //'''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
 
-  return data.map((e) => ReportTask.fromJson(e)).toList();
-} else {
+  Future<List<ReportTask>> getFilteredTasks({
+    int? userId,
+    String? department,
+  }) async {
+    String url = "$baseUrl/Reports/FilteredTableTasks";
+
+    final queryParams = {
+      if (userId != null) "userId": userId.toString(),
+      if (department != null) "department": department,
+    };
+
+    final uri = Uri.parse(url).replace(queryParameters: queryParams);
+
+    final response = await http.get(uri);
+
+    if (response.statusCode == 200) {
+      final decoded = jsonDecode(response.body);
+
+      final List data = decoded is List ? decoded : decoded['data'];
+
+      print("Decoded list length: ${data.length}");
+
+      return data.map((e) => ReportTask.fromJson(e)).toList();
+    } else {
       throw Exception("Failed to load tasks");
     }
   }

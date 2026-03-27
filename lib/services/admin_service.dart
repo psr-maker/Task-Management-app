@@ -25,23 +25,30 @@ class AdminService {
     }
   }
 
-  static Future<List<Map<String, dynamic>>> getTasksByUser(int userId) async {
-    final response = await http.get(
-      Uri.parse("$baseUrl/Manager/Stafftasklist/$userId"),
-      headers: {"Content-Type": "application/json"},
-    );
+  static Future<List<dynamic>> getGoalsByDepartment(String department) async {
+    try {
+      final url = Uri.parse("$baseUrl/Manager/allStaffGoals/$department");
 
-    if (response.statusCode == 200) {
-      final data = json.decode(response.body);
-      return List<Map<String, dynamic>>.from(data["result"]);
-    } else {
-      throw Exception("Failed to load tasks");
+      final response = await http.get(url);
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+
+        // ✅ API structure:
+        // { department, totalGoals, goals: [] }
+
+        return data["goals"] ?? [];
+      } else {
+        throw Exception("Failed to load goals: ${response.statusCode}");
+      }
+    } catch (e) {
+      throw Exception("Error fetching goals: $e");
     }
   }
 
   static Future<List<Map<String, dynamic>>> getAdminTasks(int adminId) async {
     final response = await http.get(
-      Uri.parse("$baseUrl/Manager/Managertaskslist/$adminId"),
+      Uri.parse("$baseUrl/Manager/userstaskslist/$adminId"),
       headers: {"Content-Type": "application/json"},
     );
 
@@ -51,22 +58,6 @@ class AdminService {
       );
     } else {
       throw Exception("Failed to load admin tasks");
-    }
-  }
-
-  static Future<List<dynamic>> getTasksAssignedByAdmin(int adminId) async {
-    final url = Uri.parse("$baseUrl/Manager/Managertasksassigned/$adminId");
-
-    final response = await http.get(
-      url,
-      headers: {"Content-Type": "application/json"},
-    );
-
-    if (response.statusCode == 200) {
-      final data = json.decode(response.body);
-      return data["result"] as List<dynamic>;
-    } else {
-      throw Exception("Failed to load assigned-by tasks");
     }
   }
 
@@ -181,6 +172,104 @@ class AdminService {
       return null;
     } else {
       throw Exception("Failed to fetch review");
+    }
+  }
+
+  static Future<List<dynamic>> getusergoalbyid(int userid) async {
+    try {
+      final token = await AuthService.getToken();
+
+      final response = await http.get(
+        Uri.parse("$baseUrl/Manager/usersgoallist/$userid"),
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer $token",
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data;
+      } else {
+        throw Exception("Failed to load manager tasks");
+      }
+    } catch (e) {
+      throw Exception(e.toString());
+    }
+  }
+
+  static Future<List<dynamic>> getgoalAssignedByAdmin(int adminId) async {
+    try {
+      final token = await AuthService.getToken();
+
+      final response = await http.get(
+        Uri.parse("$baseUrl/Manager/Managergoalsassigned/$adminId"),
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer $token",
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data;
+      } else {
+        throw Exception("Failed to load manager tasks");
+      }
+    } catch (e) {
+      throw Exception(e.toString());
+    }
+  }
+
+  static Future<bool> saveFiveSPoints({
+    required int staffId,
+    required String dept,
+    required int month,
+    required int week,
+    required int points,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse("$baseUrl/Manager/fiveSpoints"),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({
+          "staffId": staffId,
+          "department": dept,
+          "month": month,
+          "week": week,
+          "year": DateTime.now().year,
+          "points": points,
+        }),
+      );
+
+      return response.statusCode == 200;
+    } catch (e) {
+      print("5S Error: $e");
+      return false;
+    }
+  }
+
+  static Future<bool> addWarranty({
+    required int staffId,
+    required int totalWork,
+    required int complaints,
+  }) async {
+    try {
+      final url = Uri.parse(
+        "$baseUrl/Manager/add-warranty?staffId=$staffId&totalWork=$totalWork&complaints=$complaints",
+      );
+
+      final response = await http.post(url);
+
+      if (response.statusCode == 200) {
+        return true;
+      } else {
+        print(response.body);
+        return false;
+      }
+    } catch (e) {
+      print("Error: $e");
+      return false;
     }
   }
 }

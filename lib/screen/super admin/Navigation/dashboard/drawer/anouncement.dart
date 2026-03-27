@@ -110,6 +110,7 @@ class _AnounceState extends State<Anounce> {
       body: Stack(
         children: [
           Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               FutureBuilder<List<Announcement>>(
                 future: futureAnnouncements,
@@ -209,6 +210,7 @@ class _AnounceState extends State<Anounce> {
                                               decoration: BoxDecoration(
                                                 color: _getTypeColor(
                                                   item.fileType,
+                                                // ignore: deprecated_member_use
                                                 ).withOpacity(0.15),
                                                 borderRadius:
                                                     BorderRadius.circular(20),
@@ -322,12 +324,12 @@ class _AnounceState extends State<Anounce> {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: DataTable(
-        headingRowColor: MaterialStateProperty.all(
+        headingRowColor: WidgetStateProperty.all(
           Theme.of(context).colorScheme.primary,
         ),
 
-        dataRowColor: MaterialStateProperty.resolveWith<Color?>((
-          Set<MaterialState> states,
+        dataRowColor: WidgetStateProperty.resolveWith<Color?>((
+          Set<WidgetState> states,
         ) {
           return Colors.green.shade50;
         }),
@@ -343,7 +345,7 @@ class _AnounceState extends State<Anounce> {
           var row = entry.value;
 
           return DataRow(
-            color: MaterialStateProperty.all(
+            color: WidgetStateProperty.all(
               index % 2 == 0
                   ? Theme.of(context).colorScheme.onPrimary
                   : Theme.of(context).colorScheme.tertiary,
@@ -413,7 +415,7 @@ class _AnounceState extends State<Anounce> {
               Icon(Icons.open_in_new, color: Colors.red.shade600),
             ],
           ),
-        ),
+        ),  
       );
     }
 

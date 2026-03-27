@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:staff_work_track/Models/announcement.dart';
 import 'package:staff_work_track/core/constant/apiurl.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
+import 'package:staff_work_track/screen/staff/navigation/fullimg.dart';
+import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/drawer/postanounce.dart';
 import 'package:staff_work_track/services/announ_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -30,8 +32,25 @@ class _AnounceState extends State<ManagerAnounce> {
           icon: const Icon(Icons.arrow_back_ios),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text("Announcements"),
-     
+        title: const Text("Official Notices"),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.add),
+            onPressed: () async {
+              final result = await Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const PostAnnouncementPage()),
+              );
+
+              if (result == true) {
+                setState(() {
+                  futureAnnouncements =
+                      AnnouncementService.fetchAnnouncements();
+                });
+              }
+            },
+          ),
+        ],
       ),
       body: FutureBuilder<List<Announcement>>(
         future: futureAnnouncements,
@@ -54,172 +73,128 @@ class _AnounceState extends State<ManagerAnounce> {
               return Container(
                 margin: const EdgeInsets.symmetric(
                   horizontal: 16,
-                  vertical: 10,
+                  vertical: 14,
                 ),
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
-                      blurRadius: 15,
-                      offset: const Offset(0, 6),
-                    ),
-                  ],
-                ),
-                child: Column(
+
+                child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    /// Header Row
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    Column(
                       children: [
-                        Expanded(
-                          child: Text(
-                            item.title,
-                            style: Theme.of(context).textTheme.displaySmall,
-                          ),
-                        ),
                         Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 4,
-                          ),
+                          width: 14,
+                          height: 14,
                           decoration: BoxDecoration(
-                            color: Colors.green.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Text(
-                            item.createdBy,
-                            style: Theme.of(context).textTheme.titleLarge,
+                            shape: BoxShape.circle,
+                            gradient: LinearGradient(
+                              colors: [
+                                Theme.of(context).colorScheme.background,
+                                Theme.of(context).colorScheme.secondary,
+                              ],
+                            ),
                           ),
                         ),
+                        Container(width: 2, height: 120, color: Colors.grey),
                       ],
                     ),
 
-                    const SizedBox(height: 6),
+                    const SizedBox(width: 14),
 
-                    Text(
-                      "${item.createdDate.toLocal()}".split(' ')[0],
-                      style: TextStyle(fontSize: 12, color: Colors.grey),
-                    ),
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.all(15),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: Theme.of(context).colorScheme.secondary,
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    item.title,
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.headlineLarge,
+                                  ),
+                                ),
 
-                    const SizedBox(height: 12),
-
-                    if (item.description != null)
-                      Text(
-                        item.description!,
-                        style: Theme.of(context).textTheme.labelMedium,
-                      ),
-
-                    const SizedBox(height: 12),
-
-                    /// IMAGE DESIGN
-                    if (item.fileType == "image" && item.filePath != null)
-                      GestureDetector(
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => Scaffold(
-                                backgroundColor: Colors.black,
-                                appBar: AppBar(backgroundColor: Colors.black),
-                                body: Center(
-                                  child: InteractiveViewer(
-                                    child: Image.network(
-                                      "${ApiConstants.Uploaded}${item.filePath}",
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: _getTypeColor(
+                                      item.fileType,
+                                    ).withOpacity(0.15),
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Text(
+                                    item.fileType.toUpperCase(),
+                                    style: TextStyle(
+                                      color: _getTypeColor(item.fileType),
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 10,
                                     ),
                                   ),
                                 ),
-                              ),
-                            ),
-                          );
-                        },
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(16),
-                          child: Stack(
-                            children: [
-                              Image.network(
-                                "${ApiConstants.Uploaded}${item.filePath}",
-                                height: 200,
-                                width: double.infinity,
-                                fit: BoxFit.cover,
-                              ),
-                              Positioned(
-                                top: 10,
-                                right: 10,
-                                child: Container(
-                                  padding: const EdgeInsets.all(6),
-                                  decoration: BoxDecoration(
-                                    color: Colors.black54,
-                                    borderRadius: BorderRadius.circular(30),
-                                  ),
-                                  child: const Icon(
-                                    Icons.fullscreen,
-                                    color: Colors.white,
-                                    size: 18,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-
-                    /// PDF DESIGN
-                    if (item.fileType == "pdf" && item.filePath != null)
-                      GestureDetector(
-                        onTap: () async {
-                          final url =
-                              "${ApiConstants.Uploaded}${item.filePath}";
-                          await launchUrl(
-                            Uri.parse(url),
-                            mode: LaunchMode.externalApplication,
-                          );
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.all(14),
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [
-                                Colors.red.shade400,
-                                Colors.red.shade600,
                               ],
                             ),
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(
-                                Icons.picture_as_pdf,
-                                color: Colors.white,
-                                size: 36,
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Text(
-                                  item.fileName ??
-                                      item.filePath!.split('/').last,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                  overflow: TextOverflow.ellipsis,
+
+                            const SizedBox(height: 10),
+
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.schedule,
+                                  size: 14,
+                                  color: Colors.grey,
                                 ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  "${item.createdDate.toLocal()}".split(' ')[0],
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    color: Colors.grey,
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Icon(
+                                  Icons.person,
+                                  size: 14,
+                                  color: Colors.grey,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  item.createdBy,
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey,
+                                  ),
+                                ),
+                              ],
+                            ),
+
+                            const SizedBox(height: 12),
+
+                            if (item.description != null)
+                              Text(
+                                item.description!,
+                                style: Theme.of(context).textTheme.labelMedium,
                               ),
-                              const Icon(
-                                Icons.open_in_new,
-                                color: Colors.white,
-                              ),
-                            ],
-                          ),
+
+                            const SizedBox(height: 14),
+
+                            _buildMediaSection(item),
+                          ],
                         ),
                       ),
-
-                    /// EXCEL TABLE DESIGN
-                    if (item.fileType == "excel" && item.jsonData != null)
-                      Container(child: _buildExcelTable(item.jsonData!)),
+                    ),
                   ],
                 ),
               );
@@ -230,7 +205,6 @@ class _AnounceState extends State<ManagerAnounce> {
     );
   }
 
-  /// Dynamic Excel Table
   Widget _buildExcelTable(String jsonData) {
     List<dynamic> rows = jsonDecode(jsonData);
 
@@ -276,5 +250,92 @@ class _AnounceState extends State<ManagerAnounce> {
         }).toList(),
       ),
     );
+  }
+
+  Widget _buildMediaSection(Announcement item) {
+    if (item.fileType == "image" && item.filePath != null) {
+      final imageUrl = "${ApiConstants.Uploaded}${item.filePath}";
+
+      return GestureDetector(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => FullScreenImageViewer(imageUrl: imageUrl),
+            ),
+          );
+        },
+        child: Hero(
+          tag: imageUrl,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(18),
+            child: Image.network(
+              imageUrl,
+              height: 200,
+              width: double.infinity,
+              fit: BoxFit.cover,
+            ),
+          ),
+        ),
+      );
+    }
+
+    if (item.fileType == "pdf" && item.filePath != null) {
+      return GestureDetector(
+        onTap: () async {
+          final url = "${ApiConstants.Uploaded}${item.filePath}";
+          await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+        },
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: Colors.red.shade50,
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.picture_as_pdf, color: Colors.red.shade600, size: 25),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  item.fileName ?? item.filePath!.split('/').last,
+                  style: TextStyle(
+                    color: Colors.red.shade700,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              Icon(Icons.open_in_new, color: Colors.red.shade600),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (item.fileType == "excel" && item.jsonData != null) {
+      return Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.green.shade50,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: _buildExcelTable(item.jsonData!),
+      );
+    }
+
+    return const SizedBox();
+  }
+
+  Color _getTypeColor(String type) {
+    switch (type) {
+      case "image":
+        return Colors.blue;
+      case "pdf":
+        return Colors.red;
+      case "excel":
+        return Colors.green;
+      default:
+        return Colors.grey;
+    }
   }
 }

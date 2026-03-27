@@ -22,7 +22,7 @@ class KpiCircleCard extends StatelessWidget {
     } else if (percent < 85) {
       return Colors.blue;
     } else {
-      return Colors.green;
+      return Colors.red;
     }
   }
 

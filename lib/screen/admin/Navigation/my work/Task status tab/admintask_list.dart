@@ -1,91 +1,62 @@
 import 'package:flutter/material.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/Task/taskdetail.dart';
-import 'package:staff_work_track/services/admin_service.dart';
 import 'package:staff_work_track/widgets/StatCard.dart';
-import 'package:staff_work_track/core/widgets/loading.dart';
 
-class Alltasklist extends StatefulWidget {
-  final int adminId;
+class Alltasklist extends StatelessWidget {
+  final List tasks;
   final String searchQuery;
 
   const Alltasklist({
     super.key,
-    required this.adminId,
+    required this.tasks,
     required this.searchQuery,
   });
 
   @override
-  State<Alltasklist> createState() => _AlltasklistState();
-}
-
-class _AlltasklistState extends State<Alltasklist> {
-  late Future<List<Map<String, dynamic>>> tasksFuture;
-
-  @override
-  void initState() {
-    super.initState();
-    tasksFuture = AdminService.getAdminTasks(widget.adminId);
-  }
-
-  @override
   Widget build(BuildContext context) {
-    return FutureBuilder<List<Map<String, dynamic>>>(
-      future: tasksFuture,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: RotatingFlower());
-        }
+    final query = searchQuery.trim().toLowerCase();
 
-        if (snapshot.hasError) {
-          return Center(child: Text(snapshot.error.toString()));
-        }
+    final filteredTasks = tasks.where((task) {
+      if (query.isEmpty) return true;
 
-        if (!snapshot.hasData || snapshot.data!.isEmpty) {
-          return const Center(child: Text("No Tasks Found"));
-        }
+      final taskName = (task['task'] ?? '').toString().toLowerCase();
+      final status = (task['status'] ?? '').toString().toLowerCase();
+      final priority = (task['priority'] ?? '').toString().toLowerCase();
 
-        final tasks = snapshot.data!;
-        final query = widget.searchQuery.trim().toLowerCase();
+      return taskName.contains(query) ||
+          status.contains(query) ||
+          priority.contains(query);
+    }).toList();
 
-        final filteredTasks = tasks.where((task) {
-          if (query.isEmpty) return true;
+    if (filteredTasks.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.all(15),
+        child: Text("No tasks found"),
+      );
+    }
 
-          final taskName = (task['task'] ?? '').toString().toLowerCase();
-          final status = (task['status'] ?? '').toString().toLowerCase();
-          final priority = (task['priority'] ?? '').toString().toLowerCase();
+    return Padding(
+      padding: const EdgeInsets.all(15),
+      child: ListView.builder(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        itemCount: filteredTasks.length,
+        itemBuilder: (context, index) {
+          final task = filteredTasks[index];
 
-          return taskName.contains(query) ||
-              status.contains(query) ||
-              priority.contains(query);
-        }).toList();
-
-        return ListView.builder(
-          padding: const EdgeInsets.only(bottom: 12),
-          //   itemCount: tasks.length,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: filteredTasks.length,
-          itemBuilder: (context, index) {
-            final task = filteredTasks[index];
-
-            if (filteredTasks.isEmpty) {
-              return const Center(child: Text("No tasks found"));
-            }
-
-            return Taskstatus(
-              task: task,
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => TaskDetails(taskCode: task["taskCode"]),
-                  ),
-                );
-              },
-            );
-          },
-        );
-      },
+          return Taskstatus(
+            task: task,
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => TaskDetails(taskCode: task["taskCode"]),
+                ),
+              );
+            },
+          );
+        },
+      ),
     );
   }
 }

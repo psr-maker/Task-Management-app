@@ -403,7 +403,7 @@ class _WorklogState extends State<Worklog> {
     );
 
     return Container(
-      color: Theme.of(context).colorScheme.onPrimary,
+    //  color: Theme.of(context).colorScheme.onPrimary,
       child: Column(
         children: [
           Row(

@@ -9,11 +9,10 @@ class Reports extends StatefulWidget {
   State<Reports> createState() => _ReportsState();
 }
 
-class _ReportsState extends State<Reports>
-    with SingleTickerProviderStateMixin {
+class _ReportsState extends State<Reports> with SingleTickerProviderStateMixin {   
   late TabController _tabController;
 
-  final List<String> tabs = ["Department", "Manager", "Employee"];
+  final List<String> tabs = ["Departments", "Managers", "Staff's"];
 
   @override
   void initState() {
@@ -34,21 +33,21 @@ class _ReportsState extends State<Reports>
         title: const Text("Reports"),
         bottom: TabBar(
           controller: _tabController,
-          indicatorColor:   Theme.of(context).colorScheme.onPrimary,
-           labelColor:  Theme.of(context).colorScheme.onPrimary,
-          labelStyle:Theme.of(context).textTheme.labelLarge ,
-          unselectedLabelStyle: TextStyle(color:Colors.grey),
+          indicatorColor: Theme.of(context).colorScheme.onPrimary,
+          labelColor: Theme.of(context).colorScheme.onPrimary,
+          labelStyle: Theme.of(context).textTheme.labelLarge,
+          unselectedLabelStyle: TextStyle(color: Colors.grey),
           tabs: tabs.map((e) => Tab(text: e)).toList(),
         ),
       ),
-    body: TabBarView(
-  controller: _tabController,
-  children: const [
-    DepartmentListPage(),         
-    EmployeeReportsList(role: 'Manager',),
-    EmployeeReportsList(role: 'Staff',),
-  ],
-),
+      body: TabBarView(
+        controller: _tabController,
+        children: const [
+          DepartmentListPage(),
+          EmployeeReportsList(role: 'Manager'),
+          EmployeeReportsList(role: 'Staff'),
+        ],
+      ),
     );
   }
 }

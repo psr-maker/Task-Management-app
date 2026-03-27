@@ -1,5 +1,4 @@
 import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:staff_work_track/utils/jwt_helper.dart';
 import 'package:staff_work_track/screen/admin/admin.dart';
@@ -12,33 +11,26 @@ import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
 class Otpverify extends StatefulWidget {
   final String email;
   const Otpverify({super.key, required this.email});
-
   @override
   State<Otpverify> createState() => _OtpverifyState();
 }
 
 class _OtpverifyState extends State<Otpverify> {
   final AuthService _authService = AuthService();
-
   final List<TextEditingController> _otpcontrollers = List.generate(
     6,
     (_) => TextEditingController(),
   );
   final List<FocusNode> _focusNodes = List.generate(6, (_) => FocusNode());
-
   String get _enteredOtp => _otpcontrollers.map((c) => c.text).join();
-
   int _secondsLeft = 60;
   int _otpAttempts = 0;
   Timer? _timer;
   bool _canResend = false;
-
   bool _isLoading = false;
-
   String? _topMessage;
   bool _isErrorMessage = true;
   bool _showTopMessage = false;
-
   @override
   void initState() {
     super.initState();
@@ -59,18 +51,19 @@ class _OtpverifyState extends State<Otpverify> {
     } else if (value.isEmpty && index > 0) {
       _focusNodes[index - 1].requestFocus();
     }
+    if (_enteredOtp.length == 6) {
+      _verifyOtp();
+    }
   }
 
   void _clearOtpFields() {
     for (var c in _otpcontrollers) c.clear();
-    // _focusNodes[0].requestFocus();
   }
 
   void _startOtpTimer() {
     _timer?.cancel();
     _secondsLeft = 60;
     _canResend = false;
-
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (_secondsLeft == 0) {
         timer.cancel();
@@ -87,7 +80,6 @@ class _OtpverifyState extends State<Otpverify> {
       _isErrorMessage = isError;
       _showTopMessage = true;
     });
-
     Future.delayed(const Duration(seconds: 3), () {
       if (!mounted) return;
       setState(() {
@@ -98,24 +90,23 @@ class _OtpverifyState extends State<Otpverify> {
 
   Future<void> _verifyOtp() async {
     final otp = _enteredOtp;
-
     if (otp.length != 6) {
       showTopMessage("Please enter 6-digit OTP", isError: true);
       return;
     }
-
     setState(() => _isLoading = true);
-
     try {
       final result = await _authService.verifyOtp(widget.email, otp);
-
       final token = result["token"];
+      if (token == null || token.isEmpty) {
+        showTopMessage("Invalid server response", isError: true);
+        return;
+      }
       final role = JwtHelper.getRole(token);
-
       await AuthService.saveToken(token);
-      await Future.delayed(const Duration(seconds: 3));
       showTopMessage("OTP verified successfully", isError: false);
-      await Future.delayed(const Duration(seconds: 3));
+      await Future.delayed(const Duration(seconds: 1));
+      if (!mounted) return;
       if (role == "Director") {
         _go(const SuperAdmin());
       } else if (role == "Manager") {
@@ -125,7 +116,6 @@ class _OtpverifyState extends State<Otpverify> {
       }
     } catch (e) {
       final error = e.toString().replaceAll("Exception: ", "");
-
       if (error.contains("Invalid OTP")) {
         showTopMessage("Invalid OTP. Please try again", isError: true);
       } else if (error.contains("OTP expired")) {
@@ -136,19 +126,16 @@ class _OtpverifyState extends State<Otpverify> {
         showTopMessage("OTP verification failed", isError: true);
       }
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   Future<void> _resendOtp() async {
     setState(() => _isLoading = true);
-
     try {
       _otpAttempts = await _authService.sendOtp(widget.email);
-
       _clearOtpFields();
       _startOtpTimer();
-
       if (_otpAttempts < 3) {
         showTopMessage(
           "OTP resent successfully ($_otpAttempts / 3)",
@@ -160,7 +147,10 @@ class _OtpverifyState extends State<Otpverify> {
     } catch (e) {
       final error = e.toString().replaceAll("Exception: ", "");
       if (error.contains("Maximum OTP attempts")) {
-        showTopMessage("Maximum OTP resend attempts reached", isError: true);
+        showTopMessage(
+          "Maximum OTP attempts reached. Try again later.",
+          isError: true,
+        );
       } else {
         showTopMessage(error, isError: true);
       }
@@ -244,9 +234,7 @@ class _OtpverifyState extends State<Otpverify> {
                       ],
                     ),
                   ),
-
                   SizedBox(height: 40),
-
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: List.generate(6, (index) {
@@ -275,11 +263,10 @@ class _OtpverifyState extends State<Otpverify> {
                             filled: true,
                             fillColor: const Color.fromARGB(255, 25, 77, 38),
                             enabledBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                    borderSide: BorderSide(color: Colors.white),
-                                  ),
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: BorderSide(color: Colors.white),
+                            ),
                           ),
-
                           onChanged: (value) => _onOtpChanged(index, value),
                         ),
                       );
@@ -317,7 +304,6 @@ class _OtpverifyState extends State<Otpverify> {
                             ],
                           ),
                         ),
-
                   SizedBox(height: 40),
                   Center(
                     child: AppButton(

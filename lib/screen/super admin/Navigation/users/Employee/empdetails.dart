@@ -3,7 +3,6 @@ import 'package:staff_work_track/Models/getusers.dart';
 import 'package:staff_work_track/common/filter_model.dart';
 import 'package:staff_work_track/common/search_filter_page.dart';
 import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
-import 'package:staff_work_track/screen/super%20admin/Navigation/Task/taskdetail.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/Task/create_task.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/drawer/auditlog.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/warnings/craete_warnings.dart';
@@ -11,8 +10,6 @@ import 'package:staff_work_track/screen/super%20admin/Navigation/users/edit_user
 import 'package:staff_work_track/services/admin_service.dart';
 import 'package:staff_work_track/services/auth_service.dart';
 import 'package:staff_work_track/services/superadmin_service.dart';
-import 'package:staff_work_track/utils/TaskUtils.dart';
-import 'package:staff_work_track/utils/app_helper.dart';
 import 'package:staff_work_track/utils/jwt_helper.dart';
 import 'package:staff_work_track/widgets/StatCard.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
@@ -27,7 +24,7 @@ class EmployeeDetail extends StatefulWidget {
 }
 
 class _EmployeeDetailState extends State<EmployeeDetail> {
-  late Future<List<Map<String, dynamic>>> taskFuture;
+  bool isLoading = true;
   bool isActive = false;
   bool isUpdating = false;
   bool _statusInitialized = false;
@@ -37,72 +34,95 @@ class _EmployeeDetailState extends State<EmployeeDetail> {
   String searchQuery = "";
   final TaskFilterModel taskFilter = TaskFilterModel();
   List<String> departmentsList = [];
-  List<String> usersList = [];
-  bool canEditEmployee = false;
   bool permissionLoaded = false;
+  bool canEditDelete = false;
+  bool canSendWarning = false;
+  bool canShowMenu = false;
   String? _topMessage;
   bool _isErrorMessage = true;
   bool _showTopMessage = false;
-  List<Map<String, dynamic>> applySearchAndFilter(
-    List<Map<String, dynamic>> tasks,
-  ) {
-    return tasks.where((task) {
-      final matchesSearch =
-          searchQuery.isEmpty ||
-          task["task"].toString().toLowerCase().contains(
-            searchQuery.toLowerCase(),
-          ) ||
-          task["taskCode"].toString().toLowerCase().contains(
-            searchQuery.toLowerCase(),
-          );
+  List<dynamic> staffGoals = [];
 
-      final matchesUser =
-          taskFilter.assignedTo == null ||
-          (task["assignedTo"] as List).any((u) {
-            final selectedUser = taskFilter.assignedTo!
-                .split('-')
-                .first
-                .trim()
-                .toLowerCase();
-            final taskUser = (u["name"] ?? "").toString().trim().toLowerCase();
+  List<dynamic> applyGoalSearch(List<dynamic> goals) {
+    List<dynamic> filtered = goals;
 
-            return taskUser == selectedUser;
-          });
+    // SEARCH
+    if (searchQuery.trim().isNotEmpty) {
+      final query = searchQuery.toLowerCase();
 
-      final matchesDepartment =
-          taskFilter.department == null ||
-          (task["assignedTo"] as List).any((u) {
-            final taskDept = (u["department"] ?? "")
-                .toString()
-                .trim()
-                .toLowerCase();
-            final selectedDept = taskFilter.department!.trim().toLowerCase();
+      filtered = filtered.where((goal) {
+        final title = (goal["title"] ?? "").toString().toLowerCase();
+        final code = (goal["goalCode"] ?? "").toString().toLowerCase();
+        final department = (goal["department"] ?? "").toString().toLowerCase();
+        final status = (goal["status"] ?? "").toString().toLowerCase();
+        final priority = (goal["priority"] ?? "").toString().toLowerCase();
 
-            return taskDept == selectedDept;
-          });
+        return title.contains(query) ||
+            code.contains(query) ||
+            department.contains(query) ||
+            status.contains(query) ||
+            priority.contains(query);
+      }).toList();
+    }
 
-      final matchesStatus =
-          taskFilter.status == null ||
-          AppHelpers.normalize(task["status"]) ==
-              AppHelpers.normalize(taskFilter.status!);
+    // STATUS FILTER
+    if (taskFilter.status != null && taskFilter.status!.isNotEmpty) {
+      filtered = filtered.where((goal) {
+        return (goal["status"] ?? "").toString().toLowerCase() ==
+            taskFilter.status!.toLowerCase();
+      }).toList();
+    }
 
-      final matchesPriority =
-          taskFilter.priority == null ||
-          task["priority"].toString().toLowerCase() ==
-              taskFilter.priority!.toLowerCase();
-      return matchesSearch &&
-          matchesUser &&
-          matchesDepartment &&
-          matchesStatus &&
-          matchesPriority;
-    }).toList();
+    // PRIORITY FILTER
+    if (taskFilter.priority != null && taskFilter.priority!.isNotEmpty) {
+      filtered = filtered.where((goal) {
+        return (goal["priority"] ?? "").toString().toLowerCase() ==
+            taskFilter.priority!.toLowerCase();
+      }).toList();
+    }
+
+    // DEPARTMENT FILTER
+    if (taskFilter.department != null && taskFilter.department!.isNotEmpty) {
+      filtered = filtered.where((goal) {
+        return (goal["department"] ?? "").toString().toLowerCase() ==
+            taskFilter.department!.toLowerCase();
+      }).toList();
+    }
+
+    return filtered;
   }
 
   @override
   void initState() {
     super.initState();
-    taskFuture = AdminService.getTasksByUser(widget.employee.userId);
+
     _checkEditPermission(widget.employee);
+    loadEmployeeGoals();
+  }
+
+  Future<void> loadEmployeeGoals() async {
+    try {
+      setState(() => isLoading = true);
+
+      final goals = await AdminService.getusergoalbyid(widget.employee.userId);
+
+      if (mounted) {
+        setState(() {
+          staffGoals = goals;
+
+          departmentsList = goals
+              .map((g) => (g["department"] ?? "").toString())
+              .where((d) => d.isNotEmpty)
+              .toSet()
+              .toList();
+
+          isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint("Goal load error: $e");
+      setState(() => isLoading = false);
+    }
   }
 
   Future<void> _checkEditPermission(UserModel employee) async {
@@ -117,7 +137,7 @@ class _EmployeeDetailState extends State<EmployeeDetail> {
     final loginUserId = loginUserIdRaw.toString().trim();
     final loginUserRole = loginUserRoleRaw.toLowerCase().trim();
 
-    // Parse createdBy numeric ID
+    // Extract createdBy ID
     String createdById = "";
     if (employee.createdBy.isNotEmpty) {
       if (employee.createdBy.contains('-')) {
@@ -127,20 +147,20 @@ class _EmployeeDetailState extends State<EmployeeDetail> {
       }
     }
 
-    // Permission: Director or created this employee/admin
-    final isSuperAdmin = loginUserRole.contains("director");
-    final canEdit = isSuperAdmin || (loginUserId == createdById);
+    final isDirector = loginUserRole.contains("director");
+    final isManager = loginUserRole.contains("manager");
 
-    debugPrint("LOGIN ROLE RAW: '$loginUserRoleRaw'");
-    debugPrint("LOGIN ROLE PROCESSED: '$loginUserRole'");
-    debugPrint("LOGIN ID: $loginUserId");
-    debugPrint("CREATED BY FIELD: ${employee.createdBy}");
-    debugPrint("CREATED BY ID: $createdById");
-    debugPrint("CAN EDIT: $canEdit");
+    // ✅ RULES
+    final allowEditDelete = isDirector || (loginUserId == createdById);
+    final allowWarning = isDirector || isManager;
+
+    final showMenu = allowEditDelete || allowWarning;
 
     if (mounted) {
       setState(() {
-        canEditEmployee = canEdit;
+        canEditDelete = allowEditDelete;
+        canSendWarning = allowWarning;
+        canShowMenu = showMenu;
         permissionLoaded = true;
       });
     }
@@ -157,28 +177,6 @@ class _EmployeeDetailState extends State<EmployeeDetail> {
       if (!mounted) return;
       setState(() => _showTopMessage = false);
     });
-  }
-
-  void buildFilterListsFromTasks(List<Map<String, dynamic>> tasks) {
-    final Set<String> departments = {};
-    final Set<String> users = {};
-
-    for (final task in tasks) {
-      final assignedList = task["assignedTo"] as List? ?? [];
-
-      for (final u in assignedList) {
-        if (u["department"] != null) {
-          departments.add(u["department"].toString());
-        }
-
-        if (u["name"] != null && u["role"] != null) {
-          users.add("${u["name"]}-${u["role"]}");
-        }
-      }
-    }
-
-    departmentsList = departments.toList();
-    usersList = users.toList();
   }
 
   @override
@@ -224,292 +222,265 @@ class _EmployeeDetailState extends State<EmployeeDetail> {
           ),
 
           PopupMenuButton<String>(
-            enabled: canEditEmployee,
+            enabled: canShowMenu,
             icon: Icon(
               Icons.more_vert,
-              color: canEditEmployee ? Colors.white : Colors.grey,
+              color: canShowMenu ? Colors.white : Colors.grey,
             ),
-            onSelected: canEditEmployee
-                ? (value) async {
-                    if (value == 'edit') {
-                      final result = await Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => EditUser(user: widget.employee),
-                        ),
-                      );
+            onSelected: (value) async {
+              if (value == 'edit' && canEditDelete) {
+                final result = await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => EditUser(user: widget.employee),
+                  ),
+                );
 
-                      if (result == true) {
-                        setState(() {});
-                      }
-                    }
+                if (result == true) setState(() {});
+              }
 
-                    if (value == 'delete') {
-                      final confirm = await showConfirmDialog(
-                        context,
-                        "Delete",
-                        "User",
-                      );
-
-                      if (confirm == true) {
-                        try {
-                          final success = await SuperAdminService.deleteUser(
-                            widget.employee.userId,
-                          );
-
-                          if (success) {
-                            showTopMessage(
-                              "User deleted successfully",
-                              isError: false,
-                            );
-
-                            Future.delayed(const Duration(seconds: 2), () {
-                              if (mounted) {
-                                Navigator.pop(context, true);
-                              }
-                            });
-                          } else {
-                            showTopMessage(
-                              "Failed to delete user",
-                              isError: true,
-                            );
-                          }
-                        } catch (e) {
-                          showTopMessage("Something went wrong", isError: true);
-                        }
-                      }
-                    }
-
-                    if (value == 'send warning') {
-                      final result = await Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => SendWarningPage(
-                            receiverId: widget.employee.userId,
-                            receivername: widget.employee.name,
-                          ),
-                        ),
-                      );
-
-                      if (result == true) {
-                        setState(() {});
-                      }
-                    }
-                  }
-                : null,
-            itemBuilder: (_) => [
-              PopupMenuItem(
-                value: 'edit',
-                child: Text(
-                  "Edit",
-                  style: Theme.of(context).textTheme.headlineMedium,
-                ),
-              ),
-              PopupMenuItem(
-                value: 'delete',
-                child: Text(
+              if (value == 'delete' && canEditDelete) {
+                final confirm = await showConfirmDialog(
+                  context,
                   "Delete",
-                  style: Theme.of(context).textTheme.headlineMedium,
+                  "User",
+                );
+
+                if (confirm == true) {
+                  try {
+                    final success = await SuperAdminService.deleteUser(
+                      widget.employee.userId,
+                    );
+
+                    if (success) {
+                      showTopMessage(
+                        "User deleted successfully",
+                        isError: false,
+                      );
+
+                      Future.delayed(const Duration(seconds: 2), () {
+                        if (mounted) Navigator.pop(context, true);
+                      });
+                    } else {
+                      showTopMessage("Failed to delete user", isError: true);
+                    }
+                  } catch (e) {
+                    showTopMessage("Something went wrong", isError: true);
+                  }
+                }
+              }
+
+              if (value == 'send warning' && canSendWarning) {
+                final result = await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => SendWarningPage(
+                      receiverId: widget.employee.userId,
+                      receivername: widget.employee.name,
+                    ),
+                  ),
+                );
+
+                if (result == true) setState(() {});
+              }
+            },
+            itemBuilder: (_) => [
+              if (canEditDelete)
+                PopupMenuItem(
+                  value: 'edit',
+                  child: Text(
+                    "Edit",
+                    style: Theme.of(context).textTheme.headlineMedium,
+                  ),
                 ),
-              ),
-              PopupMenuItem(
-                value: 'send warning',
-                child: Text(
-                  "Send Warning",
-                  style: Theme.of(context).textTheme.headlineMedium,
+
+              if (canEditDelete)
+                PopupMenuItem(
+                  value: 'delete',
+                  child: Text(
+                    "Delete",
+                    style: Theme.of(context).textTheme.headlineMedium,
+                  ),
                 ),
-              ),
+
+              if (canSendWarning)
+                PopupMenuItem(
+                  value: 'send warning',
+                  child: Text(
+                    "Send Warning",
+                    style: Theme.of(context).textTheme.headlineMedium,
+                  ),
+                ),
             ],
           ),
         ],
       ),
 
-      body: FutureBuilder<List<Map<String, dynamic>>>(
-        future: taskFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: RotatingFlower());
-          }
+      body: isLoading ? const Center(child: RotatingFlower()) : _buildBody(),
+    );
+  }
 
-          if (snapshot.hasError) {
-            return Center(child: Text(snapshot.error.toString()));
-          }
+  Widget _buildBody() {
+    final filteredGoals = applyGoalSearch(staffGoals);
 
-          // final tasks = snapshot.data ?? [];
-          final allTasks = snapshot.data ?? [];
+    final allTasks = staffGoals.expand((g) => (g["tasks"] ?? [])).toList();
 
-          buildFilterListsFromTasks(allTasks);
+    final completed = allTasks
+        .where(
+          (t) => (t["status"] ?? "").toString().toLowerCase() == "completed",
+        )
+        .length;
 
-          final tasks = applySearchAndFilter(allTasks);
+    final inProgress = allTasks
+        .where(
+          (t) => (t["status"] ?? "").toString().toLowerCase() == "in progress",
+        )
+        .length;
 
-          final completed = tasks
-              .where((t) => t["status"] == "completed")
-              .length;
-          final inProgress = tasks
-              .where((t) => t["status"] == "inProgress")
-              .length;
-          final pending = tasks.where((t) => t["status"] == "pending").length;
+    final pending = allTasks
+        .where((t) => (t["status"] ?? "").toString().toLowerCase() == "pending")
+        .length;
 
-          if (!_statusInitialized) {
-            isActive = widget.employee.status.toLowerCase() == "active";
-            _statusInitialized = true;
-          }
+    if (!_statusInitialized) {
+      isActive = widget.employee.status.toLowerCase() == "active";
+      _statusInitialized = true;
+    }
 
-          return Padding(
-            padding: const EdgeInsets.all(15),
-            child: Stack(
+    return Padding(
+      padding: const EdgeInsets.all(15),
+      child: Stack(
+        children: [
+          SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                SingleChildScrollView(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _employeeCard(tasks.length),
+                _employeeCard(allTasks.length),
 
-                      const SizedBox(height: 15),
+                const SizedBox(height: 15),
 
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          _summaryItem(
-                            "Completed",
-                            completed,
-                            Colors.green,
-                            Icons.task_alt,
-                          ),
-                          const SizedBox(width: 10),
-                          _summaryItem(
-                            "In Progress",
-                            inProgress,
-                            Colors.orange,
-                            Icons.pending_outlined,
-                          ),
-                          const SizedBox(width: 10),
-                          _summaryItem(
-                            "Pending",
-                            pending,
-                            Colors.red,
-                            Icons.access_time_sharp,
-                          ),
-                        ],
+                Row(
+                  children: [
+                    Expanded(
+                      child: SmallStatCard(
+                        title: "Completed",
+                        value: completed.toString(),
+                        icon: Icons.task_alt,
+                        color: Colors.green,
                       ),
-
-                      const SizedBox(height: 15),
-
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            "Task List : ${tasks.length}",
-                            style: Theme.of(context).textTheme.headlineLarge,
-                          ),
-                          GestureDetector(
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => Createtask(
-                                    assignedToIds: [widget.employee.userId],
-                                  ),
-                                ),
-                              );
-                            },
-                            child: Chip(
-                              backgroundColor: Theme.of(context).primaryColor,
-                              label: Text(
-                                "Add Task",
-                                style: Theme.of(context).textTheme.titleMedium,
-                              ),
-                            ),
-                          ),
-                        ],
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: SmallStatCard(
+                        title: "In Progress",
+                        value: inProgress.toString(),
+                        icon: Icons.pending_outlined,
+                        color: Colors.orange,
                       ),
-
-                      const SizedBox(height: 10),
-
-                      ListView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        itemCount: tasks.length,
-                        itemBuilder: (context, index) {
-                          final task = tasks[index];
-                          final statusEnum = TaskUtils.parseStatus(
-                            task["status"],
-                          );
-                          final statusColor = TaskUtils.getStatusColor(
-                            statusEnum,
-                          );
-                          final priorityColor = TaskUtils.getPriorityColor(
-                            task["priority"],
-                          );
-
-                          return TaskCard(
-                            task: task,
-                            statusColor: statusColor,
-                            priorityColor: priorityColor,
-                            formatDate: AppHelpers.formatDate,
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) =>
-                                      TaskDetails(taskCode: task["taskCode"]),
-                                ),
-                              );
-                            },
-                          );
-                        },
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: SmallStatCard(
+                        title: "Pending",
+                        value: pending.toString(),
+                        icon: Icons.access_time_sharp,
+                        color: Colors.red,
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
 
-                if (showFilter)
-                  Positioned(
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    child: Material(
-                      elevation: 8,
-                      borderRadius: const BorderRadius.vertical(
-                        bottom: Radius.circular(20),
-                      ),
-                      child: TaskFilterDropdown(
-                        filter: taskFilter,
-                        departments: departmentsList,
-                        users: usersList,
-                        onClear: () {
-                          setState(() {
-                            taskFilter.clear();
-                            showFilter = false;
-                          });
-                        },
-                        onApply: () {
-                          setState(() {
-                            showFilter = false;
-                          });
-                        },
+                const SizedBox(height: 15),
+
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      "Goals : ${staffGoals.length}",
+                      style: Theme.of(context).textTheme.headlineLarge,
+                    ),
+                    GestureDetector(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => Createtask(
+                              assignedToIds: [widget.employee.userId],
+                            ),
+                          ),
+                        );
+                      },
+                      child: Chip(
+                        backgroundColor: Theme.of(context).primaryColor,
+                        label: Text(
+                          "Add Goal/Task",
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
                       ),
                     ),
-                  ),
-                if (_topMessage != null)
-                  AnimatedPositioned(
-                    top: _showTopMessage ? 0 : -120,
-                    left: 16,
-                    right: 16,
-                    duration: const Duration(milliseconds: 300),
-                    child: Msgsnackbar(
-                      context,
-                      message: _topMessage!,
-                      isError: _isErrorMessage,
-                      backgroundColor: Theme.of(context).colorScheme.primary,
-                      iconColor: Theme.of(context).colorScheme.onPrimary,
-                      textColor: Theme.of(context).colorScheme.onPrimary,
-                    ),
-                  ),
+                  ],
+                ),
+
+                const SizedBox(height: 20),
+
+                ListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: filteredGoals.length,
+                  itemBuilder: (context, index) {
+                    final goal = filteredGoals[index];
+                    return GoalCard(goal: goal);
+                  },
+                ),
               ],
             ),
-          );
-        },
+          ),
+
+          // 🔽 FILTER UI
+          if (showFilter)
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: Material(
+                elevation: 8,
+                borderRadius: const BorderRadius.vertical(
+                  bottom: Radius.circular(20),
+                ),
+                child: TaskFilterDropdown(
+                  filter: taskFilter,
+                  departments: departmentsList,
+                  onClear: () {
+                    setState(() {
+                      taskFilter.clear();
+                      showFilter = false;
+                    });
+                  },
+                  onApply: () {
+                    setState(() {
+                      showFilter = false;
+                    });
+                  },
+                ),
+              ),
+            ),
+
+          // 🔽 TOP MESSAGE
+          if (_topMessage != null)
+            AnimatedPositioned(
+              top: _showTopMessage ? 0 : -120,
+              left: 16,
+              right: 16,
+              duration: const Duration(milliseconds: 300),
+              child: Msgsnackbar(
+                context,
+                message: _topMessage!,
+                isError: _isErrorMessage,
+                backgroundColor: Theme.of(context).colorScheme.primary,
+                iconColor: Theme.of(context).colorScheme.onPrimary,
+                textColor: Theme.of(context).colorScheme.onPrimary,
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -640,35 +611,6 @@ class _EmployeeDetailState extends State<EmployeeDetail> {
           child: Text(value, style: Theme.of(context).textTheme.headlineLarge),
         ),
       ],
-    );
-  }
-
-  Widget _summaryItem(String title, int count, Color color, IconData icon) {
-    return Expanded(
-      child: Container(
-        height: 90,
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          children: [
-            Icon(icon, color: color, size: 20),
-            SizedBox(height: 5),
-            Text(
-              count.toString(),
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: color,
-              ),
-            ),
-            SizedBox(height: 5),
-            Text(title, style: const TextStyle(fontSize: 11)),
-          ],
-        ),
-      ),
     );
   }
 }

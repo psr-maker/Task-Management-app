@@ -39,21 +39,19 @@ class _EditTaskState extends State<EditTask> {
   }
 
   void _setInitialData() {
-    nameController.text = widget.task.task ?? '';
-    descriController.text = widget.task.description ?? '';
+    nameController.text = widget.task.task;
+    descriController.text = widget.task.description;
     selectedPriority = widget.task.priority;
 
-    if (widget.task.createdAt != null) {
-      createdDateController.text = widget.task.createdAt!.split("T").first;
-    }
-
+    createdDateController.text = widget.task.createdAt.split("T").first;
+  
     if (widget.task.dueDate != null) {
       dueDate = DateTime.tryParse(widget.task.dueDate!);
       dueDateController.text = widget.task.dueDate!.split("T").first;
     }
 
     // SAFE assigned users parsing
-    assignedUsers = (widget.task.assignedTo ?? [])
+    assignedUsers = (widget.task.assignedTo)
         .whereType<Map<String, dynamic>>()
         .map((u) => UserModel.fromJson(u))
         .toList();
@@ -210,7 +208,7 @@ class _EditTaskState extends State<EditTask> {
 
                         final success = await SuperAdminService.updateTask(
                           EditTaskRequest(
-                            taskCode: widget.task.taskCode!,
+                            taskCode: widget.task.taskCode,
                             task: nameController.text.trim(),
                             description: descriController.text.trim(),
                             priority: selectedPriority!,

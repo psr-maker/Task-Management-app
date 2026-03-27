@@ -77,10 +77,9 @@ class _DeadlineReportsTabState extends State<empReportsTable> {
 
         // 🔥 DATE FILTER
         if (startDate != null && endDate != null) {
-          if (task.createdAt == null) return false;
 
-          if (task.createdAt!.isBefore(startDate!) ||
-              task.createdAt!.isAfter(endDate!)) {
+          if (task.createdAt.isBefore(startDate!) ||
+              task.createdAt.isAfter(endDate!)) {
             return false;
           }
         }
@@ -250,9 +249,9 @@ class _DeadlineReportsTabState extends State<empReportsTable> {
                                     rows: filteredTasks.map((task) {
                                       return DataRow(
                                         cells: [
-                                          DataCell(Text(task.name ?? "")),
+                                          DataCell(Text(task.name)),
 
-                                          DataCell(Text(task.task ?? "")),
+                                          DataCell(Text(task.task)),
 
                                           DataCell(
                                             Text(
@@ -282,18 +281,16 @@ class _DeadlineReportsTabState extends State<empReportsTable> {
 
                                           DataCell(
                                             Text(
-                                              task.createdAt?.toString().split(
+                                              task.createdAt.toString().split(
                                                     " ",
-                                                  )[0] ??
-                                                  "",
+                                                  )[0],
                                             ),
                                           ),
                                           DataCell(
                                             Text(
-                                              task.dueDate?.toString().split(
+                                              task.dueDate.toString().split(
                                                     " ",
-                                                  )[0] ??
-                                                  "",
+                                                  )[0],
                                             ),
                                           ),
                                         ],

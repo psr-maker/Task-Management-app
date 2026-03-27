@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:staff_work_track/Models/table.dart';
 import 'package:staff_work_track/core/widgets/buttons.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
 import 'package:staff_work_track/services/reports_service.dart';
@@ -18,9 +17,13 @@ class ReportsTable extends StatefulWidget {
 
 class _DeadlineReportsTabState extends State<ReportsTable> {
   final ReportsService _service = ReportsService();
+  String selectedType = "Tasks"; // default
   bool _isLoading = false;
-  List<ReportTask> allTasks = [];
-  List<ReportTask> filteredTasks = [];
+  List<dynamic> allTasks = [];
+  List<dynamic> filteredTasks = [];
+
+  List<dynamic> allGoals = [];
+  List<dynamic> filteredGoals = [];
 
   String? selectedStatus;
   String? selectedPriority;
@@ -39,20 +42,20 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
 
   Future<void> fetchTasks() async {
     try {
-      final tasks = await _service.getFilteredTasks(
+      final result = await _service.getFullReport(
         userId: widget.userId,
         department: widget.department,
       );
 
       setState(() {
-        allTasks = tasks;
-        filteredTasks = tasks;
+        allTasks = result["tasks"] ?? [];
+        filteredTasks = result["tasks"] ?? [];
+        allGoals = result["goals"] ?? [];
+        filteredGoals = result["goals"] ?? [];
         isLoading = false;
       });
     } catch (e) {
-      setState(() {
-        isLoading = false;
-      });
+      setState(() => isLoading = false);
     }
   }
 
@@ -60,26 +63,43 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
     setState(() {
       filteredTasks = allTasks.where((task) {
         if (selectedStatus != null &&
-            task.status.toLowerCase() != selectedStatus!.toLowerCase()) {
+            (task["status"] ?? "").toLowerCase() !=
+                selectedStatus!.toLowerCase()) {
           return false;
         }
 
         if (selectedPriority != null &&
-            task.priority.toLowerCase() != selectedPriority!.toLowerCase()) {
+            (task["priority"] ?? "").toLowerCase() !=
+                selectedPriority!.toLowerCase()) {
           return false;
         }
 
         if (selectedOverdue != null) {
           bool overdueValue = selectedOverdue == "Yes";
-          if (task.isOverdue != overdueValue) {
+          if ((task["isOverdue"] ?? false) != overdueValue) {
             return false;
           }
         }
 
-        // 🔥 DATE FILTER
-        if (startDate != null && endDate != null) {
-          if (task.createdAt.isBefore(startDate!) ||
-              task.createdAt.isAfter(endDate!)) {
+        return true;
+      }).toList();
+
+      filteredGoals = allGoals.where((goal) {
+        if (selectedStatus != null &&
+            (goal["status"] ?? "").toLowerCase() !=
+                selectedStatus!.toLowerCase()) {
+          return false;
+        }
+
+        if (selectedPriority != null &&
+            (goal["priority"] ?? "").toLowerCase() !=
+                selectedPriority!.toLowerCase()) {
+          return false;
+        }
+
+        if (selectedOverdue != null) {
+          bool overdueValue = selectedOverdue == "Yes";
+          if ((goal["isOverdue"] ?? false) != overdueValue) {
             return false;
           }
         }
@@ -118,40 +138,6 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
               );
             },
           ),
-          IconButton(
-            icon: const Icon(Icons.date_range_outlined),
-            onPressed: () async {
-              final picked = await showDateRangePicker(
-                context: context,
-                firstDate: DateTime(2020),
-                lastDate: DateTime.now(),
-                initialDateRange: startDate != null && endDate != null
-                    ? DateTimeRange(start: startDate!, end: endDate!)
-                    : null,
-              );
-
-              if (picked != null) {
-                setState(() {
-                  startDate = picked.start;
-                  endDate = picked.end;
-                  applyFilters();
-                });
-              }
-            },
-          ),
-
-          // ✅ SHOW CLEAR ICON ONLY WHEN DATE SELECTED
-          if (startDate != null && endDate != null)
-            IconButton(
-              icon: const Icon(Icons.clear),
-              onPressed: () {
-                setState(() {
-                  startDate = null;
-                  endDate = null;
-                  applyFilters();
-                });
-              },
-            ),
         ],
       ),
       body: isLoading
@@ -199,144 +185,333 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
                     ),
                   ),
 
+                Container(
+                  margin: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 10,
+                  ),
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade200,
+                    borderRadius: BorderRadius.circular(30),
+                  ),
+                  child: Row(
+                    children: [
+                      _buildToggleButton("Tasks"),
+                      _buildToggleButton("Goals"),
+                    ],
+                  ),
+                ),
+
                 /// 🔹 TABLE SECTION
                 Expanded(
                   child: Padding(
                     padding: const EdgeInsets.all(16),
-                    child: filteredTasks.isEmpty
-                        ? Center(
-                            child: Text(
-                              "No data available",
-                              style: Theme.of(context).textTheme.displaySmall,
-                            ),
-                          )
-                        : Card(
-                            elevation: 4,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(16),
-                              child: SingleChildScrollView(
-                                scrollDirection: Axis.horizontal,
-                                child: SingleChildScrollView(
-                                  child: DataTable(
-                                    headingTextStyle: Theme.of(
-                                      context,
-                                    ).textTheme.labelLarge,
+                    child: Builder(
+                      builder: (context) {
+                        final currentList = selectedType == "Tasks"
+                            ? filteredTasks
+                            : filteredGoals;
 
-                                    dataTextStyle: Theme.of(
-                                      context,
-                                    ).textTheme.headlineSmall,
-
-                                    headingRowHeight: 50,
-                                    dataRowMinHeight: 45,
-                                    headingRowColor: MaterialStateProperty.all(
-                                      Theme.of(context).colorScheme.primary,
+                        return currentList.isEmpty
+                            ? Center(
+                                child: Text(
+                                  "No data available",
+                                  style: Theme.of(
+                                    context,
+                                  ).textTheme.displaySmall,
+                                ),
+                              )
+                            : Card(
+                                elevation: 4,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(16),
+                                  child: SingleChildScrollView(
+                                    scrollDirection: Axis.horizontal,
+                                    child: SingleChildScrollView(
+                                      child: selectedType == "Tasks"
+                                          ? _buildTaskTable()
+                                          : _buildGoalTable(),
                                     ),
-                                    columns: const [
-                                      DataColumn(label: Text("User")),
-                                      //  DataColumn(label: Text("Department")),
-                                      DataColumn(label: Text("Task")),
-                                      DataColumn(label: Text("Assigner")),
-                                      DataColumn(label: Text("Status")),
-                                      DataColumn(label: Text("Priority")),
-                                      DataColumn(label: Text("Members")),
-                                      DataColumn(label: Text("Start Date")),
-                                      DataColumn(label: Text("Due Date")),
-                                      DataColumn(label: Text("Completed Date")),
-                                      DataColumn(label: Text("Overdue")),
-                                    ],
-                                    rows: filteredTasks.map((task) {
-                                      return DataRow(
-                                        cells: [
-                                          DataCell(Text(task.name)),
-                                          // DataCell(Text(task.department)),
-                                          DataCell(Text(task.task)),
-                                          DataCell(
-                                            Text(
-                                              AppHelpers.extractName(
-                                                task.assignBy,
-                                              ),
-                                            ),
-                                          ),
-                                          DataCell(
-                                            Text(
-                                              task.status,
-                                              style: TextStyle(
-                                                color: TaskUtils.getStatusColor(
-                                                  TaskUtils.parseStatus(
-                                                    task.status,
-                                                  ),
-                                                ),
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
-                                          ),
-                                          DataCell(
-                                            Text(
-                                              task.priority,
-                                              style: TextStyle(
-                                                color:
-                                                    TaskUtils.getPriorityColor(
-                                                      task.priority,
-                                                    ),
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
-                                          ),
-                                          DataCell(
-                                            Text(task.members.toString()),
-                                          ),
-                                          DataCell(
-                                            Text(
-                                              task.createdAt.toString().split(
-                                                " ",
-                                              )[0],
-                                            ),
-                                          ),
-                                          DataCell(
-                                            Text(
-                                              task.dueDate.toString().split(
-                                                " ",
-                                              )[0],
-                                            ),
-                                          ),
-                                          DataCell(
-                                            Text(
-                                              task.status == "completed"
-                                                  ? task.completedDate
-                                                            ?.toString()
-                                                            .split(" ")[0] ??
-                                                        "-"
-                                                  : "-",
-                                            ),
-                                          ),
-                                          DataCell(
-                                            Text(
-                                              task.isOverdue == true
-                                                  ? "Yes"
-                                                  : "No",
-                                              style: TextStyle(
-                                                color: task.isOverdue == true
-                                                    ?  Theme.of(context).colorScheme.error
-                                                    :  Theme.of(context).colorScheme.secondary,
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      );
-                                    }).toList(),
                                   ),
                                 ),
-                              ),
-                            ),
-                          ),
+                              );
+                      },
+                    ),
                   ),
                 ),
               ],
             ),
+    );
+  }
+
+  Widget _buildTaskTable() {
+    return DataTable(
+      headingRowColor: WidgetStateProperty.all(
+        Theme.of(context).colorScheme.secondary,
+      ),
+      headingTextStyle: Theme.of(context).textTheme.labelLarge,
+      columns: const [
+        DataColumn(label: Text("Task")),
+        DataColumn(label: Text("Status")),
+        DataColumn(label: Text("Priority")),
+        DataColumn(label: Text("Points")),
+        DataColumn(label: Text("Due Date")),
+        DataColumn(label: Text("Completed Date")),
+        DataColumn(label: Text("Overdue")),
+      ],
+      rows: filteredTasks.map((task) {
+        String dueDate = task["due_Date"] != null
+            ? AppHelpers.formatDate(task["due_Date"])
+            : "-";
+
+        String completedDate = task["completed_Date"] != null
+            ? AppHelpers.formatDate(task["completed_Date"])
+            : "-";
+
+        return DataRow(
+          cells: [
+            DataCell(
+              Text(
+                task["task"] ?? "-",
+                style: Theme.of(context).textTheme.headlineMedium,
+              ),
+            ),
+            DataCell(
+              Text(
+                task["status"] ?? "-",
+                style: TextStyle(
+                  color: TaskUtils.getStatusColor(
+                    TaskUtils.parseStatus(task["status"] ?? ""),
+                  ),
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            DataCell(
+              Text(
+                task["priority"] ?? "-",
+                style: TextStyle(
+                  color: TaskUtils.getPriorityColor(task["priority"]),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            DataCell(
+              Text(
+                (task["points"] ?? 0).toString(),
+                style: Theme.of(context).textTheme.headlineMedium,
+              ),
+            ),
+            DataCell(
+              Text(dueDate, style: Theme.of(context).textTheme.headlineMedium),
+            ),
+            DataCell(
+              Text(
+                completedDate,
+                style: Theme.of(context).textTheme.headlineMedium,
+              ),
+            ),
+            DataCell(
+              Text(
+                task["isOverdue"] == true ? "Yes" : "No",
+                style: TextStyle(
+                  color: task["isOverdue"] == true ? Colors.red : Colors.green,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildGoalTable() {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: DataTable(
+        dataRowMinHeight: 60,
+        dataRowMaxHeight: double.infinity,
+
+        headingRowColor: WidgetStateProperty.all(
+          Theme.of(context).colorScheme.secondary,
+        ),
+        headingTextStyle: Theme.of(context).textTheme.labelLarge,
+
+        columns: const [
+          DataColumn(label: Text("Goal")),
+          DataColumn(label: Text("Tasks")),
+          DataColumn(label: Text("Status")),
+          DataColumn(label: Text("Priority")),
+          DataColumn(label: Text("Due Date")),
+          DataColumn(label: Text("Completed Date")),
+          DataColumn(label: Text("Progress")),
+          DataColumn(label: Text("Points")),
+          DataColumn(label: Text("Overdue")),
+        ],
+
+        rows: filteredGoals.map((goal) {
+          final tasksList = (goal["tasks"] is List)
+              ? List<String>.from(goal["tasks"])
+              : [];
+
+          return DataRow(
+            cells: [
+              /// GOAL
+              DataCell(
+                Text(
+                  goal["title"] ?? "",
+                  style: Theme.of(context).textTheme.headlineMedium,
+                ),
+              ),
+
+              /// TASKS (MULTI-LINE, NO OVERFLOW)
+              DataCell(
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 250),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: tasksList.isNotEmpty
+                        ? tasksList.map((task) {
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 4),
+                              child: Text(
+                                task,
+                                softWrap: true,
+                                overflow: TextOverflow.visible,
+                                style: Theme.of(
+                                  context,
+                                ).textTheme.headlineMedium,
+                              ),
+                            );
+                          }).toList()
+                        : [const Text("-")],
+                  ),
+                ),
+              ),
+
+              /// STATUS
+              DataCell(
+                Text(
+                  goal["status"] ?? "-",
+                  style: TextStyle(
+                    color: TaskUtils.getStatusColor(
+                      TaskUtils.parseStatus(goal["status"] ?? ""),
+                    ),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+
+              /// PRIORITY
+              DataCell(
+                Text(
+                  goal["priority"] ?? "",
+                  style: TextStyle(
+                    color: TaskUtils.getPriorityColor(goal["priority"]),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+
+              /// DUE DATE
+              DataCell(
+                Text(
+                  goal["dueDate"] != null
+                      ? AppHelpers.formatDate(goal["dueDate"])
+                      : "-",
+                  style: Theme.of(context).textTheme.headlineMedium,
+                ),
+              ),
+
+              /// COMPLETED DATE
+              DataCell(
+                Text(
+                  goal["completed_Date"] != null
+                      ? AppHelpers.formatDate(goal["completed_Date"])
+                      : "-",
+                  style: Theme.of(context).textTheme.headlineMedium,
+                ),
+              ),
+
+              /// PROGRESS
+              DataCell(
+                Text(
+                  "${(goal["progress"] ?? 0).toStringAsFixed(0)}%",
+                  style: Theme.of(context).textTheme.headlineMedium,
+                ),
+              ),
+
+              /// POINTS
+              DataCell(
+                Text(
+                  (goal["points"] ?? 0).toString(),
+                  style: Theme.of(context).textTheme.headlineMedium,
+                ),
+              ),
+
+              /// OVERDUE
+              DataCell(
+                Text(
+                  goal["isOverdue"] == true ? "Yes" : "No",
+                  style: TextStyle(
+                    color: goal["isOverdue"] == true
+                        ? Colors.red
+                        : Colors.green,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildToggleButton(String type) {
+    final isSelected = selectedType == type;
+
+    return Expanded(
+      child: GestureDetector(
+        onTap: () {
+          setState(() => selectedType = type);
+        },
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeInOut,
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? Theme.of(context).colorScheme.primary
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(25),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                type == "Tasks" ? Icons.task_alt : Icons.flag,
+                color: isSelected ? Colors.white : Colors.black54,
+                size: 18,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                type,
+                style: TextStyle(
+                  color: isSelected ? Colors.white : Colors.black87,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -405,7 +580,7 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
             _buildChoiceChips(
               values: ["Yes", "No"],
               selectedValue: selectedOverdue,
-              activeColor:  Theme.of(context).colorScheme.error,
+              activeColor: Theme.of(context).colorScheme.error,
               modalSetState: modalSetState,
               onSelected: (value) {
                 selectedOverdue = selectedOverdue == value ? null : value;
@@ -466,7 +641,9 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
           selectedColor: activeColor,
           backgroundColor: Colors.grey.shade200,
           labelStyle: TextStyle(
-            color: isSelected ?  Theme.of(context).colorScheme.onPrimary : Colors.black87,
+            color: isSelected
+                ? Theme.of(context).colorScheme.onPrimary
+                : Colors.black87,
             fontWeight: FontWeight.w600,
           ),
           shape: RoundedRectangleBorder(

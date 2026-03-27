@@ -8,7 +8,6 @@ import 'package:staff_work_track/services/auth_service.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
-
   @override
   State<SplashScreen> createState() => _SplashScreenState();
 }
@@ -23,19 +22,21 @@ class _SplashScreenState extends State<SplashScreen>
       vsync: this,
       duration: const Duration(seconds: 2),
     )..repeat();
-    Future.delayed(const Duration(seconds: 5), checkLogin);
+    checkLogin();
+  }
+
+  void _go(Widget page) {
+    Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => page));
   }
 
   Future<void> checkLogin() async {
     final token = await AuthService.getToken();
-
-    if (token == null || JwtHelper.isExpired(token)) {
+    await Future.delayed(const Duration(seconds: 2));
+    if (token == null || token.isEmpty || JwtHelper.isExpired(token)) {
       _go(const LoginSelection());
       return;
     }
-
     final role = JwtHelper.getRole(token);
-
     if (role == "Director") {
       _go(const SuperAdmin());
     } else if (role == "Manager") {
@@ -43,10 +44,6 @@ class _SplashScreenState extends State<SplashScreen>
     } else {
       _go(const Staff());
     }
-  }
-
-  void _go(Widget page) {
-    Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => page));
   }
 
   @override

@@ -86,7 +86,7 @@ class _PostAnnouncementPageState extends State<PostAnnouncementPage> {
           icon: const Icon(Icons.arrow_back_ios),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text("Post Announcement"),
+        title: const Text("New Announcement"),
       ),
       body: Stack(
         children: [
@@ -96,8 +96,9 @@ class _PostAnnouncementPageState extends State<PostAnnouncementPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  SizedBox(height: 15),
                   CustomFormWidgets.label(context, "Title Name"),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 10),
                   CustomFormWidgets.textField(
                     context,
                     titleController,
@@ -107,7 +108,7 @@ class _PostAnnouncementPageState extends State<PostAnnouncementPage> {
                   const SizedBox(height: 20),
 
                   CustomFormWidgets.label(context, "Description"),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 10),
                   CustomFormWidgets.textField(
                     context,
                     descController,
@@ -118,7 +119,7 @@ class _PostAnnouncementPageState extends State<PostAnnouncementPage> {
                   const SizedBox(height: 20),
 
                   CustomFormWidgets.label(context, "To"),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 10),
                   CustomFormWidgets.dropdown(
                     context: context,
                     value: targetRole,
@@ -129,11 +130,12 @@ class _PostAnnouncementPageState extends State<PostAnnouncementPage> {
 
                   const SizedBox(height: 15),
 
-                  ElevatedButton(
-                    onPressed: pickFile,
-                    child: const Text("Select File"),
-                  ),
+                  TextButton(onPressed: pickFile, child: Text("Select File")),
 
+                  // ElevatedButton(
+                  //   onPressed: pickFile,
+                  //   child: const Text("Select File"),
+                  // ),
                   if (selectedFile != null) _buildFilePreview(),
 
                   const SizedBox(height: 30),

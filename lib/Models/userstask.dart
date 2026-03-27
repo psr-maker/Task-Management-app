@@ -10,6 +10,7 @@ class TaskModel {
   final String status;
   final String createdAt;
   final String? dueDate;
+  final String? completed_date;
   final int totalMembers;
   final String? assignedBy;
   final String? assignerRole;
@@ -34,6 +35,7 @@ class TaskModel {
     required this.inProgressCount,
     required this.completedCount,
     required this.wasEdited,
+    this.completed_date,
   });
 
   factory TaskModel.fromJson(Map<String, dynamic> json) {
@@ -55,6 +57,7 @@ class TaskModel {
       inProgressCount: json["inProgressCount"] ?? 0,
       completedCount: json["completedCount"] ?? 0,
       wasEdited: json["wasEdited"] ?? false,
+      completed_date: json['completed_date'],
     );
   }
 }

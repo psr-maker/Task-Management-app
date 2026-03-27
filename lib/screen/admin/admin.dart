@@ -19,6 +19,8 @@ class Admin extends StatefulWidget {
 class _AdminState extends State<Admin> {
   int _currentIndex = 0;
   String department = "";
+  int adminId = 0;
+  String role = "";
   bool isLoading = true;
   @override
   void initState() {
@@ -26,7 +28,7 @@ class _AdminState extends State<Admin> {
     loadAdminDepartment();
   }
 
-  Future<int> getAdminIdFromToken() async {
+  Future<Map<String, dynamic>> getUserFromToken() async {
     final token = await AuthService.getToken();
 
     if (token == null) {
@@ -35,17 +37,25 @@ class _AdminState extends State<Admin> {
 
     final decodedToken = JwtDecoder.decode(token);
 
-    return int.parse(decodedToken['UserId'].toString());
+    return {
+      "userId": int.parse(decodedToken['UserId'].toString()),
+      "role": decodedToken['role'] ?? decodedToken['Role'] ?? "",
+    };
   }
 
   Future<void> loadAdminDepartment() async {
     try {
-      final adminId = await getAdminIdFromToken();
-      final adminDetails = await SuperAdminService.getAdminDetails(adminId);
+      final user = await getUserFromToken();
+
+      final adminDetails = await SuperAdminService.getAdminDetails(
+        user["userId"],
+      );
 
       if (!mounted) return;
 
       setState(() {
+        adminId = user["userId"]; // ✅ FIXED (you missed this before)
+        role = user["role"]; // ✅ NEW
         department = adminDetails.department;
         isLoading = false;
       });
@@ -55,28 +65,26 @@ class _AdminState extends State<Admin> {
     }
   }
 
-@override
-Widget build(BuildContext context) {
-  if (isLoading) {
-    return const Scaffold(
-      body: Center(child: CircularProgressIndicator()),
+  @override
+  Widget build(BuildContext context) {
+    if (isLoading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
+    final pages = [
+      AdminDashboard(department: department, role: role, mngId: adminId),
+      const Employeelist(),
+      const Mywork(),
+      const Worklog(),
+    ];
+
+    return Scaffold(
+      body: pages[_currentIndex],
+      bottomNavigationBar: CurvedBottomNav(
+        currentIndex: _currentIndex,
+        onTap: (i) => setState(() => _currentIndex = i),
+        role: UserRole.admin,
+      ),
     );
   }
-
-  final pages = [
-    AdminDashboard(department: department),
-    const Employeelist(),
-    const Mywork(),
-    const Worklog(),
-  ];
-
-  return Scaffold(
-    body: pages[_currentIndex],
-    bottomNavigationBar: CurvedBottomNav(
-      currentIndex: _currentIndex,
-      onTap: (i) => setState(() => _currentIndex = i),
-      role: UserRole.admin,
-    ),
-  );
-}
 }

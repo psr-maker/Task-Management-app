@@ -108,7 +108,7 @@ class _NotificationPageState extends State<NotificationPage> {
                         CircleAvatar(
                           radius: 15,
                           backgroundColor: accentColor,
-                          child: Icon(isDelete ? Icons.delete : Icons.edit),
+                          child: Icon( Icons.notifications_none),
                         ),
                         Container(
                           width: 2,

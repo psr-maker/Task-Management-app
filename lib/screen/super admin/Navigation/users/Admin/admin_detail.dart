@@ -6,16 +6,14 @@ import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
 import 'package:staff_work_track/screen/admin/Navigation/employee/emp_list.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/drawer/auditlog.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/warnings/craete_warnings.dart';
-import 'package:staff_work_track/screen/super%20admin/Navigation/users/Admin/admintask.dart';
-import 'package:staff_work_track/screen/super%20admin/Navigation/users/Admin/assignedtask.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/Task/create_task.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/users/edit_user.dart';
 import 'package:staff_work_track/services/admin_service.dart';
 import 'package:staff_work_track/services/auth_service.dart';
-
 import 'package:staff_work_track/services/superadmin_service.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
 import 'package:staff_work_track/utils/jwt_helper.dart';
+import 'package:staff_work_track/widgets/StatCard.dart';
 
 class Admindetails extends StatefulWidget {
   final int adminId;
@@ -34,6 +32,9 @@ class _AdmindetailsState extends State<Admindetails> {
   bool showAdminTasks = false;
   bool showAssignedTasks = false;
   bool _statusInitialized = false;
+  List<dynamic> managerGoals = [];
+  List<dynamic> managerassignGoals = [];
+
   UsersDetails? _admin;
   bool isSearching = false;
   TextEditingController searchController = TextEditingController();
@@ -47,18 +48,13 @@ class _AdmindetailsState extends State<Admindetails> {
   String? _topMessage;
   bool _isErrorMessage = true;
   bool _showTopMessage = false;
-  @override
-  void dispose() {
-    searchController.dispose();
-    super.dispose();
-  }
 
   @override
   void initState() {
     super.initState();
 
     adminFuture = SuperAdminService.getAdminDetails(widget.adminId);
-
+    _loadGoalCounts();
     adminFuture.then((adminDetails) {
       final adminUser = UserModel(
         userId: adminDetails.userId,
@@ -73,6 +69,51 @@ class _AdmindetailsState extends State<Admindetails> {
 
       _checkEditPermission(adminUser);
     });
+  }
+
+  List<dynamic> applyGoalSearch(List<dynamic> goals) {
+    List<dynamic> filtered = goals;
+
+    // SEARCH
+    if (searchQuery.trim().isNotEmpty) {
+      final query = searchQuery.toLowerCase();
+
+      filtered = filtered.where((goal) {
+        final title = (goal["title"] ?? "").toString().toLowerCase();
+        final code = (goal["goalCode"] ?? "").toString().toLowerCase();
+        final department = (goal["department"] ?? "").toString().toLowerCase();
+
+        return title.contains(query) ||
+            code.contains(query) ||
+            department.contains(query);
+      }).toList();
+    }
+
+    // STATUS FILTER
+    if (taskFilter.status != null && taskFilter.status!.isNotEmpty) {
+      filtered = filtered.where((goal) {
+        return (goal["status"] ?? "").toString().toLowerCase() ==
+            taskFilter.status!.toLowerCase();
+      }).toList();
+    }
+
+    // PRIORITY FILTER
+    if (taskFilter.priority != null && taskFilter.priority!.isNotEmpty) {
+      filtered = filtered.where((goal) {
+        return (goal["priority"] ?? "").toString().toLowerCase() ==
+            taskFilter.priority!.toLowerCase();
+      }).toList();
+    }
+
+    // DEPARTMENT FILTER
+    if (taskFilter.department != null && taskFilter.department!.isNotEmpty) {
+      filtered = filtered.where((goal) {
+        return (goal["department"] ?? "").toString().toLowerCase() ==
+            taskFilter.department!.toLowerCase();
+      }).toList();
+    }
+
+    return filtered;
   }
 
   Future<void> _checkEditPermission(UserModel user) async {
@@ -112,37 +153,6 @@ class _AdmindetailsState extends State<Admindetails> {
     }
   }
 
-  void _buildFilterListsFromTasks(List<Map<String, dynamic>> tasks) {
-    final departmentSet = <String>{};
-    final userWithRoleList = <String>[];
-
-    for (final task in tasks) {
-      final assignedList = task["assignedTo"] as List? ?? [];
-
-      for (final u in assignedList) {
-        final dept = u["department"]?.toString();
-        final name = u["name"]?.toString();
-        final role = u["role"]?.toString();
-
-        if (dept != null && dept.isNotEmpty) {
-          departmentSet.add(dept);
-        }
-
-        if (name != null && role != null) {
-          final combined = "$name - $role";
-          if (!userWithRoleList.contains(combined)) {
-            userWithRoleList.add(combined);
-          }
-        }
-      }
-    }
-
-    setState(() {
-      departmentsList = departmentSet.toList()..sort();
-      usersList = userWithRoleList..sort();
-    });
-  }
-
   void showTopMessage(String message, {bool isError = true}) {
     setState(() {
       _topMessage = message;
@@ -154,6 +164,30 @@ class _AdmindetailsState extends State<Admindetails> {
       if (!mounted) return;
       setState(() => _showTopMessage = false);
     });
+  }
+
+  Future<void> _loadGoalCounts() async {
+    try {
+      final adminGoals = await AdminService.getusergoalbyid(widget.adminId);
+      final assignedGoals = await AdminService.getgoalAssignedByAdmin(
+        widget.adminId,
+      );
+
+      if (mounted) {
+        setState(() {
+          managerGoals = adminGoals;
+          managerassignGoals = assignedGoals;
+        });
+      }
+    } catch (e) {
+      debugPrint("Failed to load goals: $e");
+    }
+  }
+
+  @override
+  void dispose() {
+    searchController.dispose();
+    super.dispose();
   }
 
   @override
@@ -358,7 +392,7 @@ class _AdmindetailsState extends State<Admindetails> {
                           child: Chip(
                             backgroundColor: Theme.of(context).primaryColor,
                             label: Text(
-                              "Add Task",
+                              "Add Goal/Task",
                               style: Theme.of(context).textTheme.titleMedium,
                             ),
                           ),
@@ -382,7 +416,7 @@ class _AdmindetailsState extends State<Admindetails> {
                       child: TaskFilterDropdown(
                         filter: taskFilter,
                         departments: departmentsList,
-                        users: usersList,
+                        //  users: usersList,
                         onClear: () {
                           setState(() {
                             taskFilter.clear();
@@ -575,25 +609,16 @@ class _AdmindetailsState extends State<Admindetails> {
 
             Expanded(
               child: _statCard(
-                title: "Manager Tasks",
-                value: admin.totalTasksAssignedTo,
+                title: "Manager Goals",
+                value: managerGoals.length,
                 icon: Icons.task_alt,
                 isActive: showAdminTasks,
-                onTap: () async {
+                onTap: () {
                   setState(() {
                     showAdminTasks = true;
                     showEmployees = false;
                     showAssignedTasks = false;
                   });
-
-                  final tasks = await AdminService.getAdminTasks(admin.userId);
-
-                  if (mounted) {
-                    _buildFilterListsFromTasks(tasks);
-                    setState(() {
-                      taskFilter.clear();
-                    });
-                  }
                 },
               ),
             ),
@@ -601,30 +626,16 @@ class _AdmindetailsState extends State<Admindetails> {
 
             Expanded(
               child: _statCard(
-                title: "Assigned Tasks",
-                value: admin.totalTasksAssignedBy,
+                title: "Assigned Goals",
+                value: managerassignGoals.length,
                 icon: Icons.assignment,
                 isActive: showAssignedTasks,
-                onTap: () async {
+                onTap: () {
                   setState(() {
                     showAssignedTasks = true;
                     showEmployees = false;
                     showAdminTasks = false;
                   });
-
-                  final tasks = await AdminService.getTasksAssignedByAdmin(
-                    admin.userId,
-                  );
-
-                  if (mounted) {
-                    final List<Map<String, dynamic>> taskMaps = tasks
-                        .cast<Map<String, dynamic>>();
-
-                    _buildFilterListsFromTasks(taskMaps);
-                    setState(() {
-                      taskFilter.clear();
-                    });
-                  }
                 },
               ),
             ),
@@ -635,17 +646,37 @@ class _AdmindetailsState extends State<Admindetails> {
           EmployeeList(department: admin.department, searchQuery: searchQuery),
 
         if (showAdminTasks)
-          Admintask(
-            adminId: admin.userId,
-            searchQuery: searchQuery,
-            filter: taskFilter,
+          Builder(
+            builder: (context) {
+              final filteredGoals = applyGoalSearch(managerGoals);
+
+              return ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: filteredGoals.length,
+                itemBuilder: (context, index) {
+                  final goal = filteredGoals[index];
+                  return GoalCard(goal: goal);
+                },
+              );
+            },
           ),
 
         if (showAssignedTasks)
-          AdminAssigntsk(
-            adminId: admin.userId,
-            searchQuery: searchQuery,
-            filter: taskFilter,
+          Builder(
+            builder: (context) {
+              final filteredGoals = applyGoalSearch(managerassignGoals);
+
+              return ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: filteredGoals.length,
+                itemBuilder: (context, index) {
+                  final goal = filteredGoals[index];
+                  return GoalCard(goal: goal);
+                },
+              );
+            },
           ),
       ],
     );

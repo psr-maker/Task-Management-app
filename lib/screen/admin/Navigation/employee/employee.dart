@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:jwt_decoder/jwt_decoder.dart';
-import 'package:staff_work_track/screen/admin/Navigation/employee/emptasklist.dart';
+import 'package:staff_work_track/screen/admin/Navigation/employee/empgoals.dart';
 import 'package:staff_work_track/screen/admin/Navigation/employee/emp_list.dart';
 import 'package:staff_work_track/services/auth_service.dart';
 import 'package:staff_work_track/services/superadmin_service.dart';
@@ -62,10 +62,10 @@ class _EmployeelistState extends State<Employeelist>
     }
   }
 
-  final List<String> tabs = ["Staff", "Staff Task"];
+  final List<String> tabs = ["Staff", "Staff Goals"];
   @override
   Widget build(BuildContext context) {
-    if (isLoading || department == null) {
+    if (isLoading) {
       return const Center(child: RotatingFlower(size: 30));
     }
     return Scaffold(
@@ -84,8 +84,8 @@ class _EmployeelistState extends State<Employeelist>
         controller: _tabController,
         children: [
           EmployeeList(department: department, searchQuery: ''),
-
-          Emptasklist(department: department),
+          Empgoals(department: department),
+          
         ],
       ),
     );
