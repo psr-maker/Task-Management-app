@@ -174,10 +174,8 @@ class _OtpverifyState extends State<Otpverify> {
       appBar: AppBar(
         backgroundColor: const Color.fromARGB(255, 50, 99, 49),
         leading: IconButton(
-          onPressed: () {
-            Navigator.pop(context);
-          },
-          icon: Icon(Icons.arrow_back_ios, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+          icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
         ),
       ),
       body: Stack(
@@ -192,6 +190,9 @@ class _OtpverifyState extends State<Otpverify> {
                 context,
                 message: _topMessage!,
                 isError: _isErrorMessage,
+                backgroundColor: Theme.of(context).colorScheme.onPrimary,
+                textColor: Theme.of(context).colorScheme.secondary,
+                iconColor: Theme.of(context).colorScheme.secondary,
               ),
             ),
           Padding(

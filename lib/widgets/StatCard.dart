@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:jwt_decoder/jwt_decoder.dart';
+import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
 import 'package:staff_work_track/screen/admin/Navigation/my%20work/Task%20status%20tab/admintask_list.dart';
+import 'package:staff_work_track/screen/super%20admin/Navigation/Task/edit_goal.dart';
 import 'package:staff_work_track/services/auth_service.dart';
+import 'package:staff_work_track/services/superadmin_service.dart';
 import 'package:staff_work_track/utils/app_helper.dart';
 import 'package:staff_work_track/utils/enum.dart';
 import 'package:staff_work_track/services/admin_service.dart';
@@ -379,8 +382,14 @@ class _TaskCardState extends State<Taskstatus> {
 
 class GoalCard extends StatefulWidget {
   final Map<String, dynamic> goal;
-
-  const GoalCard({super.key, required this.goal});
+  final Function(String message, bool isError)? onDelete;
+  final VoidCallback? onRefresh;
+  const GoalCard({
+    super.key,
+    required this.goal,
+    this.onDelete,
+    this.onRefresh,
+  });
 
   @override
   State<GoalCard> createState() => _GoalCardState();
@@ -391,6 +400,7 @@ class _GoalCardState extends State<GoalCard> {
   int? adminId;
   bool isLoading = true;
   bool isSearching = false;
+
   final TextEditingController searchController = TextEditingController();
   @override
   void initState() {
@@ -445,6 +455,74 @@ class _GoalCardState extends State<GoalCard> {
     return 0;
   }
 
+  void _showGoalDialog() {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text(
+          widget.goal["title"] ?? "",
+          style: Theme.of(context).textTheme.headlineLarge,
+        ),
+        content: const Text("What do you want to do with this goal?"),
+        actions: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              TextButton.icon(
+                onPressed: () async {
+                  Navigator.pop(context);
+
+                  final result = await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => EditGoalPage(goal: widget.goal),
+                    ),
+                  );
+                  if (result == true) {
+                    widget.onRefresh?.call();
+                  }
+                },
+
+                label: Text(
+                  "Edit",
+                  style: Theme.of(context).textTheme.displaySmall,
+                ),
+              ),
+              TextButton.icon(
+                onPressed: () async {
+                  final confirmed = await showConfirmDialog(
+                    context,
+                    "Delete",
+                    "Goal",
+                  );
+                  if (confirmed == true) {
+                    final success = await SuperAdminService.deleteGoal(
+                      widget.goal["goalCode"],
+                    );
+                    if (success) {
+                      Navigator.pop(context);
+                      widget.onDelete?.call("Goal deleted successfully", false);
+                      widget.onRefresh?.call();
+                    }
+                  }
+                },
+
+                label: Text(
+                  "Delete",
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.error,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final progress = widget.goal["progress"] ?? 0;
@@ -459,180 +537,187 @@ class _GoalCardState extends State<GoalCard> {
       widget.goal["priority"]?.toString() ?? "",
     );
     final goalPoints = widget.goal["goalpoints"] ?? 0;
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 5),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.onPrimary,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: Theme.of(context).colorScheme.secondary,
-          width: 1.2,
+    return GestureDetector(
+      onLongPress: _showGoalDialog,
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 5),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.onPrimary,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: Theme.of(context).colorScheme.secondary,
+            width: 1.2,
+          ),
         ),
-      ),
-      child: Column(
-        children: [
-          InkWell(
-            onTap: () {
-              setState(() => isExpanded = !isExpanded);
-            },
-            child: Padding(
-              padding: const EdgeInsets.all(15),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Expanded(
-                              child: Text(
-                                widget.goal["title"] ?? "",
-                                style: Theme.of(context).textTheme.displaySmall,
-                                overflow: TextOverflow.ellipsis,
+        child: Column(
+          children: [
+            InkWell(
+              onTap: () {
+                setState(() => isExpanded = !isExpanded);
+              },
+              child: Padding(
+                padding: const EdgeInsets.all(15),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  widget.goal["title"] ?? "",
+                                  style: Theme.of(
+                                    context,
+                                  ).textTheme.displaySmall,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ),
+                              Icon(
+                                isExpanded
+                                    ? Icons.keyboard_arrow_up
+                                    : Icons.keyboard_arrow_down,
+                                color: Colors.black,
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          if (goalPoints != 0)
+                            Row(
+                              children: [
+                                buildStars(goalPoints),
+                                const SizedBox(width: 8),
+                                Text(
+                                  "$goalPoints points",
+                                  style: Theme.of(
+                                    context,
+                                  ).textTheme.headlineSmall,
+                                ),
+                              ],
                             ),
-                            Icon(
-                              isExpanded
-                                  ? Icons.keyboard_arrow_up
-                                  : Icons.keyboard_arrow_down,
-                              color: Colors.black,
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                        if (goalPoints != 0)
+                          const SizedBox(height: 10),
                           Row(
                             children: [
-                              buildStars(goalPoints),
-                              const SizedBox(width: 8),
                               Text(
-                                "$goalPoints points",
+                                "Progress",
                                 style: Theme.of(
                                   context,
                                 ).textTheme.headlineSmall,
                               ),
-                            ],
-                          ),
-                        const SizedBox(height: 10),
-                        Row(
-                          children: [
-                            Text(
-                              "Progress",
-                              style: Theme.of(context).textTheme.headlineSmall,
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(6),
-                                child: LinearProgressIndicator(
-                                  minHeight: 8,
-                                  value: progress / 100,
-                                  backgroundColor: Colors.grey.shade300,
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(6),
+                                  child: LinearProgressIndicator(
+                                    minHeight: 8,
+                                    value: progress / 100,
+                                    backgroundColor: Colors.grey.shade300,
+                                    color: getProgressColor(progress),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                "$progress%",
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
                                   color: getProgressColor(progress),
                                 ),
                               ),
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              "$progress%",
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: getProgressColor(progress),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  _badge(
+                                    widget.goal["status"] ?? "",
+                                    statusColor,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  _badge(
+                                    widget.goal["priority"] ?? "",
+                                    priorityColor,
+                                  ),
+                                ],
                               ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                _badge(
-                                  widget.goal["status"] ?? "",
-                                  statusColor,
-                                ),
-                                const SizedBox(width: 8),
-                                _badge(
-                                  widget.goal["priority"] ?? "",
-                                  priorityColor,
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                const Icon(Icons.person),
-                                const SizedBox(width: 4),
-                                Text(
-                                  "By : ${AppHelpers.extractName(widget.goal["assignBy"] ?? "")}",
-                                  style: Theme.of(
-                                    context,
-                                  ).textTheme.labelMedium,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                const Spacer(),
-                                const Icon(Icons.person_outline),
-                                const SizedBox(width: 4),
-                                Text(
-                                  "To: ${AppHelpers.extractName(widget.goal["assignTo"] ?? "")}",
-                                  style: Theme.of(
-                                    context,
-                                  ).textTheme.labelMedium,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 10),
-                            Row(
-                              children: [
-                                const Icon(
-                                  Icons.calendar_today,
-                                  size: 14,
-                                  color: Colors.black,
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  "Start: ${AppHelpers.formatDate(widget.goal["startDate"])}",
-                                  style: const TextStyle(
-                                    fontSize: 12,
+                              const SizedBox(height: 12),
+                              Row(
+                                children: [
+                                  const Icon(Icons.person),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    "By : ${AppHelpers.extractName(widget.goal["assignBy"] ?? "")}",
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.labelMedium,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  const Spacer(),
+                                  const Icon(Icons.person_outline),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    "To: ${AppHelpers.extractName(widget.goal["assignTo"] ?? "")}",
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.labelMedium,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 10),
+                              Row(
+                                children: [
+                                  const Icon(
+                                    Icons.calendar_today,
+                                    size: 14,
                                     color: Colors.black,
-                                    fontWeight: FontWeight.w600,
                                   ),
-                                ),
-                                const Spacer(),
-                                const Icon(
-                                  Icons.event,
-                                  size: 14,
-                                  color: Colors.red,
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  "Due: ${AppHelpers.formatDate(widget.goal["dueDate"])}",
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    "Start: ${AppHelpers.formatDate(widget.goal["startDate"])}",
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.black,
+                                      fontWeight: FontWeight.w600,
+                                    ),
                                   ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ],
+                                  const Spacer(),
+                                  const Icon(
+                                    Icons.event,
+                                    size: 14,
+                                    color: Colors.red,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    "Due: ${AppHelpers.formatDate(widget.goal["dueDate"])}",
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-          ),
-          if (isExpanded && adminId != null)
-            Alltasklist(
-              tasks: widget.goal["tasks"] ?? [],
-              searchQuery: searchController.text,
-            ),
-        ],
+            if (isExpanded && adminId != null)
+              Alltasklist(
+                tasks: widget.goal["tasks"] ?? [],
+                searchQuery: searchController.text,
+              ),
+          ],
+        ),
       ),
     );
   }

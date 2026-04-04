@@ -17,7 +17,7 @@ class ReportsTable extends StatefulWidget {
 
 class _DeadlineReportsTabState extends State<ReportsTable> {
   final ReportsService _service = ReportsService();
-  String selectedType = "Tasks"; // default
+  String selectedType = "Goals";
   bool _isLoading = false;
   List<dynamic> allTasks = [];
   List<dynamic> filteredTasks = [];
@@ -145,6 +145,8 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
           : Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                SizedBox(height: 10),
+
                 /// 🔹 FILTER CHIPS SECTION
                 if (selectedStatus != null ||
                     selectedPriority != null ||
@@ -187,18 +189,18 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
 
                 Container(
                   margin: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 10,
+                    horizontal: 10,
+                    vertical: 5,
                   ),
-                  padding: const EdgeInsets.all(4),
+
                   decoration: BoxDecoration(
-                    color: Colors.grey.shade200,
+                    color: Colors.grey.shade300,
                     borderRadius: BorderRadius.circular(30),
                   ),
                   child: Row(
                     children: [
-                      _buildToggleButton("Tasks"),
                       _buildToggleButton("Goals"),
+                      _buildToggleButton("Tasks"),
                     ],
                   ),
                 ),
@@ -219,7 +221,7 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
                                   "No data available",
                                   style: Theme.of(
                                     context,
-                                  ).textTheme.displaySmall,
+                                  ).textTheme.headlineLarge,
                                 ),
                               )
                             : Card(
@@ -277,7 +279,7 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
             DataCell(
               Text(
                 task["task"] ?? "-",
-                style: Theme.of(context).textTheme.headlineMedium,
+                style: Theme.of(context).textTheme.labelMedium,
               ),
             ),
             DataCell(
@@ -288,6 +290,7 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
                     TaskUtils.parseStatus(task["status"] ?? ""),
                   ),
                   fontWeight: FontWeight.w700,
+                  fontSize: 14
                 ),
               ),
             ),
@@ -297,22 +300,23 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
                 style: TextStyle(
                   color: TaskUtils.getPriorityColor(task["priority"]),
                   fontWeight: FontWeight.w600,
+                  fontSize: 14
                 ),
               ),
             ),
             DataCell(
               Text(
                 (task["points"] ?? 0).toString(),
-                style: Theme.of(context).textTheme.headlineMedium,
+                style: Theme.of(context).textTheme.labelMedium,
               ),
             ),
             DataCell(
-              Text(dueDate, style: Theme.of(context).textTheme.headlineMedium),
+              Text(dueDate, style: Theme.of(context).textTheme.labelMedium),
             ),
             DataCell(
               Text(
                 completedDate,
-                style: Theme.of(context).textTheme.headlineMedium,
+                style: Theme.of(context).textTheme.labelMedium,
               ),
             ),
             DataCell(
@@ -321,6 +325,7 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
                 style: TextStyle(
                   color: task["isOverdue"] == true ? Colors.red : Colors.green,
                   fontWeight: FontWeight.bold,
+                  fontSize: 14,
                 ),
               ),
             ),
@@ -365,7 +370,7 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
               DataCell(
                 Text(
                   goal["title"] ?? "",
-                  style: Theme.of(context).textTheme.headlineMedium,
+                  style: Theme.of(context).textTheme.labelMedium,
                 ),
               ),
 
@@ -379,14 +384,12 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
                     children: tasksList.isNotEmpty
                         ? tasksList.map((task) {
                             return Padding(
-                              padding: const EdgeInsets.only(bottom: 4),
+                              padding: const EdgeInsets.only(top: 3,bottom: 3),
                               child: Text(
                                 task,
                                 softWrap: true,
                                 overflow: TextOverflow.visible,
-                                style: Theme.of(
-                                  context,
-                                ).textTheme.headlineMedium,
+                                style: Theme.of(context).textTheme.labelMedium,
                               ),
                             );
                           }).toList()
@@ -404,6 +407,7 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
                       TaskUtils.parseStatus(goal["status"] ?? ""),
                     ),
                     fontWeight: FontWeight.w600,
+                    fontSize: 14
                   ),
                 ),
               ),
@@ -415,6 +419,7 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
                   style: TextStyle(
                     color: TaskUtils.getPriorityColor(goal["priority"]),
                     fontWeight: FontWeight.w600,
+                    fontSize: 14
                   ),
                 ),
               ),
@@ -425,7 +430,7 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
                   goal["dueDate"] != null
                       ? AppHelpers.formatDate(goal["dueDate"])
                       : "-",
-                  style: Theme.of(context).textTheme.headlineMedium,
+                  style: Theme.of(context).textTheme.labelMedium,
                 ),
               ),
 
@@ -435,7 +440,7 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
                   goal["completed_Date"] != null
                       ? AppHelpers.formatDate(goal["completed_Date"])
                       : "-",
-                  style: Theme.of(context).textTheme.headlineMedium,
+                  style: Theme.of(context).textTheme.labelMedium,
                 ),
               ),
 
@@ -443,7 +448,7 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
               DataCell(
                 Text(
                   "${(goal["progress"] ?? 0).toStringAsFixed(0)}%",
-                  style: Theme.of(context).textTheme.headlineMedium,
+                  style: Theme.of(context).textTheme.labelMedium,
                 ),
               ),
 
@@ -451,7 +456,7 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
               DataCell(
                 Text(
                   (goal["points"] ?? 0).toString(),
-                  style: Theme.of(context).textTheme.headlineMedium,
+                  style: Theme.of(context).textTheme.labelMedium,
                 ),
               ),
 
@@ -464,6 +469,7 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
                         ? Colors.red
                         : Colors.green,
                     fontWeight: FontWeight.bold,
+                    fontSize: 14
                   ),
                 ),
               ),
@@ -485,7 +491,7 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 250),
           curve: Curves.easeInOut,
-          padding: const EdgeInsets.symmetric(vertical: 12),
+          padding: const EdgeInsets.symmetric(vertical: 8),
           decoration: BoxDecoration(
             color: isSelected
                 ? Theme.of(context).colorScheme.primary
@@ -506,6 +512,7 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
                 style: TextStyle(
                   color: isSelected ? Colors.white : Colors.black87,
                   fontWeight: FontWeight.w600,
+                  fontSize: 14,
                 ),
               ),
             ],

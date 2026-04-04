@@ -131,11 +131,6 @@ class _PostAnnouncementPageState extends State<PostAnnouncementPage> {
                   const SizedBox(height: 15),
 
                   TextButton(onPressed: pickFile, child: Text("Select File")),
-
-                  // ElevatedButton(
-                  //   onPressed: pickFile,
-                  //   child: const Text("Select File"),
-                  // ),
                   if (selectedFile != null) _buildFilePreview(),
 
                   const SizedBox(height: 30),
@@ -163,9 +158,6 @@ class _PostAnnouncementPageState extends State<PostAnnouncementPage> {
                 context,
                 message: _topMessage!,
                 isError: _isErrorMessage,
-                backgroundColor: Theme.of(context).colorScheme.primary,
-                iconColor: Theme.of(context).colorScheme.onPrimary,
-                textColor: Theme.of(context).colorScheme.onPrimary,
               ),
             ),
         ],

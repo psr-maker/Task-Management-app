@@ -345,30 +345,63 @@ class _UsersWorklogState extends State<UsersWorklog> {
                           return DataRow(
                             color: MaterialStateProperty.all(rowColor),
                             cells: [
-                              DataCell(Text(userName)),
+                              DataCell(
+                                Text(
+                                  userName,
+                                  style: Theme.of(
+                                    context,
+                                  ).textTheme.labelMedium,
+                                ),
+                              ),
                               DataCell(
                                 Text(
                                   log["workDate"]?.toString().split("T")[0] ??
                                       "",
+                                  style: Theme.of(
+                                    context,
+                                  ).textTheme.labelMedium,
                                 ),
                               ),
-                              DataCell(Text(log["title"] ?? "")),
+                              DataCell(
+                                SizedBox(
+                                  width: 200,
+                                  child: Text(
+                                    log["title"] ?? "",
+                                    maxLines: 2,
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.labelMedium,
+                                  ),
+                                ),
+                              ),
                               DataCell(
                                 SizedBox(
                                   width: 200,
                                   child: Text(
                                     log["description"] ?? "",
-                                    maxLines: 3,
-                                    overflow: TextOverflow.ellipsis,
+                                    softWrap: true,
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.labelMedium,
                                   ),
                                 ),
                               ),
                               DataCell(
-                                Text(AppHelpers.formatDate(log["startTime"])),
+                                Text(
+                                  AppHelpers.formatDate(log["startTime"]),
+                                  style: Theme.of(
+                                    context,
+                                  ).textTheme.labelMedium,
+                                ),
                               ),
 
                               DataCell(
-                                Text(AppHelpers.formatDate(log["endTime"])),
+                                Text(
+                                  AppHelpers.formatDate(log["endTime"]),
+                                  style: Theme.of(
+                                    context,
+                                  ).textTheme.labelMedium,
+                                ),
                               ),
 
                               DataCell(
@@ -376,9 +409,19 @@ class _UsersWorklogState extends State<UsersWorklog> {
                                   formatHours(
                                     (log["totalHours"] ?? 0).toDouble(),
                                   ),
+                                  style: Theme.of(
+                                    context,
+                                  ).textTheme.labelMedium,
                                 ),
                               ),
-                              DataCell(Text(log["departmentName"] ?? "")),
+                              DataCell(
+                                Text(
+                                  log["departmentName"] ?? "",
+                                  style: Theme.of(
+                                    context,
+                                  ).textTheme.labelMedium,
+                                ),
+                              ),
                             ],
                           );
                         }).toList(),

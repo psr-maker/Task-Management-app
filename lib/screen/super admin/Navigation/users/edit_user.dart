@@ -75,12 +75,10 @@ class _EditUserState extends State<EditUser> {
         await Future.delayed(const Duration(seconds: 1));
         Navigator.pop(context, true);
       } else {
-        showTopMessage("Failed to update user");
+        showTopMessage("Failed to update user", isError: true);
       }
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(e.toString())));
+     showTopMessage(e.toString(), isError: true);
     } finally {
       setState(() => _isLoading = false);
     }
@@ -180,9 +178,6 @@ class _EditUserState extends State<EditUser> {
                   context,
                   message: _topMessage!,
                   isError: _isErrorMessage,
-                  backgroundColor: Theme.of(context).colorScheme.primary,
-                  iconColor: Theme.of(context).colorScheme.onPrimary,
-                  textColor: Theme.of(context).colorScheme.onPrimary,
                 ),
               ),
           ],

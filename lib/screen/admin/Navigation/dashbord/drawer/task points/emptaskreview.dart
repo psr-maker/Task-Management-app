@@ -60,7 +60,7 @@ class _TaskpointsState extends State<Taskpoints> {
 
           if (_topMessage != null)
             AnimatedPositioned(
-              top: _showTopMessage ? 0 : -120,
+              top: _showTopMessage ? 20 : -120,
               left: 16,
               right: 16,
               duration: const Duration(milliseconds: 300),
@@ -68,6 +68,9 @@ class _TaskpointsState extends State<Taskpoints> {
                 context,
                 message: _topMessage!,
                 isError: _isErrorMessage,
+                backgroundColor: _isErrorMessage ? Colors.red : Theme.of(context).colorScheme.onPrimary,
+                textColor: Theme.of(context).colorScheme.secondary,
+                iconColor: Theme.of(context).colorScheme.secondary
               ),
             ),
         ],
@@ -104,29 +107,6 @@ class _TaskpointsState extends State<Taskpoints> {
         final submittedTasks = tasks
             .where((t) => t['finalPoints'] != null)
             .toList();
-
-        // return ListView(
-        //   children: [
-        //     if (pendingTasks.isNotEmpty) ...[
-        //       _buildSectionTitle("Pending Reviews"),
-        //       ...pendingTasks
-        //           .asMap()
-        //           .entries
-        //           .map((entry) => _buildTaskCard(entry.value, entry.key))
-        //           .toList(),
-        //     ],
-
-        //     if (submittedTasks.isNotEmpty) ...[
-        //       const SizedBox(height: 20),
-        //       _buildSectionTitle("Submitted Reviews"),
-        //       ...submittedTasks
-        //           .asMap()
-        //           .entries
-        //           .map((entry) => _buildTaskCard(entry.value, entry.key + 1000))
-        //           .toList(),
-        //     ],
-        //   ],
-        // );
         return ListView(
           children: [
             if (pendingTasks.isNotEmpty)

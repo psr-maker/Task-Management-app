@@ -31,14 +31,13 @@ class ThemeProvider extends ChangeNotifier {
       brightness: Brightness.light,
       useMaterial3: true,
       scaffoldBackgroundColor: background,
+
       // APPBAR
       appBarTheme: const AppBarTheme(
         backgroundColor: deepGreen,
         foregroundColor: Colors.white,
         elevation: 0,
-
         iconTheme: IconThemeData(color: Colors.white, size: 20),
-
         titleTextStyle: TextStyle(
           color: Colors.white,
           fontSize: 18,
@@ -46,11 +45,13 @@ class ThemeProvider extends ChangeNotifier {
           letterSpacing: 0.5,
         ),
       ),
+
       // BODY ICON
       iconTheme: const IconThemeData(color: deepGreen, size: 18),
 
       primaryColor: deepGreen,
 
+      // COLORS THEME
       colorScheme: const ColorScheme.light(
         primary: Color.fromARGB(255, 68, 99, 80),
         secondary: deepGreen,
@@ -62,6 +63,7 @@ class ThemeProvider extends ChangeNotifier {
 
       splashColor: Colors.white.withOpacity(0.3),
       highlightColor: Colors.white.withOpacity(0.1),
+
       // CARD THEME
       cardTheme: CardThemeData(
         color: Colors.white,
@@ -72,6 +74,18 @@ class ThemeProvider extends ChangeNotifier {
           side: BorderSide(color: Color.fromARGB(255, 15, 35, 20), width: 2),
         ),
       ),
+
+      // CHIP  THEME
+      chipTheme: const ChipThemeData(
+        backgroundColor: deepGreen,
+        selectedColor: deepGreen,
+        disabledColor: Colors.grey,
+        labelStyle: TextStyle(color: Colors.white),
+        secondaryLabelStyle: TextStyle(color: Colors.white70),
+        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        brightness: Brightness.dark,
+      ),
+
       // TEXT THEME
       textTheme: const TextTheme(
         displayLarge: TextStyle(
@@ -114,7 +128,6 @@ class ThemeProvider extends ChangeNotifier {
           fontWeight: FontWeight.w700,
           color: Colors.white,
         ),
-
         bodySmall: TextStyle(
           fontSize: 18,
           fontWeight: FontWeight.bold,
@@ -135,18 +148,13 @@ class ThemeProvider extends ChangeNotifier {
           fontWeight: FontWeight.w600,
           color: Colors.black,
         ),
+        bodyMedium: TextStyle(
+          fontSize: 18,
+          fontWeight: FontWeight.w700,
+          color: Colors.black,
+        ),
       ),
 
-      // CHIP  THEME
-      chipTheme: const ChipThemeData(
-        backgroundColor: deepGreen,
-        selectedColor: deepGreen,
-        disabledColor: Colors.grey,
-        labelStyle: TextStyle(color: Colors.white),
-        secondaryLabelStyle: TextStyle(color: Colors.white70),
-        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        brightness: Brightness.dark,
-      ),
     );
   }
 

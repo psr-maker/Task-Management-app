@@ -272,4 +272,123 @@ class AdminService {
       return false;
     }
   }
+
+  static Future<bool> applyLeave({
+    required int senderId,
+    required String name,
+    required String designation,
+    required String reason,
+    required DateTime fromDate,
+    required DateTime toDate,
+    required String leaveType,
+    required double totalDays,
+    required String contactNumber,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse("$baseUrl/Manager/apply-leave"),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({
+          "senderId": senderId,
+          "name": name,
+          "designation": designation,
+          "reason": reason,
+          "fromDate": fromDate.toIso8601String(),
+          "toDate": toDate.toIso8601String(),
+          "leaveType": leaveType,
+          "totalDays": totalDays,
+          "contactNumber": contactNumber,
+        }),
+      );
+      if (response.statusCode == 200) {
+        return true;
+      } else {
+        print(response.body);
+        return false;
+      }
+    } catch (e) {
+      print("Leave Error: $e");
+      return false;
+    }
+  }
+
+  static Future<List<dynamic>> getLeaves() async {
+    try {
+      final token = await AuthService.getToken();
+
+      final response = await http.get(
+        Uri.parse("$baseUrl/Manager/get-leaves"),
+        headers: {"Authorization": "Bearer $token"},
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        print(response.body);
+        return [];
+      }
+    } catch (e) {
+      print("Error: $e");
+      return [];
+    }
+  }
+
+  static Future<bool> updateLeaveStatus({
+    required int id,
+    required String status,
+    String? reason,
+  }) async {
+    try {
+      final url =
+          "$baseUrl/Manager/update-leave-status?id=$id&status=$status&reason=${reason ?? ""}";
+
+      final response = await http.post(
+        Uri.parse(url),
+        headers: {"Content-Type": "application/json"},
+      );
+
+      print("STATUS: ${response.statusCode}");
+      print("BODY: ${response.body}");
+
+      if (response.statusCode == 200) {
+        return true;
+      } else {
+        return false;
+      }
+    } catch (e) {
+      print(e);
+      return false;
+    }
+  }
+
+
+ static Future<List<dynamic>> getDepartmentLeaves() async {
+    try {
+      final token = await AuthService.getToken();
+
+      if (token == null) {
+        throw Exception("Token not found");
+      }
+
+      final response = await http.get(
+        Uri.parse("$baseUrl/Manager/get-department-leaves"),
+        headers: {
+          "Authorization": "Bearer $token",
+          "Content-Type": "application/json",
+        },
+      );
+
+      // ✅ Success
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data;
+      }
+      else {
+        throw Exception("Failed to load department leaves: ${response.body}");
+      }
+    } catch (e) {
+      throw Exception("Error: $e");
+    }
+  }
+
 }

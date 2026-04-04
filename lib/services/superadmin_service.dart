@@ -59,9 +59,10 @@ class SuperAdminService {
       throw Exception(e.toString());
     }
   }
+
   // get all admin
- static Future<List<dynamic>> getGoalsname() async {
-   final token = await AuthService.getToken();
+  static Future<List<dynamic>> getGoalsname() async {
+    final token = await AuthService.getToken();
     final response = await http.get(
       Uri.parse("$baseUrl/Director/GetGoals"),
       headers: {
@@ -76,6 +77,7 @@ class SuperAdminService {
       throw Exception("Failed to load goals");
     }
   }
+
   static Future<List<UserModel>> getAdmins() async {
     final response = await http.get(
       Uri.parse("$baseUrl/Director/getAllManager"),
@@ -333,19 +335,18 @@ class SuperAdminService {
   }
 
   static Future<List<AuditLogModel>> getAuditLogs() async {
-    // final token = await AuthService.getToken();
+    final token = await AuthService.getToken();
 
     final response = await http.get(
       Uri.parse("$baseUrl/Director/auditlog"),
       headers: {
         "Content-Type": "application/json",
-        // "Authorization": "Bearer $token",
+        "Authorization": "Bearer $token",
       },
     );
 
     if (response.statusCode == 200) {
       final List data = jsonDecode(response.body);
-      print("AUDIT RESPONSE✨✨✨: ${response.body}");
       return data.map((e) => AuditLogModel.fromJson(e)).toList();
     } else {
       throw Exception("Failed to load audit logs");
@@ -387,5 +388,32 @@ class SuperAdminService {
     } else {
       throw Exception('Failed to add department');
     }
+  }
+
+  static Future<bool> updateGoal(String id, Map<String, dynamic> data) async {
+    final token = await AuthService.getToken();
+
+    final response = await http.put(
+      Uri.parse("$baseUrl/Director/UpdateGoal/$id"),
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer $token",
+      },
+      body: jsonEncode(data),
+    );
+
+    return response.statusCode == 200;
+  }
+
+  // ✅ DELETE
+  static Future<bool> deleteGoal(String id) async {
+    final token = await AuthService.getToken();
+
+    final response = await http.delete(
+      Uri.parse("$baseUrl/Director/DeleteGoal/$id"),
+      headers: {"Authorization": "Bearer $token"},
+    );
+
+    return response.statusCode == 200;
   }
 }

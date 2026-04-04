@@ -93,11 +93,9 @@ class _AddWorklogPageState extends State<AddWorklogPage> {
       );
 
       if (!mounted) return;
-      Navigator.pop(context, true);
+      showTopMessage("Worklog added successfully", isError: false);
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(e.toString())));
+      showTopMessage(e.toString(), isError: true);
     }
 
     setState(() => _isLoading = false);

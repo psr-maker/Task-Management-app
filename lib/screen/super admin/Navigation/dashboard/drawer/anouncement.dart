@@ -28,30 +28,6 @@ class _AnounceState extends State<Anounce> {
     futureAnnouncements = AnnouncementService.fetchAnnouncements();
   }
 
-  Future<void> confirmDelete(int id) async {
-    final confirm = await showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text("Delete Announcement"),
-        content: const Text("Are you sure you want to delete this?"),
-        actions: [
-          TextButton(
-            child: const Text("Cancel"),
-            onPressed: () => Navigator.pop(context, false),
-          ),
-          TextButton(
-            child: const Text("Delete"),
-            onPressed: () => Navigator.pop(context, true),
-          ),
-        ],
-      ),
-    );
-
-    if (confirm == true) {
-      deleteAnnouncement(id);
-    }
-  }
-
   Future<void> deleteAnnouncement(int id) async {
     try {
       await AnnouncementService.deleteAnnouncement(id);
@@ -136,8 +112,15 @@ class _AnounceState extends State<Anounce> {
                         final item = announcements[index];
 
                         return GestureDetector(
-                          onLongPress: () {
-                            confirmDelete(item.id);
+                          onLongPress: () async {
+                            final confirmed = await showConfirmDialog(
+                              context,
+                              "Delete",
+                              "Anouncement",
+                            );
+                            if (confirmed == true) {
+                              deleteAnnouncement(item.id);
+                            }
                           },
                           child: Container(
                             margin: const EdgeInsets.symmetric(
@@ -170,7 +153,7 @@ class _AnounceState extends State<Anounce> {
                                     Container(
                                       width: 2,
                                       height: 120,
-                                      color: Colors.grey.shade300,
+                                      color: Colors.grey,
                                     ),
                                   ],
                                 ),
@@ -183,7 +166,9 @@ class _AnounceState extends State<Anounce> {
                                     decoration: BoxDecoration(
                                       borderRadius: BorderRadius.circular(20),
                                       border: Border.all(
-                                        color: Colors.green.shade200,
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.secondary,
                                       ),
                                     ),
                                     child: Column(
@@ -210,7 +195,7 @@ class _AnounceState extends State<Anounce> {
                                               decoration: BoxDecoration(
                                                 color: _getTypeColor(
                                                   item.fileType,
-                                                // ignore: deprecated_member_use
+                                                  // ignore: deprecated_member_use
                                                 ).withOpacity(0.15),
                                                 borderRadius:
                                                     BorderRadius.circular(20),
@@ -302,9 +287,6 @@ class _AnounceState extends State<Anounce> {
                 context,
                 message: _topMessage!,
                 isError: _isErrorMessage,
-                backgroundColor: Theme.of(context).colorScheme.primary,
-                iconColor: Theme.of(context).colorScheme.onPrimary,
-                textColor: Theme.of(context).colorScheme.onPrimary,
               ),
             ),
         ],
@@ -324,12 +306,12 @@ class _AnounceState extends State<Anounce> {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: DataTable(
-        headingRowColor: WidgetStateProperty.all(
+        headingRowColor: MaterialStateProperty.all(
           Theme.of(context).colorScheme.primary,
         ),
 
-        dataRowColor: WidgetStateProperty.resolveWith<Color?>((
-          Set<WidgetState> states,
+        dataRowColor: MaterialStateProperty.resolveWith<Color?>((
+          Set<MaterialState> states,
         ) {
           return Colors.green.shade50;
         }),
@@ -345,7 +327,7 @@ class _AnounceState extends State<Anounce> {
           var row = entry.value;
 
           return DataRow(
-            color: WidgetStateProperty.all(
+            color: MaterialStateProperty.all(
               index % 2 == 0
                   ? Theme.of(context).colorScheme.onPrimary
                   : Theme.of(context).colorScheme.tertiary,
@@ -401,7 +383,7 @@ class _AnounceState extends State<Anounce> {
           ),
           child: Row(
             children: [
-              Icon(Icons.picture_as_pdf, color: Colors.red.shade600, size: 25),
+              Icon(Icons.picture_as_pdf, color: Colors.red.shade600),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
@@ -409,13 +391,14 @@ class _AnounceState extends State<Anounce> {
                   style: TextStyle(
                     color: Colors.red.shade700,
                     fontWeight: FontWeight.w600,
+                    fontSize: 12,
                   ),
                 ),
               ),
               Icon(Icons.open_in_new, color: Colors.red.shade600),
             ],
           ),
-        ),  
+        ),
       );
     }
 

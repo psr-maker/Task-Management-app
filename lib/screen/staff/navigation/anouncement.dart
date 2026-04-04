@@ -258,7 +258,7 @@ class _AnounceState extends State<Anouncestaff> {
       );
     }
 
-    if (item.fileType == "pdf" && item.filePath != null) {
+    if (item.fileType == "pdf" && item.filePath != null) { 
       return GestureDetector(
         onTap: () async {
           final url = "${ApiConstants.Uploaded}${item.filePath}";
@@ -272,7 +272,7 @@ class _AnounceState extends State<Anouncestaff> {
           ),
           child: Row(
             children: [
-              Icon(Icons.picture_as_pdf, color: Colors.red.shade600, size: 25),
+              Icon(Icons.picture_as_pdf, color: Colors.red.shade600),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
@@ -280,6 +280,7 @@ class _AnounceState extends State<Anouncestaff> {
                   style: TextStyle(
                     color: Colors.red.shade700,
                     fontWeight: FontWeight.w600,
+                    fontSize: 12
                   ),
                 ),
               ),

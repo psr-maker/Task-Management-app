@@ -27,7 +27,6 @@ class _EmployeeDetailState extends State<EmployeeDetail> {
   bool isLoading = true;
   bool isActive = false;
   bool isUpdating = false;
-  bool _statusInitialized = false;
   bool isSearching = false;
   TextEditingController searchController = TextEditingController();
   bool showFilter = false;
@@ -42,6 +41,7 @@ class _EmployeeDetailState extends State<EmployeeDetail> {
   bool _isErrorMessage = true;
   bool _showTopMessage = false;
   List<dynamic> staffGoals = [];
+  bool _statusInitialized = false;
 
   List<dynamic> applyGoalSearch(List<dynamic> goals) {
     List<dynamic> filtered = goals;
@@ -191,7 +191,7 @@ class _EmployeeDetailState extends State<EmployeeDetail> {
             ? TextField(
                 controller: searchController,
                 autofocus: true,
-                style: Theme.of(context).textTheme.bodyLarge,
+                style: Theme.of(context).textTheme.titleMedium,
                 decoration: InputDecoration(
                   hintText: "Search...",
                   hintStyle: Theme.of(context).textTheme.labelLarge,
@@ -324,27 +324,40 @@ class _EmployeeDetailState extends State<EmployeeDetail> {
     final filteredGoals = applyGoalSearch(staffGoals);
 
     final allTasks = staffGoals.expand((g) => (g["tasks"] ?? [])).toList();
-
-    final completed = allTasks
-        .where(
-          (t) => (t["status"] ?? "").toString().toLowerCase() == "completed",
-        )
-        .length;
-
-    final inProgress = allTasks
-        .where(
-          (t) => (t["status"] ?? "").toString().toLowerCase() == "in progress",
-        )
-        .length;
-
-    final pending = allTasks
-        .where((t) => (t["status"] ?? "").toString().toLowerCase() == "pending")
-        .length;
-
     if (!_statusInitialized) {
       isActive = widget.employee.status.toLowerCase() == "active";
       _statusInitialized = true;
     }
+
+    final now = DateTime.now();
+
+    final completedGoals = staffGoals
+        .where(
+          (g) =>
+              (g["status"] ?? "").toString().toLowerCase().trim() ==
+              "completed",
+        )
+        .length;
+
+    final pendingGoals = staffGoals.where((g) {
+      final status = (g["status"] ?? "").toString().toLowerCase().trim();
+
+      return status != "completed";
+    }).length;
+
+    final overdueGoals = staffGoals.where((g) {
+      final status = (g["status"] ?? "").toString().toLowerCase().trim();
+
+      if (status == "completed") return false;
+
+      final dueDateStr = g["dueDate"];
+      if (dueDateStr == null) return false;
+
+      final dueDate = DateTime.tryParse(dueDateStr);
+      if (dueDate == null) return false;
+
+      return dueDate.isBefore(now);
+    }).length;
 
     return Padding(
       padding: const EdgeInsets.all(15),
@@ -363,7 +376,7 @@ class _EmployeeDetailState extends State<EmployeeDetail> {
                     Expanded(
                       child: SmallStatCard(
                         title: "Completed",
-                        value: completed.toString(),
+                        value: completedGoals.toString(),
                         icon: Icons.task_alt,
                         color: Colors.green,
                       ),
@@ -371,8 +384,8 @@ class _EmployeeDetailState extends State<EmployeeDetail> {
                     const SizedBox(width: 10),
                     Expanded(
                       child: SmallStatCard(
-                        title: "In Progress",
-                        value: inProgress.toString(),
+                        title: "Pending",
+                        value: pendingGoals.toString(),
                         icon: Icons.pending_outlined,
                         color: Colors.orange,
                       ),
@@ -380,9 +393,9 @@ class _EmployeeDetailState extends State<EmployeeDetail> {
                     const SizedBox(width: 10),
                     Expanded(
                       child: SmallStatCard(
-                        title: "Pending",
-                        value: pending.toString(),
-                        icon: Icons.access_time_sharp,
+                        title: "Overdue",
+                        value: overdueGoals.toString(),
+                        icon: Icons.warning_amber_rounded,
                         color: Colors.red,
                       ),
                     ),

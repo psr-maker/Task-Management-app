@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:staff_work_track/Models/getusers.dart';
 import 'package:staff_work_track/core/widgets/buttons.dart';
+import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
 import 'package:staff_work_track/services/admin_service.dart';
 import 'package:staff_work_track/services/superadmin_service.dart';
 
@@ -17,7 +18,9 @@ class _WarrentypointsState extends State<Warrentypoints> {
 
   final totalWorkController = TextEditingController();
   final complaintsController = TextEditingController();
-
+  String? _topMessage;
+  bool _isErrorMessage = true;
+  bool _showTopMessage = false;
   bool isLoading = false;
 
   @override
@@ -37,9 +40,7 @@ class _WarrentypointsState extends State<Warrentypoints> {
     if (selectedUser == null ||
         totalWorkController.text.isEmpty ||
         complaintsController.text.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("Please fill all fields")));
+      showTopMessage("Please fill all fields", isError: true);
       return;
     }
 
@@ -54,9 +55,7 @@ class _WarrentypointsState extends State<Warrentypoints> {
     setState(() => isLoading = false);
 
     if (success) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("Added Successfully")));
+      showTopMessage("Warranty points added successfully", isError: false);
 
       totalWorkController.clear();
       complaintsController.clear();
@@ -115,8 +114,8 @@ class _WarrentypointsState extends State<Warrentypoints> {
 
                           return ListTile(
                             leading: CircleAvatar(child: Text(user.name[0])),
-                            title: Text(user.name),
-                            subtitle: Text(user.role),
+                            title: Text(user.name, style: Theme.of(context).textTheme.labelMedium),
+                            subtitle: Text(user.role, style: Theme.of(context).textTheme.titleLarge),
                             onTap: () {
                               setState(() => selectedUser = user);
                               Navigator.pop(context);
@@ -135,6 +134,21 @@ class _WarrentypointsState extends State<Warrentypoints> {
     );
   }
 
+  void showTopMessage(String message, {bool isError = true}) {
+    setState(() {
+      _topMessage = message;
+      _isErrorMessage = isError;
+      _showTopMessage = true;
+    });
+
+    Future.delayed(const Duration(seconds: 3), () {
+      if (!mounted) return;
+      setState(() {
+        _showTopMessage = false;
+      });
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -147,39 +161,59 @@ class _WarrentypointsState extends State<Warrentypoints> {
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(15),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Stack(
           children: [
-            // 🔷 HEADER
-             Text(
-              "Warranty Entry",
-               style: Theme.of(context).textTheme.displaySmall,
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // 🔷 HEADER
+                Text(
+                  "Warranty Entry",
+                  style: Theme.of(context).textTheme.displaySmall,
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  "Warranty Points Allocation...⭐",
+                  style: Theme.of(context).textTheme.labelSmall,
+                ),
+                SizedBox(height: 30),
+                buildUserSelector(),
+                SizedBox(height: 15),
+                buildInputNew(
+                  "Total Work",
+                  totalWorkController,
+                  Icons.work_outline,
+                ),
+                SizedBox(height: 15),
+                buildInputNew(
+                  "Complaints",
+                  complaintsController,
+                  Icons.warning,
+                ),
+                const SizedBox(height: 30),
+                Center(
+                  child: AppButton(
+                    text: "Save",
+                    isLoading: isLoading,
+                    onPressed: submit,
+                    color: Theme.of(context).colorScheme.secondary,
+                    txtcolor: Theme.of(context).colorScheme.onPrimary,
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 6),
-            Text(
-              "Warranty Points Allocation...⭐",
-              style: Theme.of(context).textTheme.labelSmall,
-            ),
-            SizedBox(height: 30),
-            buildUserSelector(),
-            SizedBox(height: 15),
-            buildInputNew(
-              "Total Work",
-              totalWorkController,
-              Icons.work_outline,
-            ),
-            SizedBox(height: 15),
-            buildInputNew("Complaints", complaintsController, Icons.warning),
-            const SizedBox(height: 30),
-            Center(
-              child: AppButton(
-                text: "Save",
-                isLoading: isLoading,
-                onPressed: submit,
-                color: Theme.of(context).colorScheme.secondary,
-                txtcolor: Theme.of(context).colorScheme.onPrimary,
+            if (_topMessage != null)
+              AnimatedPositioned(
+                top: _showTopMessage ? 20 : -120,
+                left: 16,
+                right: 16,
+                duration: const Duration(milliseconds: 300),
+                child: Msgsnackbar(
+                  context,
+                  message: _topMessage!,
+                  isError: _isErrorMessage,
+                ),
               ),
-            ),
           ],
         ),
       ),

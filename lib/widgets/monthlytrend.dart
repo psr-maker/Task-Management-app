@@ -160,7 +160,6 @@ class _MonthlyTrendChartState extends State<MonthlyTrendChart> {
               maxY: _getSafeMaxY(),
               gridData: FlGridData(show: false),
               borderData: FlBorderData(show: false),
-
               titlesData: FlTitlesData(
                 leftTitles: AxisTitles(
                   sideTitles: SideTitles(
@@ -170,15 +169,11 @@ class _MonthlyTrendChartState extends State<MonthlyTrendChart> {
                     getTitlesWidget: (value, meta) {
                       return Text(
                         value.toInt().toString(),
-                        style: const TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w500,
-                        ),
+                        style: Theme.of(context).textTheme.labelSmall,
                       );
                     },
                   ),
                 ),
-
                 rightTitles: AxisTitles(
                   sideTitles: SideTitles(showTitles: false),
                 ),
@@ -217,10 +212,7 @@ class _MonthlyTrendChartState extends State<MonthlyTrendChart> {
                         padding: const EdgeInsets.only(top: 8),
                         child: Text(
                           months[monthNumber - 1],
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                          ),
+                          style: Theme.of(context).textTheme.labelSmall,
                         ),
                       );
                     },
@@ -252,7 +244,11 @@ class _MonthlyTrendChartState extends State<MonthlyTrendChart> {
 
                       return LineTooltipItem(
                         "$label\n",
-                        TextStyle(color: color, fontWeight: FontWeight.w600),
+                        TextStyle(
+                          color: color,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
                       );
                     }).toList();
                   },
@@ -354,7 +350,7 @@ class ProductivityBarChart extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          "Department Performance",
+          "Monthly Productivity",
           style: Theme.of(context).textTheme.displaySmall,
         ),
         const SizedBox(height: 10),
@@ -877,13 +873,9 @@ class _AlldeptproducticityState extends State<Alldeptproducticity> {
   @override
   void initState() {
     super.initState();
-
     currentYear = DateTime.now().year;
     currentMonth = DateTime.now().month;
-
-    // ✅ Always previous month
     final selectedMonth = currentMonth > 1 ? currentMonth - 1 : 1;
-
     futureData = DashboardService.allgetDepartmentsProductivity(
       year: currentYear,
       month: selectedMonth,
@@ -915,66 +907,61 @@ class _AlldeptproducticityState extends State<Alldeptproducticity> {
             } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
               return const Center(child: Text('No data'));
             }
-
             final departments = snapshot.data!;
-
-            return Container(
-              decoration: BoxDecoration(
-                border: Border.all(
-                  color: Colors.grey.shade300,
-                ), // ✅ full border
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Table(
-                columnWidths: const {
-                  0: FlexColumnWidth(3),
-                  1: FlexColumnWidth(2),
-                  2: FlexColumnWidth(2),
-                },
-                border: TableBorder(
-                  verticalInside: BorderSide(color: Colors.grey.shade300),
-                  horizontalInside: BorderSide(color: Colors.grey.shade300),
+            return ClipRRect(
+              borderRadius: BorderRadius.circular(15),
+              child: Container(
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey),
                 ),
-                children: [
-                  // ================= HEADER =================
-                  TableRow(
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.secondary,
-                    ),
-                    children: [
-                      _tableHeader('Department'),
-                      _tableHeader('Month'),
-                      _tableHeader('Productivity'),
-                    ],
+                child: Table(
+                  columnWidths: const {
+                    0: FlexColumnWidth(3),
+                    1: FlexColumnWidth(2),
+                    2: FlexColumnWidth(2),
+                  },
+                  border: TableBorder(
+                    verticalInside: BorderSide(color: Colors.grey),
+                    horizontalInside: BorderSide(color: Colors.grey),
                   ),
-
-                  // ================= DATA =================
-                  ...departments.map((dept) {
-                    final monthlyData = List<Map<String, dynamic>>.from(
-                      dept['monthlyData'],
-                    );
-
-                    int month = currentMonth > 1 ? currentMonth - 1 : 1;
-                    double productivity = 0;
-
-                    if (monthlyData.isNotEmpty) {
-                      month = monthlyData.first['month'];
-                      productivity = (monthlyData.first['productivity'] as num)
-                          .toDouble();
-                    }
-
-                    return TableRow(
+                  children: [
+                    // ================= HEADER =================
+                    TableRow(
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.secondary,
+                      ),
                       children: [
-                        _tableCell(dept['department']),
-                        _tableCell(_getMonthName(month)),
-                        _tableCell(
-                          '${productivity.toInt()} %',
-                          color: _getProductivityColor(productivity),
-                        ),
+                        _tableHeader('Department'),
+                        _tableHeader('Month'),
+                        _tableHeader('Productivity'),
                       ],
-                    );
-                  }).toList(),
-                ],
+                    ),
+                    // ================= DATA =================
+                    ...departments.map((dept) {
+                      final monthlyData = List<Map<String, dynamic>>.from(
+                        dept['monthlyData'],
+                      );
+                      int month = currentMonth > 1 ? currentMonth - 1 : 1;
+                      double productivity = 0;
+                      if (monthlyData.isNotEmpty) {
+                        month = monthlyData.first['month'];
+                        productivity =
+                            (monthlyData.first['productivity'] as num)
+                                .toDouble();
+                      }
+                      return TableRow(
+                        children: [
+                          _tableCell(dept['department']),
+                          _tableCell(_getMonthName(month)),
+                          _tableCell(
+                            '${productivity.toInt()} %',
+                            color: _getProductivityColor(productivity),
+                          ),
+                        ],
+                      );
+                    }).toList(),
+                  ],
+                ),
               ),
             );
           },
@@ -987,13 +974,7 @@ class _AlldeptproducticityState extends State<Alldeptproducticity> {
   Widget _tableHeader(String text) {
     return Padding(
       padding: const EdgeInsets.all(12),
-      child: Text(
-        text,
-        style: TextStyle(
-          fontWeight: FontWeight.bold,
-          color: Theme.of(context).colorScheme.onPrimary,
-        ),
-      ),
+      child: Text(text, style: Theme.of(context).textTheme.labelLarge),
     );
   }
 
@@ -1006,6 +987,7 @@ class _AlldeptproducticityState extends State<Alldeptproducticity> {
         style: TextStyle(
           color: color ?? Colors.black,
           fontWeight: FontWeight.w600,
+          fontSize: 13,
         ),
       ),
     );

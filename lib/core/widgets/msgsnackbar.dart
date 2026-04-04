@@ -6,10 +6,8 @@ class Msgsnackbar extends StatelessWidget {
   final Color? backgroundColor;
   final Color? textColor;
   final Color? iconColor;
-
-  // ✅ Keep context parameter (but don’t use it)
   const Msgsnackbar(
-    BuildContext _, { // ← use "_" to ignore it
+    BuildContext _, {
     super.key,
     required this.message,
     required this.isError,
@@ -21,15 +19,22 @@ class Msgsnackbar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bgColor =
-        backgroundColor ?? (isError ? Colors.red.shade700 : Colors.white);
+        backgroundColor ??
+        (isError
+            ? Theme.of(context).colorScheme.error
+            : Theme.of(context).colorScheme.secondary);
 
     final txtColor =
         textColor ??
-        (isError ? Colors.white : const Color.fromARGB(255, 50, 99, 49));
+        (isError
+            ? Theme.of(context).colorScheme.onPrimary
+            : Theme.of(context).colorScheme.onPrimary);
 
     final icColor =
         iconColor ??
-        (isError ? Colors.white : const Color.fromARGB(255, 50, 99, 49));
+        (isError
+            ? Theme.of(context).colorScheme.onPrimary
+            : Theme.of(context).colorScheme.onPrimary);
 
     return Material(
       elevation: 4,
@@ -55,7 +60,11 @@ class Msgsnackbar extends StatelessWidget {
             Expanded(
               child: Text(
                 message,
-                style: TextStyle(color: txtColor, fontWeight: FontWeight.w500),
+                style: TextStyle(
+                  color: txtColor,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
               ),
             ),
           ],

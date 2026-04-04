@@ -4,15 +4,14 @@ import 'package:staff_work_track/core/theme/theme_provider.dart';
 import 'package:staff_work_track/core/widgets/buttons.dart';
 import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
 import 'package:staff_work_track/screen/authen/login_selection.dart';
-import 'package:staff_work_track/screen/super admin/Navigation/dashboard/settings/add_dept.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/settings/editprofile.dart';
 import 'package:staff_work_track/services/auth_service.dart';
 
-class Settings extends StatefulWidget {
-  const Settings({super.key});
+class UsersSettings extends StatefulWidget {
+  const UsersSettings({super.key});
 
   @override
-  State<Settings> createState() => _SettingsState();
+  State<UsersSettings> createState() => _SettingsState();
 
   /// SECTION TITLE
   static Widget _sectionTitle(String title) {
@@ -52,7 +51,7 @@ class Settings extends StatefulWidget {
   }
 }
 
-class _SettingsState extends State<Settings> {
+class _SettingsState extends State<UsersSettings> {
   bool _isLoading = false;
   Future<void> logout() async {
     setState(() => _isLoading = true);
@@ -93,10 +92,10 @@ class _SettingsState extends State<Settings> {
         padding: const EdgeInsets.all(20),
         children: [
           /// ===== PROFILE CARD =====
-          Settings._sectionTitle("Account"),
+          UsersSettings._sectionTitle("Account"),
           const SizedBox(height: 10),
 
-          Settings._buildTile(
+          UsersSettings._buildTile(
             context,
             icon: Icons.person_outline,
             title: "Profile",
@@ -112,7 +111,7 @@ class _SettingsState extends State<Settings> {
           const SizedBox(height: 30),
 
           /// ===== APPEARANCE =====
-          Settings._sectionTitle("Appearance"),
+          UsersSettings._sectionTitle("Appearance"),
           const SizedBox(height: 10),
 
           Card(
@@ -138,25 +137,6 @@ class _SettingsState extends State<Settings> {
               },
             ),
           ),
-
-          const SizedBox(height: 30),
-
-          /// ===== ORGANIZATION =====
-          Settings._sectionTitle("Organization"),
-          const SizedBox(height: 10),
-          Settings._buildTile(
-            context,
-            icon: Icons.apartment_outlined,
-            title: "Manage Departments",
-            subtitle: "Add or update departments",
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const AddDepartmentPage()),
-              );
-            },
-          ),
-
           const SizedBox(height: 40),
 
           Center(

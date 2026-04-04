@@ -35,7 +35,6 @@ class AnnouncementService {
     }
   }
 
-
   static Future<bool> postAnnouncement({
     required String title,
     required String description,
@@ -228,43 +227,56 @@ class AnnouncementService {
     }
   }
 
-  static Future<void> editWorkLog({
-    required int workLogId,
-    required String title,
-    required String description,
-    required DateTime workDate,
-    required TimeOfDay startTime,
-    required TimeOfDay endTime,
-  }) async {
-    final token = await AuthService.getToken();
+ static Future<void> editWorkLog({
+  required int workLogId,
+  required String title,
+  required String description,
+  required DateTime workDate,
+  required TimeOfDay startTime,
+  required TimeOfDay endTime,
+  bool isSubmit = false,
+}) async {
+  final token = await AuthService.getToken();
 
-    final startStr =
-        "${startTime.hour.toString().padLeft(2, '0')}:${startTime.minute.toString().padLeft(2, '0')}:00";
-    final endStr =
-        "${endTime.hour.toString().padLeft(2, '0')}:${endTime.minute.toString().padLeft(2, '0')}:00";
+  final body = {
+    "title": title,
+    "description": description,
+    "workDate": workDate.toIso8601String(),
 
-    final formattedDate =
-        "${workDate.year}-${workDate.month.toString().padLeft(2, '0')}-${workDate.day.toString().padLeft(2, '0')}";
+    // send full datetime (backend uses Hour & Minute)
+    "startTime": DateTime(
+      workDate.year,
+      workDate.month,
+      workDate.day,
+      startTime.hour,
+      startTime.minute,
+    ).toIso8601String(),
 
-    final uri = Uri.parse(
-      "$baseUrl/Announcement/editworklog/$workLogId"
-      "?title=${Uri.encodeComponent(title)}"
-      "&description=${Uri.encodeComponent(description)}"
-      "&workDate=$formattedDate"
-      "&startTime=$startStr"
-      "&endTime=$endStr",
-    );
+    "endTime": DateTime(
+      workDate.year,
+      workDate.month,
+      workDate.day,
+      endTime.hour,
+      endTime.minute,
+    ).toIso8601String(),
 
-    final response = await http.put(
-      uri,
-      headers: {"Authorization": "Bearer $token"},
-    );
+    "isSubmit": isSubmit,
+  };
 
-    if (response.statusCode != 200) {
-      print(response.body);
-      throw Exception("Failed to edit worklog");
-    }
+  final response = await http.put(
+    Uri.parse("$baseUrl/Announcement/editworklog/$workLogId"),
+    headers: {
+      "Authorization": "Bearer $token",
+      "Content-Type": "application/json",
+    },
+    body: jsonEncode(body),
+  );
+
+  if (response.statusCode != 200) {
+    print(response.body);
+    throw Exception("Failed to edit worklog");
   }
+}
 
   Future<Map<String, dynamic>> sendWarning({
     required int receiverId,
@@ -315,6 +327,31 @@ class AnnouncementService {
       return data.map((warning) => WarningModel.fromJson(warning)).toList();
     } else {
       throw Exception("Failed to load warnings");
+    }
+  }
+
+  static Future<List<WarningModel>> getDepartmentWarnings() async {
+    try {
+      final token = await AuthService.getToken();
+
+      final response = await http.get(
+        Uri.parse("$baseUrl/Announcement/get-department-warnings"),
+        headers: {
+          "Authorization": "Bearer $token",
+          "Content-Type": "application/json",
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final List data = jsonDecode(response.body);
+
+        // ✅ Convert to model list
+        return data.map((e) => WarningModel.fromJson(e)).toList();
+      } else {
+        throw Exception("Failed: ${response.body}");
+      }
+    } catch (e) {
+      throw Exception(e.toString());
     }
   }
 }

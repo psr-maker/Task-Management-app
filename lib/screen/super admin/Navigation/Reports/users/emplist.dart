@@ -67,25 +67,25 @@ class _EmployeeReportsListState extends State<EmployeeReportsList> {
                 controller: searchController,
                 decoration: InputDecoration(
                   hintText: "Search ${widget.role}...",
-                    hintStyle: Theme.of(context).textTheme.bodyMedium,
+                  hintStyle: Theme.of(context).textTheme.labelMedium,
                   border: InputBorder.none,
-                            enabledBorder: InputBorder.none,
-                            focusedBorder: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
                 ),
                 onChanged: (_) => setState(() {}),
               ),
-          
+
               Expanded(
                 child: ListView.builder(
                   itemCount: finalList.length,
                   itemBuilder: (context, index) {
                     final user = finalList[index];
-          
+
                     return Container(
                       margin: const EdgeInsets.only(bottom: 14),
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(16),
-                         color:  Theme.of(context).colorScheme.background,
+                        color: Theme.of(context).colorScheme.background,
                       ),
                       child: Padding(
                         padding: const EdgeInsets.all(10),
@@ -94,7 +94,9 @@ class _EmployeeReportsListState extends State<EmployeeReportsList> {
                             // ✅ Existing UI
                             CircleAvatar(
                               radius: 18,
-                              backgroundColor:  Theme.of(context).colorScheme.secondary,
+                              backgroundColor: Theme.of(
+                                context,
+                              ).colorScheme.secondary,
                               child: Text(
                                 user.name[0].toUpperCase(),
                                 style: Theme.of(context).textTheme.labelLarge,
@@ -114,7 +116,9 @@ class _EmployeeReportsListState extends State<EmployeeReportsList> {
                                   const SizedBox(height: 3),
                                   Text(
                                     user.department,
-                                    style: Theme.of(context).textTheme.labelSmall,
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.labelSmall,
                                   ),
                                 ],
                               ),
@@ -134,10 +138,7 @@ class _EmployeeReportsListState extends State<EmployeeReportsList> {
                               },
                               child: Padding(
                                 padding: const EdgeInsets.all(8.0),
-                                child: Icon(
-                                  Icons.arrow_forward_ios,
-                                 
-                                ),
+                                child: Icon(Icons.arrow_forward_ios),
                               ),
                             ),
                           ],

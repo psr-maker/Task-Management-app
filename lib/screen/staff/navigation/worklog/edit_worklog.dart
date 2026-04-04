@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:staff_work_track/core/widgets/buttons.dart';
+import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
 import 'package:staff_work_track/services/announ_service.dart';
 import 'package:staff_work_track/widgets/customfieldwidget.dart';
 
@@ -31,7 +32,9 @@ class _EditWorklogPageState extends State<EditWorklogPage> {
 
   late TimeOfDay startTime;
   late TimeOfDay endTime;
-
+  String? _topMessage;
+  bool _isErrorMessage = true;
+  bool _showTopMessage = false;
   bool _isLoading = false;
 
   @override
@@ -50,6 +53,19 @@ class _EditWorklogPageState extends State<EditWorklogPage> {
     super.dispose();
   }
 
+  void showTopMessage(String message, {bool isError = true}) {
+    setState(() {
+      _topMessage = message;
+      _isErrorMessage = isError;
+      _showTopMessage = true;
+    });
+
+    Future.delayed(const Duration(seconds: 3), () {
+      if (!mounted) return;
+      setState(() => _showTopMessage = false);
+    });
+  }
+
   Future<void> _pickTime(bool isStart) async {
     final result = await showTimePicker(
       context: context,
@@ -65,10 +81,7 @@ class _EditWorklogPageState extends State<EditWorklogPage> {
   Future<void> _submit() async {
     if (titleController.text.trim().isEmpty ||
         descriptionController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("Please fill all fields")));
-      return;
+      showTopMessage("Please fill all fields", isError: true);
     }
 
     setState(() => _isLoading = true);
@@ -84,11 +97,9 @@ class _EditWorklogPageState extends State<EditWorklogPage> {
       );
 
       if (!mounted) return;
-      Navigator.pop(context, true);
+      showTopMessage("Worklog updated successfully", isError: false);
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(e.toString())));
+      showTopMessage(e.toString(), isError: true);
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -109,81 +120,100 @@ class _EditWorklogPageState extends State<EditWorklogPage> {
       body: Padding(
         padding: const EdgeInsets.all(15),
         child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: Stack(
             children: [
-              Text(
-                "Work Title",
-                style: Theme.of(context).textTheme.headlineLarge,
-              ),
-              const SizedBox(height: 15),
-              CustomTextField(controller: titleController),
-
-              const SizedBox(height: 20),
-              Text(
-                "Work Description",
-                style: Theme.of(context).textTheme.headlineLarge,
-              ),
-              const SizedBox(height: 15),
-              TextField(
-                controller: descriptionController,
-                maxLines: 3,
-                style: Theme.of(context).textTheme.headlineSmall,
-                decoration: InputDecoration(
-                  hintText: "Enter Work Description",
-                  hintStyle: Theme.of(context).textTheme.headlineSmall,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(
-                      color: Theme.of(context).colorScheme.secondary,
-                      width: 1.5,
-                    ),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(
-                      color: Theme.of(context).colorScheme.primary,
-                      width: 2,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
-              Text(
-                "Work Date: ${widget.workDate.toIso8601String().split("T")[0]}",
-                style: Theme.of(context).textTheme.headlineLarge,
-              ),
-              const SizedBox(height: 15),
-              Row(
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () => _pickTime(true),
-                      child: _timeCard("Start Time", startTime.format(context)),
+                  Text(
+                    "Work Title",
+                    style: Theme.of(context).textTheme.headlineLarge,
+                  ),
+                  const SizedBox(height: 15),
+                  CustomTextField(controller: titleController),
+
+                  const SizedBox(height: 20),
+                  Text(
+                    "Work Description",
+                    style: Theme.of(context).textTheme.headlineLarge,
+                  ),
+                  const SizedBox(height: 15),
+                  TextField(
+                    controller: descriptionController,
+                    maxLines: 3,
+                    style: Theme.of(context).textTheme.headlineSmall,
+                    decoration: InputDecoration(
+                      hintText: "Enter Work Description",
+                      hintStyle: Theme.of(context).textTheme.headlineSmall,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(
+                          color: Theme.of(context).colorScheme.secondary,
+                          width: 1.5,
+                        ),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(
+                          color: Theme.of(context).colorScheme.primary,
+                          width: 2,
+                        ),
+                      ),
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () => _pickTime(false),
-                      child: _timeCard("End Time", endTime.format(context)),
+                  const SizedBox(height: 20),
+                  Text(
+                    "Work Date: ${widget.workDate.toIso8601String().split("T")[0]}",
+                    style: Theme.of(context).textTheme.headlineLarge,
+                  ),
+                  const SizedBox(height: 15),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () => _pickTime(true),
+                          child: _timeCard(
+                            "Start Time",
+                            startTime.format(context),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () => _pickTime(false),
+                          child: _timeCard("End Time", endTime.format(context)),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 30),
+                  Center(
+                    child: AppButton(
+                      text: "Update",
+                      isLoading: _isLoading,
+                      onPressed: _submit,
+                      color: Theme.of(context).colorScheme.secondary,
+                      txtcolor: Theme.of(context).colorScheme.onPrimary,
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 30),
-              Center(
-                child: AppButton(
-                  text: "Update",
-                  isLoading: _isLoading,
-                  onPressed: _submit,
-                  color: Theme.of(context).colorScheme.secondary,
-                  txtcolor: Theme.of(context).colorScheme.onPrimary,
+              if (_topMessage != null)
+                AnimatedPositioned(
+                  top: _showTopMessage ? 0 : -120,
+                  left: 16,
+                  right: 16,
+                  duration: const Duration(milliseconds: 300),
+                  child: Msgsnackbar(
+                    context,
+                    message: _topMessage!,
+                    isError: _isErrorMessage,
+                  ),
                 ),
-              ),
             ],
           ),
         ),

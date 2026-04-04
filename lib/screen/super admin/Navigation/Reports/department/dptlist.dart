@@ -51,9 +51,9 @@ class _DepartmentListPageState extends State<DepartmentListPage> {
             children: [
               TextField(
                 controller: searchController,
-                decoration: InputDecoration(
+                decoration: InputDecoration(             
                   hintText: "Search Department...",
-                  hintStyle: Theme.of(context).textTheme.bodyMedium,
+                  hintStyle: Theme.of(context).textTheme.labelMedium,
                   border: InputBorder.none,
                   enabledBorder: InputBorder.none,
                   focusedBorder: InputBorder.none,

@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:staff_work_track/Models/warning_model.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
-import 'package:staff_work_track/screen/staff/navigation/dashboard/drawer/leave.dart';
+import 'package:staff_work_track/screen/staff/navigation/dashboard/drawer/leave/leavelist.dart';
+import 'package:staff_work_track/screen/staff/navigation/dashboard/usersettings.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/Reports/reports_table.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/notifi.dart';
-import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/settings/settings.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/warnings/warning.dart';
 import 'package:staff_work_track/services/announ_service.dart';
 import 'package:staff_work_track/services/notification_service.dart';
@@ -235,7 +235,7 @@ class _StaffDashboardState extends State<StaffDashboard> {
             onPressed: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => Settings()),
+                MaterialPageRoute(builder: (_) => UsersSettings()),
               );
             },
           ),
@@ -478,7 +478,7 @@ class _StaffDashboardState extends State<StaffDashboard> {
               Navigator.pop(context);
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => StaffLeave()),
+                MaterialPageRoute(builder: (_) => Leavelist()),
               );
             },
           ),

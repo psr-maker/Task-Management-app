@@ -294,7 +294,8 @@ class _DepartmentReportsTabState extends State<DepartmentReportsTab> {
     final low = data["lowPerformer"];
 
     final showTop = top != null && (top["completedTasks"] ?? 0) > 0;
-    final showLow = low != null && (low["completedTasks"] ?? 0) > 0;
+    // final showLow = low != null && (low["completedTasks"] ?? 0) > 0;
+     final showLow = low != null;
 
     if (!showTop && !showLow) return const SizedBox.shrink();
 
@@ -304,7 +305,7 @@ class _DepartmentReportsTabState extends State<DepartmentReportsTab> {
         const SizedBox(height: 25),
         Text(
           "Performance Metrics",
-          style: Theme.of(context).textTheme.displaySmall,
+          style: Theme.of(context).textTheme.displaySmall, 
         ),
         const SizedBox(height: 10),
 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:staff_work_track/Models/department.dart';
 import 'package:staff_work_track/core/widgets/buttons.dart';
+import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
 import 'package:staff_work_track/services/superadmin_service.dart';
 
 class AddDepartmentPage extends StatefulWidget {
@@ -21,7 +22,9 @@ class _AddDepartmentPageState extends State<AddDepartmentPage> {
 
   List<String> _allDepartments = [];
   List<String> _allSubDepartments = [];
-
+  String? _topMessage;
+  bool _isErrorMessage = true;
+  bool _showTopMessage = false;
   @override
   void initState() {
     super.initState();
@@ -57,24 +60,49 @@ class _AddDepartmentPageState extends State<AddDepartmentPage> {
       try {
         Department created = await _departmentService.addDepartment(newDept);
         setState(() => _isLoading = false);
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Department "${created.departmentName}" added successfully!',
-            ),
-          ),
+        showTopMessage(
+          '"${created.departmentName}" added successfully',
+          isError: false,
         );
 
         _formKey.currentState!.reset();
         _selectedZone = null;
       } catch (e) {
         setState(() => _isLoading = false);
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Failed to add department: $e')));
+        showTopMessage('Failed to add department: $e', isError: true);
       }
     }
+  }
+
+  void showTopMessage(String message, {bool isError = true}) {
+    setState(() {
+      _topMessage = message;
+      _isErrorMessage = isError;
+      _showTopMessage = true;
+    });
+
+    Future.delayed(const Duration(seconds: 3), () {
+      if (!mounted) return;
+      setState(() => _showTopMessage = false);
+    });
+  }
+
+  InputDecoration _decoration(String label, IconData icon) {
+    return InputDecoration(
+      labelText: label,
+      prefixIcon: Icon(icon,color: Theme.of(context).colorScheme.secondary,size: 18,),
+      labelStyle: Theme.of(context).textTheme.labelMedium,
+
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: Theme.of(context).colorScheme.secondary),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: Theme.of(context).colorScheme.secondary),
+      ),
+    );
   }
 
   @override
@@ -89,115 +117,144 @@ class _AddDepartmentPageState extends State<AddDepartmentPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text("Add Department"),
-        centerTitle: true,
-        backgroundColor: Theme.of(context).primaryColor,
+        leading: IconButton(
+          onPressed: () => Navigator.pop(context),
+          icon: Icon(Icons.arrow_back_ios),
+        ),
       ),
       body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            children: [
-              // Department Autocomplete
-              Autocomplete<String>(
-                optionsBuilder: (TextEditingValue textEditingValue) {
-                  return _allDepartments.where(
-                    (dept) => dept.toLowerCase().contains(
-                      textEditingValue.text.toLowerCase(),
-                    ),
-                  );
-                },
-                fieldViewBuilder:
-                    (context, controller, focusNode, onFieldSubmitted) {
-                      _departmentController.text = controller.text;
-                      return TextFormField(
-                        controller: controller,
-                        focusNode: focusNode,
-                        decoration: const InputDecoration(
-                          labelText: 'Department',
-                          border: OutlineInputBorder(),
-                          prefixIcon: Icon(Icons.business),
-                        ),
-                        validator: (value) {
-                          if (value == null || value.trim().isEmpty) {
-                            return 'Department name is required';
-                          }
-                          return null;
-                        },
-                      );
-                    },
-                onSelected: (selection) {
-                  _departmentController.text = selection;
-                },
-              ),
-              const SizedBox(height: 16),
+        padding: const EdgeInsets.all(15),
+        child: SingleChildScrollView(
+          child: Form(
+            key: _formKey,
+            child: Stack(
+              children: [
+                Column(
+                  children: [
+                    const SizedBox(height: 20),
 
-              // Sub Department Autocomplete
-              Autocomplete<String>(
-                optionsBuilder: (TextEditingValue textEditingValue) {
-                  return _allSubDepartments.where(
-                    (sub) => sub.toLowerCase().contains(
-                      textEditingValue.text.toLowerCase(),
+                    // ✅ Department
+                    _buildAutocomplete(
+                      data: _allDepartments,
+                      mainController: _departmentController,
+                      label: "Department",
+                      icon: Icons.business,
+                      validator: (v) =>
+                          v == null || v.isEmpty ? "Department required" : null,
                     ),
-                  );
-                },
-                fieldViewBuilder:
-                    (context, controller, focusNode, onFieldSubmitted) {
-                      _subDepartmentController.text = controller.text;
-                      return TextFormField(
-                        controller: controller,
-                        focusNode: focusNode,
-                        decoration: const InputDecoration(
-                          labelText: 'Sub Department',
-                          border: OutlineInputBorder(),
-                          prefixIcon: Icon(Icons.apartment),
-                        ),
-                      );
-                    },
-                onSelected: (selection) {
-                  _subDepartmentController.text = selection;
-                },
-              ),
-              const SizedBox(height: 16),
 
-              // Zone Dropdown
-              DropdownButtonFormField<String>(
-                value: _selectedZone,
-                decoration: const InputDecoration(
-                  labelText: 'Zone',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.map),
-                ),
-                style: Theme.of(context).textTheme.labelMedium,
-                items: ['North', 'South', 'East', 'West'].map((zone) {
-                  return DropdownMenuItem(
-                    value: zone,
-                    child: Text(
-                      zone,
+                    const SizedBox(height: 16),
+
+                    // ✅ Sub Department
+                    _buildAutocomplete(
+                      data: _allSubDepartments,
+                      mainController: _subDepartmentController,
+                      label: "Sub Department",
+                      icon: Icons.apartment,
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    // ✅ Dropdown
+                    DropdownButtonFormField<String>(
+                      value: _selectedZone,
+                      decoration: _decoration("Zone", Icons.map),
                       style: Theme.of(context).textTheme.labelMedium,
+
+                      items: ['North', 'South', 'East', 'West']
+                          .map(
+                            (z) => DropdownMenuItem(
+                              value: z,
+                              child: Text(
+                                z,
+                                style: Theme.of(context).textTheme.labelMedium,
+                              ),
+                            ),
+                          )
+                          .toList(),
+
+                      onChanged: (v) => setState(() => _selectedZone = v),
+                      validator: (v) => v == null ? "Select zone" : null,
                     ),
-                  );
-                }).toList(),
-                onChanged: (value) {
-                  setState(() => _selectedZone = value);
-                },
-                validator: (value) =>
-                    value == null ? 'Please select a zone' : null,
-              ),
-              const SizedBox(height: 24),
-              Center(
-                child: AppButton(
-                  text: "Add Department",
-                  isLoading: _isLoading,
-                  onPressed: _isLoading ? null : _submitDepartment,
-                  color: Theme.of(context).colorScheme.secondary,
-                  txtcolor: Theme.of(context).colorScheme.onPrimary,
+
+                    const SizedBox(height: 80),
+
+                    AppButton(
+                      text: "Add Department",
+                      isLoading: _isLoading,
+                      onPressed: _isLoading ? null : _submitDepartment,
+                      color: Theme.of(context).colorScheme.secondary,
+                      txtcolor: Theme.of(context).colorScheme.onPrimary,
+                    ),
+                  ],
                 ),
-              ),
-            ],
+                if (_topMessage != null)
+                  AnimatedPositioned(
+                    top: _showTopMessage ? 0 : -120,
+                    left: 16,
+                    right: 16,
+                    duration: const Duration(milliseconds: 300),
+                    child: Msgsnackbar(
+                      context,
+                      message: _topMessage!,
+                      isError: _isErrorMessage,
+                    ),
+                  ),
+              ],
+            ),
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildAutocomplete({
+    required List<String> data,
+    required TextEditingController mainController,
+    required String label,
+    required IconData icon,
+    String? Function(String?)? validator,
+  }) {
+    return Autocomplete<String>(
+      optionsBuilder: (text) {
+        return data.where(
+          (item) => item.toLowerCase().contains(text.text.toLowerCase()),
+        );
+      },
+
+      onSelected: (val) => mainController.text = val,
+
+      fieldViewBuilder: (context, controller, focusNode, _) {
+        controller.addListener(() {
+          mainController.text = controller.text;
+        });
+
+        return TextFormField(
+          controller: controller,
+          focusNode: focusNode,
+          style: Theme.of(context).textTheme.labelMedium,
+          decoration: _decoration(label, icon),
+          validator: validator,
+        );
+      },
+
+      // ✅ Short & clean dropdown style
+      optionsViewBuilder: (context, onSelected, options) {
+        return Material(
+          elevation: 4,
+          borderRadius: BorderRadius.circular(12),
+          child: ListView(
+            shrinkWrap: true,
+            padding: EdgeInsets.zero,
+            children: options.map((e) {
+              return ListTile(
+                title: Text(e, style: Theme.of(context).textTheme.labelMedium),
+                onTap: () => onSelected(e),
+              );
+            }).toList(),
+          ),
+        );
+      },
     );
   }
 }

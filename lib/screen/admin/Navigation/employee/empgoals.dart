@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:staff_work_track/common/filter_model.dart';
 // import 'package:staff_work_track/common/search_filter_page.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
+import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
 import 'package:staff_work_track/services/admin_service.dart';
 import 'package:staff_work_track/widgets/StatCard.dart';
 
@@ -22,6 +23,10 @@ class _EmpgoalsState extends State<Empgoals> {
   bool showFilter = false;
   bool isLoading = true;
   List<dynamic> goals = [];
+  String? _topMessage;
+  bool _isErrorMessage = true;
+  bool _showTopMessage = false;
+
   List<dynamic> applyGoalSearch(List<dynamic> goals) {
     List<dynamic> filtered = goals;
 
@@ -91,6 +96,19 @@ class _EmpgoalsState extends State<Empgoals> {
     }
   }
 
+  void showTopMessage(String message, {bool isError = true}) {
+    setState(() {
+      _topMessage = message;
+      _isErrorMessage = isError;
+      _showTopMessage = true;
+    });
+
+    Future.delayed(const Duration(seconds: 3), () {
+      if (!mounted) return;
+      setState(() => _showTopMessage = false);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final filteredGoals = applyGoalSearch(goals);
@@ -140,16 +158,6 @@ class _EmpgoalsState extends State<Empgoals> {
                               });
                             },
                           ),
-
-                          // /// 🔽 FILTER ICON
-                          // IconButton(
-                          //   icon: Icon(
-                          //     showFilter ? Icons.close : Icons.filter_list,
-                          //   ),
-                          //   onPressed: () {
-                          //     setState(() => showFilter = !showFilter);
-                          //   },
-                          // ),
                         ],
                       ),
 
@@ -163,42 +171,30 @@ class _EmpgoalsState extends State<Empgoals> {
                                 itemCount: filteredGoals.length,
                                 itemBuilder: (context, index) {
                                   final goal = filteredGoals[index];
-                                  return GoalCard(goal: goal);
+                                  return GoalCard(
+                                    goal: goal,
+                                    onDelete: (msg, isError) {
+                                      showTopMessage(msg, isError: isError);
+                                    },
+                                  );
                                 },
                               ),
                       ),
                     ],
                   ),
                 ),
-
-                // /// 🔽 FILTER DROPDOWN
-                // if (showFilter)
-                //   Positioned(
-                //     top: 0,
-                //     left: 0,
-                //     right: 0,
-                //     child: Material(
-                //       elevation: 8,
-                //       borderRadius: const BorderRadius.vertical(
-                //         bottom: Radius.circular(20),
-                //       ),
-                //       child: TaskFilterDropdown(
-                //         filter: taskFilter,
-                //         departments: [widget.department], // ✅ fix
-                //         onClear: () {
-                //           setState(() {
-                //             taskFilter.clear();
-                //             showFilter = false;
-                //           });
-                //         },
-                //         onApply: () {
-                //           setState(() {
-                //             showFilter = false;
-                //           });
-                //         },
-                //       ),
-                //     ),
-                //   ),
+                if (_topMessage != null)
+                  AnimatedPositioned(
+                    duration: const Duration(milliseconds: 300),
+                    top: _showTopMessage ? 40 : -120,
+                    left: 16,
+                    right: 16,
+                    child: Msgsnackbar(
+                      context,
+                      message: _topMessage!,
+                      isError: _isErrorMessage,
+                    ),
+                  ),
               ],
             ),
     );

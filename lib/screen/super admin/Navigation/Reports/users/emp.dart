@@ -247,16 +247,16 @@ class _EmployeeReportPageState extends State<EmployeeReportPage> {
                 ),
               ],
             ),
-
-            (data?["year"] ?? 0) == DateTime.now().year
+            const SizedBox(height: 20),
+            CapsuleBarChart(data: monthlyData),
+              const SizedBox(height: 10),
+             (data?["year"] ?? 0) == DateTime.now().year
                 ? const SizedBox() // hide
                 : YearlyProductivityPage(
                     year: data?["year"],
                     yearlyProductivity: (data?["yearlyProductivity"] ?? 0)
                         .toDouble(),
                   ),
-            const SizedBox(height: 10),
-            CapsuleBarChart(data: monthlyData),
             const SizedBox(height: 20),
             MonthlyTrendChart(
               monthlyData: (data?["monthlyTrend"] as List? ?? [])

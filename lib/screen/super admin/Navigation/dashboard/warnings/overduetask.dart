@@ -21,9 +21,14 @@ class OverdueTaskList extends StatelessWidget {
           itemCount: overdueTasks.length,
           itemBuilder: (context, index) {
             final task = overdueTasks[index];
-            // final assignedList = task["assignedTo"] as List?;
-            final assignedList =
-                (task["assignedTo"] ?? task["members"] ?? []) as List;
+
+            final assignedRaw = task["members"];
+
+            List assignedList = [];
+
+            if (assignedRaw is List) {
+              assignedList = assignedRaw;
+            }
 
             final statusEnum = TaskUtils.parseStatus(task["status"] ?? "");
             return GestureDetector(
@@ -68,24 +73,12 @@ class OverdueTaskList extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            task["task"] ?? "Unnamed Task",
+                            task["task"],
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: Theme.of(context).textTheme.headlineLarge,
                           ),
                           const SizedBox(height: 6),
-
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: assignedList.map<Widget>((member) {
-                              return Text(
-                                "${member["role"] ?? "N/A"} • ${AppHelpers.extractName(member["userId"] ?? "")}",
-                                style: Theme.of(context).textTheme.bodyMedium,
-                              );
-                            }).toList(),
-                          ),
-                          const SizedBox(height: 6),
-
                           Row(
                             children: [
                               const Icon(
@@ -96,7 +89,7 @@ class OverdueTaskList extends StatelessWidget {
                               const SizedBox(width: 6),
                               Text(
                                 "Due: ${AppHelpers.formatDate(task["dueDate"])}",
-                                style: Theme.of(context).textTheme.bodyMedium,
+                                style: Theme.of(context).textTheme.labelMedium,
                               ),
                               const SizedBox(width: 12),
                               const Icon(
@@ -106,8 +99,8 @@ class OverdueTaskList extends StatelessWidget {
                               ),
                               const SizedBox(width: 4),
                               Text(
-                                "${task["totalMembers"] ?? assignedList.length}",
-                                style: Theme.of(context).textTheme.bodyMedium,
+                                "${task["totalMembers"] ?? (assignedList.length)}",
+                                style: Theme.of(context).textTheme.labelMedium,
                               ),
                             ],
                           ),
@@ -294,7 +287,7 @@ class OverdueGoalList extends StatelessWidget {
                             const SizedBox(width: 6),
                             Text(
                               "Due: ${AppHelpers.formatDate(goal["dueDate"])}",
-                              style: Theme.of(context).textTheme.bodyMedium,
+                               style: Theme.of(context).textTheme.labelMedium,
                             ),
                           ],
                         ),

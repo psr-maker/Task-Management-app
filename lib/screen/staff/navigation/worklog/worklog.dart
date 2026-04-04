@@ -79,7 +79,7 @@ class _WorklogState extends State<Worklog> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Color.fromARGB(255, 10, 54, 12),
+      backgroundColor: Theme.of(context).colorScheme.onPrimary,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -88,7 +88,6 @@ class _WorklogState extends State<Worklog> {
           builder: (context, setModalState) {
             int maxDays = daysInMonth(tempYear, tempMonth);
             if (tempDay > maxDays) tempDay = maxDays;
-
             return Padding(
               padding: EdgeInsets.only(
                 left: 15,
@@ -99,33 +98,20 @@ class _WorklogState extends State<Worklog> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text(
+                  Text(
                     "Select Date",
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
+                    style: Theme.of(context).textTheme.displaySmall,
                   ),
                   const SizedBox(height: 16),
-
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text(
+                      Text(
                         "Year",
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
+                        style: Theme.of(context).textTheme.titleLarge,
                       ),
                       DropdownButton<int>(
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
+                        style: Theme.of(context).textTheme.headlineMedium,
                         value: tempYear,
 
                         items: List.generate(27, (i) {
@@ -139,24 +125,15 @@ class _WorklogState extends State<Worklog> {
                       ),
                     ],
                   ),
-
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text(
+                      Text(
                         "Month",
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
+                        style: Theme.of(context).textTheme.titleLarge,
                       ),
                       DropdownButton<int>(
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
+                        style: Theme.of(context).textTheme.headlineMedium,
                         value: tempMonth,
                         items: List.generate(12, (i) {
                           return DropdownMenuItem(
@@ -170,9 +147,7 @@ class _WorklogState extends State<Worklog> {
                       ),
                     ],
                   ),
-
                   const SizedBox(height: 10),
-
                   SizedBox(
                     height: 200,
                     child: GridView.builder(
@@ -186,22 +161,26 @@ class _WorklogState extends State<Worklog> {
                       itemBuilder: (context, index) {
                         int day = index + 1;
                         bool isSelected = day == tempDay;
-
                         return GestureDetector(
                           onTap: () => setModalState(() => tempDay = day),
                           child: Container(
                             alignment: Alignment.center,
                             decoration: BoxDecoration(
-                              border: Border.all(width: 2, color: Colors.white),
+                              border: Border.all(
+                                width: 1.5,
+                                color: Theme.of(context).colorScheme.secondary,
+                              ),
                               color: isSelected
-                                  ? Colors.white
-                                  : Color.fromARGB(255, 10, 54, 12),
+                                  ? Theme.of(context).colorScheme.secondary
+                                  : Theme.of(context).colorScheme.onPrimary,
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Text(
                               day.toString(),
                               style: TextStyle(
-                                color: isSelected ? Colors.black : Colors.white,
+                                color: isSelected
+                                    ? Theme.of(context).colorScheme.onPrimary
+                                    : Theme.of(context).colorScheme.secondary,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
@@ -210,7 +189,6 @@ class _WorklogState extends State<Worklog> {
                       },
                     ),
                   ),
-
                   const SizedBox(height: 16),
                   Center(
                     child: AppButton(
@@ -220,13 +198,11 @@ class _WorklogState extends State<Worklog> {
                         setState(() {
                           selectedDate = DateTime(tempYear, tempMonth, tempDay);
                         });
-
                         Navigator.pop(context);
-
                         await _loadLogs();
                       },
-
-                      color: Colors.white,
+                      color: Theme.of(context).colorScheme.secondary,
+                      txtcolor: Theme.of(context).colorScheme.onPrimary,
                     ),
                   ),
                 ],
@@ -403,7 +379,7 @@ class _WorklogState extends State<Worklog> {
     );
 
     return Container(
-    //  color: Theme.of(context).colorScheme.onPrimary,
+      //  color: Theme.of(context).colorScheme.onPrimary,
       child: Column(
         children: [
           Row(

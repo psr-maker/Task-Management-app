@@ -7,8 +7,14 @@ import 'package:staff_work_track/widgets/StatCard.dart';
 class Allgoals extends StatefulWidget {
   final String searchQuery;
   final TaskFilterModel? filter;
+  final Function(String, bool)? onDelete;
 
-  const Allgoals({super.key, required this.searchQuery, this.filter});
+  const Allgoals({
+    super.key,
+    required this.searchQuery,
+    this.filter,
+    this.onDelete,
+  });
 
   @override
   State<Allgoals> createState() => _AllgoalsState();
@@ -96,7 +102,11 @@ class _AllgoalsState extends State<Allgoals> {
     return ListView.builder(
       itemCount: filteredGoals.length,
       itemBuilder: (context, index) {
-        return GoalCard(goal: filteredGoals[index]);
+        return GoalCard(
+          goal: filteredGoals[index],
+          onDelete: widget.onDelete,
+          onRefresh: loadGoals,
+        );
       },
     );
   }

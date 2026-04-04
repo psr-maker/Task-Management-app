@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:jwt_decoder/jwt_decoder.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
+import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
 import 'package:staff_work_track/screen/admin/Navigation/my%20work/Task%20status%20tab/allgoals.dart';
 import 'package:staff_work_track/screen/admin/Navigation/my%20work/Task%20status%20tab/completedtask.dart';
 import 'package:staff_work_track/screen/admin/Navigation/my%20work/Task%20status%20tab/pendingtask.dart';
@@ -20,7 +21,9 @@ class _MyworkState extends State<Mywork> {
   bool isLoading = true;
   bool isSearching = false;
   final TextEditingController searchController = TextEditingController();
-
+  String? _topMessage;
+  bool _isErrorMessage = true;
+  bool _showTopMessage = false;
   @override
   void initState() {
     super.initState();
@@ -55,107 +58,145 @@ class _MyworkState extends State<Mywork> {
     return int.parse(decodedToken['UserId'].toString());
   }
 
+  void showTopMessage(String message, {bool isError = true}) {
+    setState(() {
+      _topMessage = message;
+      _isErrorMessage = isError;
+      _showTopMessage = true;
+    });
+
+    Future.delayed(const Duration(seconds: 3), () {
+      if (!mounted) return;
+      setState(() => _showTopMessage = false);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     if (isLoading || adminId == null) {
       return const Center(child: RotatingFlower());
     }
+
     return DefaultTabController(
       length: 4,
-      child: Column(
+      child: Stack(
         children: [
-          SizedBox(height: 50),
-          TabBar(
-            indicatorSize: TabBarIndicatorSize.tab,
-            indicatorPadding: const EdgeInsets.all(10),
-            indicator: BoxDecoration(
-              color: Theme.of(context).colorScheme.secondary,
-              borderRadius: BorderRadius.circular(30),
-            ),
-            labelColor: Theme.of(context).colorScheme.onPrimary,
-            unselectedLabelColor: Theme.of(context).colorScheme.secondary,
-            labelStyle: Theme.of(context).textTheme.headlineMedium,
-            tabs: const [
-              Tab(text: 'ALL'),
-              Tab(text: 'Pending/Pause'),
-              Tab(text: 'In Process'),
-              Tab(text: 'Completed'),
-            ],
-          ),
+          Column(
+            children: [
+              const SizedBox(height: 50),
 
-          Expanded(
-            child: TabBarView(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.only(left: 15,right: 15,top: 10),
-                  child: Column(
-                    children: [
-                      // Top Row: Search + Add Task
-                      Row(
+              TabBar(
+                indicatorSize: TabBarIndicatorSize.tab,
+                indicatorPadding: const EdgeInsets.all(10),
+                indicator: BoxDecoration(
+                  color: Theme.of(context).colorScheme.secondary,
+                  borderRadius: BorderRadius.circular(30),
+                ),
+                labelColor: Theme.of(context).colorScheme.onPrimary,
+                unselectedLabelColor: Theme.of(context).colorScheme.secondary,
+                labelStyle: Theme.of(context).textTheme.headlineMedium,
+                tabs: const [
+                  Tab(text: 'ALL'),
+                  Tab(text: 'Pending/Pause'),
+                  Tab(text: 'In Process'),
+                  Tab(text: 'Completed'),
+                ],
+              ),
+
+              Expanded(
+                child: TabBarView(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.all(15),
+                      child: Column(
                         children: [
-                          Expanded(
-                            child: isSearching
-                                ? TextField(
-                                    controller: searchController,
-                                    decoration: InputDecoration(
-                                      hintText: "Search Goal",
-                                      border: InputBorder.none,
+                          Row(
+                            children: [
+                              Expanded(
+                                child: isSearching
+                                    ? TextField(
+                                        controller: searchController,
+                                        decoration: const InputDecoration(
+                                          hintText: "Search Goal",
+                                          border: InputBorder.none,
+                                        ),
+                                        onChanged: (_) => setState(() {}),
+                                      )
+                                    : Text(
+                                        "My Goals",
+                                        style: Theme.of(
+                                          context,
+                                        ).textTheme.displaySmall,
+                                      ),
+                              ),
+                              IconButton(
+                                icon: Icon(
+                                  isSearching ? Icons.close : Icons.search,
+                                ),
+                                onPressed: () {
+                                  setState(() {
+                                    isSearching = !isSearching;
+                                    searchController.clear();
+                                  });
+                                },
+                              ),
+                              GestureDetector(
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          Createtask(assignedToIds: [adminId!]),
                                     ),
-                                    onChanged: (_) => setState(() {}),
-                                  )
-                                : Text(
-                                    "My Goals",
+                                  );
+                                },
+                                child: Chip(
+                                  backgroundColor: Theme.of(
+                                    context,
+                                  ).colorScheme.secondary,
+                                  label: Text(
+                                    "Add Goal/Task",
                                     style: Theme.of(
                                       context,
-                                    ).textTheme.displaySmall,
+                                    ).textTheme.titleMedium,
                                   ),
-                          ),
-                          IconButton(
-                            icon: Icon(
-                              isSearching ? Icons.close : Icons.search,
-                            ),
-                            onPressed: () {
-                              setState(() {
-                                isSearching = !isSearching;
-                                searchController.clear();
-                              });
-                            },
-                          ),
-                          GestureDetector(
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) =>
-                                      Createtask(assignedToIds: [adminId!]),
                                 ),
-                              );
-                            },
-                            child: Chip(
-                              backgroundColor: Theme.of(
-                                context,
-                              ).colorScheme.secondary,
-                              label: Text(
-                                "Add Goal/Task",
-                                style: Theme.of(context).textTheme.titleMedium,
                               ),
+                            ],
+                          ),
+                          Expanded(
+                            child: Allgoals(
+                              searchQuery: searchController.text,
+                              onDelete: (msg, isError) {
+                                showTopMessage(msg, isError: isError);
+                              },
                             ),
                           ),
                         ],
                       ),
-                      Expanded(
-                        child: Allgoals(searchQuery: searchController.text),
-                      ),
-                    ],
-                  ),
+                    ),
+                    PendingTab(adminId: adminId!),
+                    InProcessTab(adminId: adminId!),
+                    CompletedTab(adminId: adminId!),
+                  ],
                 ),
-
-                PendingTab(adminId: adminId!),
-                InProcessTab(adminId: adminId!),
-                CompletedTab(adminId: adminId!),
-              ],
-            ),
+              ),
+            ],
           ),
+
+          /// ✅ GLOBAL TOP MESSAGE (FIXED)
+          if (_topMessage != null)
+            AnimatedPositioned(
+              duration: const Duration(milliseconds: 300),
+              top: _showTopMessage ? 40 : -120,
+              left: 16,
+              right: 16,
+              child: Msgsnackbar(
+                context,
+                message: _topMessage!,
+                isError: _isErrorMessage,
+              ),
+            ),
         ],
       ),
     );

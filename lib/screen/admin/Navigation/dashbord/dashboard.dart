@@ -1,17 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:staff_work_track/Models/warning_model.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
+import 'package:staff_work_track/screen/admin/Navigation/dashbord/deptwarnings.dart';
 import 'package:staff_work_track/screen/admin/Navigation/dashbord/drawer/5spoints.dart';
-import 'package:staff_work_track/screen/admin/Navigation/dashbord/drawer/anouncement.dart';
-import 'package:staff_work_track/screen/admin/Navigation/dashbord/drawer/auditlog.dart';
+import 'package:staff_work_track/screen/admin/Navigation/dashbord/drawer/staffleaves.dart';
 import 'package:staff_work_track/screen/admin/Navigation/dashbord/drawer/staffworklog.dart';
 import 'package:staff_work_track/screen/admin/Navigation/dashbord/drawer/task%20points/emptaskreview.dart';
 import 'package:staff_work_track/screen/admin/Navigation/dashbord/drawer/warrentypoints.dart';
 import 'package:staff_work_track/screen/staff/navigation/dashboard/dashboard.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/Reports/reports_table.dart';
+import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/drawer/anouncement.dart';
+import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/drawer/auditlog.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/notifi.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/settings/settings.dart';
-import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/warnings/warning.dart';
 import 'package:staff_work_track/services/announ_service.dart';
 import 'package:staff_work_track/services/notification_service.dart';
 import 'package:staff_work_track/services/reports_service.dart';
@@ -47,7 +48,7 @@ class _AdminState extends State<AdminDashboard> {
   List<Map<String, dynamic>> overdueGoalList = [];
   bool showSwitch = false;
   bool isManagerView = true;
-  
+
   @override
   void initState() {
     super.initState();
@@ -59,7 +60,7 @@ class _AdminState extends State<AdminDashboard> {
 
   void _fetchWarnings() async {
     try {
-      final warnings = await AnnouncementService.getWarnings();
+      final warnings = await AnnouncementService.getDepartmentWarnings();
       if (!mounted) return;
       setState(() {
         apiWarnings = warnings;
@@ -148,7 +149,7 @@ class _AdminState extends State<AdminDashboard> {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) => Warning(
+                              builder: (_) => DeptWarning(
                                 overdueTasks: overdueTaskList,
                                 overdueGoals: overdueGoalList,
                               ),
@@ -254,6 +255,19 @@ class _AdminState extends State<AdminDashboard> {
                     return Center(child: Text("Error: ${snapshot.error}"));
                   }
                   final data = snapshot.data!;
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    setState(() {
+                      overdueTaskList = List<Map<String, dynamic>>.from(
+                        data["overdueTasksList"] ?? [],
+                      );
+                      overdueGoalList = List<Map<String, dynamic>>.from(
+                        data["overdueGoalsList"] ?? [],
+                      );
+
+                      overdueTaskCount = overdueTaskList.length;
+                      overdueGoalCount = overdueGoalList.length;
+                    });
+                  });
                   final monthlyData =
                       (this.data?["monthlyData"] as List? ?? []);
                   return SingleChildScrollView(
@@ -464,7 +478,7 @@ class _AdminState extends State<AdminDashboard> {
           alignment: Alignment.center,
           child: Text(
             "Switch to My Dashboard",
-           style: Theme.of(context).textTheme.labelLarge,
+            style: Theme.of(context).textTheme.labelLarge,
           ),
         ),
       ),
@@ -742,12 +756,12 @@ class _AdminState extends State<AdminDashboard> {
           _buildDrawerItem(
             context,
             icon: Icons.message,
-            title: "Anouncements",
+            title: "Anouncements", 
             onTap: () {
               Navigator.pop(context);
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => ManagerAnounce()),
+                MaterialPageRoute(builder: (_) => Anounce()),
               );
             },
           ),
@@ -760,6 +774,18 @@ class _AdminState extends State<AdminDashboard> {
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => Staffworklog()),
+              );
+            },
+          ),
+          _buildDrawerItem(
+            context,
+            icon: Icons.align_horizontal_right_rounded,
+            title: "Leave Request",
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => StaffLeaves()),
               );
             },
           ),
