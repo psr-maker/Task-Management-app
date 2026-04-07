@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:staff_work_track/screen/authen/login_selection.dart';
 import 'package:staff_work_track/utils/jwt_helper.dart';
 import 'package:staff_work_track/screen/admin/admin.dart';
 import 'package:staff_work_track/screen/staff/staff.dart';
@@ -23,7 +24,7 @@ class _OtpverifyState extends State<Otpverify> {
   );
   final List<FocusNode> _focusNodes = List.generate(6, (_) => FocusNode());
   String get _enteredOtp => _otpcontrollers.map((c) => c.text).join();
-  int _secondsLeft = 60;
+  int _secondsLeft = 600;
   int _otpAttempts = 0;
   Timer? _timer;
   bool _canResend = false;
@@ -62,12 +63,12 @@ class _OtpverifyState extends State<Otpverify> {
 
   void _startOtpTimer() {
     _timer?.cancel();
-    _secondsLeft = 60;
+    _secondsLeft = 600;
     _canResend = false;
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (_secondsLeft == 0) {
         timer.cancel();
-        setState(() => _canResend = true);
+        setState(() => _canResend = true); // enable resend
       } else {
         setState(() => _secondsLeft--);
       }
@@ -80,16 +81,15 @@ class _OtpverifyState extends State<Otpverify> {
       _isErrorMessage = isError;
       _showTopMessage = true;
     });
+
     Future.delayed(const Duration(seconds: 3), () {
       if (!mounted) return;
-      setState(() {
-        _showTopMessage = false;
-      });
+      setState(() => _showTopMessage = false);
     });
   }
 
   Future<void> _verifyOtp() async {
-    final otp = _enteredOtp;
+    final otp = _enteredOtp.trim();
     if (otp.length != 6) {
       showTopMessage("Please enter 6-digit OTP", isError: true);
       return;
@@ -123,7 +123,7 @@ class _OtpverifyState extends State<Otpverify> {
       } else if (error.contains("Maximum OTP attempts")) {
         showTopMessage("Maximum OTP attempts reached", isError: true);
       } else {
-        showTopMessage("OTP verification failed", isError: true);
+        showTopMessage("OTP verification failedddddddddddddd", isError: true);
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -167,6 +167,13 @@ class _OtpverifyState extends State<Otpverify> {
     );
   }
 
+  String get formattedTime {
+    final secondsLeft = _secondsLeft - 1; // subtract 1 for accurate display
+    final minutes = (secondsLeft ~/ 60).clamp(0, 59).toString().padLeft(2, '0');
+    final seconds = (secondsLeft % 60).clamp(0, 59).toString().padLeft(2, '0');
+    return "$minutes:$seconds";
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -174,7 +181,10 @@ class _OtpverifyState extends State<Otpverify> {
       appBar: AppBar(
         backgroundColor: const Color.fromARGB(255, 50, 99, 49),
         leading: IconButton(
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const LoginSelection()),
+          ),
           icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
         ),
       ),
@@ -296,7 +306,7 @@ class _OtpverifyState extends State<Otpverify> {
                             children: [
                               const TextSpan(text: "OTP expires in : "),
                               TextSpan(
-                                text: "$_secondsLeft seconds",
+                                text: formattedTime,
                                 style: const TextStyle(
                                   fontWeight: FontWeight.bold,
                                   color: Colors.white,

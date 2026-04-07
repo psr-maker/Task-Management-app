@@ -33,46 +33,47 @@ class _LoginSelectionState extends State<LoginSelection> {
   String? emailRoleMessage;
   bool isCheckingRole = false;
 
-  Future<void> _sendOtp() async {
-    if (emailController.text.trim().isEmpty) {
-      _showMessage("Please enter email", isError: true);
-      return;
-    }
+ Future<void> _sendOtp() async {
+  if (_isLoading) return; // ✅ HARD BLOCK
 
-    setState(() => _isLoading = true);
-
-    try {
-      await authService.sendOtp(emailController.text.trim());
-
-      setState(() => _isLoading = false);
-
-      _showMessage(
-        "OTP sent to ${emailController.text.trim()}",
-        isError: false,
-      );
-      await Future.delayed(const Duration(seconds: 3));
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (context) => Otpverify(email: emailController.text.trim()),
-        ),
-      );
-    } catch (e) {
-      setState(() => _isLoading = false);
-
-      final errorMsg = e.toString().replaceAll("Exception:", "").trim();
-
-      if (errorMsg.toLowerCase().contains("User not found or inactive") ||
-          errorMsg.toLowerCase().contains("inactive")) {
-        await showPendingAlert(
-          context,
-          "Please waiting for Director Approvel",
-        );
-      } else {
-        _showMessage(errorMsg, isError: true);
-      }
-    }
+  if (emailController.text.trim().isEmpty) {
+    _showMessage("Please enter email", isError: true);
+    return;
   }
+
+  setState(() => _isLoading = true);
+
+  try {
+    await authService.sendOtp(emailController.text.trim());
+
+    _showMessage(
+      "OTP sent to ${emailController.text.trim()}",
+      isError: false,
+    );
+
+    // ✅ DO NOT reset loading before navigation
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (_) => Otpverify(email: emailController.text.trim()),
+      ),
+    );
+
+  } catch (e) {
+    final errorMsg = e.toString().replaceAll("Exception:", "").trim();
+
+    if (errorMsg.toLowerCase().contains("inactive")) {
+      await showPendingAlert(
+        context,
+        "Please waiting for Director Approvel",
+      );
+    } else {
+      _showMessage(errorMsg, isError: true);
+    }
+
+    setState(() => _isLoading = false); // ✅ only reset on error
+  }
+}
 
   void _showMessage(String message, {bool isError = true}) {
     setState(() {

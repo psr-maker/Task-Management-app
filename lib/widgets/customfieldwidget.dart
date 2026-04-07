@@ -98,9 +98,8 @@ class CustomFormWidgets {
             hint,
             style: Theme.of(
               context,
-            ).textTheme.headlineSmall?.copyWith(color: Colors.grey),
+            ).textTheme.headlineSmall,
           ),
-          dropdownColor: Colors.white,
           isExpanded: true,
           style: Theme.of(context).textTheme.headlineSmall,
           items: items

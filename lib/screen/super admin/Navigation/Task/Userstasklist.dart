@@ -134,6 +134,7 @@ class _TaskListPageState extends State<UsersTasklist> {
                           filter: filter,
                           onDelete: (msg, isError) {
                             showTopMessage(msg, isError: isError);
+                            _fetchDepartments();
                           },
                         ),
                       ),

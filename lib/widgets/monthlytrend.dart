@@ -984,11 +984,7 @@ class _AlldeptproducticityState extends State<Alldeptproducticity> {
       padding: const EdgeInsets.all(12),
       child: Text(
         text,
-        style: TextStyle(
-          color: color ?? Colors.black,
-          fontWeight: FontWeight.w600,
-          fontSize: 13,
-        ),
+        style: Theme.of(context).textTheme.labelMedium,
       ),
     );
   }

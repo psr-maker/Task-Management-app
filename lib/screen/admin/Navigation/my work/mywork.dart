@@ -141,14 +141,17 @@ class _MyworkState extends State<Mywork> {
                                 },
                               ),
                               GestureDetector(
-                                onTap: () {
-                                  Navigator.push(
+                                onTap: () async {
+                                  final result = await Navigator.push(
                                     context,
                                     MaterialPageRoute(
                                       builder: (_) =>
                                           Createtask(assignedToIds: [adminId!]),
                                     ),
                                   );
+                                  if (result == true) {
+                                    setState(() {});
+                                  }
                                 },
                                 child: Chip(
                                   backgroundColor: Theme.of(

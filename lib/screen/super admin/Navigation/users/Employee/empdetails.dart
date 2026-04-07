@@ -236,7 +236,9 @@ class _EmployeeDetailState extends State<EmployeeDetail> {
                   ),
                 );
 
-                if (result == true) setState(() {});
+                if (result == true) {
+                  loadEmployeeGoals();
+                }
               }
 
               if (value == 'delete' && canEditDelete) {
@@ -412,8 +414,8 @@ class _EmployeeDetailState extends State<EmployeeDetail> {
                       style: Theme.of(context).textTheme.headlineLarge,
                     ),
                     GestureDetector(
-                      onTap: () {
-                        Navigator.push(
+                      onTap: () async {
+                        final result = await Navigator.push(
                           context,
                           MaterialPageRoute(
                             builder: (_) => Createtask(
@@ -421,6 +423,9 @@ class _EmployeeDetailState extends State<EmployeeDetail> {
                             ),
                           ),
                         );
+                        if (result == true) {
+                          loadEmployeeGoals();
+                        }
                       },
                       child: Chip(
                         backgroundColor: Theme.of(context).primaryColor,

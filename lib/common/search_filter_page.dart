@@ -23,7 +23,7 @@ class TaskFilterDropdown extends StatelessWidget {
   Widget build(BuildContext context) {
     return Material(
       elevation: 6,
-      color: Colors.white,
+      color: Theme.of(context).colorScheme.primary,
       child: Padding(
         padding: const EdgeInsets.all(14),
         child: Column(
@@ -31,23 +31,23 @@ class TaskFilterDropdown extends StatelessWidget {
             _statusDropdown(context),
             _priorityDropdown(context),
             _departmentDropdown(context),
-          //  _assignedDropdown(context),
 
+            //  _assignedDropdown(context),
             const SizedBox(height: 14),
             Row(
               children: [
                 AppButton(
                   text: 'Clear',
                   onPressed: onClear,
-                  color: const Color.fromARGB(255, 25, 77, 38),
-                  txtcolor: Colors.white,
+                  color: Theme.of(context).colorScheme.secondary,
+                  txtcolor: Theme.of(context).colorScheme.onPrimary,
                 ),
                 const Spacer(),
                 AppButton(
                   text: 'Apply',
                   onPressed: onApply,
-                  color: const Color.fromARGB(255, 25, 77, 38),
-                  txtcolor: Colors.white,
+                  color: Theme.of(context).colorScheme.secondary,
+                  txtcolor: Theme.of(context).colorScheme.onPrimary,
                 ),
               ],
             ),
@@ -56,144 +56,134 @@ class TaskFilterDropdown extends StatelessWidget {
       ),
     );
   }
+
   // ... keep _statusDropdown, _priorityDropdown, _normalDropdown methods
-Widget _departmentDropdown(BuildContext context) {
-  return _styledDropdown(
-    label: "Department",
-    value: filter.department,
-    items: departments,
-    onChanged: (v) => filter.department = v,
-    itemBuilder: (e) => Text(
-      e,
-      style: Theme.of(context).textTheme.headlineSmall
-    ),
-  );
-}
+  Widget _departmentDropdown(BuildContext context) {
+    return _styledDropdown(
+      label: "Department",
+      value: filter.department,
+      items: departments,
+      onChanged: (v) => filter.department = v,
+      itemBuilder: (e) =>
+          Text(e, style: Theme.of(context).textTheme.headlineSmall),
+    );
+  }
 
   // ---------------- STATUS ----------------
-Widget _statusDropdown(BuildContext context) {
-  return _styledDropdown(
-    label: "Status",
-    value: filter.status,
-    items: droptaskutils.getAllStatuses(),
-    onChanged: (v) => filter.status = v,
-    itemBuilder: (e) => _statusChip(context, e),
-    selectedBuilder: (e) => _statusChip(context, e),
-  );
-}
+  Widget _statusDropdown(BuildContext context) {
+    return _styledDropdown(
+      label: "Status",
+      value: filter.status,
+      items: droptaskutils.getAllStatuses(),
+      onChanged: (v) => filter.status = v,
+      itemBuilder: (e) => _statusChip(context, e),
+      selectedBuilder: (e) => _statusChip(context, e),
+    );
+  }
 
-Widget _statusChip(BuildContext context, String e) {
-  final statusEnum = TaskUtils.parseStatus(e);
-  final color = TaskUtils.getStatusColor(statusEnum);
+  Widget _statusChip(BuildContext context, String e) {
+    final statusEnum = TaskUtils.parseStatus(e);
+    final color = TaskUtils.getStatusColor(statusEnum);
 
-  return Container(
-    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-    decoration: BoxDecoration(
-      color: color.withOpacity(0.15),
-      borderRadius: BorderRadius.circular(20),
-      border: Border.all(color: color.withOpacity(0.4)),
-    ),
-    child: Text(
-      droptaskutils.getStatusDisplayName(e),
-      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            color: color,
-            fontWeight: FontWeight.w600,
-          ),
-    ),
-  );
-}
-  // ---------------- PRIORITY ----------------
-
-Widget _priorityDropdown(BuildContext context) {
-  return _styledDropdown(
-    label: "Priority",
-    value: filter.priority,
-    items: droptaskutils.getAllPriorities(),
-    onChanged: (v) => filter.priority = v,
-    itemBuilder: (e) => _priorityChip(context, e),
-    selectedBuilder: (e) => _priorityChip(context, e),
-  );
-}
-
-Widget _priorityChip(BuildContext context, String e) {
-
-  final color = TaskUtils.getPriorityColor(e);
-
-  return Container(
-    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-    decoration: BoxDecoration(
-      color: color.withOpacity(0.15),
-      borderRadius: BorderRadius.circular(20),
-      border: Border.all(color: color.withOpacity(0.4)),
-    ),
-    child: Text(
-      droptaskutils.getPriorityDisplayName(e),
-      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            color: color,
-            fontWeight: FontWeight.w600,
-          ),
-    ),
-  );
-}
-
-  // ---------------- COLORED DROPDOWN ----------------
-Widget _styledDropdown({
-  required String label,
-  required String? value,
-  required List<String> items,
-  required ValueChanged<String?> onChanged,
-  required Widget Function(String) itemBuilder,
-  Widget Function(String)? selectedBuilder,
-}) {
-  return Padding(
-    padding: const EdgeInsets.only(bottom: 14),
-    child: DropdownButtonFormField<String?>(
-      value: value,
-      decoration: InputDecoration(
-        labelText: label,
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 14,
-          vertical: 14,   // 🔥 Medium height
-        ),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: Colors.grey.shade400),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(
-            color: Color.fromARGB(255, 25, 77, 38),
-            width: 1.4,
-          ),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withOpacity(0.4)),
+      ),
+      child: Text(
+        droptaskutils.getStatusDisplayName(e),
+        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+          color: color,
+          fontWeight: FontWeight.w600,
         ),
       ),
-      isExpanded: true,
-      items: [
-        const DropdownMenuItem(
-          value: null,
-          child: Text(
-            "All",
-            style: TextStyle(fontWeight: FontWeight.w500, color: Color.fromARGB(255, 25, 77, 38),),
+    );
+  }
+  // ---------------- PRIORITY ----------------
+
+  Widget _priorityDropdown(BuildContext context) {
+    return _styledDropdown(
+      label: "Priority",
+      value: filter.priority,
+      items: droptaskutils.getAllPriorities(),
+      onChanged: (v) => filter.priority = v,
+      itemBuilder: (e) => _priorityChip(context, e),
+      selectedBuilder: (e) => _priorityChip(context, e),
+    );
+  }
+
+  Widget _priorityChip(BuildContext context, String e) {
+    final color = TaskUtils.getPriorityColor(e);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withOpacity(0.4)),
+      ),
+      child: Text(
+        droptaskutils.getPriorityDisplayName(e),
+        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+          color: color,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+
+  // ---------------- COLORED DROPDOWN ----------------
+  Widget _styledDropdown({
+    required String label,
+    required String? value,
+    required List<String> items,
+    required ValueChanged<String?> onChanged,
+    required Widget Function(String) itemBuilder,
+    Widget Function(String)? selectedBuilder,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: DropdownButtonFormField<String?>(
+        value: value,
+        decoration: InputDecoration(
+          labelText: label,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 14,
+            vertical: 14, // 🔥 Medium height
+          ),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: BorderSide(color: Colors.grey.shade400),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: const BorderSide(
+              color: Color.fromARGB(255, 25, 77, 38),
+              width: 1.4,
+            ),
           ),
         ),
-        ...items.map(
-          (e) => DropdownMenuItem(
-            value: e,
-            child: itemBuilder(e),
+        isExpanded: true,
+        items: [
+          const DropdownMenuItem(
+            value: null,
+            child: Text("All", style: TextStyle(fontWeight: FontWeight.w500)),
           ),
-        ),
-      ],
-      selectedItemBuilder: selectedBuilder != null
-          ? (context) => [
+          ...items.map(
+            (e) => DropdownMenuItem(value: e, child: itemBuilder(e)),
+          ),
+        ],
+        selectedItemBuilder: selectedBuilder != null
+            ? (context) => [
                 const Text("All"),
                 ...items.map((e) => selectedBuilder(e)),
               ]
-          : null,
-      onChanged: onChanged,
-    ),
-  );
-}
+            : null,
+        onChanged: onChanged,
+      ),
+    );
+  }
 }

@@ -185,7 +185,7 @@ class _EmployeeListState extends State<EmployeeList> {
                     final emp = filteredEmployees[index];
                     final isSelected = selectedEmpIds.contains(emp.userId);
                     return Card(
-                      color:  Theme.of(context).colorScheme.background,
+                      color: Theme.of(context).colorScheme.background,
                       elevation: 2,
                       margin: EdgeInsets.only(bottom: 10),
                       shape: RoundedRectangleBorder(
@@ -196,16 +196,20 @@ class _EmployeeListState extends State<EmployeeList> {
                         leading: isSelectionMode
                             ? Checkbox(
                                 value: isSelected,
-                                activeColor:  Theme.of(context).colorScheme.secondary,
+                                activeColor: Theme.of(
+                                  context,
+                                ).colorScheme.secondary,
                                 onChanged: (_) => _toggleSelection(emp.userId),
                               )
                             : CircleAvatar(
-                                backgroundColor: Theme.of(context).colorScheme.secondary,
+                                backgroundColor: Theme.of(
+                                  context,
+                                ).colorScheme.secondary,
                                 child: Text(
                                   emp.name.isNotEmpty
                                       ? emp.name[0].toUpperCase()
                                       : "?",
-                                   style: Theme.of(context).textTheme.labelLarge,
+                                  style: Theme.of(context).textTheme.labelLarge,
                                 ),
                               ),
                         title: Text(
@@ -219,16 +223,24 @@ class _EmployeeListState extends State<EmployeeList> {
                         trailing: isSelectionMode
                             ? null
                             : Icon(Icons.arrow_forward_ios),
-                        onTap: () {
+                        onTap: () async {
                           if (isSelectionMode) {
                             _toggleSelection(emp.userId);
                           } else {
-                            Navigator.push(
+                            final result = await Navigator.push(
                               context,
                               MaterialPageRoute(
                                 builder: (_) => EmployeeDetail(employee: emp),
                               ),
                             );
+                            if (result == true) {
+                              setState(() {
+                                employeesFuture =
+                                    AdminService.getEmployeesByDepartment(
+                                      widget.department,
+                                    );
+                              });
+                            }
                           }
                         },
                       ),

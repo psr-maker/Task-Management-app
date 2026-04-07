@@ -119,7 +119,9 @@ class _EmployeetabState extends State<Employeetab> {
                       },
                       child: Chip(
                         label: Text(
-                          selectedempIds.isNotEmpty ? "Add Goal/Task" : "Staff +",
+                          selectedempIds.isNotEmpty
+                              ? "Add Goal/Task"
+                              : "Staff +",
                           style: Theme.of(context).textTheme.titleMedium,
                         ),
                       ),
@@ -253,21 +255,21 @@ class _EmployeetabState extends State<Employeetab> {
                                       ),
 
                                       InkWell(
-                                        onTap: () {
-                                          Navigator.push(
+                                        onTap: () async {
+                                          final result = await Navigator.push(
                                             context,
                                             MaterialPageRoute(
                                               builder: (context) =>
                                                   EmployeeDetail(employee: emp),
                                             ),
                                           );
+                                          if (result == true) {
+                                            employees();
+                                          }
                                         },
                                         child: const Padding(
                                           padding: EdgeInsets.all(8.0),
-                                          child: Icon(
-                                            Icons.arrow_forward_ios,
-                                         
-                                          ),
+                                          child: Icon(Icons.arrow_forward_ios),
                                         ),
                                       ),
                                     ],

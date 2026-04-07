@@ -61,8 +61,8 @@ class ThemeProvider extends ChangeNotifier {
         error: Colors.red,
       ),
 
-      splashColor: Colors.white.withOpacity(0.3),
-      highlightColor: Colors.white.withOpacity(0.1),
+      splashColor: Colors.white,
+      highlightColor: Colors.white,
 
       // CARD THEME
       cardTheme: CardThemeData(
@@ -154,52 +154,73 @@ class ThemeProvider extends ChangeNotifier {
           color: Colors.black,
         ),
       ),
-
     );
   }
 
   ThemeData get darkTheme {
     const deepGreen = Color.fromARGB(255, 25, 77, 38);
-    const darkBackground = const Color.fromARGB(255, 6, 33, 4);
+    const darkBg = Color(0xFF0B1F14);
 
     return ThemeData(
       brightness: Brightness.dark,
       useMaterial3: true,
-      scaffoldBackgroundColor: darkBackground,
 
-      appBarTheme: AppBarTheme(
-        backgroundColor: Color.fromARGB(255, 30, 45, 38),
+      scaffoldBackgroundColor: darkBg,
+
+      // COLOR SCHEME
+      colorScheme: const ColorScheme.dark(
+        primary: deepGreen,
+        secondary: Color(0xFF4CAF50),
+        surface: Color(0xFF132A1B),
+        background: darkBg,
+        onPrimary: Colors.white,
+        onSecondary: Colors.white,
+        onSurface: Colors.white,
+        onBackground: Colors.white,
+        error: Colors.redAccent,
+      ),
+
+      primaryColor: deepGreen,
+
+      // APPBAR
+      appBarTheme: const AppBarTheme(
+        backgroundColor: Color(0xFF132A1B),
         foregroundColor: Colors.white,
         elevation: 0,
-        titleTextStyle: const TextStyle(
+        iconTheme: IconThemeData(color: Colors.white, size: 20),
+        titleTextStyle: TextStyle(
           color: Colors.white,
           fontSize: 18,
           fontWeight: FontWeight.bold,
         ),
-        iconTheme: IconThemeData(color: Colors.white, size: 20),
       ),
+
+      // ICON
       iconTheme: const IconThemeData(color: Colors.white, size: 18),
-      primaryColor: deepGreen,
-      colorScheme: const ColorScheme.dark(
-        primary: Colors.white,
-        onPrimary: Color.fromARGB(255, 68, 99, 80),
-        secondary: Color.fromARGB(255, 97, 124, 95),
-        tertiary: Colors.white54,
-        background: Color.fromARGB(255, 134, 170, 136),
-        error: Colors.red,
+
+      // CARD
+      cardTheme: CardThemeData(
+        color: const Color(0xFF132A1B),
+        elevation: 2,
+        margin: const EdgeInsets.symmetric(vertical: 6),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       ),
-      splashColor: deepGreen.withOpacity(0.3),
+
+      // CHIP
+      chipTheme: const ChipThemeData(
+        backgroundColor: Color(0xFF1E3A2F),
+        selectedColor: deepGreen,
+        disabledColor: Colors.grey,
+        labelStyle: TextStyle(color: Colors.white),
+        secondaryLabelStyle: TextStyle(color: Colors.white70),
+        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        brightness: Brightness.dark,
+      ),
+
+      splashColor: deepGreen.withOpacity(0.2),
       highlightColor: deepGreen.withOpacity(0.1),
 
-      cardTheme: const CardThemeData(
-        color: Color.fromARGB(255, 15, 35, 20), // dark card background
-        elevation: 2,
-        margin: EdgeInsets.symmetric(vertical: 8, horizontal: 0),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.all(Radius.circular(14)),
-        ),
-      ),
-
+      // TEXT THEME (FIXED CONTRAST)
       textTheme: const TextTheme(
         displayLarge: TextStyle(
           fontSize: 22,
@@ -216,6 +237,7 @@ class ThemeProvider extends ChangeNotifier {
           fontWeight: FontWeight.bold,
           color: Colors.white,
         ),
+
         headlineLarge: TextStyle(
           fontSize: 15,
           fontWeight: FontWeight.bold,
@@ -231,6 +253,7 @@ class ThemeProvider extends ChangeNotifier {
           fontWeight: FontWeight.w600,
           color: Colors.white,
         ),
+
         titleLarge: TextStyle(
           fontSize: 12,
           fontWeight: FontWeight.bold,
@@ -239,38 +262,28 @@ class ThemeProvider extends ChangeNotifier {
         titleMedium: TextStyle(
           fontSize: 10,
           fontWeight: FontWeight.w600,
-          color: deepGreen,
+          color: Colors.white,
         ),
 
-        bodySmall: TextStyle(
-          fontSize: 18,
-          fontWeight: FontWeight.bold,
-          color: deepGreen,
-        ),
+        bodyLarge: TextStyle(fontSize: 16, color: Colors.white),
+        bodyMedium: TextStyle(fontSize: 14, color: Colors.white),
+        bodySmall: TextStyle(fontSize: 12, color: Colors.white70),
+
         labelLarge: TextStyle(
           fontSize: 15,
           fontWeight: FontWeight.w700,
-          color: deepGreen
+          color: Colors.white,
         ),
         labelMedium: TextStyle(
           fontSize: 14,
           fontWeight: FontWeight.w600,
-          color: Colors.white,
+          color: Colors.white70,
         ),
         labelSmall: TextStyle(
           fontSize: 10,
           fontWeight: FontWeight.w600,
-          color: Colors.white,
+          color: Colors.white60,
         ),
-      ),
-      chipTheme: const ChipThemeData(
-        backgroundColor: Color.fromARGB(255, 50, 70, 60),
-        selectedColor: deepGreen,
-        disabledColor: Colors.grey,
-        labelStyle: TextStyle(color: Colors.white),
-        secondaryLabelStyle: TextStyle(color: Colors.white70),
-        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        brightness: Brightness.dark,
       ),
     );
   }

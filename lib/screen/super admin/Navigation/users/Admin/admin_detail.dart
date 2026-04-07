@@ -380,14 +380,21 @@ class _AdmindetailsState extends State<Admindetails> {
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
                         GestureDetector(
-                          onTap: () {
-                            Navigator.push(
+                          onTap: () async {
+                            final result = await Navigator.push(
                               context,
                               MaterialPageRoute(
                                 builder: (_) =>
                                     Createtask(assignedToIds: [admin.userId]),
                               ),
                             );
+                            if (result == true) {
+                              setState(() {
+                                adminFuture = SuperAdminService.getAdminDetails(
+                                  widget.adminId,
+                                );
+                              });
+                            }
                           },
                           child: Chip(
                             backgroundColor: Theme.of(context).primaryColor,
