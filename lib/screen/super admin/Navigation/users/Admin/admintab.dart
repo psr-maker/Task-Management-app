@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:staff_work_track/Models/getusers.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/users/Admin/admin_detail.dart';
-import 'package:staff_work_track/screen/super%20admin/Navigation/Task/create_task.dart';
+import 'package:staff_work_track/screen/super%20admin/Navigation/Task/goalntask_create.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/users/user_create.dart';
 import 'package:staff_work_track/services/superadmin_service.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';

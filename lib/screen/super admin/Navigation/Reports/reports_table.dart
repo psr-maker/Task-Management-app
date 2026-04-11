@@ -16,11 +16,10 @@ class ReportsTable extends StatefulWidget {
 }
 
 class _DeadlineReportsTabState extends State<ReportsTable> {
-  final ReportsService _service = ReportsService();
   String selectedType = "Goals";
   bool _isLoading = false;
   List<dynamic> allTasks = [];
-  List<dynamic> filteredTasks = [];
+  List<dynamic> filteredTasks = []; 
 
   List<dynamic> allGoals = [];
   List<dynamic> filteredGoals = [];
@@ -42,7 +41,7 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
 
   Future<void> fetchTasks() async {
     try {
-      final result = await _service.getFullReport(
+      final result = await ReportsService.getFullReport(
         userId: widget.userId,
         department: widget.department,
       );

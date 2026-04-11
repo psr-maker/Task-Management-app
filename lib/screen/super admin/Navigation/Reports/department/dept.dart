@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
 import 'package:staff_work_track/screen/admin/Navigation/employee/emp_list.dart';
+import 'package:staff_work_track/screen/super%20admin/Navigation/Reports/downpdf.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/Reports/reports_table.dart';
 import 'package:staff_work_track/services/reports_service.dart';
 import 'package:staff_work_track/widgets/StatCard.dart';
@@ -64,6 +65,40 @@ class _DepartmentReportsTabState extends State<DepartmentReportsTab> {
     }
   }
 
+  Future<void> generateAndDownloadPDF() async {
+    Map<String, dynamic> summaryReportData = {};
+    Map<String, dynamic> tableReportData = {};
+
+    try {
+      summaryReportData = await ReportsService.fetchDepartmentReport(
+        widget.department,
+      );
+      tableReportData = await ReportsService.getFullReport(
+        department: widget.department,
+      );
+    } catch (e) {
+      print("Error fetching department reports: $e");
+    }
+
+    final pdfGenerator = EmployeeReportPdfGenerator(
+      department: widget.department,
+      reportYear: selectedYear.year,
+      summaryData: summaryReportData,
+      monthlyData: data?["monthlyData"] ?? [],
+      warnings: [],
+      completionPercentage: (summaryReportData["goalCompletionPercentage"] ?? 0)
+          .toDouble(),
+      onTimePercentage: (summaryReportData["onTimeGoalCompletionPercentage"] ?? 0)
+          .toDouble(),
+      delayedGoalPercent: (summaryReportData["delayedGoalPercentage"] ?? 0).toDouble(),
+      reportData: tableReportData,
+      topPerformer: summaryReportData["topPerformer"],
+      lowPerformer: summaryReportData["lowPerformer"],
+    );
+
+    await pdfGenerator.generateAndDownloadPDF();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -74,6 +109,10 @@ class _DepartmentReportsTabState extends State<DepartmentReportsTab> {
         ),
         title: Text(widget.department),
         actions: [
+          IconButton(
+            onPressed: generateAndDownloadPDF,
+            icon: Icon(Icons.download),
+          ),
           IconButton(
             onPressed: () {
               Navigator.push(
@@ -295,7 +334,7 @@ class _DepartmentReportsTabState extends State<DepartmentReportsTab> {
 
     final showTop = top != null && (top["completedTasks"] ?? 0) > 0;
     // final showLow = low != null && (low["completedTasks"] ?? 0) > 0;
-     final showLow = low != null;
+    final showLow = low != null;
 
     if (!showTop && !showLow) return const SizedBox.shrink();
 
@@ -305,7 +344,7 @@ class _DepartmentReportsTabState extends State<DepartmentReportsTab> {
         const SizedBox(height: 25),
         Text(
           "Performance Metrics",
-          style: Theme.of(context).textTheme.displaySmall, 
+          style: Theme.of(context).textTheme.displaySmall,
         ),
         const SizedBox(height: 10),
 

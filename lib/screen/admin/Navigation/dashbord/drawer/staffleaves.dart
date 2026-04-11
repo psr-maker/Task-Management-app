@@ -14,13 +14,14 @@ class StaffLeaves extends StatefulWidget {
 
 class _StaffLeavesState extends State<StaffLeaves>
     with SingleTickerProviderStateMixin {
-  List allLeaves = [];
-  List filteredLeaves = [];
+  List allItems = [];
+  List filteredItems = [];
   bool isLoading = true;
   bool _isLoading = false;
   String? _topMessage;
   bool _isErrorMessage = true;
   bool _showTopMessage = false;
+  bool showPermissions = false;
 
   late TabController _tabController;
   final tabs = ["All", "Pending", "Approved", "Rejected"];
@@ -30,17 +31,27 @@ class _StaffLeavesState extends State<StaffLeaves>
   void initState() {
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
-    loadLeaves();
+    loadItems();
     _tabController.addListener(() {
-      filterLeaves();
+      if (!showPermissions) filterItems();
     });
   }
 
-  Future<void> loadLeaves() async {
-    final data = await AdminService.getDepartmentLeaves();
+  Future<void> loadItems() async {
     setState(() {
-      allLeaves = data;
-      filteredLeaves = data;
+      isLoading = true;
+      allItems = [];
+      filteredItems = [];
+      expandedItems.clear();
+    });
+
+    final data = showPermissions
+        ? await AdminService.getDepartmentPermissions()
+        : await AdminService.getDepartmentLeaves();
+
+    setState(() {
+      allItems = data;
+      filteredItems = data;
       isLoading = false;
     });
   }
@@ -60,13 +71,13 @@ class _StaffLeavesState extends State<StaffLeaves>
     });
   }
 
-  void filterLeaves() {
+  void filterItems() {
     String selected = tabs[_tabController.index];
     setState(() {
       if (selected == "All") {
-        filteredLeaves = allLeaves;
+        filteredItems = allItems;
       } else {
-        filteredLeaves = allLeaves
+        filteredItems = allItems
             .where(
               (e) =>
                   (e["status"] ?? "").toLowerCase() == selected.toLowerCase(),
@@ -79,12 +90,13 @@ class _StaffLeavesState extends State<StaffLeaves>
   Map<String, List> groupByMonth(List data) {
     Map<String, List> grouped = {};
     for (var item in data) {
-      final date = DateTime.parse(item["fromDate"]);
+      final dateString =
+          item["fromDate"] ?? item["date"] ?? item["submittedDate"];
+      final date = dateString != null
+          ? DateTime.parse(dateString)
+          : DateTime.now();
       final key = DateFormat("MMMM yyyy").format(date);
-      if (!grouped.containsKey(key)) {
-        grouped[key] = [];
-      }
-      grouped[key]!.add(item);
+      grouped.putIfAbsent(key, () => []).add(item);
     }
     return grouped;
   }
@@ -101,51 +113,130 @@ class _StaffLeavesState extends State<StaffLeaves>
   }
 
   static String formatDate(String? date) {
-    if (date == null) return "";
+    if (date == null || date.isEmpty) return "";
     return DateFormat("EEE, dd MMMM").format(DateTime.parse(date));
   }
 
   @override
   Widget build(BuildContext context) {
-    final groupedData = groupByMonth(filteredLeaves);
+    final groupedData = groupByMonth(filteredItems);
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Leaves"),
+        title: Text(showPermissions ? "Permissions" : "Leaves"),
         leading: IconButton(
           onPressed: () => Navigator.pop(context),
           icon: const Icon(Icons.arrow_back_ios),
         ),
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(50),
-          child: TabBar(
-            controller: _tabController,
-            indicator: UnderlineTabIndicator(
-              borderSide: BorderSide(width: 3, color: Colors.white),
-              insets: EdgeInsets.symmetric(horizontal: 20),
-            ),
-            indicatorSize: TabBarIndicatorSize.label,
-            labelColor: Colors.white,
-            unselectedLabelColor: Colors.white70,
-            labelStyle: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-            ),
-
-            tabs: tabs.map((e) => Tab(text: e)).toList(),
+          preferredSize: Size.fromHeight(showPermissions ? 60 : 100),
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 5,
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () {
+                          if (showPermissions) {
+                            setState(() {
+                              showPermissions = false;
+                            });
+                            loadItems();
+                          }
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 5,
+                            horizontal: 10,
+                          ),
+                          decoration: BoxDecoration(
+                            color: showPermissions
+                                ? Colors.transparent
+                                : Colors.white24,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Center(
+                            child: Text(
+                              'Leave',
+                              style: Theme.of(context).textTheme.labelLarge,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () {
+                          if (!showPermissions) {
+                            setState(() {
+                              showPermissions = true;
+                            });
+                            loadItems();
+                          }
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 5,
+                            horizontal: 10,
+                          ),
+                          decoration: BoxDecoration(
+                            color: showPermissions
+                                ? Colors.white24
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Center(
+                            child: Text(
+                              'Permission',
+                              style: Theme.of(context).textTheme.labelLarge,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (!showPermissions)
+                TabBar(
+                  controller: _tabController,
+                  indicator: UnderlineTabIndicator(
+                    borderSide: const BorderSide(width: 3, color: Colors.white),
+                    insets: const EdgeInsets.symmetric(horizontal: 20),
+                  ),
+                  indicatorSize: TabBarIndicatorSize.label,
+                  labelColor: Colors.white,
+                  unselectedLabelColor: Colors.white70,
+                  labelStyle: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  tabs: tabs.map((e) => Tab(text: e)).toList(),
+                ),
+            ],
           ),
         ),
       ),
       body: isLoading
           ? const Center(child: RotatingFlower())
-          : filteredLeaves.isEmpty
-          ? const Center(child: Text("No Leave Found"))
+          : filteredItems.isEmpty
+          ? Center(
+              child: Text(
+                showPermissions ? "No Permission Found" : "No Leave Found",
+              ),
+            )
           : Stack(
               children: [
                 ListView(
                   padding: const EdgeInsets.all(12),
                   children: groupedData.entries.map((entry) {
                     String month = entry.key;
-                    List leaves = entry.value;
+                    List items = entry.value;
 
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -157,10 +248,10 @@ class _StaffLeavesState extends State<StaffLeaves>
                             style: Theme.of(context).textTheme.bodyMedium,
                           ),
                         ),
-                        ...leaves.asMap().entries.map((entry) {
+                        ...items.asMap().entries.map((entry) {
                           int index = entry.key;
-                          var leave = entry.value;
-                          return buildLeaveItem(leave, index);
+                          var item = entry.value;
+                          return buildItem(item, index);
                         }).toList(),
                       ],
                     );
@@ -183,7 +274,8 @@ class _StaffLeavesState extends State<StaffLeaves>
     );
   }
 
-  Widget buildLeaveItem(dynamic e, int index) {
+  Widget buildItem(dynamic e, int index) {
+    final isPermission = showPermissions;
     final status = (e["status"] ?? "").toString().toLowerCase();
     final isExpanded = expandedItems.contains(index);
 
@@ -227,66 +319,80 @@ class _StaffLeavesState extends State<StaffLeaves>
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          e["leaveType"] ?? "",
+                          isPermission
+                              ? formatDate(e["date"] ?? e["fromDate"])
+                              : e["leaveType"] ?? "",
                           style: Theme.of(context).textTheme.labelMedium,
                         ),
                         const SizedBox(height: 5),
                         Text(
-                          formatDate(e["fromDate"]),
+                          isPermission
+                              ? e["totalHours"].toString() + " hours"
+                              : formatDate(e["fromDate"] ?? e["date"]),
                           style: Theme.of(context).textTheme.displaySmall,
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          "Applied on ${AppHelpers.formatDate(e["submittedDate"])}",
-                          style: Theme.of(context).textTheme.labelSmall,
-                        ),
+                        if (!isPermission) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            "Applied on ${AppHelpers.formatDate(e["submittedDate"])}",
+                            style: Theme.of(context).textTheme.labelSmall,
+                          ),
+                        ],
                       ],
                     ),
                   ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 3,
-                    ),
-                    decoration: BoxDecoration(
-                      color: statusColor(status).withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      status.toUpperCase(),
-                      style: TextStyle(
-                        color: statusColor(status),
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
+                  if (!isPermission)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: statusColor(status).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        status.toUpperCase(),
+                        style: TextStyle(
+                          color: statusColor(status),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
-                  ),
                 ],
               ),
             ),
           ),
 
-          /// 🔽 EXPANDED CONTENT
           if (isExpanded)
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
               child: Column(
                 children: [
                   Divider(color: Colors.grey.shade200),
-
                   infoRow("Name", e["name"]),
-                  infoRow("Designation", e["designation"]),
-                  infoRow("Reason", e["reason"]),
-                  infoRow("Contact", e["contactNumber"]),
-                  const SizedBox(height: 8),
-                  if (status.toLowerCase() == "pending") buildActionSection(e),
-                  if (status == "approved")
-                    infoRow(
-                      "Approved Date",
-                      AppHelpers.formatDate(e["approvedDate"]),
-                    ),
-                  if (status == "rejected")
-                    infoRow("Rejected Reason", e["rejectionReason"]),
+                  if (isPermission) ...[
+                    infoRow("Date", formatDate(e["date"] ?? e["fromDate"])),
+                    infoRow("From Time", e["fromTime"]),
+                    infoRow("To Time", e["toTime"]),
+                    infoRow("Total Hours", e["totalHours"] ?? "-"),
+                    infoRow("Reason", e["reason"]),
+                  ] else ...[
+                    infoRow("Designation", e["designation"]),
+                    infoRow("Reason", e["reason"]),
+                    infoRow("Contact", e["contactNumber"]),
+                    const SizedBox(height: 8),
+                    if (status.toLowerCase() == "pending")
+                      buildActionSection(e),
+                    if (status == "approved")
+                      infoRow(
+                        "Approved Date",
+                        AppHelpers.formatDate(e["approvedDate"]),
+                      ),
+                    if (status == "rejected")
+                      infoRow("Rejected Reason", e["rejectionReason"]),
+                  ],
                 ],
               ),
             ),
@@ -352,7 +458,7 @@ class _StaffLeavesState extends State<StaffLeaves>
                           "Failed to approve leave",
                           isError: true,
                         );
-                        await loadLeaves();
+                        await loadItems();
                       }
                     },
                     color: Theme.of(context).colorScheme.secondary,
@@ -411,7 +517,7 @@ class _StaffLeavesState extends State<StaffLeaves>
                   } else {
                     showTopMessage("Failed to reject leave", isError: true);
                   }
-                  await loadLeaves();
+                  await loadItems();
                 },
                 color: Theme.of(context).colorScheme.error,
                 txtcolor: Theme.of(context).colorScheme.onPrimary,

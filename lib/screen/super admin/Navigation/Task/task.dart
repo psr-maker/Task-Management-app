@@ -4,16 +4,16 @@ import 'package:staff_work_track/core/widgets/buttons.dart';
 import 'package:staff_work_track/widgets/customfieldwidget.dart';
 import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
 
-class Createtask extends StatefulWidget {
+class Ctask extends StatefulWidget {
   final List<int> assignedToIds;
 
-  const Createtask({super.key, required this.assignedToIds});
+  const Ctask({super.key, required this.assignedToIds});
 
   @override
-  State<Createtask> createState() => _CreateTaskPageState();
+  State<Ctask> createState() => _CreateTaskPageState();
 }
 
-class _CreateTaskPageState extends State<Createtask> {
+class _CreateTaskPageState extends State<Ctask> {
   // Controllers
   final TextEditingController nameController = TextEditingController();
   final TextEditingController descriController = TextEditingController();
@@ -37,7 +37,7 @@ class _CreateTaskPageState extends State<Createtask> {
   String? _topMessage;
   bool _isErrorMessage = true;
   bool _showTopMessage = false;
-  bool isTask = true;
+  bool isTask = false;
   List<dynamic> goalsList = [];
 
   @override
@@ -52,12 +52,23 @@ class _CreateTaskPageState extends State<Createtask> {
     bool isCreated,
   ) async {
     DateTime initialDate = DateTime.now();
+
+    DateTime firstDate = DateTime(2000);
+    DateTime lastDate = DateTime(2100);
+
+    // ✅ Apply goal date restriction ONLY for task
+    if (isTask && goalStartDate != null && goalDueDate != null) {
+      firstDate = goalStartDate!;
+      lastDate = goalDueDate!;
+    }
+
     DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: initialDate,
-      firstDate: DateTime(2000),
-      lastDate: DateTime(2100),
+      initialDate: initialDate.isBefore(firstDate) ? firstDate : initialDate,
+      firstDate: firstDate,
+      lastDate: lastDate,
     );
+
     if (picked != null) {
       controller.text =
           "${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}";
@@ -97,7 +108,6 @@ class _CreateTaskPageState extends State<Createtask> {
       showTopMessage("Please fill the All Fields", isError: true);
       return;
     }
-
     setState(() => _isLoading = true);
 
     bool success = await SuperAdminService.createTask(
@@ -153,36 +163,7 @@ class _CreateTaskPageState extends State<Createtask> {
     }
   }
 
-  Future<void> _createGoal() async {
-    if (goalTitleController.text.isEmpty ||
-        selectedPriority == null ||
-        goalStartDate == null ||
-        goalDueDate == null) {
-      showTopMessage("Please fill the All Fields", isError: true);
-      return;
-    }
-
-    setState(() => _isLoading = true);
-
-    bool success = await SuperAdminService.createGoal(
-      title: goalTitleController.text,
-      priority: selectedPriority!,
-      startDate: goalStartDate!,
-      dueDate: goalDueDate!,
-      assignTo: widget.assignedToIds.first.toString(),
-    );
-
-    setState(() => _isLoading = false);
-
-    if (success) {
-      showTopMessage("Goal Created Successfully", isError: false);
-      await Future.delayed(const Duration(seconds: 2));
-      Navigator.pop(context, true);
-    } else {
-      showTopMessage("Failed to create Goal", isError: true);
-    }
-  }
-
+  
   Future<void> loadGoals() async {
     setState(() => isGoalLoading = true);
 
@@ -203,7 +184,7 @@ class _CreateTaskPageState extends State<Createtask> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Create Goal"),
+        title: const Text("Create Task"),
         leading: IconButton(
           onPressed: () {
             Navigator.pop(context);
@@ -220,41 +201,14 @@ class _CreateTaskPageState extends State<Createtask> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const SizedBox(height: 25),
-                  Center(
-                    child: ToggleButtons(
-                      borderRadius: BorderRadius.circular(10),
-                      isSelected: [isTask, !isTask],
-                      onPressed: (index) {
-                        setState(() {
-                          isTask = index == 0;
-                        });
-                      },
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 25),
-                          child: Text("Task",style: Theme.of(context).textTheme.headlineLarge,),
-                        ),
-                         Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 25),
-                          child: Text("Goal",style: Theme.of(context).textTheme.headlineLarge,),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 25),
-                  isTask ? _taskForm() : _goalForm(),
-                  const SizedBox(height: 30),
+                  _taskForm(),
+
                   Center(
                     child: AppButton(
                       text: "Create",
                       isLoading: _isLoading,
                       onPressed: () {
-                        if (isTask) {
-                          _createTask();
-                        } else {
-                          _createGoal();
-                        }
+                        _createTask();
                       },
                       color: Theme.of(context).colorScheme.secondary,
                       txtcolor: Theme.of(context).colorScheme.onPrimary,
@@ -275,7 +229,7 @@ class _CreateTaskPageState extends State<Createtask> {
               child: Msgsnackbar(
                 context,
                 message: _topMessage!,
-                isError: _isErrorMessage,   
+                isError: _isErrorMessage,
               ),
             ),
         ],
@@ -343,6 +297,12 @@ class _CreateTaskPageState extends State<Createtask> {
             onChanged: (value) {
               setState(() {
                 selectedGoalCode = value;
+
+                final selectedGoal = goalsList.firstWhere(
+                  (g) => g['goalCode'].toString() == value,
+                );
+                goalStartDate = DateTime.parse(selectedGoal['startDate']);
+                goalDueDate = DateTime.parse(selectedGoal['dueDate']);
               });
             },
           ),
@@ -372,51 +332,6 @@ class _CreateTaskPageState extends State<Createtask> {
         CustomFormWidgets.dateField(
           controller: dueDateController,
           onTap: () => _selectDate(context, dueDateController, false),
-        ),
-      ],
-    );
-  }
-
-  Widget _goalForm() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        CustomFormWidgets.label(context, "Goal Title"),
-        const SizedBox(height: 8),
-        CustomFormWidgets.textField(
-          context,
-          goalTitleController,
-          hint: "Enter goal title",
-        ),
-
-        const SizedBox(height: 20),
-
-        CustomFormWidgets.label(context, "Start Date"),
-        const SizedBox(height: 8),
-        CustomFormWidgets.dateField(
-          controller: goalStartController,
-          onTap: () => selectDate(context, goalStartController, true),
-        ),
-
-        const SizedBox(height: 20),
-
-        CustomFormWidgets.label(context, "Due Date"),
-        const SizedBox(height: 8),
-        CustomFormWidgets.dateField(
-          controller: goalDueController,
-          onTap: () => selectDate(context, goalDueController, false),
-        ),
-
-        const SizedBox(height: 20),
-
-        CustomFormWidgets.label(context, "Priority"),
-        const SizedBox(height: 8),
-        CustomFormWidgets.dropdown(
-          context: context,
-          value: selectedPriority,
-          items: ["Normal", "Medium", "High"],
-          onChanged: (v) => setState(() => selectedPriority = v),
-          hint: "Select Priority",
         ),
       ],
     );

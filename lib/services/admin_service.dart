@@ -312,6 +312,29 @@ class AdminService {
     }
   }
 
+  static Future<bool> deleteLeave(int id) async {
+    try {
+      final token = await AuthService.getToken();
+      final response = await http.delete(
+        Uri.parse("$baseUrl/Manager/delete-leave/$id"),
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer $token",
+        },
+      );
+
+      if (response.statusCode == 200) {
+        return true;
+      } else {
+        print("Delete failed: ${response.body}");
+        return false;
+      }
+    } catch (e) {
+      print("Error deleting leave: $e");
+      return false;
+    }
+  }
+
   static Future<List<dynamic>> getLeaves() async {
     try {
       final token = await AuthService.getToken();
@@ -361,8 +384,94 @@ class AdminService {
     }
   }
 
+  static Future<bool> applyPermission({
+    required String name,
+    required String designation,
+    required String reason,
+    required DateTime date,
+    required String fromTime, // "HH:mm:ss"
+    required String toTime, // "HH:mm:ss"
+  }) async {
+    try {
+      final token = await AuthService.getToken();
 
- static Future<List<dynamic>> getDepartmentLeaves() async {
+      final response = await http.post(
+        Uri.parse("$baseUrl/Manager/apply-permission"),
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer $token",
+        },
+        body: jsonEncode({
+          "name": name,
+          "designation": designation,
+          "reason": reason,
+          "date": date.toIso8601String(),
+          "fromTime": fromTime,
+          "toTime": toTime,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        return true;
+      } else {
+        print("Error: ${response.body}");
+        return false;
+      }
+    } catch (e) {
+      print("Exception: $e");
+      return false;
+    }
+  }
+
+  static Future<List<dynamic>> getPermissions() async {
+    try {
+      final token = await AuthService.getToken();
+
+      final response = await http.get(
+        Uri.parse("$baseUrl/Manager/get-permissions"),
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer $token",
+        },
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        print("Error: ${response.body}");
+        return [];
+      }
+    } catch (e) {
+      print("Exception: $e");
+      return [];
+    }
+  }
+
+  static Future<List<dynamic>> getDepartmentPermissions() async {
+    try {
+      final token = await AuthService.getToken();
+
+      final response = await http.get(
+        Uri.parse("$baseUrl/Manager/get-department-permissions"),
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer $token",
+        },
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        print("Error: ${response.body}");
+        return [];
+      }
+    } catch (e) {
+      print("Exception: $e");
+      return [];
+    }
+  }
+
+  static Future<List<dynamic>> getDepartmentLeaves() async {
     try {
       final token = await AuthService.getToken();
 
@@ -382,13 +491,11 @@ class AdminService {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         return data;
-      }
-      else {
+      } else {
         throw Exception("Failed to load department leaves: ${response.body}");
       }
     } catch (e) {
       throw Exception("Error: $e");
     }
   }
-
 }

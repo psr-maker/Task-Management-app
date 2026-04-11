@@ -6,7 +6,7 @@ import 'package:staff_work_track/screen/admin/Navigation/my%20work/Task%20status
 import 'package:staff_work_track/screen/admin/Navigation/my%20work/Task%20status%20tab/completedtask.dart';
 import 'package:staff_work_track/screen/admin/Navigation/my%20work/Task%20status%20tab/pendingtask.dart';
 import 'package:staff_work_track/screen/admin/Navigation/my%20work/Task%20status%20tab/progresstask.dart';
-import 'package:staff_work_track/screen/super%20admin/Navigation/Task/create_task.dart';
+import 'package:staff_work_track/screen/super%20admin/Navigation/Task/goalntask_create.dart';
 import 'package:staff_work_track/services/auth_service.dart';
 
 class Mywork extends StatefulWidget {

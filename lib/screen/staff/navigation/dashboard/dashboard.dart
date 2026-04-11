@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:staff_work_track/Models/warning_model.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
 import 'package:staff_work_track/screen/staff/navigation/dashboard/drawer/leave/leavelist.dart';
-import 'package:staff_work_track/screen/staff/navigation/dashboard/usersettings.dart';
+import 'package:staff_work_track/screen/staff/navigation/dashboard/settings/usersettings.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/Reports/reports_table.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/notifi.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/warnings/warning.dart';

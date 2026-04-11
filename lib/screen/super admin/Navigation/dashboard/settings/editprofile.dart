@@ -18,6 +18,15 @@ class _EditProfilePageState extends State<EditProfilePage> {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
 
+  final TextEditingController _bloodGroupController = TextEditingController();
+  final TextEditingController _contactGroupController = TextEditingController();
+  final TextEditingController _dobController = TextEditingController();
+  final TextEditingController _emergencyContactController =
+      TextEditingController();
+
+  String? _selectedGender;
+
+  @override
   late Future<Map<String, dynamic>> _profileFuture;
   String? _topMessage;
   bool _isErrorMessage = true;
@@ -96,42 +105,192 @@ class _EditProfilePageState extends State<EditProfilePage> {
               key: _formKey,
               child: Stack(
                 children: [
+                  // Column(
+                  //   crossAxisAlignment: CrossAxisAlignment.start,
+                  //   children: [
+                  //     Center(
+                  //       child: CircleAvatar(
+                  //         radius: 45,
+                  //         backgroundColor: Theme.of(
+                  //           context,
+                  //         ).primaryColor.withOpacity(0.1),
+                  //         child: Icon(
+                  //           Icons.person,
+                  //           size: 45,
+                  //           color: Theme.of(context).primaryColor,
+                  //         ),
+                  //       ),
+                  //     ),
+                  //     const SizedBox(height: 20),
+                  //     Text(
+                  //       "UserName",
+                  //       style: Theme.of(context).textTheme.headlineLarge,
+                  //     ),
+                  //     const SizedBox(height: 8),
+                  //     CustomTextField(controller: _nameController),
+                  //     const SizedBox(height: 20),
+
+                  //     Text(
+                  //       "Email",
+                  //       style: Theme.of(context).textTheme.headlineLarge,
+                  //     ),
+                  //     const SizedBox(height: 8),
+                  //     CustomTextField(
+                  //       controller: _emailController,
+                  //       isEmail: true,
+                  //     ),
+                  //     const SizedBox(height: 30),
+
+                  //     Center(
+                  //       child: AppButton(
+                  //         text: "Save Changes",
+                  //         isLoading: _isLoading,
+                  //         onPressed: isSaving ? null : _saveProfile,
+                  //         color: Theme.of(context).colorScheme.secondary,
+                  //         txtcolor: Theme.of(context).colorScheme.onPrimary,
+                  //       ),
+                  //     ),
+                  //   ],
+                  // ),
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      /// 👤 PROFILE IMAGE
                       Center(
-                        child: CircleAvatar(
-                          radius: 45,
-                          backgroundColor: Theme.of(
-                            context,
-                          ).primaryColor.withOpacity(0.1),
-                          child: Icon(
-                            Icons.person,
-                            size: 45,
-                            color: Theme.of(context).primaryColor,
-                          ),
+                        child: Stack(
+                          children: [
+                            CircleAvatar(
+                              radius: 45,
+                              backgroundColor: Theme.of(
+                                context,
+                              ).primaryColor.withOpacity(0.1),
+                              child: Icon(
+                                Icons.person,
+                                size: 45,
+                                color: Theme.of(context).primaryColor,
+                              ),
+                            ),
+                            Positioned(
+                              bottom: 0,
+                              right: 0,
+                              child: CircleAvatar(
+                                radius: 14,
+                                backgroundColor: Theme.of(
+                                  context,
+                                ).colorScheme.secondary,
+                                child: const Icon(
+                                  Icons.edit,
+                                  size: 14,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      const SizedBox(height: 20),
-                      Text(
-                        "UserName",
-                        style: Theme.of(context).textTheme.headlineLarge,
-                      ),
-                      const SizedBox(height: 8),
-                      CustomTextField(controller: _nameController),
-                      const SizedBox(height: 20),
 
+                      const SizedBox(height: 25),
+
+                      /// 🧾 PERSONAL DETAILS TITLE
+                      Text(
+                        "Personal Details",
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+
+                      const SizedBox(height: 15),
+
+                      /// NAME
+                      Text(
+                        "Name",
+                        style: Theme.of(context).textTheme.labelLarge,
+                      ),
+                      const SizedBox(height: 6),
+                      CustomTextField(controller: _nameController),
+
+                      const SizedBox(height: 16),
+
+                      /// EMAIL
                       Text(
                         "Email",
-                        style: Theme.of(context).textTheme.headlineLarge,
+                        style: Theme.of(context).textTheme.labelLarge,
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 6),
                       CustomTextField(
                         controller: _emailController,
                         isEmail: true,
                       ),
+
+                      const SizedBox(height: 16),
+
+                      /// BLOOD GROUP
+                      Text(
+                        "Blood Group",
+                        style: Theme.of(context).textTheme.labelLarge,
+                      ),
+                      const SizedBox(height: 6),
+                      CustomTextField(controller: _bloodGroupController),
+
+                      const SizedBox(height: 16),
+
+                      /// CONTACT NUMBER
+                      Text(
+                        "Contact Number",
+                        style: Theme.of(context).textTheme.labelLarge,
+                      ),
+                      const SizedBox(height: 6),
+                      CustomTextField(
+                        keyboardType: TextInputType.phone,
+                        controller: _contactGroupController,
+                      ),
+
+                      const SizedBox(height: 16),
+
+                      /// DOB
+                      Text(
+                        "Date of Birth",
+                        style: Theme.of(context).textTheme.labelLarge,
+                      ),
+                      const SizedBox(height: 6),
+                      CustomTextField(controller: _dobController),
+
+                      const SizedBox(height: 16),
+
+                      /// EMERGENCY CONTACT
+                      Text(
+                        "Emergency Contact",
+                        style: Theme.of(context).textTheme.labelLarge,
+                      ),
+                      const SizedBox(height: 6),
+                      CustomTextField(
+                        keyboardType: TextInputType.phone,
+                        controller: _emergencyContactController,
+                      ),
+
+                      const SizedBox(height: 16),
+
+                      /// GENDER
+                      Text(
+                        "Gender",
+                        style: Theme.of(context).textTheme.labelLarge,
+                      ),
+                      const SizedBox(height: 6),
+                      DropdownButtonFormField<String>(
+                        decoration: InputDecoration(
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        items: ["Male", "Female", "Other"]
+                            .map(
+                              (g) => DropdownMenuItem(value: g, child: Text(g)),
+                            )
+                            .toList(),
+                        onChanged: (value) {},
+                      ),
+
                       const SizedBox(height: 30),
 
+                      /// SAVE BUTTON
                       Center(
                         child: AppButton(
                           text: "Save Changes",

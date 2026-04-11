@@ -22,7 +22,6 @@ class _PendingTabState extends State<PendingTab> {
     tasksFuture = AdminService.getAdminTasks(widget.adminId);
   }
 
-
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<List<Map<String, dynamic>>>(
@@ -43,7 +42,9 @@ class _PendingTabState extends State<PendingTab> {
         // Filter only pending and paused tasks
         final tasks = snapshot.data!.where((task) {
           final normalizedStatus = AppHelpers.normalize(task["status"]);
-          return normalizedStatus == "pending" || normalizedStatus == "paused";
+          return normalizedStatus == "pending" ||
+              normalizedStatus == "paused" ||
+              normalizedStatus == "notstarted";
         }).toList();
 
         if (tasks.isEmpty) {
@@ -55,9 +56,8 @@ class _PendingTabState extends State<PendingTab> {
           itemCount: tasks.length,
           itemBuilder: (context, index) {
             final task = tasks[index];
-       
 
-          return Taskstatus(
+            return Taskstatus(
               task: task,
               onTap: () {
                 Navigator.push(

@@ -354,4 +354,25 @@ class AnnouncementService {
       throw Exception(e.toString());
     }
   }
+
+  static Future<List<WarningModel>> getWarningsByUser(int userId) async {
+    try {
+      final response = await http.get(
+        Uri.parse("$baseUrl/Announcement/get-warnings-by-user/$userId"),
+        headers: {
+          "Content-Type": "application/json",
+        },
+      );
+
+      if (response.statusCode == 200) {
+        List data = jsonDecode(response.body);
+
+        return data.map((e) => WarningModel.fromJson(e)).toList();
+      } else {
+        throw Exception("Failed to load warnings");
+      }
+    } catch (e) {
+      throw Exception("Error: $e");
+    }
+  }
 }

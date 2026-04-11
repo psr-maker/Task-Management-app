@@ -1,7 +1,6 @@
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
-import 'package:staff_work_track/Models/table.dart';
 import 'package:staff_work_track/core/constant/apiurl.dart';
 
 class ReportsService {
@@ -118,7 +117,7 @@ class ReportsService {
     }
   }
 
-  Future<Map<String, dynamic>> getFullReport({
+ static Future<Map<String, dynamic>> getFullReport({
     int? userId,
     String? department,
   }) async {
@@ -147,31 +146,31 @@ class ReportsService {
   }
   //'''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
 
-  Future<List<ReportTask>> getFilteredTasks({
-    int? userId,
-    String? department,
-  }) async {
-    String url = "$baseUrl/Reports/FilteredTableTasks";
+  // Future<List<ReportTask>> getFilteredTasks({
+  //   int? userId,
+  //   String? department,
+  // }) async {
+  //   String url = "$baseUrl/Reports/FilteredTableTasks";
 
-    final queryParams = {
-      if (userId != null) "userId": userId.toString(),
-      if (department != null) "department": department,
-    };
+  //   final queryParams = {
+  //     if (userId != null) "userId": userId.toString(),
+  //     if (department != null) "department": department,
+  //   };
 
-    final uri = Uri.parse(url).replace(queryParameters: queryParams);
+  //   final uri = Uri.parse(url).replace(queryParameters: queryParams);
 
-    final response = await http.get(uri);
+  //   final response = await http.get(uri);
 
-    if (response.statusCode == 200) {
-      final decoded = jsonDecode(response.body);
+  //   if (response.statusCode == 200) {
+  //     final decoded = jsonDecode(response.body);
 
-      final List data = decoded is List ? decoded : decoded['data'];
+  //     final List data = decoded is List ? decoded : decoded['data'];
 
-      print("Decoded list length: ${data.length}");
+  //     print("Decoded list length: ${data.length}");
 
-      return data.map((e) => ReportTask.fromJson(e)).toList();
-    } else {
-      throw Exception("Failed to load tasks");
-    }
-  }
+  //     return data.map((e) => ReportTask.fromJson(e)).toList();
+  //   } else {
+  //     throw Exception("Failed to load tasks");
+  //   }
+  // }
 }

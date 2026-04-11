@@ -26,6 +26,11 @@ class _LeaveapplyState extends State<Leaveapply> {
   String? _topMessage;
   bool _isErrorMessage = true;
   bool _showTopMessage = false;
+  String applicationType = "Leave";
+  TimeOfDay? fromTime;
+  TimeOfDay? toTime;
+  double totalHours = 0;
+  int totalMinutes = 0;
   Future pickFromDate() async {
     DateTime? picked = await showDatePicker(
       context: context,
@@ -69,10 +74,11 @@ class _LeaveapplyState extends State<Leaveapply> {
 
   void calculateTotal() {
     totalLeave = 0;
+
     for (var day in leaveDays) {
       if (day["type"] == "Full Day") {
         totalLeave += 1;
-      } else {
+      } else if (day["type"] == "First Half" || day["type"] == "Second Half") {
         totalLeave += 0.5;
       }
     }
@@ -129,6 +135,126 @@ class _LeaveapplyState extends State<Leaveapply> {
     }
   }
 
+  Future pickFromTime() async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.now(),
+    );
+
+    if (picked != null) {
+      setState(() {
+        fromTime = picked;
+      });
+      calculateHours(); // ✅ IMPORTANT
+    }
+  }
+
+  Future pickToTime() async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.now(),
+    );
+
+    if (picked != null) {
+      setState(() {
+        toTime = picked;
+      });
+      calculateHours(); // ✅ IMPORTANT
+    }
+  }
+
+  Widget timeTile(String label, TimeOfDay? time, VoidCallback onTap) {
+    return Card(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+        side: BorderSide(color: Colors.grey.shade300),
+      ),
+      child: ListTile(
+        leading: const Icon(Icons.access_time),
+        title: Text(time == null ? label : time.format(context)),
+        onTap: onTap,
+      ),
+    );
+  }
+
+  void calculateHours() {
+    if (fromTime == null || toTime == null) return;
+
+    final from = DateTime(0, 0, 0, fromTime!.hour, fromTime!.minute);
+    final to = DateTime(0, 0, 0, toTime!.hour, toTime!.minute);
+
+    final diff = to.difference(from).inMinutes;
+
+    if (diff < 0) {
+      totalMinutes = 0;
+      showTopMessage("Invalid time range", isError: true);
+      return;
+    }
+
+    totalMinutes = diff;
+
+    setState(() {});
+  }
+
+  String formatDuration(int minutes) {
+    int hours = minutes ~/ 60;
+    int mins = minutes % 60;
+
+    if (hours > 0 && mins > 0) {
+      return "${hours}h ${mins}m";
+    } else if (hours > 0) {
+      return "${hours}h";
+    } else {
+      return "${mins}m";
+    }
+  }
+
+  Future<void> submitPermission() async {
+    if (fromTime == null || toTime == null || fromDate == null) {
+      showTopMessage("Please fill all fields", isError: true);
+      return;
+    }
+
+    if (nameController.text.isEmpty ||
+        designationController.text.isEmpty ||
+        reasonController.text.isEmpty) {
+      showTopMessage("Please fill all fields", isError: true);
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    final success = await AdminService.applyPermission(
+      name: nameController.text,
+      designation: designationController.text,
+      reason: reasonController.text,
+      date: fromDate!, // single date
+      fromTime: formatTimeToApi(fromTime!),
+      toTime: formatTimeToApi(toTime!),
+    );
+
+    setState(() => _isLoading = false);
+
+    if (success) {
+      showTopMessage("Permission Applied Successfully", isError: false);
+
+      // ✅ optional reset
+      setState(() {
+        fromTime = null;
+        toTime = null;
+        totalMinutes = 0;
+      });
+    } else {
+      showTopMessage("Failed to apply permission", isError: true);
+    }
+  }
+
+  String formatTimeToApi(TimeOfDay time) {
+    final hour = time.hour.toString().padLeft(2, '0');
+    final minute = time.minute.toString().padLeft(2, '0');
+    return "$hour:$minute:00"; // HH:mm:ss
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -142,103 +268,275 @@ class _LeaveapplyState extends State<Leaveapply> {
       body: Stack(
         children: [
           ListView(
-            padding: const EdgeInsets.only(left: 15, right: 15, top: 15),
+            padding: const EdgeInsets.only(left: 15, right: 15),
             children: [
-              sectionTitle("Employee Details"),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      "Application Type",
+                      style: Theme.of(context).textTheme.labelMedium,
+                    ),
+                  ),
+                  DropdownButton<String>(
+                    value: applicationType,
+                    items: [
+                      DropdownMenuItem(
+                        value: "Leave",
+                        child: Text(
+                          "Leave",
+                          style: Theme.of(context).textTheme.headlineLarge,
+                        ),
+                      ),
+                      DropdownMenuItem(
+                        value: "Permission",
+                        child: Text(
+                          "Permission",
+                          style: Theme.of(context).textTheme.headlineLarge,
+                        ),
+                      ),
+                    ],
+                    onChanged: (value) {
+                      setState(() {
+                        applicationType = value!;
+                      });
+                    },
+                  ),
+                ],
+              ),
               const SizedBox(height: 20),
-              inputField("Name", nameController),
-              const SizedBox(height: 5),
-              inputField("Designation", designationController),
-              const SizedBox(height: 5),
-              inputField("Leave Reason", reasonController),
-              const SizedBox(height: 20),
-              sectionTitle("Leave Period"),
-              const SizedBox(height: 20),
-              dateTile("Select From Date", fromDate, pickFromDate),
-              const SizedBox(height: 10),
-              dateTile("Select To Date", toDate, pickToDate),
-              const SizedBox(height: 20),
-              if (leaveDays.isNotEmpty) ...[
-                sectionTitle("Leave Type Per Day"),
+              if (applicationType == "Leave") ...[
+                sectionTitle("Employee Details"),
+                const SizedBox(height: 20),
+                inputField("Name", nameController),
+                const SizedBox(height: 5),
+                inputField("Designation", designationController),
+                const SizedBox(height: 5),
+                inputField("Leave Reason", reasonController),
+                const SizedBox(height: 20),
+                sectionTitle("Leave Period"),
+                const SizedBox(height: 20),
+                dateTile("Select From Date", fromDate, pickFromDate),
+                const SizedBox(height: 10),
+                dateTile("Select To Date", toDate, pickToDate),
+                const SizedBox(height: 20),
+                if (leaveDays.isNotEmpty) ...[
+                  sectionTitle("Leave Type Per Day"),
+                  const SizedBox(height: 20),
+                  Card(
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      side: BorderSide(color: Colors.grey.shade300),
+                    ),
+                    child: Column(
+                      children: leaveDays.map((day) {
+                        int index = leaveDays.indexOf(day);
+                        return ListTile(
+                          title: Text(
+                            DateFormat("dd MMM yyyy").format(day["date"]),
+                          ),
+                          trailing: DropdownButton<String>(
+                            value: day["type"],
+                            dropdownColor: Colors.white,
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(
+                                  color: Colors.black,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                            iconEnabledColor: Colors.black,
+                            items: const [
+                              DropdownMenuItem(
+                                value: "Full Day",
+                                child: Text("Full Day"),
+                              ),
+                              DropdownMenuItem(
+                                value: "First Half",
+                                child: Text("First Half"),
+                              ),
+                              DropdownMenuItem(
+                                value: "Second Half",
+                                child: Text("Second Half"),
+                              ),
+                              DropdownMenuItem(
+                                value: "Holiday",
+                                child: Text("Holiday"),
+                              ),
+                            ],
+                            onChanged: (value) {
+                              setState(() {
+                                leaveDays[index]["type"] = value;
+                                calculateTotal();
+                              });
+                            },
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 20),
                 Card(
-                  elevation: 0,
+                  color: Theme.of(context).colorScheme.background,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10),
-                    side: BorderSide(color: Colors.grey.shade300),
                   ),
-                  child: Column(
-                    children: leaveDays.map((day) {
-                      int index = leaveDays.indexOf(day);
-                      return ListTile(
-                        title: Text(
-                          DateFormat("dd MMM yyyy").format(day["date"]),
-                        ),
-                        trailing: DropdownButton<String>(
-                          value: day["type"],
-                          dropdownColor: Colors.white,
-                          style: Theme.of(context).textTheme.bodyMedium
-                              ?.copyWith(
-                                color: Colors.black,
-                                fontWeight: FontWeight.w500,
-                              ),
-                          iconEnabledColor: Colors.black,
-                          items: const [
-                            DropdownMenuItem(
-                              value: "Full Day",
-                              child: Text("Full Day"),
-                            ),
-                            DropdownMenuItem(
-                              value: "First Half",
-                              child: Text("First Half"),
-                            ),
-                            DropdownMenuItem(
-                              value: "Second Half",
-                              child: Text("Second Half"),
-                            ),
-                          ],
-                          onChanged: (value) {
-                            setState(() {
-                              leaveDays[index]["type"] = value;
-                              calculateTotal();
-                            });
-                          },
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                ),
-              ],
-              const SizedBox(height: 20),
-              Card(
-                color: Theme.of(context).colorScheme.background,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: ListTile(
-                  title: const Text(
-                    "Total Leave",
-                    style: TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                  trailing: Text(
-                    "$totalLeave Days",
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
+                  child: ListTile(
+                    title: const Text(
+                      "Total Leave",
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    trailing: Text(
+                      "$totalLeave Days",
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 20),
-              sectionTitle("Emergency Contact"),
-              const SizedBox(height: 20),
-              inputField("Phone Number", emergencyController),
+                const SizedBox(height: 20),
+                sectionTitle("Emergency Contact"),
+                const SizedBox(height: 20),
+                inputField("Phone Number", emergencyController),
+              ],
+              if (applicationType == "Permission") ...[
+                sectionTitle("Permission Details"),
+                const SizedBox(height: 20),
+
+                inputField("Name", nameController),
+                inputField("Designation", designationController),
+                inputField("Reason", reasonController),
+
+                const SizedBox(height: 10),
+
+                dateTile("Select Date", fromDate, pickFromDate),
+
+                const SizedBox(height: 15),
+
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 12,
+                    horizontal: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey.shade300),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    children: [
+                      // FROM
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: pickFromTime,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              Text(
+                                "FROM",
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.grey.shade600,
+                                  letterSpacing: 1,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                fromTime == null
+                                    ? "--:--"
+                                    : fromTime!.format(context),
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+
+                      // Divider
+                      Container(
+                        height: 30,
+                        width: 1,
+                        color: Colors.grey.shade300,
+                      ),
+
+                      // TO
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: pickToTime,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              Text(
+                                "TO",
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.grey.shade600,
+                                  letterSpacing: 1,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                toTime == null
+                                    ? "--:--"
+                                    : toTime!.format(context),
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+
+                      // Divider
+                      Container(
+                        height: 30,
+                        width: 1,
+                        color: Colors.grey.shade300,
+                      ),
+
+                      // TOTAL
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            Text(
+                              "TOTAL",
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.grey.shade600,
+                                letterSpacing: 1,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              totalMinutes > 0
+                                  ? formatDuration(totalMinutes)
+                                  : "--",
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
               const SizedBox(height: 20),
               Center(
                 child: AppButton(
                   text: "Submit",
                   isLoading: _isLoading,
-                  onPressed: submitLeave,
+                  onPressed: applicationType == "Leave"
+                      ? submitLeave
+                      : submitPermission,
                   color: Theme.of(context).colorScheme.secondary,
                   txtcolor: Theme.of(context).colorScheme.onPrimary,
                 ),

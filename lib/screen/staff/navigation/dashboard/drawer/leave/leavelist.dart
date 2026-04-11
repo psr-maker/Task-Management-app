@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
+import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
 import 'package:staff_work_track/services/admin_service.dart';
 import 'package:staff_work_track/screen/staff/navigation/dashboard/drawer/leave/leaveapply.dart';
 import 'package:staff_work_track/utils/app_helper.dart';
@@ -13,20 +14,24 @@ class Leavelist extends StatefulWidget {
 
 class _LeavelistState extends State<Leavelist>
     with SingleTickerProviderStateMixin {
-  List allLeaves = [];
-  List filteredLeaves = [];
+  List allItems = [];
+  List filteredItems = [];
   bool isLoading = true;
+  bool showPermissions = false;
   late TabController _tabController;
   final tabs = ["All", "Pending", "Approved", "Rejected"];
   Set<int> expandedItems = {};
+  String? _topMessage;
+  bool _isErrorMessage = true;
+  bool _showTopMessage = false;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
-    loadLeaves();
+    loadItems();
     _tabController.addListener(() {
-      filterLeaves();
+      if (!showPermissions) filterItems();
     });
   }
 
@@ -35,22 +40,32 @@ class _LeavelistState extends State<Leavelist>
     return DateFormat("EEE, dd MMMM").format(DateTime.parse(date));
   }
 
-  Future<void> loadLeaves() async {
-    final data = await AdminService.getLeaves();
+  Future<void> loadItems() async {
     setState(() {
-      allLeaves = data;
-      filteredLeaves = data;
+      isLoading = true;
+      allItems = [];
+      filteredItems = [];
+      expandedItems.clear();
+    });
+
+    final data = showPermissions
+        ? await AdminService.getPermissions()
+        : await AdminService.getLeaves();
+
+    setState(() {
+      allItems = data;
+      filteredItems = data;
       isLoading = false;
     });
   }
 
-  void filterLeaves() {
+  void filterItems() {
     String selected = tabs[_tabController.index];
     setState(() {
       if (selected == "All") {
-        filteredLeaves = allLeaves;
+        filteredItems = allItems;
       } else {
-        filteredLeaves = allLeaves
+        filteredItems = allItems
             .where(
               (e) =>
                   (e["status"] ?? "").toLowerCase() == selected.toLowerCase(),
@@ -63,12 +78,13 @@ class _LeavelistState extends State<Leavelist>
   Map<String, List> groupByMonth(List data) {
     Map<String, List> grouped = {};
     for (var item in data) {
-      final date = DateTime.parse(item["fromDate"]);
+      final dateString =
+          item["fromDate"] ?? item["date"] ?? item["submittedDate"];
+      final date = dateString != null
+          ? DateTime.parse(dateString)
+          : DateTime.now();
       final key = DateFormat("MMMM yyyy").format(date);
-      if (!grouped.containsKey(key)) {
-        grouped[key] = [];
-      }
-      grouped[key]!.add(item);
+      grouped.putIfAbsent(key, () => []).add(item);
     }
     return grouped;
   }
@@ -84,16 +100,31 @@ class _LeavelistState extends State<Leavelist>
     }
   }
 
+  void showTopMessage(String message, {bool isError = true}) {
+    setState(() {
+      _topMessage = message;
+      _isErrorMessage = isError;
+      _showTopMessage = true;
+    });
+
+    Future.delayed(const Duration(seconds: 3), () {
+      if (!mounted) return;
+      setState(() {
+        _showTopMessage = false;
+      });
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
-    final groupedData = groupByMonth(filteredLeaves);
+    final groupedData = groupByMonth(filteredItems);
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
           onPressed: () => Navigator.pop(context),
           icon: const Icon(Icons.arrow_back_ios),
         ),
-        title: const Text("Leaves"),
+        title: Text(showPermissions ? "Permissions" : "Leaves"),
         actions: [
           IconButton(
             icon: const Icon(Icons.add),
@@ -106,61 +137,159 @@ class _LeavelistState extends State<Leavelist>
           ),
         ],
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(50),
-          child: TabBar(
-            controller: _tabController,
-            indicator: UnderlineTabIndicator(
-              borderSide: BorderSide(
-                width: 3,
-                color: Theme.of(context).colorScheme.onPrimary,
+          preferredSize: Size.fromHeight(showPermissions ? 60 : 100),
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 8,
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () {
+                          if (showPermissions) {
+                            setState(() {
+                              showPermissions = false;
+                            });
+                            loadItems();
+                          }
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 5,
+                            horizontal: 10,
+                          ),
+                          decoration: BoxDecoration(
+                            color: showPermissions
+                                ? Colors.transparent
+                                : Colors.white24,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Center(
+                            child: Text(
+                              'Leave',
+                              style: Theme.of(context).textTheme.labelLarge,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () {
+                          if (!showPermissions) {
+                            setState(() {
+                              showPermissions = true;
+                            });
+                            loadItems();
+                          }
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 5,
+                            horizontal: 10,
+                          ),
+                          decoration: BoxDecoration(
+                            color: showPermissions
+                                ? Colors.white24
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Center(
+                            child: Text(
+                              'Permission',
+                              style: Theme.of(context).textTheme.labelLarge,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              insets: EdgeInsets.symmetric(horizontal: 20),
-            ),
-            indicatorSize: TabBarIndicatorSize.label,
-            labelColor: Theme.of(context).colorScheme.onPrimary,
-            unselectedLabelColor: Theme.of(context).colorScheme.tertiary,
-            labelStyle: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-            ),
+              if (!showPermissions)
+                TabBar(
+                  controller: _tabController,
+                  indicator: UnderlineTabIndicator(
+                    borderSide: BorderSide(
+                      width: 3,
+                      color: Theme.of(context).colorScheme.onPrimary,
+                    ),
+                    insets: EdgeInsets.symmetric(horizontal: 20),
+                  ),
+                  indicatorSize: TabBarIndicatorSize.label,
+                  labelColor: Theme.of(context).colorScheme.onPrimary,
+                  unselectedLabelColor: Theme.of(context).colorScheme.tertiary,
+                  labelStyle: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                  ),
 
-            tabs: tabs.map((e) => Tab(text: e)).toList(),
+                  tabs: tabs.map((e) => Tab(text: e)).toList(),
+                ),
+            ],
           ),
         ),
       ),
       body: isLoading
           ? const Center(child: RotatingFlower())
-          : filteredLeaves.isEmpty
-          ? const Center(child: Text("No Leave Found"))
-          : ListView(
-              padding: const EdgeInsets.all(12),
-              children: groupedData.entries.map((entry) {
-                String month = entry.key;
-                List leaves = entry.value;
+          : filteredItems.isEmpty
+          ? Center(
+              child: Text(
+                showPermissions ? "No Permission Found" : "No Leave Found",
+              ),
+            )
+          : Stack(
+              children: [
+                ListView(
+                  padding: const EdgeInsets.all(12),
+                  children: groupedData.entries.map((entry) {
+                    String month = entry.key;
+                    List items = entry.value;
 
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 10),
-                      child: Text(
-                        month,
-                        style: Theme.of(context).textTheme.bodyMedium,
-                      ),
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          child: Text(
+                            month,
+                            style: Theme.of(context).textTheme.bodyMedium,
+                          ),
+                        ),
+                        ...items.asMap().entries.map((entry) {
+                          int index = entry.key;
+                          var item = entry.value;
+                          return buildItem(item, index);
+                        }).toList(),
+                      ],
+                    );
+                  }).toList(),
+                ),
+
+                if (_topMessage != null)
+                  AnimatedPositioned(
+                    top: _showTopMessage ? 10 : -120,
+                    left: 16,
+                    right: 16,
+                    duration: const Duration(milliseconds: 300),
+                    child: Msgsnackbar(
+                      context,
+                      message: _topMessage!,
+                      isError: _isErrorMessage,
                     ),
-                    ...leaves.asMap().entries.map((entry) {
-                      int index = entry.key;
-                      var leave = entry.value;
-                      return buildLeaveItem(leave, index);
-                    }).toList(),
-                  ],
-                );
-              }).toList(),
+                  ),
+              ],
             ),
     );
   }
 
-  Widget buildLeaveItem(dynamic e, int index) {
+  Widget buildItem(dynamic e, int index) {
+    final isPermission = showPermissions;
     final status = (e["status"] ?? "").toString().toLowerCase();
     final isExpanded = expandedItems.contains(index);
 
@@ -182,6 +311,33 @@ class _LeavelistState extends State<Leavelist>
                 }
               });
             },
+            onLongPress: () async {
+              if (isPermission) return; // No delete for permissions
+              if (status != "pending") {
+                showTopMessage(
+                  "Only pending leave can be deleted",
+                  isError: true,
+                );
+                return;
+              }
+
+              final confirmed = await showConfirmDialog(
+                context,
+                "Delete",
+                "leave",
+              );
+
+              if (confirmed == true) {
+                final success = await AdminService.deleteLeave(e["id"]);
+
+                if (success) {
+                  showTopMessage("Leave deleted successfully", isError: false);
+                  loadItems(); // 🔥 refresh list
+                } else {
+                  showTopMessage("Failed to delete leave", isError: true);
+                }
+              }
+            },
             child: Padding(
               padding: const EdgeInsets.all(12),
               child: Row(
@@ -199,40 +355,51 @@ class _LeavelistState extends State<Leavelist>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          e["leaveType"] ?? "",
+                          isPermission ? e["name"] ?? "" : e["leaveType"] ?? "",
                           style: Theme.of(context).textTheme.labelMedium,
                         ),
                         const SizedBox(height: 5),
                         Text(
-                          formatDate(e["fromDate"]),
+                          isPermission
+                              ? formatDate(e["date"] ?? e["fromDate"])
+                              : formatDate(e["fromDate"]),
                           style: Theme.of(context).textTheme.displaySmall,
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          "Applied on ${AppHelpers.formatDate(e["submittedDate"])}",
-                          style: Theme.of(context).textTheme.labelSmall,
-                        ),
+                        if (isPermission) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            'From ${e["fromTime"] ?? "-"} • To ${e["toTime"] ?? "-"}',
+                            style: Theme.of(context).textTheme.displaySmall,
+                          ),
+                        ] else ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            "Applied on ${AppHelpers.formatDate(e["submittedDate"])}",
+                            style: Theme.of(context).textTheme.labelSmall,
+                          ),
+                        ],
                       ],
                     ),
                   ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 3,
-                    ),
-                    decoration: BoxDecoration(
-                      color: statusColor(status).withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      status.toUpperCase(),
-                      style: TextStyle(
-                        color: statusColor(status),
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
+                  if (!isPermission)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: statusColor(status).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        status.toUpperCase(),
+                        style: TextStyle(
+                          color: statusColor(status),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
-                  ),
                 ],
               ),
             ),
@@ -246,19 +413,33 @@ class _LeavelistState extends State<Leavelist>
                 children: [
                   Divider(color: Colors.grey.shade200),
 
-                  infoRow("Name", e["name"]),
-                  infoRow("Designation", e["designation"]),
-                  infoRow("Reason", e["reason"]),
-                  infoRow("Contact", e["contactNumber"]),
-
-                  if (status == "approved")
+                  if (isPermission) ...[
+                    infoRow("Name", e["name"]),
+                    infoRow("Date", formatDate(e["date"] ?? e["fromDate"])),
+                    infoRow("From Time", e["fromTime"]),
+                    infoRow("To Time", e["toTime"]),
                     infoRow(
-                      "Approved Date",
-                      AppHelpers.formatDate(e["approvedDate"]),
+                      "Total Hours",
+                      e["totalHours"] != null
+                          ? e["totalHours"].toString() + " hours"
+                          : "-",
                     ),
+                    infoRow("Reason", e["reason"]),
+                  ] else ...[
+                    infoRow("Name", e["name"]),
+                    infoRow("Designation", e["designation"]),
+                    infoRow("Reason", e["reason"]),
+                    infoRow("Contact", e["contactNumber"]),
 
-                  if (status == "rejected")
-                    infoRow("Rejected Reason", e["rejectionReason"]),
+                    if (status == "approved")
+                      infoRow(
+                        "Approved Date",
+                        AppHelpers.formatDate(e["approvedDate"]),
+                      ),
+
+                    if (status == "rejected")
+                      infoRow("Rejected Reason", e["rejectionReason"]),
+                  ],
                 ],
               ),
             ),

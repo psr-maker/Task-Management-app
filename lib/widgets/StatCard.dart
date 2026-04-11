@@ -224,7 +224,7 @@ class _TaskCardState extends State<Taskstatus> {
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-           color: Theme.of(context).colorScheme.onPrimary,
+          color: Theme.of(context).colorScheme.onPrimary,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
             color: Theme.of(context).colorScheme.secondary,
@@ -239,7 +239,7 @@ class _TaskCardState extends State<Taskstatus> {
               height: 55,
               decoration: BoxDecoration(
                 color: statusColor,
-                borderRadius: BorderRadius.circular(10), 
+                borderRadius: BorderRadius.circular(10),
               ),
             ),
             const SizedBox(width: 12),
@@ -281,6 +281,7 @@ class _TaskCardState extends State<Taskstatus> {
                 ],
               ),
             ),
+
             /// Right side
             Column(
               crossAxisAlignment: CrossAxisAlignment.end,
@@ -306,6 +307,7 @@ class _TaskCardState extends State<Taskstatus> {
                   ],
                 ),
                 const SizedBox(height: 8),
+
                 /// STATUS DROPDOWN
                 Container(
                   padding: const EdgeInsets.symmetric(
@@ -639,7 +641,7 @@ class _GoalCardState extends State<GoalCard> {
                                 ],
                               ),
                               const SizedBox(height: 12),
-                              Row(             
+                              Row(
                                 children: [
                                   const Icon(Icons.person),
                                   const SizedBox(width: 4),
@@ -655,7 +657,9 @@ class _GoalCardState extends State<GoalCard> {
                                   const SizedBox(width: 4),
                                   Text(
                                     "To: ${AppHelpers.extractName(widget.goal["assignTo"] ?? "")}",
-                                    style: Theme.of(context,).textTheme.labelMedium,
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.labelMedium,
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                 ],
@@ -691,7 +695,7 @@ class _GoalCardState extends State<GoalCard> {
                                     ),
                                   ),
                                 ],
-                              ),
+                              ),                          
                             ],
                           ),
                         ],
