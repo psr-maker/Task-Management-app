@@ -117,6 +117,22 @@ class _StaffLeavesState extends State<StaffLeaves>
     return DateFormat("EEE, dd MMMM").format(DateTime.parse(date));
   }
 
+  String formatTime(String? time) {
+    if (time == null || time.isEmpty) return "-";
+
+    try {
+      List<String> parts = time.split(":");
+
+      if (parts.length >= 2) {
+        return "${parts[0]}:${parts[1]}";
+      }
+
+      return time;
+    } catch (e) {
+      return time;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final groupedData = groupByMonth(filteredItems);
@@ -329,7 +345,7 @@ class _StaffLeavesState extends State<StaffLeaves>
                           isPermission
                               ? e["totalHours"].toString() + " hours"
                               : formatDate(e["fromDate"] ?? e["date"]),
-                          style: Theme.of(context).textTheme.displaySmall,
+                          style: Theme.of(context).textTheme.headlineMedium,
                         ),
                         if (!isPermission) ...[
                           const SizedBox(height: 4),
@@ -374,8 +390,8 @@ class _StaffLeavesState extends State<StaffLeaves>
                   infoRow("Name", e["name"]),
                   if (isPermission) ...[
                     infoRow("Date", formatDate(e["date"] ?? e["fromDate"])),
-                    infoRow("From Time", e["fromTime"]),
-                    infoRow("To Time", e["toTime"]),
+                    infoRow("From Time", formatTime(e["fromTime"])),
+                    infoRow("To Time", formatTime(e["toTime"])),
                     infoRow("Total Hours", e["totalHours"] ?? "-"),
                     infoRow("Reason", e["reason"]),
                   ] else ...[

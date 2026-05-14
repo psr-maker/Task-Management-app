@@ -294,57 +294,27 @@ class _AnounceState extends State<Anounce> {
     );
   }
 
-  Widget _buildExcelTable(String jsonData) {
+  Widget _buildSimpleList(String jsonData) {
     List<dynamic> rows = jsonDecode(jsonData);
 
-    if (rows.isEmpty) {
-      return const Text("No Data Available");
-    }
-
-    List<String> headers = (rows[0] as Map<String, dynamic>).keys.toList();
-
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: DataTable(
-        headingRowColor: MaterialStateProperty.all(
-          Theme.of(context).colorScheme.primary,
-        ),
-
-        dataRowColor: MaterialStateProperty.resolveWith<Color?>((
-          Set<MaterialState> states,
-        ) {
-          return Colors.green.shade50;
-        }),
-
-        headingTextStyle: Theme.of(context).textTheme.labelLarge,
-
-        dataTextStyle: Theme.of(context).textTheme.labelMedium,
-
-        columns: headers.map((h) => DataColumn(label: Text(h))).toList(),
-
-        rows: rows.asMap().entries.map((entry) {
-          int index = entry.key;
-          var row = entry.value;
-
-          return DataRow(
-            color: MaterialStateProperty.all(
-              index % 2 == 0
-                  ? Theme.of(context).colorScheme.onPrimary
-                  : Theme.of(context).colorScheme.tertiary,
-            ),
-            cells: headers
-                .map((h) => DataCell(Text(row[h]?.toString() ?? "")))
-                .toList(),
-          );
-        }).toList(),
-      ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: rows.map((row) {
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Text(
+            row.values.first.toString(),
+            style: const TextStyle(fontSize: 13),
+          ),
+        );
+      }).toList(),
     );
   }
 
   Widget _buildMediaSection(Announcement item) {
     if (item.fileType == "image" && item.filePath != null) {
-      final imageUrl = "${ApiConstants.Uploaded}${item.filePath}";
-
+      final imageUrl =
+          "${ApiConstants.Uploaded}${item.filePath.toString().replaceFirst('/uploads/', '')}";
       return GestureDetector(
         onTap: () {
           Navigator.push(
@@ -372,8 +342,12 @@ class _AnounceState extends State<Anounce> {
     if (item.fileType == "pdf" && item.filePath != null) {
       return GestureDetector(
         onTap: () async {
-          final url = "${ApiConstants.Uploaded}${item.filePath}";
-          await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+          final pdfurl =
+              "${ApiConstants.Uploaded}${item.filePath.toString().replaceFirst('/uploads/', '')}";
+          await launchUrl(
+            Uri.parse(pdfurl),
+            mode: LaunchMode.externalApplication,
+          );
         },
         child: Container(
           padding: const EdgeInsets.all(14),
@@ -409,7 +383,7 @@ class _AnounceState extends State<Anounce> {
           color: Colors.green.shade50,
           borderRadius: BorderRadius.circular(16),
         ),
-        child: _buildExcelTable(item.jsonData!),
+        child: _buildSimpleList(item.jsonData!),
       );
     }
 

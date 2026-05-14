@@ -7,9 +7,7 @@ import 'package:staff_work_track/utils/enum.dart';
 
 class MonthlyTrendChart extends StatefulWidget {
   final List<Map<String, dynamic>> monthlyData;
-
   const MonthlyTrendChart({super.key, required this.monthlyData});
-
   @override
   State<MonthlyTrendChart> createState() => _MonthlyTrendChartState();
 }
@@ -18,9 +16,7 @@ class _MonthlyTrendChartState extends State<MonthlyTrendChart> {
   String selectedStatus = "All";
   double _calculateInterval() {
     if (widget.monthlyData.isEmpty) return 1;
-
     double maxY = 0;
-
     for (var data in widget.monthlyData) {
       maxY = [
         maxY,
@@ -29,19 +25,14 @@ class _MonthlyTrendChartState extends State<MonthlyTrendChart> {
         (data["overdue"] ?? 0).toDouble(),
       ].reduce((a, b) => a > b ? a : b);
     }
-
     if (maxY <= 0) return 1;
-
     final interval = (maxY / 5).ceilToDouble();
-
     return interval <= 0 ? 1 : interval;
   }
 
   double _getSafeMaxY() {
     if (widget.monthlyData.isEmpty) return 5;
-
     double maxY = 0;
-
     for (var data in widget.monthlyData) {
       maxY = [
         maxY,
@@ -50,7 +41,6 @@ class _MonthlyTrendChartState extends State<MonthlyTrendChart> {
         (data["overdue"] ?? 0).toDouble(),
       ].reduce((a, b) => a > b ? a : b);
     }
-
     return maxY <= 0 ? 5 : maxY + 2;
   }
 
@@ -61,11 +51,9 @@ class _MonthlyTrendChartState extends State<MonthlyTrendChart> {
           (data["pending"] ?? 0) > 0 ||
           (data["overdue"] ?? 0) > 0;
     });
-
     if (!hasData) {
       return const SizedBox.shrink();
     }
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -77,7 +65,6 @@ class _MonthlyTrendChartState extends State<MonthlyTrendChart> {
           child: Row(
             children: ["All", "Completed", "Pending", "Overdue"].map((status) {
               final bool isSelected = selectedStatus == status;
-
               Color statusColor;
               switch (status) {
                 case "Completed":
@@ -92,7 +79,6 @@ class _MonthlyTrendChartState extends State<MonthlyTrendChart> {
                 default:
                   statusColor = Colors.blue;
               }
-
               return GestureDetector(
                 onTap: () {
                   setState(() {
@@ -145,9 +131,7 @@ class _MonthlyTrendChartState extends State<MonthlyTrendChart> {
             }).toList(),
           ),
         ),
-
         const SizedBox(height: 30),
-
         SizedBox(
           height: 230,
           child: LineChart(
@@ -189,10 +173,8 @@ class _MonthlyTrendChartState extends State<MonthlyTrendChart> {
                       if (index < 0 || index >= widget.monthlyData.length) {
                         return const SizedBox();
                       }
-
                       final monthNumber =
                           widget.monthlyData[index]["month"] as int;
-
                       const months = [
                         "Jan",
                         "Feb",
@@ -207,7 +189,6 @@ class _MonthlyTrendChartState extends State<MonthlyTrendChart> {
                         "Nov",
                         "Dec",
                       ];
-
                       return Padding(
                         padding: const EdgeInsets.only(top: 8),
                         child: Text(
@@ -219,7 +200,6 @@ class _MonthlyTrendChartState extends State<MonthlyTrendChart> {
                   ),
                 ),
               ),
-
               lineBarsData: _buildWaveLines(),
               lineTouchData: LineTouchData(
                 handleBuiltInTouches: true,
@@ -229,11 +209,9 @@ class _MonthlyTrendChartState extends State<MonthlyTrendChart> {
                     return spots.map((spot) {
                       final index = spot.x.toInt();
                       final data = widget.monthlyData[index];
-
                       String label = "";
                       Color color =
                           spot.bar.gradient?.colors.first ?? Colors.white;
-
                       if (spot.barIndex == 0) {
                         label = "Completed: ${data['completed'] ?? 0}";
                       } else if (spot.barIndex == 1) {
@@ -241,7 +219,6 @@ class _MonthlyTrendChartState extends State<MonthlyTrendChart> {
                       } else if (spot.barIndex == 2) {
                         label = "Overdue: ${data['overdue'] ?? 0}";
                       }
-
                       return LineTooltipItem(
                         "$label\n",
                         TextStyle(
@@ -263,7 +240,6 @@ class _MonthlyTrendChartState extends State<MonthlyTrendChart> {
 
   List<LineChartBarData> _buildWaveLines() {
     List<LineChartBarData> lines = [];
-
     if (selectedStatus == "All" || selectedStatus == "Completed") {
       lines.add(
         _createWaveLine(
@@ -272,7 +248,6 @@ class _MonthlyTrendChartState extends State<MonthlyTrendChart> {
         ),
       );
     }
-
     if (selectedStatus == "All" || selectedStatus == "Pending") {
       lines.add(
         _createWaveLine(
@@ -281,11 +256,9 @@ class _MonthlyTrendChartState extends State<MonthlyTrendChart> {
         ),
       );
     }
-
     if (selectedStatus == "All" || selectedStatus == "Overdue") {
       lines.add(_createWaveLine("overdue", Colors.red));
     }
-
     return lines;
   }
 
@@ -325,10 +298,7 @@ class _MonthlyTrendChartState extends State<MonthlyTrendChart> {
 
 class ProductivityBarChart extends StatelessWidget {
   final List<Map<String, dynamic>> data;
-
   const ProductivityBarChart({super.key, required this.data});
-
-  // ✅ MOVE months here (global inside class)
   static const List<String> months = [
     "Jan",
     "Feb",
@@ -343,7 +313,6 @@ class ProductivityBarChart extends StatelessWidget {
     "Nov",
     "Dec",
   ];
-
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -354,7 +323,6 @@ class ProductivityBarChart extends StatelessWidget {
           style: Theme.of(context).textTheme.displaySmall,
         ),
         const SizedBox(height: 10),
-
         SizedBox(
           height: 230,
           child: SingleChildScrollView(
@@ -367,7 +335,6 @@ class ProductivityBarChart extends StatelessWidget {
                 final value = (data[index]["productivity"] ?? 0)
                     .toDouble()
                     .clamp(0, 100);
-
                 return GestureDetector(
                   onTap: () => _showDetails(context, data[index]),
                   child: Padding(
@@ -383,8 +350,6 @@ class ProductivityBarChart extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(height: 6),
-
-                        // BAR
                         Container(
                           height: 180,
                           width: 22,
@@ -407,9 +372,7 @@ class ProductivityBarChart extends StatelessWidget {
                             ),
                           ),
                         ),
-
                         const SizedBox(height: 8),
-
                         Text(
                           months[(data[index]["month"] ?? 1) - 1],
                           style: const TextStyle(
@@ -439,7 +402,6 @@ class ProductivityBarChart extends StatelessWidget {
   void _showDetails(BuildContext context, Map item) {
     final monthIndex = (item["month"] ?? 1) - 1;
     final monthName = months[monthIndex];
-
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -454,7 +416,6 @@ class ProductivityBarChart extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // 🔘 HANDLE BAR (modern touch)
               Container(
                 width: 40,
                 height: 4,
@@ -464,8 +425,6 @@ class ProductivityBarChart extends StatelessWidget {
                   borderRadius: BorderRadius.circular(10),
                 ),
               ),
-
-              // 📅 HEADER
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -485,9 +444,7 @@ class ProductivityBarChart extends StatelessWidget {
                   ),
                 ],
               ),
-
               const SizedBox(height: 4),
-
               Align(
                 alignment: Alignment.centerLeft,
                 child: Text(
@@ -495,15 +452,11 @@ class ProductivityBarChart extends StatelessWidget {
                   style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
                 ),
               ),
-
               const SizedBox(height: 20),
-
-              // 📊 CLEAN LIST
               _cleanRow(context, "Task Points", item["taskPoints"]),
               _cleanRow(context, "Goal Points", item["goalPoints"]),
               _cleanRow(context, "5S Points", item["fiveSPoints"]),
               _cleanRow(context, "Warranty Points", item["warrantyPoints"]),
-
               const SizedBox(height: 10),
             ],
           ),
@@ -534,9 +487,7 @@ class ProductivityBarChart extends StatelessWidget {
 
 class CapsuleBarChart extends StatelessWidget {
   final List<dynamic> data;
-
   const CapsuleBarChart({super.key, required this.data});
-
   String getMonthName(int month) {
     const months = [
       "Jan",
@@ -558,13 +509,9 @@ class CapsuleBarChart extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const double maxHeight = 180;
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // SizedBox(
-        //   height: 200,
-        // child:
         const SizedBox(height: 20),
         Text(
           "Monthly Productivity",
@@ -580,17 +527,13 @@ class CapsuleBarChart extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: data.map((item) {
               final int month = item["month"] ?? 1;
-
               final int value = item["productivity"] ?? 0;
-
               final double fillHeight = (value / 100) * maxHeight;
-
               return Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 8),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
-                    // 🔥 % TEXT
                     Text(
                       "${value.toInt()}%",
                       style: const TextStyle(
@@ -598,10 +541,7 @@ class CapsuleBarChart extends StatelessWidget {
                         fontSize: 13,
                       ),
                     ),
-
                     const SizedBox(height: 6),
-
-                    // 🔥 CAPSULE BACKGROUND
                     GestureDetector(
                       onTap: () => _showDetails(context, item),
                       child: SizedBox(
@@ -609,7 +549,6 @@ class CapsuleBarChart extends StatelessWidget {
                         child: Stack(
                           alignment: Alignment.bottomCenter,
                           children: [
-                            // BACKGROUND (EMPTY CAPSULE)
                             Container(
                               width: 22,
                               height: maxHeight,
@@ -618,8 +557,6 @@ class CapsuleBarChart extends StatelessWidget {
                                 borderRadius: BorderRadius.circular(50),
                               ),
                             ),
-
-                            // 🔥 FILLED PART
                             AnimatedContainer(
                               duration: const Duration(milliseconds: 700),
                               curve: Curves.easeOut,
@@ -634,10 +571,7 @@ class CapsuleBarChart extends StatelessWidget {
                         ),
                       ),
                     ),
-
                     const SizedBox(height: 8),
-
-                    // 🔥 MONTH
                     Text(
                       getMonthName(month),
                       style: const TextStyle(
@@ -651,12 +585,10 @@ class CapsuleBarChart extends StatelessWidget {
             }).toList(),
           ),
         ),
-        //),
       ],
     );
   }
 
-  // 🎨 COLOR BASED ON %
   Color _getColor(int value) {
     if (value >= 90) return Colors.green;
     if (value >= 70) return Colors.blue;
@@ -666,6 +598,13 @@ class CapsuleBarChart extends StatelessWidget {
 
   void _showDetails(BuildContext context, Map item) {
     String monthName = getMonthName(item["month"] ?? 1);
+    final leaveAdj = item["leaveadjust"] ?? 0;
+    final permissionAdj = item["permisadjust"] ?? 0;
+    String formatValue(dynamic value) {
+      if (value == null) return "0";
+      if (value > 0) return "+$value";
+      return "$value";
+    }
 
     showModalBottomSheet(
       context: context,
@@ -681,7 +620,6 @@ class CapsuleBarChart extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // 🔘 HANDLE BAR (modern touch)
               Container(
                 width: 40,
                 height: 4,
@@ -691,8 +629,6 @@ class CapsuleBarChart extends StatelessWidget {
                   borderRadius: BorderRadius.circular(10),
                 ),
               ),
-
-              // 📅 HEADER
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -712,9 +648,7 @@ class CapsuleBarChart extends StatelessWidget {
                   ),
                 ],
               ),
-
               const SizedBox(height: 4),
-
               Align(
                 alignment: Alignment.centerLeft,
                 child: Text(
@@ -722,15 +656,47 @@ class CapsuleBarChart extends StatelessWidget {
                   style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
                 ),
               ),
-
               const SizedBox(height: 20),
-
-              // 📊 CLEAN LIST
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "Base Productivity      ${item["progress"] ?? 0}%",
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      "Leave Adjustment       ${formatValue(leaveAdj)}",
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: leaveAdj < 0
+                            ? Theme.of(context).colorScheme.error
+                            : Theme.of(context).colorScheme.secondary,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      "Permission Adjustment  ${formatValue(permissionAdj)}",
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: permissionAdj < 0
+                            ? Theme.of(context).colorScheme.error
+                            : Theme.of(context).colorScheme.secondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
               _cleanRow(context, "Task Points", item["taskPoints"]),
               _cleanRow(context, "Goal Points", item["goalPoints"]),
               _cleanRow(context, "5S Points", item["fiveSPoints"]),
               _cleanRow(context, "Warranty Points", item["warrantyPoints"]),
-
               const SizedBox(height: 10),
             ],
           ),
@@ -762,13 +728,11 @@ class CapsuleBarChart extends StatelessWidget {
 class YearlyProductivityPage extends StatelessWidget {
   final double yearlyProductivity;
   final int year;
-
   const YearlyProductivityPage({
     super.key,
     required this.yearlyProductivity,
     required this.year,
   });
-
   Color getProgressColor(double value) {
     if (value < 40) return Colors.red;
     if (value < 70) return Colors.orange;
@@ -778,7 +742,6 @@ class YearlyProductivityPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final percent = (yearlyProductivity.clamp(0, 100)) / 100;
-
     return Center(
       child: Container(
         width: double.infinity,
@@ -810,7 +773,6 @@ class YearlyProductivityPage extends StatelessWidget {
               style: TextStyle(color: Colors.white70, fontSize: 15),
             ),
             const SizedBox(height: 10),
-
             Text(
               "$year",
               style: const TextStyle(
@@ -819,9 +781,7 @@ class YearlyProductivityPage extends StatelessWidget {
                 fontWeight: FontWeight.bold,
               ),
             ),
-
             const SizedBox(height: 10),
-
             CircularPercentIndicator(
               radius: 60.0,
               lineWidth: 10.0,
@@ -839,9 +799,7 @@ class YearlyProductivityPage extends StatelessWidget {
                 ),
               ),
             ),
-
             const SizedBox(height: 10),
-
             Text(
               yearlyProductivity >= 80
                   ? "Excellent Performance 🚀"
@@ -859,7 +817,6 @@ class YearlyProductivityPage extends StatelessWidget {
 
 class Alldeptproducticity extends StatefulWidget {
   const Alldeptproducticity({super.key});
-
   @override
   State<Alldeptproducticity> createState() => _AlldeptproducticityState();
 }
@@ -867,9 +824,7 @@ class Alldeptproducticity extends StatefulWidget {
 class _AlldeptproducticityState extends State<Alldeptproducticity> {
   late int currentYear;
   late int currentMonth;
-
   late Future<List<Map<String, dynamic>>> futureData;
-
   @override
   void initState() {
     super.initState();
@@ -891,9 +846,7 @@ class _AlldeptproducticityState extends State<Alldeptproducticity> {
           'Department Productivity',
           style: Theme.of(context).textTheme.displaySmall,
         ),
-
         const SizedBox(height: 12),
-
         FutureBuilder<List<Map<String, dynamic>>>(
           future: futureData,
           builder: (context, snapshot) {
@@ -925,7 +878,6 @@ class _AlldeptproducticityState extends State<Alldeptproducticity> {
                     horizontalInside: BorderSide(color: Colors.grey),
                   ),
                   children: [
-                    // ================= HEADER =================
                     TableRow(
                       decoration: BoxDecoration(
                         color: Theme.of(context).colorScheme.secondary,
@@ -936,7 +888,6 @@ class _AlldeptproducticityState extends State<Alldeptproducticity> {
                         _tableHeader('Productivity'),
                       ],
                     ),
-                    // ================= DATA =================
                     ...departments.map((dept) {
                       final monthlyData = List<Map<String, dynamic>>.from(
                         dept['monthlyData'],
@@ -970,7 +921,6 @@ class _AlldeptproducticityState extends State<Alldeptproducticity> {
     );
   }
 
-  // ================= HEADER =================
   Widget _tableHeader(String text) {
     return Padding(
       padding: const EdgeInsets.all(12),
@@ -978,25 +928,19 @@ class _AlldeptproducticityState extends State<Alldeptproducticity> {
     );
   }
 
-  // ================= CELL =================
   Widget _tableCell(String text, {Color? color}) {
     return Padding(
       padding: const EdgeInsets.all(12),
-      child: Text(
-        text,
-        style: Theme.of(context).textTheme.labelMedium,
-      ),
+      child: Text(text, style: Theme.of(context).textTheme.labelMedium),
     );
   }
 
-  // ================= COLOR =================
   Color _getProductivityColor(double value) {
     if (value >= 80) return Theme.of(context).colorScheme.secondary;
     if (value >= 50) return Colors.orange;
     return Theme.of(context).colorScheme.error;
   }
 
-  // ================= MONTH =================
   String _getMonthName(int month) {
     const months = [
       '',
@@ -1014,5 +958,161 @@ class _AlldeptproducticityState extends State<Alldeptproducticity> {
       'Dec',
     ];
     return months[month];
+  }
+}
+
+class LeavePermissionChart extends StatelessWidget {
+  final Map<String, dynamic> attendance;
+  const LeavePermissionChart({super.key, required this.attendance});
+  @override
+  Widget build(BuildContext context) {
+    final months = _getMonthsTillNow();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Monthly Attendance Trend',
+          style: Theme.of(context).textTheme.displaySmall,
+        ),
+        const SizedBox(height: 15),
+        Container(
+          height: 250,
+          padding: const EdgeInsets.all(16),
+          child: BarChart(
+            BarChartData(
+              barGroups: _buildBarGroups(months),
+              titlesData: _titlesData(months),
+              borderData: FlBorderData(
+                show: true,
+                border: const Border(
+                  left: BorderSide(color: Colors.black, width: 1),
+                  bottom: BorderSide(color: Colors.black, width: 1),
+                  top: BorderSide.none,
+                  right: BorderSide.none,
+                ),
+              ),
+              gridData: FlGridData(show: false),
+              alignment: BarChartAlignment.spaceAround,
+              barTouchData: BarTouchData(
+                enabled: true,
+                touchTooltipData: BarTouchTooltipData(
+                  tooltipPadding: const EdgeInsets.all(8),
+                  getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                    final month = months[group.x];
+                    final leave = (attendance[month]?["leave"] ?? 0).toDouble();
+                    final permission = (attendance[month]?["permission"] ?? 0)
+                        .toDouble();
+                    return BarTooltipItem(
+                      'Leave - $leave Days\nPermission - $permission hours',
+                      const TextStyle(color: Colors.white, fontSize: 12),
+                    );
+                  },
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  List<String> _getMonthsTillNow() {
+    int currentMonth = DateTime.now().month;
+    const allMonths = [
+      "Jan",
+      "Feb",
+      "Mar",
+      "Apr",
+      "May",
+      "Jun",
+      "Jul",
+      "Aug",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dec",
+    ];
+    return allMonths.sublist(0, currentMonth);
+  }
+
+  String formatValue(double value) {
+    return value % 1 == 0 ? value.toInt().toString() : value.toString();
+  }
+
+  List<BarChartGroupData> _buildBarGroups(List<String> months) {
+    return List.generate(months.length, (index) {
+      final month = months[index];
+      final leave = (attendance[month]?["leave"] ?? 0).toDouble();
+      final permission = (attendance[month]?["permission"] ?? 0).toDouble();
+      return BarChartGroupData(
+        x: index,
+        barsSpace: 6,
+        barRods: [
+          BarChartRodData(
+            toY: leave,
+            width: 8,
+            color: Colors.red,
+            borderRadius: BorderRadius.circular(4),
+          ),
+          BarChartRodData(
+            toY: permission,
+            width: 8,
+            color: Colors.blue,
+            borderRadius: BorderRadius.circular(4),
+          ),
+        ],
+      );
+    });
+  }
+
+  FlTitlesData _titlesData(List<String> months) {
+    return FlTitlesData(
+      bottomTitles: AxisTitles(
+        sideTitles: SideTitles(
+          showTitles: true,
+          reservedSize: 28,
+          getTitlesWidget: (value, meta) {
+            if (value.toInt() >= months.length) return const SizedBox();
+            return Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text(
+                months[value.toInt()],
+                style: const TextStyle(fontSize: 12),
+              ),
+            );
+          },
+        ),
+      ),
+      leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+      topTitles: AxisTitles(
+        sideTitles: SideTitles(
+          showTitles: true,
+          reservedSize: 32,
+          getTitlesWidget: (value, meta) {
+            if (value.toInt() >= months.length) {
+              return const SizedBox();
+            }
+            final month = months[value.toInt()];
+            final leave = (attendance[month]?["leave"] ?? 0).toDouble();
+            final permission = (attendance[month]?["permission"] ?? 0)
+                .toDouble();
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  formatValue(leave),
+                  style: const TextStyle(fontSize: 10, color: Colors.red),
+                ),
+                Text(
+                  formatValue(permission),
+                  style: const TextStyle(fontSize: 10, color: Colors.blue),
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+      rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+    );
   }
 }

@@ -27,6 +27,8 @@ class AnnouncementService {
 
     if (response.statusCode == 200) {
       List<dynamic> data = jsonDecode(response.body);
+       print("❌❌😍😍😍");
+      print(response.body);
       return data.map((e) => Announcement.fromJson(e)).toList();
     } else if (response.statusCode == 401) {
       throw Exception("Unauthorized - Token expired");
@@ -35,33 +37,51 @@ class AnnouncementService {
     }
   }
 
-  static Future<bool> postAnnouncement({
-    required String title,
-    required String description,
-    required String targetRole,
-    required String createdBy,
-    File? file,
-  }) async {
-    var uri = Uri.parse("$baseUrl/Announcement/upload-announcement");
+ static Future<bool> postAnnouncement({
+  required String title,
+  required String description,
+  required String targetRole,
+  File? file,
+}) async {
+  try {
     final token = await AuthService.getToken();
 
-    var request = http.MultipartRequest("POST", uri);
+    var request = http.MultipartRequest(
+      "POST",
+      Uri.parse("$baseUrl/Announcement/postannouncements"),
+    );
 
+    // 🔐 AUTH
     request.headers["Authorization"] = "Bearer $token";
 
-    request.fields["title"] = title;
-    request.fields["description"] = description;
-    request.fields["targetRole"] = targetRole;
-    request.fields["createdBy"] = createdBy;
+    // 📝 FIELDS
+    request.fields['title'] = title;
+    request.fields['description'] = description;
+    request.fields['targetRole'] = targetRole;
 
-    if (file != null) {
-      request.files.add(await http.MultipartFile.fromPath("file", file.path));
+    // 📎 FILE (SAFE CHECK)
+    if (file != null && await file.exists()) {
+      request.files.add(
+        await http.MultipartFile.fromPath(
+          'file',
+          file.path,
+        ),
+      );
     }
 
-    var response = await request.send();
+    // 🔥 SEND
+    final response = await request.send();
+    final body = await response.stream.bytesToString();
+
+    print("STATUS: ${response.statusCode}");
+    print("BODY: $body");
 
     return response.statusCode == 200;
+  } catch (e) {
+    print("ERROR: $e");
+    return false;
   }
+}
 
   static Future<bool> deleteAnnouncement(int id) async {
     final token = await AuthService.getToken();
@@ -89,6 +109,10 @@ class AnnouncementService {
     required TimeOfDay startTime,
     required TimeOfDay endTime,
     required bool isSubmit,
+    required double latitude,
+    required double longitude,
+    required String locationName,
+    File? image,
   }) async {
     final startDateTime = DateTime(
       workDate.year,
@@ -108,27 +132,36 @@ class AnnouncementService {
 
     final token = await AuthService.getToken();
 
-    final response = await http.post(
+    var request = http.MultipartRequest(
+      'POST',
       Uri.parse("$baseUrl/Announcement/addworklog"),
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": "Bearer $token",
-      },
-      body: jsonEncode({
-        "workDate": workDate.toIso8601String(),
-        "startTime": startDateTime.toIso8601String(),
-        "endTime": endDateTime.toIso8601String(),
-        "title": title,
-        "description": description,
-        "isSubmit": isSubmit,
-      }),
     );
 
-    print(response.statusCode);
-    print(response.body);
+    request.headers['Authorization'] = 'Bearer $token';
+
+    request.fields['Title'] = title;
+    request.fields['Description'] = description;
+    request.fields['WorkDate'] = workDate.toIso8601String();
+    request.fields['StartTime'] = startDateTime.toIso8601String();
+    request.fields['EndTime'] = endDateTime.toIso8601String();
+    request.fields['IsSubmit'] = isSubmit.toString();
+    request.fields['Latitude'] = latitude.toString();
+    request.fields['Longitude'] = longitude.toString();
+    request.fields['LocationName'] = locationName;
+
+    if (image != null) {
+      request.files.add(
+        await http.MultipartFile.fromPath(
+          'Image', // 👈 must match DTO
+          image.path,
+        ),
+      );
+    }
+
+    var response = await request.send();
 
     if (response.statusCode != 200) {
-      throw Exception("Failed to save worklog");
+      throw Exception("Upload failed");
     }
   }
 
@@ -227,56 +260,56 @@ class AnnouncementService {
     }
   }
 
- static Future<void> editWorkLog({
-  required int workLogId,
-  required String title,
-  required String description,
-  required DateTime workDate,
-  required TimeOfDay startTime,
-  required TimeOfDay endTime,
-  bool isSubmit = false,
-}) async {
-  final token = await AuthService.getToken();
+  static Future<void> editWorkLog({
+    required int workLogId,
+    required String title,
+    required String description,
+    required DateTime workDate,
+    required TimeOfDay startTime,
+    required TimeOfDay endTime,
+    bool isSubmit = false,
+  }) async {
+    final token = await AuthService.getToken();
 
-  final body = {
-    "title": title,
-    "description": description,
-    "workDate": workDate.toIso8601String(),
+    final body = {
+      "title": title,
+      "description": description,
+      "workDate": workDate.toIso8601String(),
 
-    // send full datetime (backend uses Hour & Minute)
-    "startTime": DateTime(
-      workDate.year,
-      workDate.month,
-      workDate.day,
-      startTime.hour,
-      startTime.minute,
-    ).toIso8601String(),
+      // send full datetime (backend uses Hour & Minute)
+      "startTime": DateTime(
+        workDate.year,
+        workDate.month,
+        workDate.day,
+        startTime.hour,
+        startTime.minute,
+      ).toIso8601String(),
 
-    "endTime": DateTime(
-      workDate.year,
-      workDate.month,
-      workDate.day,
-      endTime.hour,
-      endTime.minute,
-    ).toIso8601String(),
+      "endTime": DateTime(
+        workDate.year,
+        workDate.month,
+        workDate.day,
+        endTime.hour,
+        endTime.minute,
+      ).toIso8601String(),
 
-    "isSubmit": isSubmit,
-  };
+      "isSubmit": isSubmit,
+    };
 
-  final response = await http.put(
-    Uri.parse("$baseUrl/Announcement/editworklog/$workLogId"),
-    headers: {
-      "Authorization": "Bearer $token",
-      "Content-Type": "application/json",
-    },
-    body: jsonEncode(body),
-  );
+    final response = await http.put(
+      Uri.parse("$baseUrl/Announcement/editworklog/$workLogId"),
+      headers: {
+        "Authorization": "Bearer $token",
+        "Content-Type": "application/json",
+      },
+      body: jsonEncode(body),
+    );
 
-  if (response.statusCode != 200) {
-    print(response.body);
-    throw Exception("Failed to edit worklog");
+    if (response.statusCode != 200) {
+      print(response.body);
+      throw Exception("Failed to edit worklog");
+    }
   }
-}
 
   Future<Map<String, dynamic>> sendWarning({
     required int receiverId,
@@ -359,9 +392,7 @@ class AnnouncementService {
     try {
       final response = await http.get(
         Uri.parse("$baseUrl/Announcement/get-warnings-by-user/$userId"),
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: {"Content-Type": "application/json"},
       );
 
       if (response.statusCode == 200) {

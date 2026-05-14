@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:staff_work_track/core/widgets/buttons.dart';
+import 'package:staff_work_track/core/constant/apiurl.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
+import 'package:staff_work_track/screen/staff/navigation/fullimg.dart';
 import 'package:staff_work_track/services/announ_service.dart';
 
 class Staffworklog extends StatefulWidget {
@@ -15,13 +16,14 @@ class _UsersWorklogState extends State<Staffworklog> {
   List<dynamic> worklogs = [];
   List<dynamic> filteredLogs = [];
   bool isLoading = true;
+
   TextEditingController searchController = TextEditingController();
   bool isSearching = false;
+
   List<String> departments = [];
   String searchQuery = "";
   String? selectedDepartment;
   DateTime? selectedDate;
-  bool _isLoading = false;
 
   @override
   void initState() {
@@ -29,36 +31,30 @@ class _UsersWorklogState extends State<Staffworklog> {
     fetchData();
   }
 
+  // ✅ FORMAT TIME
   String formatTime(String? dateTime) {
     if (dateTime == null) return "";
     final time = DateTime.parse(dateTime);
     return "${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}";
   }
 
+  // ✅ FORMAT HOURS
   String formatHours(double hours) {
     int h = hours.floor();
     int m = ((hours - h) * 60).round();
     return "${h}h ${m}m";
   }
 
+  // ✅ FETCH DATA
   Future<void> fetchData() async {
     setState(() => isLoading = true);
 
     try {
       final data = await AnnouncementService.getDepartmentWorklogs();
 
-      final deptSet = <String>{};
-
-      for (var log in data) {
-        if (log['departmentName'] != null) {
-          deptSet.add(log['departmentName']);
-        }
-      }
-
       setState(() {
         worklogs = data;
         filteredLogs = data;
-        departments = deptSet.toList();
         isLoading = false;
       });
     } catch (e) {
@@ -67,37 +63,25 @@ class _UsersWorklogState extends State<Staffworklog> {
     }
   }
 
+  // ✅ FILTER
   void applyFilter() {
     List<dynamic> temp = worklogs;
 
-    if (selectedDepartment != null && selectedDepartment!.isNotEmpty) {
-      temp = temp
-          .where((w) => w['departmentName'] == selectedDepartment)
-          .toList();
-    }
-
     if (selectedDate != null) {
-      temp = temp
-          .where(
-            (w) =>
-                DateTime.parse(w['workDate']).toLocal().day ==
-                    selectedDate!.day &&
-                DateTime.parse(w['workDate']).toLocal().month ==
-                    selectedDate!.month &&
-                DateTime.parse(w['workDate']).toLocal().year ==
-                    selectedDate!.year,
-          )
-          .toList();
+      temp = temp.where((w) {
+        final date = DateTime.parse(w['workDate']).toLocal();
+        return date.year == selectedDate!.year &&
+            date.month == selectedDate!.month &&
+            date.day == selectedDate!.day;
+      }).toList();
     }
 
     if (searchQuery.isNotEmpty) {
-      temp = temp
-          .where(
-            (w) => (w['userName'] ?? "").toString().toLowerCase().contains(
-              searchQuery.toLowerCase(),
-            ),
-          )
-          .toList();
+      temp = temp.where((w) {
+        return (w['userName'] ?? "").toString().toLowerCase().contains(
+          searchQuery.toLowerCase(),
+        );
+      }).toList();
     }
 
     setState(() {
@@ -105,146 +89,44 @@ class _UsersWorklogState extends State<Staffworklog> {
     });
   }
 
-  void _showDateMonthPicker() {
-    int tempYear = selectedDate?.year ?? DateTime.now().year;
-    int tempMonth = selectedDate?.month ?? DateTime.now().month;
-    int tempDay = selectedDate?.day ?? DateTime.now().day;
+  // ✅ GROUP BY DATE
+  Map<String, List<dynamic>> groupByDate(List logs) {
+    Map<String, List<dynamic>> grouped = {};
 
-    showModalBottomSheet(
+    for (var log in logs) {
+      String date = log["workDate"]?.split("T")[0] ?? "";
+
+      if (!grouped.containsKey(date)) {
+        grouped[date] = [];
+      }
+
+      grouped[date]!.add(log);
+    }
+
+    return grouped;
+  }
+
+  // ✅ DATE PICKER
+  void _showDatePicker() async {
+    DateTime? picked = await showDatePicker(
       context: context,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            return Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text(
-                    "Select Date or Month",
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  // YEAR
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text("Year"),
-                      DropdownButton<int>(
-                        value: tempYear,
-                        dropdownColor: Colors.white,
-                        style: const TextStyle(color: Colors.black),
-                        items: List.generate(10, (i) => DateTime.now().year - i)
-                            .map(
-                              (y) =>
-                                  DropdownMenuItem(value: y, child: Text("$y")),
-                            )
-                            .toList(),
-                        onChanged: (v) {
-                          setModalState(() {
-                            tempYear = v!;
-                          });
-                        },
-                      ),
-                    ],
-                  ),
-
-                  // MONTH
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text("Month"),
-                      DropdownButton<int>(
-                        value: tempMonth,
-                        dropdownColor: Colors.white,
-                        style: const TextStyle(color: Colors.black),
-                        items: List.generate(12, (i) {
-                          return DropdownMenuItem(
-                            value: i + 1,
-                            child: Text(
-                              DateFormat('MMMM').format(DateTime(0, i + 1)),
-                            ),
-                          );
-                        }),
-                        onChanged: (v) {
-                          setModalState(() {
-                            tempMonth = v!;
-                          });
-                        },
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  // DAY
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text("Day (optional)"),
-                      DropdownButton<int>(
-                        value: tempDay,
-                        dropdownColor: Colors.white,
-                        style: const TextStyle(color: Colors.black),
-                        items:
-                            List.generate(
-                                  DateTime(tempYear, tempMonth + 1, 0).day,
-                                  (i) => i + 1,
-                                )
-                                .map(
-                                  (d) => DropdownMenuItem(
-                                    value: d,
-                                    child: Text("$d"),
-                                  ),
-                                )
-                                .toList(),
-                        onChanged: (v) {
-                          setModalState(() {
-                            tempDay = v!;
-                          });
-                        },
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  Center(
-                    child: AppButton(
-                      text: "Apply",
-                      isLoading: _isLoading,
-                      onPressed: () {
-                        setState(() {
-                          selectedDate = DateTime(tempYear, tempMonth, tempDay);
-                          applyFilter();
-                        });
-                        Navigator.pop(context);
-                      },
-                      color: Theme.of(context).colorScheme.secondary,
-                      txtcolor: Theme.of(context).colorScheme.onPrimary,
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
+      initialDate: selectedDate ?? DateTime.now(),
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2100),
     );
+
+    if (picked != null) {
+      setState(() {
+        selectedDate = picked;
+        applyFilter();
+      });
+    }
   }
 
-  Color _getUserColor(String userName) {
-    int hash = userName.hashCode;
-    int r = (hash & 0xFF0000) >> 16;
-    int g = (hash & 0x00FF00) >> 8;
-    int b = (hash & 0x0000FF);
-    return Color.fromARGB(255, r, g, b).withOpacity(0.2);
-  }
-
+  // ✅ BUILD UI
   @override
   Widget build(BuildContext context) {
+    final groupedLogs = groupByDate(filteredLogs);
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
@@ -255,10 +137,8 @@ class _UsersWorklogState extends State<Staffworklog> {
             ? TextField(
                 controller: searchController,
                 autofocus: true,
-                style: Theme.of(context).textTheme.titleMedium,
-                decoration: InputDecoration(
-                  hintText: "Search by user...",
-                  hintStyle: Theme.of(context).textTheme.titleMedium,
+                decoration: const InputDecoration(
+                  hintText: "Search user...",
                   border: InputBorder.none,
                 ),
                 onChanged: (value) {
@@ -283,115 +163,193 @@ class _UsersWorklogState extends State<Staffworklog> {
               });
             },
           ),
-
           IconButton(
-            onPressed: _showDateMonthPicker,
             icon: const Icon(Icons.calendar_today),
+            onPressed: _showDatePicker,
           ),
         ],
       ),
+
       body: isLoading
           ? const Center(child: RotatingFlower())
           : filteredLogs.isEmpty
           ? const Center(child: Text("No Worklogs Found"))
-          : SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Card(
-                  elevation: 3,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: DataTable(
-                    headingRowColor: MaterialStateProperty.all(
-                      Theme.of(context).colorScheme.secondary,
-                    ),
-                    headingTextStyle: Theme.of(context).textTheme.labelLarge,
-                    columns: const [
-                      DataColumn(label: Text("User")),
-                      DataColumn(label: Text("Date")),
-                      DataColumn(label: Text("Title")),
-                      DataColumn(label: Text("Description")),
-                      DataColumn(label: Text("Start Time")),
-                      DataColumn(label: Text("End Time")),
-                      DataColumn(label: Text("Hours")),
-                      DataColumn(label: Text("Department")),
-                    ],
-                    rows: filteredLogs.map((log) {
-                      String userName = log["userName"] ?? "";
-                      Color rowColor = _getUserColor(userName);
-                      return DataRow(
-                        color: MaterialStateProperty.all(
-                          rowColor.withOpacity(0.1),
-                        ),
-                        cells: [
-                          DataCell(
-                            Text(
-                              userName,
-                              style: Theme.of(context).textTheme.labelMedium,
-                            ),
-                          ),
-                          DataCell(
-                            Text(
-                              log["workDate"]?.split("T")[0] ?? "",
-                              style: Theme.of(context).textTheme.labelMedium,
-                            ),
-                          ),
-                          DataCell(
-                            SizedBox(
-                              width: 200,
-                              child: Text(
-                                log["title"] ?? "",
-                                softWrap: true,
-                                maxLines: null,
-                                style: Theme.of(context).textTheme.labelMedium,
-                              ),
-                            ),
-                          ),
+          : ListView(
+              padding: const EdgeInsets.all(12),
+              children: groupedLogs.entries.map((entry) {
+                String date = entry.key;
+                List logs = entry.value;
 
-                          DataCell(
-                            SizedBox(
-                              width: 200,
-                              child: Text(
-                                log["description"] ?? "",
-                                softWrap: true,
-                                maxLines: null,
-                                style: Theme.of(context).textTheme.labelMedium,
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // 📅 DATE HEADER
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      child: Text(
+                        DateFormat("yyyy-MMMM-dd").format(DateTime.parse(date)),
+                        style: Theme.of(context).textTheme.labelMedium,
+                      ),
+                    ),
+
+                    // 📍 TIMELINE ITEMS
+                    ...logs
+                        .map((log) => buildTimelineItem(context, log))
+                        .toList(),
+                  ],
+                );
+              }).toList(),
+            ),
+    );
+  }
+
+  Widget buildTimelineItem(BuildContext context, dynamic log) {
+    final accentColor = Theme.of(context).colorScheme.secondary;
+
+    return StatefulBuilder(
+      builder: (context, setLocalState) {
+        bool isExpanded = false;
+
+        return StatefulBuilder(
+          builder: (context, setStateItem) {
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Column(
+                  children: [
+                    Icon(
+                      Icons.location_history,
+                      size: 30,
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                    Container(width: 2, height: 25, color: accentColor),
+                  ],
+                ),
+
+                const SizedBox(width: 15),
+
+                // 📦 CONTENT BOX
+                Expanded(
+                  child: Container(
+                    margin: const EdgeInsets.only(bottom: 5),
+                    padding: const EdgeInsets.only(
+                      left: 10,
+                      right: 10,
+                      bottom: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(15),
+                      border: Border.all(
+                        color: accentColor.withOpacity(0.3),
+                        width: 1,
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              log["userName"] ?? "",
+                              style: Theme.of(context).textTheme.displaySmall,
+                            ),
+                            Row(
+                              children: [
+                                Text(
+                                  formatHours(
+                                    (log["totalHours"] ?? 0).toDouble(),
+                                  ),
+                                  style: Theme.of(
+                                    context,
+                                  ).textTheme.labelMedium,
+                                ),
+                                IconButton(
+                                  icon: Icon(
+                                    isExpanded
+                                        ? Icons.keyboard_arrow_up
+                                        : Icons.keyboard_arrow_down,
+                                  ),
+                                  onPressed: () {
+                                    setStateItem(() {
+                                      isExpanded = !isExpanded;
+                                    });
+                                  },
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                        Text(
+                          log["title"] ?? "",
+                          style: Theme.of(context).textTheme.labelMedium,
+                        ),
+
+                        const SizedBox(height: 5),
+
+                        // 📍 LOCATION
+                        Text(
+                          " Location : ${log["locationName"] ?? "No location"}",
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
+
+                        // // ⬇ EXPANDED CONTENT
+                        if (isExpanded) ...[
+                          Divider(color: accentColor),
+                          const SizedBox(height: 5),
+                          Text(
+                            "Start Time: ${formatTime(log["startTime"])}",
+                            style: Theme.of(context).textTheme.labelMedium,
+                          ),
+                          const SizedBox(height: 5),
+                          Text(
+                            "End Time: ${formatTime(log["endTime"])}",
+                            style: Theme.of(context).textTheme.labelMedium,
+                          ),
+                          const SizedBox(height: 5),
+                          Text(
+                            "Description: ${log["description"] ?? ""}",
+                            style: Theme.of(context).textTheme.labelMedium,
+                          ),
+                          if (log["imageUrl"] != null &&
+                              log["imageUrl"].toString().isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 8),
+                              child: GestureDetector(
+                                onTap: () {
+                                  final fullUrl =
+                                      "${ApiConstants.Uploaded}${log["imageUrl"].toString().replaceFirst('/uploads/', '')}";
+
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => FullScreenImageViewer(
+                                        imageUrl: fullUrl,
+                                      ),
+                                    ),
+                                  );
+                                },
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(10),
+                                  child: Image.network(
+                                    "${ApiConstants.Uploaded}${log["imageUrl"].toString().replaceFirst('/uploads/', '')}",
+                                    height: 150,
+                                    width: double.infinity,
+                                    fit: BoxFit.cover,
+                                  ),
+                                ),
                               ),
                             ),
-                          ),
-                          DataCell(
-                            Text(
-                              formatTime(log["startTime"]),
-                              style: Theme.of(context).textTheme.labelMedium,
-                            ),
-                          ),
-                          DataCell(
-                            Text(
-                              formatTime(log["endTime"]),
-                              style: Theme.of(context).textTheme.labelMedium,
-                            ),
-                          ),
-                          DataCell(
-                            Text(
-                              formatHours((log["totalHours"] ?? 0).toDouble()),
-                              style: Theme.of(context).textTheme.labelMedium,
-                            ),
-                          ),
-                          DataCell(
-                            Text(
-                              log["departmentName"] ?? "",
-                              style: Theme.of(context).textTheme.labelMedium,
-                            ),
-                          ),
                         ],
-                      );
-                    }).toList(),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 }

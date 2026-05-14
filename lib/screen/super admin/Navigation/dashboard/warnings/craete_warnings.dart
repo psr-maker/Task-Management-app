@@ -162,7 +162,11 @@ class _SendWarningPageState extends State<SendWarningPage> {
                       Expanded(
                         child: Text(
                           "Send official warning to ${widget.receivername}",
-                          style: const TextStyle(fontSize: 14),
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: Colors.red,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
                     ],
@@ -180,11 +184,10 @@ class _SendWarningPageState extends State<SendWarningPage> {
                   controller: titleController,
                   decoration: InputDecoration(
                     hintText: "Enter warning title",
-                    filled: true,
-                    fillColor: Colors.white,
+                    hintStyle: Theme.of(context,).textTheme.labelSmall,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(14),
-                      borderSide: BorderSide.none,
+                      borderSide: BorderSide(color: Colors.grey.shade300),
                     ),
                   ),
                 ),
@@ -202,11 +205,10 @@ class _SendWarningPageState extends State<SendWarningPage> {
                   maxLines: 4,
                   decoration: InputDecoration(
                     hintText: "Explain the reason clearly...",
-                    filled: true,
-                    fillColor: Colors.white,
+                    hintStyle: Theme.of(context).textTheme.labelSmall,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(14),
-                      borderSide: BorderSide.none,
+                      borderSide: BorderSide(color: Colors.grey.shade300),
                     ),
                   ),
                 ),
@@ -237,7 +239,7 @@ class _SendWarningPageState extends State<SendWarningPage> {
                     isLoading: isLoading,
                     onPressed: isLoading ? null : sendWarning,
                     color: Theme.of(context).colorScheme.error,
-                    txtcolor: Theme.of(context).colorScheme.onPrimary,
+                    txtcolor: Colors.white,
                   ),
                 ),
               ],

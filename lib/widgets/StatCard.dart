@@ -215,6 +215,7 @@ class _TaskCardState extends State<Taskstatus> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final statusColor = TaskUtils.getStatusColor(selectedStatus);
     final priorityColor = TaskUtils.getPriorityColor(widget.task["priority"]);
 
@@ -224,7 +225,10 @@ class _TaskCardState extends State<Taskstatus> {
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.onPrimary,
+          // color: Theme.of(context).colorScheme.onPrimary,
+          color: isDark
+              ? Theme.of(context).colorScheme.onSecondary
+              : Theme.of(context).colorScheme.onPrimary,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
             color: Theme.of(context).colorScheme.secondary,
@@ -395,7 +399,7 @@ class _GoalCardState extends State<GoalCard> {
   int? adminId;
   bool isLoading = true;
   bool isSearching = false;
-
+  late final isDark = Theme.of(context).brightness == Brightness.dark;
   final TextEditingController searchController = TextEditingController();
   @override
   void initState() {
@@ -437,7 +441,9 @@ class _GoalCardState extends State<GoalCard> {
     } else if (progress <= 70) {
       return Colors.orange;
     } else {
-      return Theme.of(context).colorScheme.secondary;
+      return isDark
+          ? Theme.of(context).colorScheme.onSecondary
+          : Theme.of(context).colorScheme.secondary;
     }
   }
 
@@ -537,7 +543,9 @@ class _GoalCardState extends State<GoalCard> {
       child: Container(
         margin: const EdgeInsets.symmetric(vertical: 5),
         decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.onPrimary,
+          color: isDark
+              ? Theme.of(context).colorScheme.primary
+              : Theme.of(context).colorScheme.onPrimary,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
             color: Theme.of(context).colorScheme.secondary,
@@ -695,7 +703,7 @@ class _GoalCardState extends State<GoalCard> {
                                     ),
                                   ),
                                 ],
-                              ),                          
+                              ),
                             ],
                           ),
                         ],

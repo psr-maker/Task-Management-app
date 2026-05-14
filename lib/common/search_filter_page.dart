@@ -23,7 +23,7 @@ class TaskFilterDropdown extends StatelessWidget {
   Widget build(BuildContext context) {
     return Material(
       elevation: 6,
-      color: Theme.of(context).colorScheme.primary,
+      color: Theme.of(context).colorScheme.onPrimary,
       child: Padding(
         padding: const EdgeInsets.all(14),
         child: Column(
@@ -40,14 +40,14 @@ class TaskFilterDropdown extends StatelessWidget {
                   text: 'Clear',
                   onPressed: onClear,
                   color: Theme.of(context).colorScheme.secondary,
-                  txtcolor: Theme.of(context).colorScheme.onPrimary,
+                  txtcolor: Theme.of(context).colorScheme.background,
                 ),
                 const Spacer(),
                 AppButton(
                   text: 'Apply',
                   onPressed: onApply,
                   color: Theme.of(context).colorScheme.secondary,
-                  txtcolor: Theme.of(context).colorScheme.onPrimary,
+                  txtcolor: Theme.of(context).colorScheme.background,
                 ),
               ],
             ),
@@ -66,6 +66,7 @@ class TaskFilterDropdown extends StatelessWidget {
       onChanged: (v) => filter.department = v,
       itemBuilder: (e) =>
           Text(e, style: Theme.of(context).textTheme.headlineSmall),
+      context: context,
     );
   }
 
@@ -78,6 +79,7 @@ class TaskFilterDropdown extends StatelessWidget {
       onChanged: (v) => filter.status = v,
       itemBuilder: (e) => _statusChip(context, e),
       selectedBuilder: (e) => _statusChip(context, e),
+      context: context,
     );
   }
 
@@ -111,6 +113,7 @@ class TaskFilterDropdown extends StatelessWidget {
       onChanged: (v) => filter.priority = v,
       itemBuilder: (e) => _priorityChip(context, e),
       selectedBuilder: (e) => _priorityChip(context, e),
+      context: context,
     );
   }
 
@@ -136,6 +139,7 @@ class TaskFilterDropdown extends StatelessWidget {
 
   // ---------------- COLORED DROPDOWN ----------------
   Widget _styledDropdown({
+    required BuildContext context,
     required String label,
     required String? value,
     required List<String> items,
@@ -143,45 +147,75 @@ class TaskFilterDropdown extends StatelessWidget {
     required Widget Function(String) itemBuilder,
     Widget Function(String)? selectedBuilder,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
       child: DropdownButtonFormField<String?>(
         value: value,
+
+        dropdownColor: Theme.of(context).colorScheme.onPrimary,
+
+        style: Theme.of(context).textTheme.titleSmall,
+
         decoration: InputDecoration(
           labelText: label,
+
+          labelStyle: TextStyle(color: Theme.of(context).colorScheme.secondary),
+
           contentPadding: const EdgeInsets.symmetric(
             horizontal: 14,
-            vertical: 14, // 🔥 Medium height
+            vertical: 14,
           ),
+
+          filled: true,
+          fillColor: isDark
+              ? Theme.of(context).colorScheme.background
+              : Theme.of(context).colorScheme.onPrimary,
+
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(10),
-            borderSide: BorderSide(color: Colors.grey.shade400),
+            borderSide: BorderSide(
+              color: isDark ? Colors.white24 : Colors.grey.shade400,
+            ),
           ),
+
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(10),
-            borderSide: const BorderSide(
-              color: Color.fromARGB(255, 25, 77, 38),
+            borderSide: BorderSide(
+              color: Theme.of(context).colorScheme.secondary,
               width: 1.4,
             ),
           ),
         ),
+
+        iconEnabledColor: Theme.of(context).colorScheme.secondary,
+
         isExpanded: true,
+
         items: [
-          const DropdownMenuItem(
+          DropdownMenuItem(
             value: null,
-            child: Text("All", style: TextStyle(fontWeight: FontWeight.w500)),
+            child: Text(
+              "All",
+              style: Theme.of(context).textTheme.headlineSmall,
+            ),
           ),
+
           ...items.map(
             (e) => DropdownMenuItem(value: e, child: itemBuilder(e)),
           ),
         ],
+
         selectedItemBuilder: selectedBuilder != null
             ? (context) => [
-                const Text("All"),
+                Text("All", style: Theme.of(context).textTheme.headlineSmall),
                 ...items.map((e) => selectedBuilder(e)),
               ]
             : null,
+
         onChanged: onChanged,
       ),
     );

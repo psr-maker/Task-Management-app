@@ -117,7 +117,7 @@ class ReportsService {
     }
   }
 
- static Future<Map<String, dynamic>> getFullReport({
+  static Future<Map<String, dynamic>> getFullReport({
     int? userId,
     String? department,
   }) async {
@@ -138,39 +138,12 @@ class ReportsService {
       return {
         "tasks": decoded["tasks"],
 
-        "goals": decoded["goals"], // keep raw for now
+        "goals": decoded["goals"],
+        "leaveList": decoded["leaveList"],
+        "permissionList": decoded["permissionList"],
       };
     } else {
       throw Exception("Failed to load report");
     }
   }
-  //'''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
-
-  // Future<List<ReportTask>> getFilteredTasks({
-  //   int? userId,
-  //   String? department,
-  // }) async {
-  //   String url = "$baseUrl/Reports/FilteredTableTasks";
-
-  //   final queryParams = {
-  //     if (userId != null) "userId": userId.toString(),
-  //     if (department != null) "department": department,
-  //   };
-
-  //   final uri = Uri.parse(url).replace(queryParameters: queryParams);
-
-  //   final response = await http.get(uri);
-
-  //   if (response.statusCode == 200) {
-  //     final decoded = jsonDecode(response.body);
-
-  //     final List data = decoded is List ? decoded : decoded['data'];
-
-  //     print("Decoded list length: ${data.length}");
-
-  //     return data.map((e) => ReportTask.fromJson(e)).toList();
-  //   } else {
-  //     throw Exception("Failed to load tasks");
-  //   }
-  // }
 }

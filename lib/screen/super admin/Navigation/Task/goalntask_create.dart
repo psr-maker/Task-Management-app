@@ -235,6 +235,9 @@ class _CreateTaskPageState extends State<Createtask> {
                     child: ToggleButtons(
                       borderRadius: BorderRadius.circular(10),
                       isSelected: [!isTask, isTask],
+                      color: Theme.of(context).colorScheme.secondary,
+                      selectedColor: Colors.white,
+                      fillColor: Theme.of(context).colorScheme.secondary,
                       onPressed: (index) {
                         setState(() {
                           isTask = index == 1; // Task is index 1
@@ -245,14 +248,24 @@ class _CreateTaskPageState extends State<Createtask> {
                           padding: EdgeInsets.symmetric(horizontal: 25),
                           child: Text(
                             "Goal",
-                            style: Theme.of(context).textTheme.headlineLarge,
+                            style: TextStyle(
+                              color: !isTask
+                                  ? Colors.white
+                                  : Theme.of(context).colorScheme.secondary,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 25),
                           child: Text(
                             "Task",
-                            style: Theme.of(context).textTheme.headlineLarge,
+                            style: TextStyle(
+                              color: !isTask
+                                  ? Theme.of(context).colorScheme.secondary
+                                  : Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
                       ],

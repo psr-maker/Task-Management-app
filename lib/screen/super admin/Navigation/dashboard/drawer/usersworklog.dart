@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:staff_work_track/core/constant/apiurl.dart';
 import 'package:staff_work_track/core/widgets/buttons.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
+import 'package:staff_work_track/screen/staff/navigation/fullimg.dart';
 import 'package:staff_work_track/services/announ_service.dart';
-import 'package:staff_work_track/utils/app_helper.dart';
 
 class UsersWorklog extends StatefulWidget {
   const UsersWorklog({super.key});
@@ -31,6 +32,13 @@ class _UsersWorklogState extends State<UsersWorklog> {
     fetchData();
   }
 
+  String formatTime(String? dateTime) {
+    if (dateTime == null) return "";
+    final time = DateTime.parse(dateTime);
+    return "${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}";
+  }
+
+  // ✅ FORMAT HOURS
   String formatHours(double hours) {
     int h = hours.floor();
     int m = ((hours - h) * 60).round();
@@ -250,17 +258,25 @@ class _UsersWorklogState extends State<UsersWorklog> {
     );
   }
 
-  Color _getUserColor(String userName) {
-    // Generate color based on user name
-    int hash = userName.hashCode;
-    int r = (hash & 0xFF0000) >> 16;
-    int g = (hash & 0x00FF00) >> 8;
-    int b = (hash & 0x0000FF);
-    return Color.fromARGB(255, r, g, b).withOpacity(0.2);
+  Map<String, List<dynamic>> groupByDate(List logs) {
+    Map<String, List<dynamic>> grouped = {};
+
+    for (var log in logs) {
+      String date = log["workDate"]?.split("T")[0] ?? "";
+
+      if (!grouped.containsKey(date)) {
+        grouped[date] = [];
+      }
+
+      grouped[date]!.add(log);
+    }
+
+    return grouped;
   }
 
   @override
   Widget build(BuildContext context) {
+    final groupedLogs = groupByDate(filteredLogs);
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
@@ -315,96 +331,88 @@ class _UsersWorklogState extends State<UsersWorklog> {
           ? const Center(child: RotatingFlower())
           : filteredLogs.isEmpty
           ? const Center(child: Text("No Worklogs Found"))
-          : Padding(
-              padding: const EdgeInsets.all(15),
-              child: SingleChildScrollView(
-                child: Column(
+          : ListView(
+              padding: const EdgeInsets.all(12),
+              children: groupedLogs.entries.map((entry) {
+                String date = entry.key;
+                List logs = entry.value;
+
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: DataTable(
-                        headingRowColor: MaterialStateProperty.all(
-                          Theme.of(context).colorScheme.secondary,
-                        ),
-                        headingTextStyle: Theme.of(
-                          context,
-                        ).textTheme.labelLarge,
-                        columns: const [
-                          DataColumn(label: Text("User")),
-                          DataColumn(label: Text("Date")),
-                          DataColumn(label: Text("Title")),
-                          DataColumn(label: Text("Description")),
-                          DataColumn(label: Text("Start Time")),
-                          DataColumn(label: Text("End Time")),
-                          DataColumn(label: Text("Hours")),
-                          DataColumn(label: Text("Department")),
-                        ],
-                        rows: filteredLogs.map((log) {
-                          String userName = log["userName"] ?? "";
-                          Color rowColor = _getUserColor(userName);
-                          return DataRow(
-                            color: MaterialStateProperty.all(rowColor),
-                            cells: [
-                              DataCell(
-                                Text(
-                                  userName,
-                                  style: Theme.of(
-                                    context,
-                                  ).textTheme.labelMedium,
-                                ),
-                              ),
-                              DataCell(
-                                Text(
-                                  log["workDate"]?.toString().split("T")[0] ??
-                                      "",
-                                  style: Theme.of(
-                                    context,
-                                  ).textTheme.labelMedium,
-                                ),
-                              ),
-                              DataCell(
-                                SizedBox(
-                                  width: 200,
-                                  child: Text(
-                                    log["title"] ?? "",
-                                    maxLines: 2,
-                                    style: Theme.of(
-                                      context,
-                                    ).textTheme.labelMedium,
-                                  ),
-                                ),
-                              ),
-                              DataCell(
-                                SizedBox(
-                                  width: 200,
-                                  child: Text(
-                                    log["description"] ?? "",
-                                    softWrap: true,
-                                    style: Theme.of(
-                                      context,
-                                    ).textTheme.labelMedium,
-                                  ),
-                                ),
-                              ),
-                              DataCell(
-                                Text(
-                                  AppHelpers.formatDate(log["startTime"]),
-                                  style: Theme.of(
-                                    context,
-                                  ).textTheme.labelMedium,
-                                ),
-                              ),
+                    // 📅 DATE HEADER
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      child: Text(
+                        DateFormat("yyyy-MMMM-dd").format(DateTime.parse(date)),
+                        style: Theme.of(context).textTheme.labelMedium,
+                      ),
+                    ),
 
-                              DataCell(
-                                Text(
-                                  AppHelpers.formatDate(log["endTime"]),
-                                  style: Theme.of(
-                                    context,
-                                  ).textTheme.labelMedium,
-                                ),
-                              ),
+                    // 📍 TIMELINE ITEMS
+                    ...logs
+                        .map((log) => buildTimelineItem(context, log))
+                        .toList(),
+                  ],
+                );
+              }).toList(),
+            ),
+    );
+  }
 
-                              DataCell(
+  Widget buildTimelineItem(BuildContext context, dynamic log) {
+    final accentColor = Theme.of(context).colorScheme.secondary;
+
+    return StatefulBuilder(
+      builder: (context, setLocalState) {
+        bool isExpanded = false;
+
+        return StatefulBuilder(
+          builder: (context, setStateItem) {
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Column(
+                  children: [
+                    Icon(
+                      Icons.location_history,
+                      size: 30,
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                    Container(width: 2, height: 25, color: accentColor),
+                  ],
+                ),
+
+                const SizedBox(width: 15),
+
+                // 📦 CONTENT BOX
+                Expanded(
+                  child: Container(
+                    margin: const EdgeInsets.only(bottom: 5),
+                    padding: const EdgeInsets.only(
+                      left: 10,
+                      right: 10,
+                      bottom: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(15),
+                      border: Border.all(
+                        color: accentColor.withOpacity(0.3),
+                        width: 1,
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              log["userName"] ?? "",
+                              style: Theme.of(context).textTheme.displaySmall,
+                            ),
+                            Row(
+                              children: [
                                 Text(
                                   formatHours(
                                     (log["totalHours"] ?? 0).toDouble(),
@@ -413,24 +421,92 @@ class _UsersWorklogState extends State<UsersWorklog> {
                                     context,
                                   ).textTheme.labelMedium,
                                 ),
-                              ),
-                              DataCell(
-                                Text(
-                                  log["departmentName"] ?? "",
-                                  style: Theme.of(
+                                IconButton(
+                                  icon: Icon(
+                                    isExpanded
+                                        ? Icons.keyboard_arrow_up
+                                        : Icons.keyboard_arrow_down,
+                                  ),
+                                  onPressed: () {
+                                    setStateItem(() {
+                                      isExpanded = !isExpanded;
+                                    });
+                                  },
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                        Text(
+                          log["title"] ?? "",
+                          style: Theme.of(context).textTheme.labelMedium,
+                        ),
+
+                        const SizedBox(height: 5),
+
+                        // 📍 LOCATION
+                        Text(
+                          " Location : ${log["locationName"] ?? "No location"}",
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
+
+                        // // ⬇ EXPANDED CONTENT
+                        if (isExpanded) ...[
+                          Divider(color: accentColor),
+                          const SizedBox(height: 5),
+                          Text(
+                            "Start Time: ${formatTime(log["startTime"])}",
+                            style: Theme.of(context).textTheme.labelMedium,
+                          ),
+                          const SizedBox(height: 5),
+                          Text(
+                            "End Time: ${formatTime(log["endTime"])}",
+                            style: Theme.of(context).textTheme.labelMedium,
+                          ),
+                          const SizedBox(height: 5),
+                          Text(
+                            "Description: ${log["description"] ?? ""}",
+                            style: Theme.of(context).textTheme.labelMedium,
+                          ),
+                          if (log["imageUrl"] != null &&
+                              log["imageUrl"].toString().isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 8),
+                              child: GestureDetector(
+                                onTap: () {
+                                  final fullUrl =
+                                      "${ApiConstants.Uploaded}${log["imageUrl"].toString().replaceFirst('/uploads/', '')}";
+
+                                  Navigator.push(
                                     context,
-                                  ).textTheme.labelMedium,
+                                    MaterialPageRoute(
+                                      builder: (_) => FullScreenImageViewer(
+                                        imageUrl: fullUrl,
+                                      ),
+                                    ),
+                                  );
+                                },
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(10),
+                                  child: Image.network(
+                                    "${ApiConstants.Uploaded}${log["imageUrl"].toString().replaceFirst('/uploads/', '')}",
+                                    height: 150,
+                                    width: double.infinity,
+                                    fit: BoxFit.cover,
+                                  ),
                                 ),
                               ),
-                            ],
-                          );
-                        }).toList(),
-                      ),
+                            ),
+                        ],
+                      ],
                     ),
-                  ],
+                  ),
                 ),
-              ),
-            ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 }

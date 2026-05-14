@@ -115,6 +115,36 @@ class _StaffDashboardState extends State<StaffDashboard> {
 
   @override
   Widget build(BuildContext context) {
+    final List list = data?["leavePermissionMonthly"] ?? [];
+    const months = [
+      "Jan",
+      "Feb",
+      "Mar",
+      "Apr",
+      "May",
+      "Jun",
+      "Jul",
+      "Aug",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dec",
+    ];
+
+    final Map<String, dynamic> attendanceMap = {
+      for (var item in list)
+        months[(item["month"] ?? 1) - 1]: {
+          "leave": item["leave"] ?? 0,
+          "permission": item["permission"] ?? 0,
+        },
+    };
+    if (isLoading) {
+      return const Scaffold(body: Center(child: RotatingFlower()));
+    }
+
+    if (data == null) {
+      return const Scaffold(body: Center(child: Text("No data found")));
+    }
     if (isLoading) {
       return const Scaffold(body: Center(child: RotatingFlower()));
     }
@@ -379,16 +409,10 @@ class _StaffDashboardState extends State<StaffDashboard> {
                       ),
                     ],
                   ),
-
-                  (data?["year"] ?? 0) == DateTime.now().year
-                      ? const SizedBox() // hide
-                      : YearlyProductivityPage(
-                          year: data?["year"],
-                          yearlyProductivity: (data?["yearlyProductivity"] ?? 0)
-                              .toDouble(),
-                        ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 20),
                   CapsuleBarChart(data: monthlyData),
+                  const SizedBox(height: 20),
+                  LeavePermissionChart(attendance: attendanceMap),
                   const SizedBox(height: 20),
                   MonthlyTrendChart(
                     monthlyData: (data?["monthlyTrend"] as List? ?? [])
@@ -410,6 +434,7 @@ class _StaffDashboardState extends State<StaffDashboard> {
     required String title,
     required VoidCallback onTap,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       child: Material(
@@ -419,6 +444,10 @@ class _StaffDashboardState extends State<StaffDashboard> {
           onTap: onTap,
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              color: isDark ? Theme.of(context).colorScheme.onSecondary : null,
+              borderRadius: BorderRadius.circular(12),
+            ),
             child: Row(
               children: [
                 Icon(icon),

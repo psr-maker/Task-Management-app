@@ -1,4 +1,9 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:geocoding/geocoding.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:staff_work_track/core/widgets/buttons.dart';
 import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
@@ -15,16 +20,14 @@ class AddWorklogPage extends StatefulWidget {
 class _AddWorklogPageState extends State<AddWorklogPage> {
   final TextEditingController titleController = TextEditingController();
   final TextEditingController descriptionController = TextEditingController();
-
   bool _isLoading = false;
-
   DateTime selectedDate = DateTime.now();
-
   TimeOfDay startTime = const TimeOfDay(hour: 9, minute: 0);
   TimeOfDay endTime = const TimeOfDay(hour: 10, minute: 0);
   String? _topMessage;
   bool _isErrorMessage = true;
   bool _showTopMessage = false;
+  File? _image;
   @override
   void dispose() {
     titleController.dispose();
@@ -54,7 +57,6 @@ class _AddWorklogPageState extends State<AddWorklogPage> {
       firstDate: DateTime(2024),
       lastDate: DateTime.now(),
     );
-
     if (result != null) {
       setState(() => selectedDate = result);
     }
@@ -65,7 +67,6 @@ class _AddWorklogPageState extends State<AddWorklogPage> {
       context: context,
       initialTime: isStart ? startTime : endTime,
     );
-
     if (result != null) {
       setState(() {
         isStart ? startTime = result : endTime = result;
@@ -77,12 +78,54 @@ class _AddWorklogPageState extends State<AddWorklogPage> {
     if (titleController.text.trim().isEmpty &&
         descriptionController.text.trim().isEmpty) {
       showTopMessage("Please enter Title or Description", isError: true);
-
       return;
     }
     setState(() => _isLoading = true);
 
     try {
+      LocationPermission permission = await Geolocator.checkPermission();
+
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        throw Exception("Location permission required");
+      }
+
+      // 🔥 STEP 2: CHECK SERVICE (GPS)
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        throw Exception("Please enable location services");
+      }
+
+      // 🔥 STEP 3: GET LOCATION
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+
+      // 🔥 NEW: Get location name
+      List<Placemark> placemarks = await placemarkFromCoordinates(
+        position.latitude,
+        position.longitude,
+      );
+
+      Placemark place = placemarks.first;
+
+      String fullAddress = [
+        place.name, // Building / place name
+        place.street, // Street name
+        place.subLocality, // Area (like Maradu)
+        place.locality, // City (Kochi)
+        place.subAdministrativeArea,
+        place.administrativeArea, // State (Kerala)
+        place.postalCode,
+        place.country,
+      ].where((e) => e != null && e.isNotEmpty).join(', ');
+      String locationName = fullAddress.isNotEmpty
+          ? fullAddress
+          : "Unknown Location";
       await AnnouncementService.addWorkLog(
         title: titleController.text.trim(),
         description: descriptionController.text.trim(),
@@ -90,15 +133,37 @@ class _AddWorklogPageState extends State<AddWorklogPage> {
         startTime: startTime,
         endTime: endTime,
         isSubmit: isSubmit,
+        latitude: position.latitude,
+        longitude: position.longitude,
+        locationName: locationName,
+        image: _image,
       );
 
       if (!mounted) return;
-      showTopMessage("Worklog added successfully", isError: false);
+      showTopMessage(
+        "Worklog added with Location successfully",
+        isError: false,
+      );
     } catch (e) {
       showTopMessage(e.toString(), isError: true);
     }
 
     setState(() => _isLoading = false);
+  }
+
+  Future<void> _pickImage() async {
+    final picker = ImagePicker();
+
+    final pickedFile = await picker.pickImage(
+      source: ImageSource.camera,
+      imageQuality: 70,
+    );
+
+    if (pickedFile != null) {
+      setState(() {
+        _image = File(pickedFile.path);
+      });
+    }
   }
 
   @override
@@ -125,7 +190,6 @@ class _AddWorklogPageState extends State<AddWorklogPage> {
                   titleController,
                   hint: "Enter Work Title",
                 ),
-
                 const SizedBox(height: 15),
                 CustomFormWidgets.label(context, "Work Description"),
                 const SizedBox(height: 10),
@@ -134,8 +198,6 @@ class _AddWorklogPageState extends State<AddWorklogPage> {
                   descriptionController,
                   hint: "Enter Work Description",
                 ),
-
-                //  const SizedBox(height: 15),
 
                 /// Date Picker
                 ListTile(
@@ -150,9 +212,7 @@ class _AddWorklogPageState extends State<AddWorklogPage> {
                   trailing: Icon(Icons.calendar_today),
                   onTap: _pickDate,
                 ),
-
                 const SizedBox(height: 15),
-
                 Row(
                   children: [
                     Expanded(
@@ -173,9 +233,28 @@ class _AddWorklogPageState extends State<AddWorklogPage> {
                     ),
                   ],
                 ),
+                const SizedBox(height: 15),
+                Row(
+                  children: [
+                    IconButton(
+                      icon: Icon(Icons.camera_alt, size: 30),
+                      onPressed: _pickImage,
+                    ),
+                    const SizedBox(width: 10),
 
+                    if (_image != null)
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: Image.file(
+                          _image!,
+                          width: 80,
+                          height: 80,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                  ],
+                ),
                 const SizedBox(height: 30),
-
                 Center(
                   child: AppButton(
                     text: "Save Draft",

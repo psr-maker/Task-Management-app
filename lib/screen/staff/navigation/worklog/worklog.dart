@@ -79,7 +79,7 @@ class _WorklogState extends State<Worklog> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Theme.of(context).colorScheme.onPrimary,
+      backgroundColor: Theme.of(context).colorScheme.primary,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -100,7 +100,7 @@ class _WorklogState extends State<Worklog> {
                 children: [
                   Text(
                     "Select Date",
-                    style: Theme.of(context).textTheme.displaySmall,
+                    style: Theme.of(context).textTheme.bodySmall,
                   ),
                   const SizedBox(height: 16),
                   Row(
@@ -108,17 +108,20 @@ class _WorklogState extends State<Worklog> {
                     children: [
                       Text(
                         "Year",
-                        style: Theme.of(context).textTheme.titleLarge,
+                        style: Theme.of(context).textTheme.labelLarge,
                       ),
                       DropdownButton<int>(
-                        style: Theme.of(context).textTheme.headlineMedium,
+                        style: Theme.of(context).textTheme.labelLarge,
                         value: tempYear,
 
                         items: List.generate(27, (i) {
                           int year = DateTime.now().year - i;
                           return DropdownMenuItem(
                             value: year,
-                            child: Text(year.toString()),
+                            child: Text(
+                              year.toString(),
+                              style: Theme.of(context).textTheme.labelMedium,
+                            ),
                           );
                         }),
                         onChanged: (v) => setModalState(() => tempYear = v!),
@@ -130,16 +133,17 @@ class _WorklogState extends State<Worklog> {
                     children: [
                       Text(
                         "Month",
-                        style: Theme.of(context).textTheme.titleLarge,
+                        style: Theme.of(context).textTheme.labelLarge,
                       ),
                       DropdownButton<int>(
-                        style: Theme.of(context).textTheme.headlineMedium,
+                        style: Theme.of(context).textTheme.labelLarge,
                         value: tempMonth,
                         items: List.generate(12, (i) {
                           return DropdownMenuItem(
                             value: i + 1,
                             child: Text(
                               DateFormat('MMMM').format(DateTime(0, i + 1)),
+                              style: Theme.of(context).textTheme.labelMedium,
                             ),
                           );
                         }),
@@ -171,7 +175,7 @@ class _WorklogState extends State<Worklog> {
                                 color: Theme.of(context).colorScheme.secondary,
                               ),
                               color: isSelected
-                                  ? Theme.of(context).colorScheme.secondary
+                                  ? Theme.of(context).colorScheme.background
                                   : Theme.of(context).colorScheme.onPrimary,
                               borderRadius: BorderRadius.circular(8),
                             ),
@@ -346,7 +350,7 @@ class _WorklogState extends State<Worklog> {
                 _weekHeader(),
                 SizedBox(height: 10),
                 _totalHours(),
-                SizedBox(height: 10),
+                SizedBox(height: 15),
                 Expanded(child: _timelineLogs()),
               ],
             ),

@@ -94,6 +94,7 @@ class _FiveSpointsState extends State<FiveSpoints> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
       appBar: AppBar(
         title: const Text("5S Points"),
@@ -126,7 +127,9 @@ class _FiveSpointsState extends State<FiveSpoints> {
                   const SizedBox(height: 10),
                   DropdownButtonFormField<String>(
                     value: selectedDept,
-                    dropdownColor: Colors.white,
+                    dropdownColor: isDark
+                        ? Theme.of(context).colorScheme.background
+                        : Theme.of(context).colorScheme.onPrimary,
                     style: Theme.of(context).textTheme.headlineSmall,
                     items: allDepartments.map((d) {
                       return DropdownMenuItem(
@@ -147,7 +150,9 @@ class _FiveSpointsState extends State<FiveSpoints> {
                   const SizedBox(height: 10),
                   DropdownButtonFormField<UserModel>(
                     value: selectedUser,
-                    dropdownColor: Colors.white,
+                    dropdownColor: isDark
+                        ? Theme.of(context).colorScheme.background
+                        : Theme.of(context).colorScheme.onPrimary,
                     style: Theme.of(context).textTheme.headlineSmall,
                     items: filteredUsers.map((u) {
                       return DropdownMenuItem(

@@ -115,6 +115,22 @@ class _LeavelistState extends State<Leavelist>
     });
   }
 
+  String formatTime(String? time) {
+    if (time == null || time.isEmpty) return "-";
+
+    try {
+      List<String> parts = time.split(":");
+
+      if (parts.length >= 2) {
+        return "${parts[0]}:${parts[1]}";
+      }
+
+      return time;
+    } catch (e) {
+      return time;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final groupedData = groupByMonth(filteredItems);
@@ -258,7 +274,7 @@ class _LeavelistState extends State<Leavelist>
                           padding: const EdgeInsets.symmetric(vertical: 10),
                           child: Text(
                             month,
-                            style: Theme.of(context).textTheme.bodyMedium,
+                            style: Theme.of(context).textTheme.labelMedium,
                           ),
                         ),
                         ...items.asMap().entries.map((entry) {
@@ -363,13 +379,13 @@ class _LeavelistState extends State<Leavelist>
                           isPermission
                               ? formatDate(e["date"] ?? e["fromDate"])
                               : formatDate(e["fromDate"]),
-                          style: Theme.of(context).textTheme.displaySmall,
+                          style: Theme.of(context).textTheme.headlineLarge,
                         ),
                         if (isPermission) ...[
                           const SizedBox(height: 4),
                           Text(
-                            'From ${e["fromTime"] ?? "-"} • To ${e["toTime"] ?? "-"}',
-                            style: Theme.of(context).textTheme.displaySmall,
+                           e["totalHours"].toString() + " hours",
+                            style: Theme.of(context).textTheme.headlineMedium,
                           ),
                         ] else ...[
                           const SizedBox(height: 4),
@@ -416,8 +432,8 @@ class _LeavelistState extends State<Leavelist>
                   if (isPermission) ...[
                     infoRow("Name", e["name"]),
                     infoRow("Date", formatDate(e["date"] ?? e["fromDate"])),
-                    infoRow("From Time", e["fromTime"]),
-                    infoRow("To Time", e["toTime"]),
+                    infoRow("From Time", formatTime(e["fromTime"])),
+                    infoRow("To Time", formatTime(e["toTime"])),
                     infoRow(
                       "Total Hours",
                       e["totalHours"] != null

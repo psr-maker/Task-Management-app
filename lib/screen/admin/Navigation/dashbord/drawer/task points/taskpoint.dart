@@ -92,7 +92,7 @@ class _TaskPointDetailState extends State<TaskPointDetail> {
     if (isLoading) {
       return const Center(child: RotatingFlower());
     }
-
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       margin: const EdgeInsets.only(top: 10),
       padding: const EdgeInsets.all(20),
@@ -111,7 +111,10 @@ class _TaskPointDetailState extends State<TaskPointDetail> {
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.onPrimary,
+              color: isDark
+                  ? Theme.of(context).colorScheme.background
+                  : Theme.of(context).colorScheme.onPrimary,
+
               borderRadius: BorderRadius.circular(12),
             ),
 
@@ -212,7 +215,9 @@ class _TaskPointDetailState extends State<TaskPointDetail> {
               decoration: InputDecoration(
                 hintText: "Enter delay reason...",
                 filled: true,
-                fillColor: Colors.white,
+                fillColor: isDark
+                    ? Theme.of(context).colorScheme.background
+                    : Theme.of(context).colorScheme.onPrimary,
                 contentPadding: const EdgeInsets.all(15),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(15),
@@ -237,7 +242,9 @@ class _TaskPointDetailState extends State<TaskPointDetail> {
             decoration: InputDecoration(
               hintText: "Manager comment...",
               filled: true,
-              fillColor: Colors.white,
+              fillColor: isDark
+                  ? Theme.of(context).colorScheme.background
+                  : Theme.of(context).colorScheme.onPrimary,
               contentPadding: const EdgeInsets.all(15),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(15),

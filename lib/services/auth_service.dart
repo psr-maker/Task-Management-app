@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:staff_work_track/core/constant/apiurl.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -76,34 +77,55 @@ class AuthService {
     }
   }
 
-  static Future<void> updateProfile(String name, String email) async {
-    final token = await AuthService.getToken();
-    final response = await http.put(
-      Uri.parse("$baseUrl/auth/update-profile"),
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": "Bearer $token",
-      },
-      body: jsonEncode({"name": name, "email": email}),
-    );
-    if (response.statusCode != 200) {
-      throw Exception("Failed to update profile");
-    }
-  }
-
   static Future<Map<String, dynamic>> getMyProfile() async {
-    final token = await AuthService.getToken();
+    final token = await getToken();
+
     final response = await http.get(
       Uri.parse("$baseUrl/auth/my-profile"),
       headers: {
-        "Content-Type": "application/json",
         "Authorization": "Bearer $token",
+        "Content-Type": "application/json",
       },
     );
+
     if (response.statusCode == 200) {
+      if (response.body.isEmpty) return {};
       return jsonDecode(response.body);
     } else {
       throw Exception("Failed to load profile");
+    }
+  }
+
+  /// ✅ UPDATE PROFILE (FULL DATA)
+  static Future<void> updateProfile(
+    Map<String, dynamic> data,
+    File? image,
+  ) async {
+    final token = await getToken();
+
+    var request = http.MultipartRequest(
+      "POST",
+      Uri.parse("$baseUrl/auth/update-profile"),
+    );
+
+    request.headers["Authorization"] = "Bearer $token";
+
+    // 🔹 add fields
+    data.forEach((key, value) {
+      request.fields[key] = value?.toString() ?? "";
+    });
+
+    // 🔹 add image
+    if (image != null) {
+      request.files.add(
+        await http.MultipartFile.fromPath("ProfileImage", image.path),
+      );
+    }
+
+    var response = await request.send();
+
+    if (response.statusCode != 200) {
+      throw Exception("Failed to update profile");
     }
   }
 

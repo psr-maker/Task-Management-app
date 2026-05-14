@@ -5,7 +5,6 @@ import 'package:staff_work_track/core/widgets/buttons.dart';
 import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
 import 'package:staff_work_track/screen/authen/login_selection.dart';
 import 'package:staff_work_track/screen/super admin/Navigation/dashboard/settings/add_dept.dart';
-import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/settings/editprofile.dart';
 import 'package:staff_work_track/services/auth_service.dart';
 
 class Settings extends StatefulWidget {
@@ -92,25 +91,6 @@ class _SettingsState extends State<Settings> {
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
-          /// ===== PROFILE CARD =====
-          Settings._sectionTitle("Account"),
-          const SizedBox(height: 10),
-
-          Settings._buildTile(
-            context,
-            icon: Icons.person_outline,
-            title: "Profile",
-            subtitle: "Change name & email",
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const EditProfilePage()),
-              );
-            },
-          ),
-
-          const SizedBox(height: 30),
-
           /// ===== APPEARANCE =====
           Settings._sectionTitle("Appearance"),
           const SizedBox(height: 10),

@@ -34,6 +34,7 @@ class _EmployeeReportPageState extends State<EmployeeReportPage> {
   double completionPercentage = 0;
   double onTimePercentage = 0;
   double delayedGoalPercent = 0;
+
   @override
   void initState() {
     super.initState();
@@ -99,17 +100,12 @@ class _EmployeeReportPageState extends State<EmployeeReportPage> {
   }
 
   Future<void> generateAndDownloadPDF() async {
-    // Fetch detailed report data for tables
     Map<String, dynamic> reportData = {};
     try {
-      reportData = await ReportsService.getFullReport(
-        userId: widget.userid,
-      );
+      reportData = await ReportsService.getFullReport(userId: widget.userid);
     } catch (e) {
       print("Error fetching full report: $e");
     }
-
-    // Create PDF generator and generate PDF
     final pdfGenerator = EmployeeReportPdfGenerator(
       userId: widget.userid,
       username: widget.username,
@@ -122,12 +118,34 @@ class _EmployeeReportPageState extends State<EmployeeReportPage> {
       delayedGoalPercent: delayedGoalPercent,
       reportData: reportData,
     );
-
     await pdfGenerator.generateAndDownloadPDF();
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) { 
+    final List list = data?["leavePermissionMonthly"] ?? [];
+    const months = [
+      "Jan",
+      "Feb",
+      "Mar",
+      "Apr",
+      "May",
+      "Jun",
+      "Jul",
+      "Aug",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dec",
+    ];
+
+    final Map<String, dynamic> attendanceMap = {
+      for (var item in list)
+        months[(item["month"] ?? 1) - 1]: {
+          "leave": item["leave"] ?? 0,
+          "permission": item["permission"] ?? 0,
+        },
+    };
     if (isLoading) {
       return const Scaffold(body: Center(child: RotatingFlower()));
     }
@@ -155,7 +173,7 @@ class _EmployeeReportPageState extends State<EmployeeReportPage> {
                   builder: (context) => ReportsTable(userId: widget.userid),
                 ),
               );
-            }, 
+            },
             icon: const Icon(Icons.bar_chart_rounded),
           ),
           IconButton(
@@ -325,13 +343,15 @@ class _EmployeeReportPageState extends State<EmployeeReportPage> {
                         .toDouble(),
                   ),
             const SizedBox(height: 20),
+           LeavePermissionChart(attendance: attendanceMap),
+            const SizedBox(height: 20),
             MonthlyTrendChart(
               monthlyData: (data?["monthlyTrend"] as List? ?? [])
                   .map((e) => Map<String, dynamic>.from(e))
                   .toList(),
             ),
             const SizedBox(height: 20),
-
+            // LeavePermissionChart(attendance: attendance),
             if (apiWarnings.isNotEmpty) ...[
               /// Title + Count
               Row(

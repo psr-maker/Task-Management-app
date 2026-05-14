@@ -650,6 +650,7 @@ class _AdminState extends State<AdminDashboard> {
     required String title,
     required VoidCallback onTap,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       child: Material(
@@ -659,6 +660,10 @@ class _AdminState extends State<AdminDashboard> {
           onTap: onTap,
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              color: isDark ? Theme.of(context).colorScheme.onSecondary :null,
+              borderRadius: BorderRadius.circular(12),
+            ),
             child: Row(
               children: [
                 Icon(icon),
@@ -756,7 +761,7 @@ class _AdminState extends State<AdminDashboard> {
           _buildDrawerItem(
             context,
             icon: Icons.message,
-            title: "Anouncements", 
+            title: "Anouncements",
             onTap: () {
               Navigator.pop(context);
               Navigator.push(

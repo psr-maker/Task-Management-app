@@ -17,17 +17,26 @@ class ReportsTable extends StatefulWidget {
 
 class _DeadlineReportsTabState extends State<ReportsTable> {
   String selectedType = "Goals";
+  String selectedView = "Work";
+  String? selectedLeaveView = "Leave";
   bool _isLoading = false;
   List<dynamic> allTasks = [];
-  List<dynamic> filteredTasks = []; 
+  List<dynamic> filteredTasks = [];
 
   List<dynamic> allGoals = [];
   List<dynamic> filteredGoals = [];
-
+  List<dynamic> allLeaves = [];
+  List<dynamic> allPermissions = [];
+  List<dynamic> filteredLeaves = [];
+  List<dynamic> filteredPermissions = [];
   String? selectedStatus;
   String? selectedPriority;
   String? selectedOverdue;
+  String? selectedLeaveStatus;
+  String? selectedLeaveType;
+  DateTime? selectedLeaveDate;
 
+  DateTime? selectedPermissionDate;
   DateTime? startDate;
   DateTime? endDate;
 
@@ -51,6 +60,11 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
         filteredTasks = result["tasks"] ?? [];
         allGoals = result["goals"] ?? [];
         filteredGoals = result["goals"] ?? [];
+        allLeaves = result["leaveList"] ?? [];
+        filteredLeaves = result["leaveList"] ?? [];
+        allPermissions = result["permissionList"] ?? [];
+
+        filteredPermissions = result["permissionList"] ?? [];
         isLoading = false;
       });
     } catch (e) {
@@ -105,6 +119,47 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
 
         return true;
       }).toList();
+
+      // ---------------- LEAVE FILTER ----------------
+      filteredLeaves = allLeaves.where((leave) {
+        if (selectedLeaveStatus != null &&
+            (leave["status"] ?? "").toLowerCase() !=
+                selectedLeaveStatus!.toLowerCase())
+          return false;
+
+        if (selectedLeaveType != null &&
+            (leave["type"] ?? "").toLowerCase() !=
+                selectedLeaveType!.toLowerCase())
+          return false;
+
+        if (selectedLeaveDate != null) {
+          final leaveDate = leave["fromDate"];
+          if (leaveDate == null) return false;
+
+          final date = DateTime.parse(leaveDate.toString());
+          if (date.year != selectedLeaveDate!.year ||
+              date.month != selectedLeaveDate!.month ||
+              date.day != selectedLeaveDate!.day) {
+            return false;
+          }
+        }
+
+        return true;
+      }).toList();
+
+      // ---------------- PERMISSION FILTER ----------------
+      filteredPermissions = allPermissions.where((p) {
+        if (selectedPermissionDate != null) {
+          final date = DateTime.parse(p["date"].toString());
+
+          if (date.year != selectedPermissionDate!.year ||
+              date.month != selectedPermissionDate!.month ||
+              date.day != selectedPermissionDate!.day) {
+            return false;
+          }
+        }
+        return true;
+      }).toList();
     });
   }
 
@@ -137,6 +192,31 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
               );
             },
           ),
+          IconButton(
+            icon: const Icon(Icons.more_vert),
+            onPressed: () async {
+              final value = await showMenu(
+                context: context,
+                position: const RelativeRect.fromLTRB(100, 80, 0, 0),
+                items: [
+                  const PopupMenuItem(
+                    value: "work",
+                    child: Text("Goals / Tasks"),
+                  ),
+                  const PopupMenuItem(
+                    value: "leave",
+                    child: Text("Leave / Permission"),
+                  ),
+                ],
+              );
+
+              if (value != null) {
+                setState(() {
+                  selectedView = value == "work" ? "Work" : "Leave";
+                });
+              }
+            },
+          ),
         ],
       ),
       body: isLoading
@@ -146,10 +226,11 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
               children: [
                 SizedBox(height: 10),
 
-                /// 🔹 FILTER CHIPS SECTION
-                if (selectedStatus != null ||
-                    selectedPriority != null ||
-                    selectedOverdue != null)
+                /// 🔹 FILTER CHIPS SECTION - FOR GOALS/TASKS
+                if (selectedView == "Work" &&
+                    (selectedStatus != null ||
+                        selectedPriority != null ||
+                        selectedOverdue != null))
                   Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 16,
@@ -186,23 +267,85 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
                     ),
                   ),
 
-                Container(
-                  margin: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 5,
+                /// 🔹 FILTER CHIPS SECTION - FOR LEAVE/PERMISSION
+                if (selectedView == "Leave")
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
+                    child: Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        if (selectedLeaveType != null)
+                          _buildFilterChip(
+                            "Leave Type: $selectedLeaveType",
+                            () {
+                              setState(() {
+                                selectedLeaveType = null;
+                                applyFilters();
+                              });
+                            },
+                          ),
+
+                        if (selectedLeaveStatus != null)
+                          _buildFilterChip("Status: $selectedLeaveStatus", () {
+                            setState(() {
+                              selectedLeaveStatus = null;
+                              applyFilters();
+                            });
+                          }),
+
+                        if (selectedLeaveDate != null)
+                          _buildFilterChip(
+                            "Date: ${AppHelpers.formatDate(selectedLeaveDate!.toString())}",
+                            () {
+                              setState(() {
+                                selectedLeaveDate = null;
+                                applyFilters();
+                              });
+                            },
+                          ),
+                      ],
+                    ),
                   ),
 
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
-                    borderRadius: BorderRadius.circular(30),
+                if (selectedView == "Work")
+                  Container(
+                    margin: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 5,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                    child: Row(
+                      children: [
+                        _buildToggleButton("Goals"),
+                        _buildToggleButton("Tasks"),
+                      ],
+                    ),
                   ),
-                  child: Row(
-                    children: [
-                      _buildToggleButton("Goals"),
-                      _buildToggleButton("Tasks"),
-                    ],
+
+                if (selectedView == "Leave")
+                  Container(
+                    margin: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 5,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                    child: Row(
+                      children: [
+                        _buildToggleButton("Leave"),
+                        _buildToggleButton("Permission"),
+                      ],
+                    ),
                   ),
-                ),
 
                 /// 🔹 TABLE SECTION
                 Expanded(
@@ -210,10 +353,13 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
                     padding: const EdgeInsets.all(16),
                     child: Builder(
                       builder: (context) {
-                        final currentList = selectedType == "Tasks"
-                            ? filteredTasks
-                            : filteredGoals;
-
+                        final currentList = selectedView == "Work"
+                            ? (selectedType == "Tasks"
+                                  ? filteredTasks
+                                  : filteredGoals)
+                            : (selectedLeaveView == "Leave"
+                                  ? filteredLeaves
+                                  : filteredPermissions);
                         return currentList.isEmpty
                             ? Center(
                                 child: Text(
@@ -233,9 +379,13 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
                                   child: SingleChildScrollView(
                                     scrollDirection: Axis.horizontal,
                                     child: SingleChildScrollView(
-                                      child: selectedType == "Tasks"
-                                          ? _buildTaskTable()
-                                          : _buildGoalTable(),
+                                      child: selectedView == "Work"
+                                          ? (selectedType == "Tasks"
+                                                ? _buildTaskTable()
+                                                : _buildGoalTable())
+                                          : (selectedLeaveView == "Leave"
+                                                ? _buildLeaveTable()
+                                                : _buildPermissionTable()),
                                     ),
                                   ),
                                 ),
@@ -246,6 +396,146 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
                 ),
               ],
             ),
+    );
+  }
+
+  Widget _buildLeaveTable() {
+    return DataTable(
+      headingRowColor: WidgetStateProperty.all(
+        Theme.of(context).colorScheme.secondary,
+      ),
+      headingTextStyle: Theme.of(context).textTheme.labelLarge,
+      columns: const [
+        DataColumn(label: Text("Leave Type")),
+        DataColumn(label: Text("Reason")),
+        DataColumn(label: Text("Date")),
+        DataColumn(label: Text("Submitted Date")),
+        DataColumn(label: Text("Status")),
+        DataColumn(label: Text("Reject Reason")),
+        DataColumn(label: Text("Approved Date")),
+        DataColumn(label: Text("Contact Number")),
+      ],
+      rows: filteredLeaves.map((item) {
+        return DataRow(
+          cells: [
+            DataCell(
+              Text(
+                item["type"] ?? "-",
+                style: Theme.of(context).textTheme.labelMedium,
+              ),
+            ),
+            DataCell(
+              Text(
+                item["reason"] ?? "",
+                style: Theme.of(context).textTheme.labelMedium,
+              ),
+            ),
+            DataCell(
+              Text(
+                AppHelpers.formatDate(item["fromDate"] ?? "-"),
+                style: Theme.of(context).textTheme.labelMedium,
+              ),
+            ),
+            DataCell(
+              Text(
+                AppHelpers.formatDate(item["submdate"] ?? "-"),
+                style: Theme.of(context).textTheme.labelMedium,
+              ),
+            ),
+            DataCell(
+              Text(
+                item["status"] ?? "",
+                style: TextStyle(
+                  color: item["status"] == "Approved"
+                      ? Colors.green
+                      : item["status"] == "Rejected"
+                      ? Colors.red
+                      : Colors.orange,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            DataCell(
+              Text(
+                item["rejreason"] ?? "-",
+                style: Theme.of(context).textTheme.labelMedium,
+              ),
+            ),
+            DataCell(
+              Text(
+                AppHelpers.formatDate(item["approvedate"] ?? "-"),
+                style: Theme.of(context).textTheme.labelMedium,
+              ),
+            ),
+            DataCell(
+              Text(
+                item["contactno"] ?? "-",
+                style: Theme.of(context).textTheme.labelMedium,
+              ),
+            ),
+          ],
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildPermissionTable() {
+    return DataTable(
+      headingRowColor: WidgetStateProperty.all(
+        Theme.of(context).colorScheme.secondary,
+      ),
+      headingTextStyle: Theme.of(context).textTheme.labelLarge,
+      columns: const [
+        DataColumn(label: Text("Reason")),
+        DataColumn(label: Text("Date")),
+        DataColumn(label: Text("From Time")),
+        DataColumn(label: Text("To Time")),
+        DataColumn(label: Text("Total Hours")),
+        DataColumn(label: Text("Submitted Date")),
+      ],
+      rows: filteredPermissions.map((item) {
+        return DataRow(
+          cells: [
+            DataCell(
+              Text(
+                item["reason"] ?? "",
+                style: Theme.of(context).textTheme.labelMedium,
+              ),
+            ),
+            DataCell(
+              Text(
+                AppHelpers.formatDate(item["date"] ?? "-"),
+                style: Theme.of(context).textTheme.labelMedium,
+              ),
+            ),
+            DataCell(
+              Text(
+                item["fromTime"] ?? "-",
+                style: Theme.of(context).textTheme.labelMedium,
+              ),
+            ),
+            DataCell(
+              Text(
+                item["toTime"] ?? "-",
+                style: Theme.of(context).textTheme.labelMedium,
+              ),
+            ),
+            DataCell(
+              Text(
+                item["totalhours"] != null ? "${item["totalhours"]} hrs" : "-",
+                style: Theme.of(context).textTheme.labelMedium,
+              ),
+            ),
+            DataCell(
+              Text(
+                AppHelpers.formatDate(item["submdate"] ?? "-"),
+                style: Theme.of(context).textTheme.labelMedium,
+              ),
+            ),
+          ],
+        );
+      }).toList(),
     );
   }
 
@@ -269,7 +559,9 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
             ? AppHelpers.formatDate(task["due_Date"])
             : "-";
 
-        String completedDate = task["completed_Date"] != null
+        String completedDate =
+            task["completed_Date"] != null &&
+                task["completed_Date"] != "0001-01-01T00:00:00"
             ? AppHelpers.formatDate(task["completed_Date"])
             : "-";
 
@@ -289,7 +581,7 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
                     TaskUtils.parseStatus(task["status"] ?? ""),
                   ),
                   fontWeight: FontWeight.w700,
-                  fontSize: 14
+                  fontSize: 14,
                 ),
               ),
             ),
@@ -299,7 +591,7 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
                 style: TextStyle(
                   color: TaskUtils.getPriorityColor(task["priority"]),
                   fontWeight: FontWeight.w600,
-                  fontSize: 14
+                  fontSize: 14,
                 ),
               ),
             ),
@@ -383,7 +675,7 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
                     children: tasksList.isNotEmpty
                         ? tasksList.map((task) {
                             return Padding(
-                              padding: const EdgeInsets.only(top: 3,bottom: 3),
+                              padding: const EdgeInsets.only(top: 3, bottom: 3),
                               child: Text(
                                 task,
                                 softWrap: true,
@@ -406,7 +698,7 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
                       TaskUtils.parseStatus(goal["status"] ?? ""),
                     ),
                     fontWeight: FontWeight.w600,
-                    fontSize: 14
+                    fontSize: 14,
                   ),
                 ),
               ),
@@ -418,7 +710,7 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
                   style: TextStyle(
                     color: TaskUtils.getPriorityColor(goal["priority"]),
                     fontWeight: FontWeight.w600,
-                    fontSize: 14
+                    fontSize: 14,
                   ),
                 ),
               ),
@@ -468,7 +760,7 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
                         ? Colors.red
                         : Colors.green,
                     fontWeight: FontWeight.bold,
-                    fontSize: 14
+                    fontSize: 14,
                   ),
                 ),
               ),
@@ -480,12 +772,20 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
   }
 
   Widget _buildToggleButton(String type) {
-    final isSelected = selectedType == type;
+    final isSelectedWork = selectedType == type;
+    final isSelectedLeave = selectedLeaveView == type;
+    final isSelected = isSelectedWork || isSelectedLeave;
 
     return Expanded(
       child: GestureDetector(
         onTap: () {
-          setState(() => selectedType = type);
+          setState(() {
+            if (type == "Goals" || type == "Tasks") {
+              selectedType = type;
+            } else if (type == "Leave" || type == "Permission") {
+              selectedLeaveView = type;
+            }
+          });
         },
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 250),
@@ -501,7 +801,13 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(
-                type == "Tasks" ? Icons.task_alt : Icons.flag,
+                type == "Tasks"
+                    ? Icons.task_alt
+                    : type == "Leave"
+                    ? Icons.calendar_month
+                    : type == "Permission"
+                    ? Icons.check_circle
+                    : Icons.flag,
                 color: isSelected ? Colors.white : Colors.black54,
                 size: 18,
               ),
@@ -542,60 +848,146 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            /// 🔹 STATUS
-            _buildHeading("Status"),
-            const SizedBox(height: 12),
-            _buildChoiceChips(
-              values: [
-                "Not Started",
-                "InProgress",
-                "Completed",
-                "Pending",
-                "Pause",
+            // ================= WORK FILTER =================
+            if (selectedView == "Work") ...[
+              _buildHeading("Status"),
+              const SizedBox(height: 12),
+              _buildChoiceChips(
+                values: [
+                  "Not Started",
+                  "InProgress",
+                  "Completed",
+                  "Pending",
+                  "Pause",
+                ],
+                selectedValue: selectedStatus,
+                activeColor: Colors.blue,
+                modalSetState: modalSetState,
+                onSelected: (value) {
+                  selectedStatus = selectedStatus == value ? null : value;
+                  applyFilters();
+                },
+              ),
+
+              const SizedBox(height: 24),
+
+              _buildHeading("Priority"),
+              const SizedBox(height: 12),
+              _buildChoiceChips(
+                values: ["Normal", "Medium", "High"],
+                selectedValue: selectedPriority,
+                activeColor: Colors.orange,
+                modalSetState: modalSetState,
+                onSelected: (value) {
+                  selectedPriority = selectedPriority == value ? null : value;
+                  applyFilters();
+                },
+              ),
+
+              const SizedBox(height: 24),
+
+              _buildHeading("Overdue"),
+              const SizedBox(height: 12),
+              _buildChoiceChips(
+                values: ["Yes", "No"],
+                selectedValue: selectedOverdue,
+                activeColor: theme.colorScheme.error,
+                modalSetState: modalSetState,
+                onSelected: (value) {
+                  selectedOverdue = selectedOverdue == value ? null : value;
+                  applyFilters();
+                },
+              ),
+            ],
+
+            // ================= LEAVE / PERMISSION =================
+            if (selectedView == "Leave") ...[
+              /// 🔹 SWITCH TYPE
+              _buildHeading("Type"),
+              const SizedBox(height: 10),
+              _buildChoiceChips(
+                values: ["Leave", "Permission"],
+                selectedValue: selectedLeaveView,
+                activeColor: Colors.teal,
+                modalSetState: modalSetState,
+                onSelected: (v) {
+                  selectedLeaveView = selectedLeaveView == v ? "Leave" : v;
+                  applyFilters();
+                },
+              ),
+
+              const SizedBox(height: 20),
+
+              /// 🔹 LEAVE TYPE (ONLY FOR LEAVE)
+              if (selectedLeaveView == "Leave") ...[
+                _buildHeading("Leave Type"),
+                const SizedBox(height: 10),
+                _buildChoiceChips(
+                  values: ["Full Day", "First Half", "Second Half"],
+                  selectedValue: selectedLeaveType,
+                  activeColor: Colors.green,
+                  modalSetState: modalSetState,
+                  onSelected: (v) {
+                    selectedLeaveType = selectedLeaveType == v ? null : v;
+                    applyFilters();
+                  },
+                ),
+
+                const SizedBox(height: 20),
+
+                /// STATUS ONLY FOR LEAVE
+                _buildHeading("Status"),
+                const SizedBox(height: 10),
+                _buildChoiceChips(
+                  values: ["Pending", "Approved", "Rejected"],
+                  selectedValue: selectedLeaveStatus,
+                  activeColor: Colors.blue,
+                  modalSetState: modalSetState,
+                  onSelected: (v) {
+                    selectedLeaveStatus = selectedLeaveStatus == v ? null : v;
+                    applyFilters();
+                  },
+                ),
               ],
-              selectedValue: selectedStatus,
-              activeColor: Colors.blue,
-              modalSetState: modalSetState,
-              onSelected: (value) {
-                selectedStatus = selectedStatus == value ? null : value;
-                applyFilters();
-              },
-            ),
 
-            const SizedBox(height: 24),
+              const SizedBox(height: 20),
 
-            /// 🔹 PRIORITY
-            _buildHeading("Priority"),
-            const SizedBox(height: 12),
-            _buildChoiceChips(
-              values: ["Normal", "Medium", "High"],
-              selectedValue: selectedPriority,
-              activeColor: Colors.orange,
-              modalSetState: modalSetState,
-              onSelected: (value) {
-                selectedPriority = selectedPriority == value ? null : value;
-                applyFilters();
-              },
-            ),
+              /// 🔹 DATE (COMMON)
+              _buildHeading("Date"),
+              const SizedBox(height: 10),
 
-            const SizedBox(height: 24),
+              ElevatedButton.icon(
+                onPressed: () async {
+                  final picked = await showDatePicker(
+                    context: context,
+                    initialDate: selectedLeaveDate ?? DateTime.now(),
+                    firstDate: DateTime(2020),
+                    lastDate: DateTime(2030),
+                  );
 
-            /// 🔹 OVERDUE
-            _buildHeading("Overdue"),
-            const SizedBox(height: 12),
-            _buildChoiceChips(
-              values: ["Yes", "No"],
-              selectedValue: selectedOverdue,
-              activeColor: Theme.of(context).colorScheme.error,
-              modalSetState: modalSetState,
-              onSelected: (value) {
-                selectedOverdue = selectedOverdue == value ? null : value;
-                applyFilters();
-              },
-            ),
+                  if (picked != null) {
+                    modalSetState(() {
+                      selectedLeaveDate = selectedLeaveDate == picked
+                          ? null
+                          : picked;
+                    });
+                    applyFilters();
+                  }
+                },
+                icon: const Icon(Icons.calendar_today),
+                label: Text(
+                  selectedLeaveDate != null
+                      ? AppHelpers.formatDate(
+                          selectedLeaveDate!.toIso8601String(),
+                        ) // ✅ FIXED
+                      : "Select Date",
+                ),
+              ),
+            ],
 
             const SizedBox(height: 30),
 
+            /// 🔹 CLEAR BUTTON (COMMON)
             Center(
               child: AppButton(
                 text: "Clear Filters",
@@ -605,12 +997,18 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
                     selectedStatus = null;
                     selectedPriority = null;
                     selectedOverdue = null;
+
+                    selectedLeaveType = null;
+                    selectedLeaveStatus = null;
+                    selectedLeaveDate = null;
+                    selectedPermissionDate = null;
+                    selectedLeaveView = null;
                   });
 
                   applyFilters();
                 },
-                color: Theme.of(context).colorScheme.secondary,
-                txtcolor: Theme.of(context).colorScheme.onPrimary,
+                color: theme.colorScheme.secondary,
+                txtcolor: theme.colorScheme.onPrimary,
               ),
             ),
           ],

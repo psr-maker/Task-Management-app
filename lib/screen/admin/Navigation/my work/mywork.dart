@@ -93,14 +93,14 @@ class _MyworkState extends State<Mywork> {
                   borderRadius: BorderRadius.circular(30),
                 ),
                 labelColor: Theme.of(context).colorScheme.onPrimary,
-                unselectedLabelColor: Theme.of(context).colorScheme.secondary,
+                unselectedLabelColor: Theme.of(context).colorScheme.background,
                 labelStyle: Theme.of(context).textTheme.headlineMedium,
                 tabs: const [
                   Tab(text: 'ALL'),
                   Tab(text: 'Pending/Pause'),
                   Tab(text: 'In Process'),
                   Tab(text: 'Completed'),
-                ],
+                ], 
               ),
 
               Expanded(

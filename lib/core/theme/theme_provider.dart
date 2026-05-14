@@ -128,6 +128,11 @@ class ThemeProvider extends ChangeNotifier {
           fontWeight: FontWeight.w700,
           color: Colors.white,
         ),
+        titleSmall: TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          color: Color.fromARGB(255, 25, 77, 38),
+        ),
         bodySmall: TextStyle(
           fontSize: 18,
           fontWeight: FontWeight.bold,
@@ -159,28 +164,21 @@ class ThemeProvider extends ChangeNotifier {
 
   ThemeData get darkTheme {
     const deepGreen = Color.fromARGB(255, 25, 77, 38);
-    const darkBg = Color(0xFF0B1F14);
 
     return ThemeData(
       brightness: Brightness.dark,
       useMaterial3: true,
 
-      scaffoldBackgroundColor: darkBg,
-
       // COLOR SCHEME
       colorScheme: const ColorScheme.dark(
-        primary: deepGreen,
-        secondary: Color(0xFF4CAF50),
-        surface: Color(0xFF132A1B),
-        background: darkBg,
+        primary: Color.fromARGB(255, 82, 112, 90),
+        secondary: Color.fromARGB(255, 74, 104, 75),
+        tertiary: Colors.white,
+        background: Color.fromARGB(255, 134, 170, 136),
         onPrimary: Colors.white,
-        onSecondary: Colors.white,
-        onSurface: Colors.white,
-        onBackground: Colors.white,
         error: Colors.redAccent,
+        onSecondary: deepGreen,
       ),
-
-      primaryColor: deepGreen,
 
       // APPBAR
       appBarTheme: const AppBarTheme(
@@ -222,7 +220,7 @@ class ThemeProvider extends ChangeNotifier {
 
       // TEXT THEME (FIXED CONTRAST)
       textTheme: const TextTheme(
-        displayLarge: TextStyle(
+        displayLarge: TextStyle( 
           fontSize: 22,
           fontWeight: FontWeight.bold,
           color: Colors.white,
@@ -267,7 +265,11 @@ class ThemeProvider extends ChangeNotifier {
 
         bodyLarge: TextStyle(fontSize: 16, color: Colors.white),
         bodyMedium: TextStyle(fontSize: 14, color: Colors.white),
-        bodySmall: TextStyle(fontSize: 12, color: Colors.white70),
+        bodySmall: TextStyle(
+          fontSize: 18,
+          color: Colors.white70,
+          fontWeight: FontWeight.bold,
+        ),
 
         labelLarge: TextStyle(
           fontSize: 15,
@@ -283,6 +285,11 @@ class ThemeProvider extends ChangeNotifier {
           fontSize: 10,
           fontWeight: FontWeight.w600,
           color: Colors.white60,
+        ),
+        titleSmall: TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          color: Color.fromARGB(255, 25, 77, 38),
         ),
       ),
     );

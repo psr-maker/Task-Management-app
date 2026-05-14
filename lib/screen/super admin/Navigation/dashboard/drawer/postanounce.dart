@@ -51,33 +51,30 @@ class _PostAnnouncementPageState extends State<PostAnnouncementPage> {
     }
   }
 
-  Future<void> uploadAnnouncement() async {
-    if (titleController.text.isEmpty || targetRole == null) {
-      showTopMessage("Please fill all required fields");
-      return;
-    }
-
-    setState(() => _isLoading = true);
-
-    bool success = await AnnouncementService.postAnnouncement(
-      title: titleController.text,
-      description: descController.text,
-      targetRole: targetRole!,
-      createdBy: "Director",
-      file: selectedFile,
-    );
-
-    setState(() => _isLoading = false);
-
-    if (success) {
-      showTopMessage("Uploaded Successfully", isError: false);
-      await Future.delayed(const Duration(seconds: 1));
-      Navigator.pop(context, true);
-    } else {
-      showTopMessage("Upload Failed");
-    }
+ Future<void> uploadAnnouncement() async {
+  if (titleController.text.trim().isEmpty || targetRole == null) {
+    showTopMessage("Please fill required fields");
+    return;
   }
 
+  setState(() => _isLoading = true);
+
+  bool success = await AnnouncementService.postAnnouncement(
+    title: titleController.text.trim(),
+    description: descController.text.trim(),
+    targetRole: targetRole!,
+    file: selectedFile,
+  );
+
+  setState(() => _isLoading = false);
+
+  if (success) {
+    showTopMessage("Uploaded Successfully", isError: false);
+    Navigator.pop(context, true);
+  } else {
+    showTopMessage("Upload Failed");
+  }
+}
   @override
   Widget build(BuildContext context) {
     return Scaffold(

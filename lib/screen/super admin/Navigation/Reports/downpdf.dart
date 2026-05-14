@@ -64,31 +64,57 @@ class EmployeeReportPdfGenerator {
   pw.Widget _buildCell(String text, pw.Font? font) {
     return pw.Padding(
       padding: const pw.EdgeInsets.all(8),
-      child: pw.Text(text, style: pw.TextStyle(font: font, fontSize: 12)),
+      child: pw.Text(text, style: pw.TextStyle(font: font, fontSize: 10)),
     );
   }
 
   pw.Widget _cell(String text, {pw.Font? font}) {
     return pw.Padding(
       padding: const pw.EdgeInsets.all(6),
-      child: pw.Text(text, style: pw.TextStyle(font: font, fontSize: 11)),
+      child: pw.Text(text, style: pw.TextStyle(font: font, fontSize: 10)),
     );
+  }
+
+  Future<Directory> _getSaveDirectory() async {
+    if (Platform.isAndroid) {
+      final dir = await getExternalStorageDirectory();
+      if (dir != null) return dir;
+    }
+    return await getApplicationDocumentsDirectory();
+  }
+
+  Future<bool> _ensureStoragePermission() async {
+    if (!Platform.isAndroid) return true;
+
+    if (await Permission.storage.isGranted) return true;
+
+    final status = await Permission.storage.request();
+    if (status.isGranted) return true;
+
+    final manageStatus = await Permission.manageExternalStorage.request();
+    return manageStatus.isGranted;
   }
 
   Future<void> generateAndDownloadPDF() async {
     final pdf = pw.Document();
 
     final boldFont = await PdfGoogleFonts.notoSansBold();
-
+    String reportTitle;
     final totalGoals = summaryData["totalGoals"] ?? 0;
     final totalTasks = summaryData["totalTasks"] ?? 0;
-
+    if (username != null && username!.isNotEmpty) {
+      reportTitle = "$username Reports - $reportYear";
+    } else if (department != null && department!.isNotEmpty) {
+      reportTitle = "$department Reports - $reportYear";
+    } else {
+      reportTitle = "Reports - $reportYear";
+    }
     pdf.addPage(
       pw.MultiPage(
         build: (context) => [
           /// TITLE
           pw.Text(
-            "Department Report ($reportYear) - $department",
+            reportTitle,
             style: pw.TextStyle(font: boldFont, fontSize: 22),
           ),
           pw.SizedBox(height: 20),
@@ -208,9 +234,12 @@ class EmployeeReportPdfGenerator {
                     ),
                     pw.SizedBox(height: 5),
                     pw.Text("Name: ${topPerformer!["user"] ?? "-"}"),
-                    pw.Text("Completed Tasks: ${topPerformer!["completedTasks"] ?? 0}"),
+                    pw.Text(
+                      "Completed Tasks: ${topPerformer!["completedTasks"] ?? 0}",
+                    ),
                     pw.Text("Total Tasks: ${topPerformer!["totalTasks"] ?? 0}"),
-                    if (topPerformer!["totalTasks"] != null && topPerformer!["totalTasks"] > 0)
+                    if (topPerformer!["totalTasks"] != null &&
+                        topPerformer!["totalTasks"] > 0)
                       pw.Text(
                         "Completion Rate: ${((topPerformer!["completedTasks"] ?? 0) / topPerformer!["totalTasks"] * 100).round()}%",
                       ),
@@ -240,9 +269,12 @@ class EmployeeReportPdfGenerator {
                     ),
                     pw.SizedBox(height: 5),
                     pw.Text("Name: ${lowPerformer!["user"] ?? "-"}"),
-                    pw.Text("Completed Tasks: ${lowPerformer!["completedTasks"] ?? 0}"),
+                    pw.Text(
+                      "Completed Tasks: ${lowPerformer!["completedTasks"] ?? 0}",
+                    ),
                     pw.Text("Total Tasks: ${lowPerformer!["totalTasks"] ?? 0}"),
-                    if (lowPerformer!["totalTasks"] != null && lowPerformer!["totalTasks"] > 0)
+                    if (lowPerformer!["totalTasks"] != null &&
+                        lowPerformer!["totalTasks"] > 0)
                       pw.Text(
                         "Completion Rate: ${((lowPerformer!["completedTasks"] ?? 0) / lowPerformer!["totalTasks"] * 100).round()}%",
                       ),
@@ -306,7 +338,7 @@ class EmployeeReportPdfGenerator {
       pw.MultiPage(
         build: (context) => [
           pw.Text(
-            "GOALS DETAILED REPORT",
+            "GOALS REPORT",
             style: pw.TextStyle(font: boldFont, fontSize: 18),
           ),
           pw.SizedBox(height: 15),
@@ -381,7 +413,7 @@ class EmployeeReportPdfGenerator {
           build: (context) {
             return [
               pw.Text(
-                "TASKS DETAILED REPORT",
+                "TASKS REPORT",
                 style: pw.TextStyle(font: boldFont, fontSize: 18),
               ),
               pw.SizedBox(height: 15),
@@ -447,18 +479,191 @@ class EmployeeReportPdfGenerator {
       );
     }
 
-    /// ✅ Save + Download
-    if (await Permission.storage.request().isGranted) {
-      final dir = await getExternalStorageDirectory();
-      final file = File("${dir!.path}/employee_report_$userId.pdf");
+    if ((reportData["leaveList"] as List?)?.isNotEmpty ?? false) {
+      pdf.addPage(
+        pw.MultiPage(
+          // ✅ CHANGE HERE
+          build: (context) {
+            return [
+              pw.Text(
+                "LEAVE REPORT",
+                style: pw.TextStyle(font: boldFont, fontSize: 18),
+              ),
+              pw.SizedBox(height: 15),
 
-      await file.writeAsBytes(await pdf.save());
+              pw.Table(
+                border: pw.TableBorder.all(width: 1, color: PdfColors.black),
+                columnWidths: {
+                  0: const pw.FlexColumnWidth(1),
+                  1: const pw.FlexColumnWidth(1),
+                  2: const pw.FlexColumnWidth(1),
+                  3: const pw.FlexColumnWidth(1),
+                  4: const pw.FlexColumnWidth(1),
+                  5: const pw.FlexColumnWidth(1),
+                  6: const pw.FlexColumnWidth(1),
+                  7: const pw.FlexColumnWidth(1),
+                },
+                children: [
+                  /// HEADER
+                  pw.TableRow(
+                    decoration: pw.BoxDecoration(color: PdfColors.grey300),
+                    children: [
+                      _buildCell("Leave Type", boldFont),
+                      _buildCell("Reason", boldFont),
+                      _buildCell("Date", boldFont),
+                      _buildCell("Submitted Date", boldFont),
+                      _buildCell("Status", boldFont),
+                      _buildCell("Reject Reason", boldFont),
+                      _buildCell("Approved Date", boldFont),
+                      _buildCell("Contact Number", boldFont),
+                    ],
+                  ),
 
-      await Printing.layoutPdf(onLayout: (format) async => pdf.save());
-
-      print("PDF Saved at: ${file.path}");
-    } else {
-      print("Permission Denied");
+                  /// DATA
+                  ...(reportData["leaveList"] as List).map((leave) {
+                    return pw.TableRow(
+                      children: [
+                        _buildCell(leave["type"]?.toString() ?? "-", null),
+                        _buildCell(leave["reason"]?.toString() ?? "-", null),
+                        _buildCell(
+                          AppHelpers.formatDate(
+                            leave["fromDate"]?.toString() ?? "-",
+                          ),
+                          null,
+                        ),
+                        _buildCell(
+                          AppHelpers.formatDate(
+                            leave["submdate"]?.toString() ?? "-",
+                          ),
+                          null,
+                        ),
+                        _buildCell((leave["status"] ?? "-").toString(), null),
+                        _buildCell(
+                          (leave["rejreason"] ?? "-").toString(),
+                          null,
+                        ),
+                        _buildCell(
+                          AppHelpers.formatDate(
+                            leave["approvedate"]?.toString() ?? "-",
+                          ),
+                          null,
+                        ),
+                        _buildCell(leave["contactno"]?.toString() ?? "-", null),
+                      ],
+                    );
+                  }).toList(),
+                ],
+              ),
+            ];
+          },
+        ),
+      );
     }
+    if ((reportData["permissionList"] as List?)?.isNotEmpty ?? false) {
+      pdf.addPage(
+        pw.MultiPage(
+          // ✅ CHANGE HERE
+          build: (context) {
+            return [
+              pw.Text(
+                "PERMISSION REPORT",
+                style: pw.TextStyle(font: boldFont, fontSize: 18),
+              ),
+              pw.SizedBox(height: 15),
+
+              pw.Table(
+                border: pw.TableBorder.all(width: 1, color: PdfColors.black),
+                columnWidths: {
+                  0: const pw.FlexColumnWidth(1),
+                  1: const pw.FlexColumnWidth(1),
+                  2: const pw.FlexColumnWidth(1),
+                  3: const pw.FlexColumnWidth(1),
+                  4: const pw.FlexColumnWidth(1),
+                  5: const pw.FlexColumnWidth(1),
+                  6: const pw.FlexColumnWidth(1),
+                  7: const pw.FlexColumnWidth(1),
+                },
+                children: [
+                  /// HEADER
+                  pw.TableRow(
+                    decoration: pw.BoxDecoration(color: PdfColors.grey300),
+                    children: [
+                      _buildCell("Reason", boldFont),
+                      _buildCell("Date", boldFont),
+                      _buildCell("From Time", boldFont),
+                      _buildCell("To Time", boldFont),
+                      _buildCell("Total Hours", boldFont),
+                      _buildCell("Submitted Date", boldFont),
+                    ],
+                  ),
+
+                  /// DATA
+                  ...(reportData["permissionList"] as List).map((permission) {
+                    return pw.TableRow(
+                      children: [
+                        _buildCell(
+                          permission["reason"]?.toString() ?? "-",
+                          null,
+                        ),
+                        _buildCell(
+                          AppHelpers.formatDate(
+                            permission["date"]?.toString() ?? "-",
+                          ),
+                          null,
+                        ),
+                        _buildCell(
+                          (permission["fromTime"] ?? "-").toString(),
+                          null,
+                        ),
+                        _buildCell(
+                          (permission["toTime"] ?? "-").toString(),
+                          null,
+                        ),
+                        _buildCell(
+                          permission["totalhours"]?.toString() ?? "-",
+                          null,
+                        ),
+                        _buildCell(
+                          AppHelpers.formatDate(
+                            permission["submdate"]?.toString() ?? "-",
+                          ),
+                          null,
+                        ),
+                      ],
+                    );
+                  }).toList(),
+                ],
+              ),
+            ];
+          },
+        ),
+      );
+    }
+
+    /// ✅ Save + Download
+    final saveDir = await _getSaveDirectory();
+    final file = File(
+      "${saveDir.path}/employee_report_${userId ?? DateTime.now().millisecondsSinceEpoch}.pdf",
+    );
+
+    try {
+      await file.writeAsBytes(await pdf.save());
+      print("PDF Saved at: ${file.path}");
+    } catch (e) {
+      final granted = await _ensureStoragePermission();
+      if (!granted) {
+        print("Permission Denied");
+        return;
+      }
+
+      final retryDir = await _getSaveDirectory();
+      final retryFile = File(
+        "${retryDir.path}/employee_report_${userId ?? DateTime.now().millisecondsSinceEpoch}.pdf",
+      );
+      await retryFile.writeAsBytes(await pdf.save());
+      print("PDF Saved at: ${retryFile.path}");
+    }
+
+    await Printing.layoutPdf(onLayout: (format) async => pdf.save());
   }
 }
