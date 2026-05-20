@@ -22,8 +22,7 @@ class _SettingsState extends State<Profile> {
   String getImageUrl(String? path) {
     if (path == null || path.isEmpty) return "";
 
-    final cleanPath = path.replaceFirst("/uploads/", "");
-    return "${ApiConstants.Uploaded}$cleanPath";
+    return "${ApiConstants.Uploaded}$path";
   }
 
   @override
@@ -92,11 +91,15 @@ class _SettingsState extends State<Profile> {
                         child: CircleAvatar(
                           radius: 45,
                           backgroundColor: Colors.grey.shade300,
+
                           backgroundImage:
                               (data["profileImage"] != null &&
                                   data["profileImage"].toString().isNotEmpty)
-                              ? NetworkImage(getImageUrl(data["profileImage"]))
+                              ? NetworkImage(
+                                  getImageUrl(data["profileImage"].toString()),
+                                )
                               : null,
+
                           child:
                               (data["profileImage"] == null ||
                                   data["profileImage"].toString().isEmpty)

@@ -131,13 +131,56 @@ class _TaskDetailsState extends State<TaskDetails> {
       createdById = task.assignedBy!.trim();
     }
 
-    final isSuperAdmin = loginUserRole == "director";
+    final isDirector = loginUserRole.contains("director");
+    final isManager = loginUserRole.contains("manager");
 
-    final canEdit = isSuperAdmin || (loginUserId == createdById);
+    // ✅ Directors can always edit
+    if (isDirector) {
+      if (mounted) {
+        setState(() {
+          _canEditTask = true;
+          permissionLoaded = true;
+        });
+      }
+      return;
+    }
+
+    // ✅ Check if login user is the creator
+    if (loginUserId == createdById) {
+      if (mounted) {
+        setState(() {
+          _canEditTask = true;
+          permissionLoaded = true;
+        });
+      }
+      return;
+    }
+
+    // ✅ Managers can always edit
+    if (isManager) {
+      if (mounted) {
+        setState(() {
+          _canEditTask = true;
+          permissionLoaded = true;
+        });
+      }
+      return;
+    }
+
+    // ✅ Check if login staff is assigned to this task
+    final assignedTo = task.assignedTo;
+    bool isStaffAssigned = false;
+    for (var staff in assignedTo) {
+      final staffUserId = (staff['userId'] as dynamic)?.toString().trim();
+      if (staffUserId == loginUserId) {
+        isStaffAssigned = true;
+        break;
+      }
+    }
 
     if (mounted) {
       setState(() {
-        _canEditTask = canEdit;
+        _canEditTask = isStaffAssigned;
         permissionLoaded = true;
       });
     }

@@ -19,7 +19,7 @@ class _AnounceState extends State<Anouncestaff> {
   late Future<List<Announcement>> futureAnnouncements;
 
   @override
-  void initState() { 
+  void initState() {
     super.initState();
     futureAnnouncements = AnnouncementService.fetchAnnouncements();
   }
@@ -37,6 +37,9 @@ class _AnounceState extends State<Anouncestaff> {
 
           if (snapshot.hasError) {
             return Center(child: Text("Error: ${snapshot.error}"));
+          }
+          if (!snapshot.hasData || snapshot.data!.isEmpty) {
+            return Center(child: Text("No Annoumcements"));
           }
 
           final announcements = snapshot.data ?? [];
@@ -62,7 +65,7 @@ class _AnounceState extends State<Anouncestaff> {
                           height: 14,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            gradient:  LinearGradient(
+                            gradient: LinearGradient(
                               colors: [
                                 Theme.of(context).colorScheme.background,
                                 Theme.of(context).colorScheme.secondary,
@@ -70,11 +73,7 @@ class _AnounceState extends State<Anouncestaff> {
                             ),
                           ),
                         ),
-                        Container(
-                          width: 2,
-                          height: 120,
-                          color: Colors.grey,
-                        ),
+                        Container(width: 2, height: 120, color: Colors.grey),
                       ],
                     ),
 
@@ -85,7 +84,9 @@ class _AnounceState extends State<Anouncestaff> {
                         padding: const EdgeInsets.all(15),
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color:  Theme.of(context).colorScheme.secondary,),
+                          border: Border.all(
+                            color: Theme.of(context).colorScheme.secondary,
+                          ),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -258,7 +259,7 @@ class _AnounceState extends State<Anouncestaff> {
       );
     }
 
-    if (item.fileType == "pdf" && item.filePath != null) { 
+    if (item.fileType == "pdf" && item.filePath != null) {
       return GestureDetector(
         onTap: () async {
           final url = "${ApiConstants.Uploaded}${item.filePath}";
@@ -280,7 +281,7 @@ class _AnounceState extends State<Anouncestaff> {
                   style: TextStyle(
                     color: Colors.red.shade700,
                     fontWeight: FontWeight.w600,
-                    fontSize: 12
+                    fontSize: 12,
                   ),
                 ),
               ),

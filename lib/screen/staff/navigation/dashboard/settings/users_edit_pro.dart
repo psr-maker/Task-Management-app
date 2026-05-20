@@ -110,6 +110,7 @@ class _UserEditProfileState extends State<UserEditProfile> {
       }, _profileImage);
 
       showTopMessage("Profile updated", isError: false);
+      Navigator.pop(context);
     } catch (e) {
       showTopMessage("Update failed", isError: true);
     }
@@ -117,17 +118,24 @@ class _UserEditProfileState extends State<UserEditProfile> {
     if (mounted) setState(() => _saving = false);
   }
 
-  Future<void> _pickImage(ImageSource source) async {
-    final picker = ImagePicker();
-    final picked = await picker.pickImage(source: source);
+Future<void> _pickImage(ImageSource source) async {
+  final picker = ImagePicker();
 
-    if (picked != null) {
-      setState(() {
-        _profileImage = File(picked.path);
-      });
-    }
+  final picked = await picker.pickImage(
+    source: source,
+
+    // reduce size
+    imageQuality: 40,
+    maxWidth: 800,
+    maxHeight: 800,
+  );
+
+  if (picked != null) {
+    setState(() {
+      _profileImage = File(picked.path);
+    });
   }
-
+}
   String? getProfileImageUrl(Map<String, dynamic> data) {
     final path = data["profileImage"];
     if (path == null || path.isEmpty) return "";

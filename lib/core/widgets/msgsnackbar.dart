@@ -127,7 +127,7 @@ Future<void> showPendingAlert(BuildContext context, String message) {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       title: const Text(
         "Approval Pending",
-        style: TextStyle(fontWeight: FontWeight.bold),
+        style: TextStyle(fontWeight: FontWeight.bold,fontSize: 18),
       ),
       content: Text(message, style: const TextStyle(fontSize: 14)),
       actions: [

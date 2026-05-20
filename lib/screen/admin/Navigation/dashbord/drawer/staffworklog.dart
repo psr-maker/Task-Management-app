@@ -318,7 +318,7 @@ class _UsersWorklogState extends State<Staffworklog> {
                               child: GestureDetector(
                                 onTap: () {
                                   final fullUrl =
-                                      "${ApiConstants.Uploaded}${log["imageUrl"].toString().replaceFirst('/uploads/', '')}";
+                                      "${ApiConstants.Uploaded}${log["imageUrl"].toString()}";
 
                                   Navigator.push(
                                     context,
@@ -332,7 +332,7 @@ class _UsersWorklogState extends State<Staffworklog> {
                                 child: ClipRRect(
                                   borderRadius: BorderRadius.circular(10),
                                   child: Image.network(
-                                    "${ApiConstants.Uploaded}${log["imageUrl"].toString().replaceFirst('/uploads/', '')}",
+                                    "${ApiConstants.Uploaded}${log["imageUrl"].toString()}",
                                     height: 150,
                                     width: double.infinity,
                                     fit: BoxFit.cover,

@@ -3,7 +3,6 @@ import 'package:jwt_decoder/jwt_decoder.dart';
 import 'package:staff_work_track/Models/getusers.dart';
 import 'package:staff_work_track/core/widgets/buttons.dart';
 import 'package:staff_work_track/services/auth_service.dart';
-import 'package:staff_work_track/services/superadmin_service.dart';
 
 class AssignUsersPage extends StatefulWidget {
   final List<UserModel> users;
@@ -52,9 +51,21 @@ class _AssignUsersPageState extends State<AssignUsersPage> {
 
       loginRole = decoded['Role'];
 
-      final adminDetails = await SuperAdminService.getAdminDetails(userId);
+      // ✅ Find current user in the provided users list to get their department
+      UserModel? currentUser;
+      for (var user in widget.users) {
+        if (user.userId == userId) {
+          currentUser = user;
+          break;
+        }
+      }
 
-      loginDepartment = adminDetails.department;
+      if (currentUser != null) {
+        loginDepartment = currentUser.department;
+        debugPrint("✅ Got manager department from users list: $loginDepartment");
+      } else {
+        debugPrint("⚠️ Current user not found in users list. userId: $userId");
+      }
 
       _applyRoleBasedFilter(); // ✅ NOW SAFE
     } catch (e) {
@@ -78,9 +89,20 @@ class _AssignUsersPageState extends State<AssignUsersPage> {
     if (loginRole == "Director") {
       users = users.where((u) => u.role != "Director").toList();
     } else if (loginRole == "Manager") {
-      users = users
-          .where((u) => u.department == loginDepartment && u.role != "Director")
-          .toList();
+      // Filter users by: same department AND not director
+      if (loginDepartment != null && loginDepartment!.isNotEmpty) {
+        users = users
+            .where((u) =>
+                u.department.toLowerCase().trim() ==
+                    loginDepartment!.toLowerCase().trim() &&
+                u.role != "Director")
+            .toList();
+      } else {
+        // If department is not available, show no users
+        users = [];
+        debugPrint(
+            "⚠️ Manager department not found. loginDepartment: $loginDepartment");
+      }
     }
 
     setState(() {
@@ -91,8 +113,23 @@ class _AssignUsersPageState extends State<AssignUsersPage> {
   void applySearch(String query) {
     final text = query.toLowerCase().trim();
 
+    // Start with role-filtered users
+    List<UserModel> baseUsers = [];
+    
+    if (loginRole == "Director") {
+      baseUsers = widget.users.where((u) => u.role != "Director").toList();
+    } else if (loginRole == "Manager" && loginDepartment != null) {
+      baseUsers = widget.users
+          .where((u) =>
+              u.department.toLowerCase().trim() ==
+                  loginDepartment!.toLowerCase().trim() &&
+              u.role != "Director")
+          .toList();
+    }
+
+    // Then search within those users
     setState(() {
-      filteredUsers = filteredUsers.where((user) {
+      filteredUsers = baseUsers.where((user) {
         return user.name.toLowerCase().contains(text) ||
             user.department.toLowerCase().contains(text) ||
             user.role.toLowerCase().contains(text);
@@ -135,14 +172,16 @@ class _AssignUsersPageState extends State<AssignUsersPage> {
       ),
       body: Padding(
         padding: const EdgeInsets.all(15),
-        child: Column(
-          children: [
-            isStaffUser
-                ? Text(
-                    "You can't assign any staff",
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-                  )
-                : Expanded(
+        child: !isStaffUser
+            ? Column(
+                children: [
+                  //isStaffUser
+                  // ? Text(
+                  //     "You can't assign any staff",
+                  //     style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                  //   )
+                  // :
+                  Expanded(
                     child: filteredUsers.isEmpty
                         ? const Center(child: Text("No users found"))
                         : ListView.builder(
@@ -152,7 +191,7 @@ class _AssignUsersPageState extends State<AssignUsersPage> {
                               final isSelected = selected.any(
                                 (u) => u.userId == user.userId,
                               );
-
+                    
                               return GestureDetector(
                                 onTap: () {
                                   setState(() {
@@ -194,8 +233,7 @@ class _AssignUsersPageState extends State<AssignUsersPage> {
                                                 selected.add(user);
                                               } else {
                                                 selected.removeWhere(
-                                                  (u) =>
-                                                      u.userId == user.userId,
+                                                  (u) => u.userId == user.userId,
                                                 );
                                               }
                                             });
@@ -209,9 +247,7 @@ class _AssignUsersPageState extends State<AssignUsersPage> {
                                             99,
                                             49,
                                           ),
-                                          child: Text(
-                                            user.name[0].toUpperCase(),
-                                          ),
+                                          child: Text(user.name[0].toUpperCase()),
                                         ),
                                         const SizedBox(width: 15),
                                         Expanded(
@@ -243,17 +279,28 @@ class _AssignUsersPageState extends State<AssignUsersPage> {
                             },
                           ),
                   ),
-            AppButton(
-              text: "Done",
-              isLoading: isLoading,
-              onPressed: () {
-                Navigator.pop(context, selected);
-              },
-              color: Theme.of(context).colorScheme.secondary,
-              txtcolor: Theme.of(context).colorScheme.onPrimary,
-            ),
-          ],
-        ),
+                  AppButton(
+                    text: "Done",
+                    isLoading: isLoading,
+                    onPressed: () {
+                      Navigator.pop(context, selected);
+                    },
+                    color: Theme.of(context).colorScheme.secondary,
+                    txtcolor: Theme.of(context).colorScheme.onPrimary,
+                  ),
+                ],
+              )
+            : Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Center(
+                    child: Text(
+                      "You can't assign any staff",
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ],
+              ),
       ),
     );
   }

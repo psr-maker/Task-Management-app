@@ -142,17 +142,6 @@ class _StaffDashboardState extends State<StaffDashboard> {
       return const Scaffold(body: Center(child: RotatingFlower()));
     }
 
-    if (data == null) {
-      return const Scaffold(body: Center(child: Text("No data found")));
-    }
-    if (isLoading) {
-      return const Scaffold(body: Center(child: RotatingFlower()));
-    }
-
-    if (data == null) {
-      return const Scaffold(body: Center(child: Text("No data found")));
-    }
-
     double completionPercentage = (data?["goalCompletionPercent"] ?? 0)
         .toDouble();
     double onTimePercentage = (data?["goalOnTimePercent"] ?? 0).toDouble();

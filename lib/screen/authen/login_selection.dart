@@ -65,7 +65,7 @@ class _LoginSelectionState extends State<LoginSelection> {
     if (errorMsg.toLowerCase().contains("inactive")) {
       await showPendingAlert(
         context,
-        "Please waiting for Director Approvel",
+        "Your Email is not Approved Yet, Please Wait for Director approval",
       );
     } else {
       _showMessage(errorMsg, isError: true);
@@ -107,9 +107,9 @@ class _LoginSelectionState extends State<LoginSelection> {
                 context,
                 message: _topMessage!,
                 isError: _isErrorMessage,
-                backgroundColor: Theme.of(context).colorScheme.onPrimary,
-                textColor: Theme.of(context).colorScheme.secondary,
-                iconColor: Theme.of(context).colorScheme.secondary,
+                // backgroundColor: Theme.of(context).colorScheme.onPrimary,
+                // textColor: Theme.of(context).colorScheme.secondary,
+                // iconColor: Theme.of(context).colorScheme.secondary,
               ),
             ),
 
@@ -280,7 +280,7 @@ class _LoginSelectionState extends State<LoginSelection> {
                       children: [
                         Image.asset("assets/flower.png", height: 15, width: 15),
                         Text(
-                          "  Poornasree Equipements",
+                          "  Poornasree Equipments",
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w400,

@@ -509,6 +509,12 @@ class CapsuleBarChart extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const double maxHeight = 180;
+    final bool hasData = data.isNotEmpty;
+
+    // Hide entire widget if no data
+    if (!hasData) {
+      return const SizedBox.shrink();
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -858,7 +864,7 @@ class _AlldeptproducticityState extends State<Alldeptproducticity> {
             } else if (snapshot.hasError) {
               return Center(child: Text('Error: ${snapshot.error}'));
             } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-              return const Center(child: Text('No data'));
+              return const SizedBox();
             }
             final departments = snapshot.data!;
             return ClipRRect(
@@ -967,6 +973,12 @@ class LeavePermissionChart extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final months = _getMonthsTillNow();
+     final bool hasData = attendance.isNotEmpty;
+
+    // Hide entire widget if no data
+    if (!hasData) {
+      return const SizedBox.shrink();
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [

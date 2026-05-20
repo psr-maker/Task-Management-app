@@ -17,7 +17,7 @@ import 'package:staff_work_track/utils/enum.dart';
 import 'package:staff_work_track/widgets/StatCard.dart';
 import 'package:staff_work_track/widgets/monthlytrend.dart';
 import 'package:staff_work_track/widgets/kpicard.dart';
-
+ 
 class SuperAdminDashboard extends StatefulWidget {
   final DateTime? fromDate;
   final DateTime? toDate;
@@ -373,15 +373,17 @@ class _OverallReportsTabState extends State<SuperAdminDashboard> {
                   ],
                 ),
                 const SizedBox(height: 20),
-                Text(
-                  "Department Performance",
-                  style: Theme.of(context).textTheme.displaySmall,
-                ),
-                const SizedBox(height: 15),
-                _buildToggle(),
-                const SizedBox(height: 15),
-                _buildDepartmentChart(data["departmentData"]),
-                const SizedBox(height: 20),
+                if ((data["totalDepartments"] ?? 0) > 0) ...[
+                  Text(
+                    "Department Performance",
+                    style: Theme.of(context).textTheme.displaySmall,
+                  ),
+                  const SizedBox(height: 15),
+                  _buildToggle(),
+                  const SizedBox(height: 15),
+                  _buildDepartmentChart(data["departmentData"]),
+                  const SizedBox(height: 20),
+                ],
                 Alldeptproducticity(),
                 const SizedBox(height: 20),
                 PendingApprovals(),

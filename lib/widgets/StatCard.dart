@@ -9,6 +9,7 @@ import 'package:staff_work_track/utils/app_helper.dart';
 import 'package:staff_work_track/utils/enum.dart';
 import 'package:staff_work_track/services/admin_service.dart';
 import 'package:staff_work_track/utils/TaskUtils.dart';
+import 'package:staff_work_track/utils/jwt_helper.dart';
 
 class SmallStatCard extends StatelessWidget {
   final String title;
@@ -192,6 +193,9 @@ class Taskstatus extends StatefulWidget {
 class _TaskCardState extends State<Taskstatus> {
   late TaskStatus selectedStatus;
   bool isUpdating = false;
+  bool _canEditStatus = false;
+  bool _permissionChecked = false;
+
   bool get isCompleted => selectedStatus == TaskStatus.completed;
 
   @override
@@ -200,6 +204,111 @@ class _TaskCardState extends State<Taskstatus> {
     selectedStatus = TaskUtils.parseStatus(
       widget.task["status"]!.toString().trim(),
     );
+    _checkPermissions();
+  }
+
+  Future<void> _checkPermissions() async {
+    try {
+      final token = await AuthService.getToken();
+      if (token == null) {
+        setState(() {
+          _canEditStatus = false;
+          _permissionChecked = true;
+        });
+        return;
+      }
+
+      final loginUserId = JwtHelper.getuid(token)?.toString().trim();
+      final userRole = JwtHelper.getRole(token)?.toLowerCase().trim();
+      final userDepartment = JwtHelper.getDepartment(token)?.toLowerCase().trim();
+
+      if (loginUserId == null || userRole == null) {
+        setState(() {
+          _canEditStatus = false;
+          _permissionChecked = true;
+        });
+        return;
+      }
+
+      final assignedTo = widget.task["assignedTo"] as List?;
+      if (assignedTo == null || assignedTo.isEmpty) {
+        setState(() {
+          _canEditStatus = false;
+          _permissionChecked = true;
+        });
+        return;
+      }
+
+      // Directors can edit any task (no restrictions)
+      if (userRole == "director") {
+        setState(() {
+          _canEditStatus = true;
+          _permissionChecked = true;
+        });
+        return;
+      }
+
+      // Check if login user is in the assigned list
+      bool isAssignedToUser = false;
+      for (var staff in assignedTo) {
+        if (staff is Map<String, dynamic>) {
+          final staffUserId = (staff["userId"] as dynamic?)?.toString().trim();
+          if (staffUserId == loginUserId) {
+            isAssignedToUser = true;
+            break;
+          }
+        }
+      }
+
+      // Staff can only edit if task is assigned to them
+      if (userRole != "manager") {
+        setState(() {
+          _canEditStatus = isAssignedToUser;
+          _permissionChecked = true;
+        });
+        return;
+      }
+
+      // Managers: can edit if assigned to them OR if staff are in their department
+      if (isAssignedToUser) {
+        setState(() {
+          _canEditStatus = true;
+          _permissionChecked = true;
+        });
+        return;
+      }
+
+      if (userDepartment == null) {
+        setState(() {
+          _canEditStatus = false;
+          _permissionChecked = true;
+        });
+        return;
+      }
+
+      // Check if at least one staff member is in the manager's department
+      bool hasStaffInDepartment = false;
+      for (var staff in assignedTo) {
+        if (staff is Map<String, dynamic>) {
+          final staffDept = (staff["department"] as String?)?.toLowerCase().trim();
+          if (staffDept == userDepartment) {
+            hasStaffInDepartment = true;
+            break;
+          }
+        }
+      }
+
+      setState(() {
+        _canEditStatus = hasStaffInDepartment;
+        _permissionChecked = true;
+      });
+    } catch (e) {
+      debugPrint("Permission check error: $e");
+      setState(() {
+        _canEditStatus = false;
+        _permissionChecked = true;
+      });
+    }
   }
 
   @override
@@ -313,61 +422,75 @@ class _TaskCardState extends State<Taskstatus> {
                 const SizedBox(height: 8),
 
                 /// STATUS DROPDOWN
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 2,
-                  ),
-                  decoration: BoxDecoration(
-                    color: statusColor.withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: DropdownButton<TaskStatus>(
-                    value: selectedStatus,
-                    underline: const SizedBox(),
-                    isDense: true,
-                    icon: const Icon(Icons.arrow_drop_down, size: 18),
-                    items: TaskStatus.values.map((status) {
-                      return DropdownMenuItem(
-                        value: status,
-                        child: Text(
-                          TaskUtils.getStatusText(status),
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                            color: TaskUtils.getStatusColor(status),
+                Tooltip(
+                  message: !_permissionChecked
+                      ? "Loading permissions..."
+                      : !_canEditStatus
+                          ? "Permission denied: Managers can only edit their department staff tasks"
+                          : "Click to change status",
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: statusColor.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(20),
+                      border: !_permissionChecked || !_canEditStatus
+                          ? Border.all(color: Colors.red.withOpacity(0.3), width: 1)
+                          : null,
+                    ),
+                    child: DropdownButton<TaskStatus>(
+                      value: selectedStatus,
+                      underline: const SizedBox(),
+                      isDense: true,
+                      icon: Icon(
+                        Icons.arrow_drop_down,
+                        size: 18,
+                        color: !_canEditStatus ? Colors.grey : null,
+                      ),
+                      items: TaskStatus.values.map((status) {
+                        return DropdownMenuItem(
+                          value: status,
+                          child: Text(
+                            TaskUtils.getStatusText(status),
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: TaskUtils.getStatusColor(status),
+                            ),
                           ),
-                        ),
-                      );
-                    }).toList(),
+                        );
+                      }).toList(),
 
-                    onChanged: (isUpdating || isCompleted)
-                        ? null
-                        : (value) async {
-                            if (value == null) return;
+                      onChanged: (isUpdating || isCompleted || !_canEditStatus || !_permissionChecked)
+                          ? null
+                          : (value) async {
+                              if (value == null) return;
 
-                            setState(() {
-                              selectedStatus = value;
-                              isUpdating = true;
-                            });
+                              setState(() {
+                                selectedStatus = value;
+                                isUpdating = true;
+                              });
 
-                            try {
-                              await AdminService.updateTaskStatus(
-                                taskCode: widget.task["taskCode"],
-                                status: value,
-                              );
-                            } catch (e) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text("Status update failed"),
-                                ),
-                              );
-                            } finally {
-                              if (mounted) {
-                                setState(() => isUpdating = false);
+                              try {
+                                await AdminService.updateTaskStatus(
+                                  taskCode: widget.task["taskCode"],
+                                  status: value,
+                                );
+                              } catch (e) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text("Status update failed"),
+                                  ),
+                                );
+                              } finally {
+                                if (mounted) {
+                                  setState(() => isUpdating = false);
+                                }
                               }
-                            }
-                          },
+                            },
+                    ),
                   ),
                 ),
               ],

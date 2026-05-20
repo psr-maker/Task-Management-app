@@ -13,4 +13,9 @@ class JwtHelper {
     final decoded = Jwt.parseJwt(token);
     return decoded["UserId"];
   }
+
+  static String? getDepartment(String token) {
+    final decoded = Jwt.parseJwt(token);
+    return decoded["Department"];
+  }
 }

@@ -141,9 +141,10 @@ class _AddWorklogPageState extends State<AddWorklogPage> {
 
       if (!mounted) return;
       showTopMessage(
-        "Worklog added with Location successfully",
+        "Worklog added  successfully",
         isError: false,
       );
+       Navigator.pop(context);
     } catch (e) {
       showTopMessage(e.toString(), isError: true);
     }

@@ -314,8 +314,8 @@ class _AnounceState extends State<Anounce> {
   Widget _buildMediaSection(Announcement item) {
     if (item.fileType == "image" && item.filePath != null) {
       final imageUrl =
-          "${ApiConstants.Uploaded}${item.filePath.toString().replaceFirst('/uploads/', '')}";
-      return GestureDetector(
+        "${ApiConstants.Uploaded}${item.filePath}";
+      return GestureDetector( 
         onTap: () {
           Navigator.push(
             context,
@@ -343,7 +343,7 @@ class _AnounceState extends State<Anounce> {
       return GestureDetector(
         onTap: () async {
           final pdfurl =
-              "${ApiConstants.Uploaded}${item.filePath.toString().replaceFirst('/uploads/', '')}";
+              "${ApiConstants.Uploaded}${item.filePath.toString()}";
           await launchUrl(
             Uri.parse(pdfurl),
             mode: LaunchMode.externalApplication,

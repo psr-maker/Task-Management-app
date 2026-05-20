@@ -60,8 +60,8 @@ class _SplashScreenState extends State<SplashScreen>
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             const Text(
-              "Staff Work Tracking",
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              "Performance Tracking",
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 20),
             RotationTransition(

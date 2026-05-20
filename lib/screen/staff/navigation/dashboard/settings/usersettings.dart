@@ -5,7 +5,6 @@ import 'package:staff_work_track/core/widgets/buttons.dart';
 import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
 import 'package:staff_work_track/screen/authen/login_selection.dart';
 import 'package:staff_work_track/screen/staff/navigation/dashboard/settings/profile.dart';
-import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/settings/add_dept.dart';
 import 'package:staff_work_track/services/auth_service.dart';
 
 class UsersSettings extends StatefulWidget {

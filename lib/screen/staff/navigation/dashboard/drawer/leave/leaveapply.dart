@@ -130,6 +130,7 @@ class _LeaveapplyState extends State<Leaveapply> {
     setState(() => _isLoading = false);
     if (success) {
       showTopMessage("Leave Applied Successfully", isError: false);
+      Navigator.pop(context);
     } else {
       showTopMessage("Failed to apply leave", isError: true);
     }
@@ -244,6 +245,7 @@ class _LeaveapplyState extends State<Leaveapply> {
         toTime = null;
         totalMinutes = 0;
       });
+      Navigator.pop(context);
     } else {
       showTopMessage("Failed to apply permission", isError: true);
     }

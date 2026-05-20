@@ -145,43 +145,52 @@ class OverdueTaskList extends StatelessWidget {
     );
   }
 
-  String _getDaysLeftText(dynamic dueDate) {
-    if (dueDate == null) return "";
+ String _getDaysLeftText(dynamic dueDate) {
+  if (dueDate == null) return "";
 
-    DateTime due;
-    try {
-      due = DateTime.parse(dueDate.toString());
-    } catch (_) {
-      return "";
+  try {
+    final due = DateTime.parse(dueDate.toString());
+    final now = DateTime.now();
+
+    // Remove time portion
+    final dueDateOnly = DateTime(due.year, due.month, due.day);
+    final todayOnly = DateTime(now.year, now.month, now.day);
+
+    final difference = dueDateOnly.difference(todayOnly).inDays;
+
+    if (difference > 0) {
+      return "$difference day${difference > 1 ? 's' : ''} left";
     }
 
-    final now = DateTime.now();
-    final difference = due.difference(now).inDays;
+    if (difference == 0) {
+      return "Due today!";
+    }
 
-    if (difference > 0)
-      return "$difference day${difference > 1 ? 's' : ''} left";
-    if (difference == 0) return "Due today!";
     return "Overdue by ${difference.abs()} day${difference.abs() > 1 ? 's' : ''}";
+  } catch (_) {
+    return "";
   }
+}
 
   Color _getDaysLeftColor(dynamic dueDate) {
-    if (dueDate == null) return Colors.grey.shade400;
+  if (dueDate == null) return Colors.grey.shade400;
 
-    DateTime due;
-    try {
-      due = DateTime.parse(dueDate.toString());
-    } catch (_) {
-      return Colors.grey.shade400;
-    }
-
+  try {
+    final due = DateTime.parse(dueDate.toString());
     final now = DateTime.now();
-    final difference = due.difference(now).inDays;
+
+    final dueDateOnly = DateTime(due.year, due.month, due.day);
+    final todayOnly = DateTime(now.year, now.month, now.day);
+
+    final difference = dueDateOnly.difference(todayOnly).inDays;
 
     if (difference > 0) return Colors.greenAccent.shade400;
     if (difference == 0) return Colors.orangeAccent.shade200;
     return Colors.redAccent.shade200;
+  } catch (_) {
+    return Colors.grey.shade400;
   }
-
+}
   Widget _buildChip({
     required IconData icon,
     required String text,

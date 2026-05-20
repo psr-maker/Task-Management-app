@@ -386,7 +386,6 @@ class _AuditLogPageState extends State<AuditLogPage> {
   }
 
   Widget _buildAuditItem(AuditLogGroupModel log, Map<String, UserModel> users) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final color = actionColor(log.action);
     final displayName = log.editedByName.isNotEmpty
         ? log.editedByName

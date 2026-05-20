@@ -673,17 +673,17 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: tasksList.isNotEmpty
-                        ? tasksList.map((task) {
+                        ? List.generate(tasksList.length, (index) {
                             return Padding(
                               padding: const EdgeInsets.only(top: 3, bottom: 3),
                               child: Text(
-                                task,
+                                "${index + 1}. ${tasksList[index]}",
                                 softWrap: true,
                                 overflow: TextOverflow.visible,
                                 style: Theme.of(context).textTheme.labelMedium,
                               ),
                             );
-                          }).toList()
+                          })
                         : [const Text("-")],
                   ),
                 ),
