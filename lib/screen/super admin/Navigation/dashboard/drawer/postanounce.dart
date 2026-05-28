@@ -5,6 +5,7 @@ import 'package:staff_work_track/core/widgets/buttons.dart';
 import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
 import 'package:staff_work_track/services/announ_service.dart';
 import 'package:staff_work_track/widgets/customfieldwidget.dart';
+import 'package:flutter_image_compress/flutter_image_compress.dart';
 
 class PostAnnouncementPage extends StatefulWidget {
   const PostAnnouncementPage({super.key});
@@ -39,17 +40,32 @@ class _PostAnnouncementPageState extends State<PostAnnouncementPage> {
     });
   }
 
-  Future<void> pickFile() async {
-    FilePickerResult? result = await FilePicker.platform.pickFiles(
-      type: FileType.any,
+ Future<void> pickFile() async {
+  FilePickerResult? result = await FilePicker.platform.pickFiles(
+    type: FileType.image,
+  );
+
+  if (result != null && result.files.single.path != null) {
+    final originalFile = File(result.files.single.path!);
+
+    print("Original Size: ${await originalFile.length()}");
+
+    final compressedFile =
+        await FlutterImageCompress.compressAndGetFile(
+      originalFile.path,
+      "${originalFile.path}_compressed.jpg",
+      quality: 70,
     );
 
-    if (result != null && result.files.single.path != null) {
+    if (compressedFile != null) {
+      print("Compressed Size: ${await compressedFile.length()}");
+
       setState(() {
-        selectedFile = File(result.files.single.path!);
+        selectedFile = File(compressedFile.path);
       });
     }
   }
+}
 
  Future<void> uploadAnnouncement() async {
   if (titleController.text.trim().isEmpty || targetRole == null) {

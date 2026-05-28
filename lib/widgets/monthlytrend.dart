@@ -848,11 +848,6 @@ class _AlldeptproducticityState extends State<Alldeptproducticity> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Department Productivity',
-          style: Theme.of(context).textTheme.displaySmall,
-        ),
-        const SizedBox(height: 12),
         FutureBuilder<List<Map<String, dynamic>>>(
           future: futureData,
           builder: (context, snapshot) {
@@ -867,59 +862,68 @@ class _AlldeptproducticityState extends State<Alldeptproducticity> {
               return const SizedBox();
             }
             final departments = snapshot.data!;
-            return ClipRRect(
-              borderRadius: BorderRadius.circular(15),
-              child: Container(
-                decoration: BoxDecoration(
-                  border: Border.all(color: Colors.grey),
+            return Column(
+              children: [
+                Text(
+                  'Department Productivity',
+                  style: Theme.of(context).textTheme.displaySmall,
                 ),
-                child: Table(
-                  columnWidths: const {
-                    0: FlexColumnWidth(3),
-                    1: FlexColumnWidth(2),
-                    2: FlexColumnWidth(2),
-                  },
-                  border: TableBorder(
-                    verticalInside: BorderSide(color: Colors.grey),
-                    horizontalInside: BorderSide(color: Colors.grey),
-                  ),
-                  children: [
-                    TableRow(
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.secondary,
+                const SizedBox(height: 12),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(15),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey),
+                    ),
+                    child: Table(
+                      columnWidths: const {
+                        0: FlexColumnWidth(3),
+                        1: FlexColumnWidth(2),
+                        2: FlexColumnWidth(2),
+                      },
+                      border: TableBorder(
+                        verticalInside: BorderSide(color: Colors.grey),
+                        horizontalInside: BorderSide(color: Colors.grey),
                       ),
                       children: [
-                        _tableHeader('Department'),
-                        _tableHeader('Month'),
-                        _tableHeader('Productivity'),
+                        TableRow(
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.secondary,
+                          ),
+                          children: [
+                            _tableHeader('Department'),
+                            _tableHeader('Month'),
+                            _tableHeader('Productivity'),
+                          ],
+                        ),
+                        ...departments.map((dept) {
+                          final monthlyData = List<Map<String, dynamic>>.from(
+                            dept['monthlyData'],
+                          );
+                          int month = currentMonth > 1 ? currentMonth - 1 : 1;
+                          double productivity = 0;
+                          if (monthlyData.isNotEmpty) {
+                            month = monthlyData.first['month'];
+                            productivity =
+                                (monthlyData.first['productivity'] as num)
+                                    .toDouble();
+                          }
+                          return TableRow(
+                            children: [
+                              _tableCell(dept['department']),
+                              _tableCell(_getMonthName(month)),
+                              _tableCell(
+                                '${productivity.toInt()} %',
+                                color: _getProductivityColor(productivity),
+                              ),
+                            ],
+                          );
+                        }).toList(),
                       ],
                     ),
-                    ...departments.map((dept) {
-                      final monthlyData = List<Map<String, dynamic>>.from(
-                        dept['monthlyData'],
-                      );
-                      int month = currentMonth > 1 ? currentMonth - 1 : 1;
-                      double productivity = 0;
-                      if (monthlyData.isNotEmpty) {
-                        month = monthlyData.first['month'];
-                        productivity =
-                            (monthlyData.first['productivity'] as num)
-                                .toDouble();
-                      }
-                      return TableRow(
-                        children: [
-                          _tableCell(dept['department']),
-                          _tableCell(_getMonthName(month)),
-                          _tableCell(
-                            '${productivity.toInt()} %',
-                            color: _getProductivityColor(productivity),
-                          ),
-                        ],
-                      );
-                    }).toList(),
-                  ],
+                  ),
                 ),
-              ),
+              ],
             );
           },
         ),
@@ -973,7 +977,7 @@ class LeavePermissionChart extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final months = _getMonthsTillNow();
-     final bool hasData = attendance.isNotEmpty;
+    final bool hasData = attendance.isNotEmpty;
 
     // Hide entire widget if no data
     if (!hasData) {
