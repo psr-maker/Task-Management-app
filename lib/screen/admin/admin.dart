@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:jwt_decoder/jwt_decoder.dart';
+import 'package:staff_work_track/core/widgets/loading.dart';
 import 'package:staff_work_track/screen/staff/navigation/worklog/worklog.dart';
 import 'package:staff_work_track/services/auth_service.dart';
 import 'package:staff_work_track/services/superadmin_service.dart';
@@ -68,7 +69,7 @@ class _AdminState extends State<Admin> {
   @override
   Widget build(BuildContext context) {
     if (isLoading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const Scaffold(body: Center(child: RotatingFlower()));
     }
 
     final pages = [

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:staff_work_track/Models/getusers.dart';
 import 'package:staff_work_track/common/filter_model.dart';
 import 'package:staff_work_track/common/search_filter_page.dart';
 import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
+import 'package:staff_work_track/core/providers/data_refresh_provider.dart';
 import 'package:staff_work_track/screen/admin/Navigation/employee/emp_list.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/drawer/auditlog.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/warnings/craete_warnings.dart';
@@ -31,9 +33,9 @@ class _AdmindetailsState extends State<Admindetails> {
   bool showEmployees = true;
   bool showAdminTasks = false;
   bool showAssignedTasks = false;
-  bool _statusInitialized = false;
   List<dynamic> managerGoals = [];
   List<dynamic> managerassignGoals = [];
+  DateTime? _lastRefreshTime;
 
   UsersDetails? _admin;
   bool isSearching = false;
@@ -48,6 +50,27 @@ class _AdmindetailsState extends State<Admindetails> {
   String? _topMessage;
   bool _isErrorMessage = true;
   bool _showTopMessage = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    
+    // Listen for refresh signals and reload data
+    final refreshNotifier = context.watch<DataRefreshNotifier>();
+    
+    // Reload if user refresh signal changed
+    if (refreshNotifier.lastUserRefresh != null && 
+        (_lastRefreshTime == null || refreshNotifier.lastUserRefresh!.isAfter(_lastRefreshTime!))) {
+      _lastRefreshTime = refreshNotifier.lastUserRefresh;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          setState(() {
+            adminFuture = SuperAdminService.getAdminDetails(widget.adminId);
+          });
+        }
+      });
+    }
+  }
 
   @override
   void initState() {
@@ -362,10 +385,8 @@ class _AdmindetailsState extends State<Admindetails> {
 
           final admin = snapshot.data!;
           _admin ??= admin;
-          if (!_statusInitialized) {
-            isActive = admin.status.toLowerCase() == "active";
-            _statusInitialized = true;
-          }
+          // Always use the fresh data from snapshot
+          isActive = admin.status.toLowerCase() == "active";
 
           return SingleChildScrollView(
             padding: const EdgeInsets.all(15),
@@ -535,6 +556,16 @@ class _AdmindetailsState extends State<Admindetails> {
                             admin.userId,
                             value ? "Active" : "Deactive",
                           );
+                          
+                          // Notify other screens to refresh
+                          if (mounted) {
+                            context.read<DataRefreshNotifier>().refreshUsers();
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text("Status updated successfully"),
+                              ),
+                            );
+                          }
                         } catch (e) {
                           if (mounted) {
                             setState(() {

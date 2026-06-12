@@ -1,12 +1,16 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:staff_work_track/core/widgets/buttons.dart';
+import 'package:staff_work_track/core/widgets/loading.dart';
 import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
+import 'package:staff_work_track/core/providers/data_refresh_provider.dart';
+import 'package:staff_work_track/screen/staff/navigation/fullimg.dart';
 import 'package:staff_work_track/services/announ_service.dart';
 import 'package:staff_work_track/widgets/customfieldwidget.dart';
 
@@ -28,6 +32,8 @@ class _AddWorklogPageState extends State<AddWorklogPage> {
   bool _isErrorMessage = true;
   bool _showTopMessage = false;
   File? _image;
+  bool _isImageLoading = false;
+
   @override
   void dispose() {
     titleController.dispose();
@@ -66,7 +72,21 @@ class _AddWorklogPageState extends State<AddWorklogPage> {
     final result = await showTimePicker(
       context: context,
       initialTime: isStart ? startTime : endTime,
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.light(
+              primary: Theme.of(context).colorScheme.secondary,
+              onPrimary: Colors.white,
+              surface: Colors.white,
+              onSurface: Colors.black,
+            ),
+          ),
+          child: child!,
+        );
+      },
     );
+
     if (result != null) {
       setState(() {
         isStart ? startTime = result : endTime = result;
@@ -78,6 +98,11 @@ class _AddWorklogPageState extends State<AddWorklogPage> {
     if (titleController.text.trim().isEmpty &&
         descriptionController.text.trim().isEmpty) {
       showTopMessage("Please enter Title or Description", isError: true);
+      return;
+    }
+
+    if (_image == null) {
+      showTopMessage("Please capture an image", isError: true);
       return;
     }
     setState(() => _isLoading = true);
@@ -114,12 +139,12 @@ class _AddWorklogPageState extends State<AddWorklogPage> {
       Placemark place = placemarks.first;
 
       String fullAddress = [
-        place.name, // Building / place name
-        place.street, // Street name
-        place.subLocality, // Area (like Maradu)
-        place.locality, // City (Kochi)
+        place.name, 
+        place.street, 
+        place.subLocality, 
+        place.locality, 
         place.subAdministrativeArea,
-        place.administrativeArea, // State (Kerala)
+        place.administrativeArea,
         place.postalCode,
         place.country,
       ].where((e) => e != null && e.isNotEmpty).join(', ');
@@ -140,11 +165,9 @@ class _AddWorklogPageState extends State<AddWorklogPage> {
       );
 
       if (!mounted) return;
-      showTopMessage(
-        "Worklog added  successfully",
-        isError: false,
-      );
-       Navigator.pop(context);
+      showTopMessage("Worklog added  successfully", isError: false);
+      context.read<DataRefreshNotifier>().refreshWorklogs();
+      Navigator.pop(context, true);
     } catch (e) {
       showTopMessage(e.toString(), isError: true);
     }
@@ -153,18 +176,30 @@ class _AddWorklogPageState extends State<AddWorklogPage> {
   }
 
   Future<void> _pickImage() async {
+    setState(() {
+      _isImageLoading = true;
+    });
+
     final picker = ImagePicker();
 
     final pickedFile = await picker.pickImage(
       source: ImageSource.camera,
-      imageQuality: 70,
+      imageQuality: 25,
+      maxWidth: 800,
+      maxHeight: 800,
     );
 
     if (pickedFile != null) {
       setState(() {
         _image = File(pickedFile.path);
       });
+
+      await precacheImage(FileImage(_image!), context);
     }
+
+    setState(() {
+      _isImageLoading = false;
+    });
   }
 
   @override
@@ -238,19 +273,36 @@ class _AddWorklogPageState extends State<AddWorklogPage> {
                 Row(
                   children: [
                     IconButton(
-                      icon: Icon(Icons.camera_alt, size: 30),
+                      icon: const Icon(Icons.camera_alt, size: 30),
                       onPressed: _pickImage,
                     ),
                     const SizedBox(width: 10),
 
-                    if (_image != null)
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(10),
-                        child: Image.file(
-                          _image!,
-                          width: 80,
-                          height: 80,
-                          fit: BoxFit.cover,
+                    if (_isImageLoading)
+                      const SizedBox(
+                        width: 80,
+                        height: 80,
+                        child: Center(child: RotatingFlower()),
+                      )
+                    else if (_image != null)
+                      GestureDetector(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  FullScreenImageViewer(imageFile: _image!),
+                            ),
+                          );
+                        },
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(10),
+                          child: Image.file(
+                            _image!,
+                            width: 200,
+                            height: 150,
+                            fit: BoxFit.cover,
+                          ),
                         ),
                       ),
                   ],

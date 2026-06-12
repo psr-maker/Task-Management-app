@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:staff_work_track/core/widgets/buttons.dart';
 import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
+import 'package:staff_work_track/core/providers/data_refresh_provider.dart';
 import 'package:staff_work_track/services/announ_service.dart';
 import 'package:staff_work_track/widgets/customfieldwidget.dart';
 
@@ -70,6 +72,19 @@ class _EditWorklogPageState extends State<EditWorklogPage> {
     final result = await showTimePicker(
       context: context,
       initialTime: isStart ? startTime : endTime,
+        builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.light(
+              primary: Theme.of(context).colorScheme.secondary,
+              onPrimary: Colors.white,
+              surface: Colors.white,
+              onSurface: Colors.black,
+            ),
+          ),
+          child: child!,
+        );
+      },
     );
     if (result != null) {
       setState(() {
@@ -98,6 +113,9 @@ class _EditWorklogPageState extends State<EditWorklogPage> {
 
       if (!mounted) return;
       showTopMessage("Worklog updated successfully", isError: false);
+      context.read<DataRefreshNotifier>().refreshWorklogs();
+      await Future.delayed(const Duration(seconds: 2));
+      if (mounted) Navigator.pop(context, true);
     } catch (e) {
       showTopMessage(e.toString(), isError: true);
     } finally {

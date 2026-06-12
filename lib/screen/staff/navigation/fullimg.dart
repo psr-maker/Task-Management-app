@@ -1,11 +1,15 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 
 class FullScreenImageViewer extends StatelessWidget {
-  final String imageUrl;
+  final String? imageUrl;
+  final File? imageFile;
 
   const FullScreenImageViewer({
     super.key,
-    required this.imageUrl,
+     this.imageUrl,
+    this.imageFile,
   });
 
   @override
@@ -14,17 +18,15 @@ class FullScreenImageViewer extends StatelessWidget {
       backgroundColor: Colors.black,
       body: Stack(
         children: [
-
           /// FULL SCREEN ZOOM IMAGE
           Positioned.fill(
             child: InteractiveViewer(
               minScale: 0.5,
               maxScale: 5,
               child: Center(
-                child: Image.network(
-                  imageUrl,
-                  fit: BoxFit.contain,
-                ),
+                child: imageFile != null
+                    ? Image.file(imageFile!)
+                    : Image.network(imageUrl!),
               ),
             ),
           ),
@@ -41,10 +43,7 @@ class FullScreenImageViewer extends StatelessWidget {
                   color: Colors.black54,
                   borderRadius: BorderRadius.circular(30),
                 ),
-                child: const Icon(
-                  Icons.close,
-                  color: Colors.white,
-                ),
+                child: const Icon(Icons.close, color: Colors.white),
               ),
             ),
           ),

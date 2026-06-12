@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:staff_work_track/core/constant/apiurl.dart';
+import 'package:staff_work_track/core/widgets/loading.dart';
 import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
+import 'package:staff_work_track/screen/staff/navigation/fullimg.dart';
 import 'package:staff_work_track/screen/staff/navigation/worklog/addworklog.dart';
 import 'package:staff_work_track/core/widgets/buttons.dart';
 import 'package:staff_work_track/screen/staff/navigation/worklog/edit_worklog.dart';
@@ -254,6 +257,7 @@ class _WorklogState extends State<Worklog> {
             "status": item["status"],
             "id": item["id"],
             "totalHours": (item["totalHours"] as num).toDouble(),
+            "imageUrl": item["imageUrl"],
           };
         }).toList();
       });
@@ -572,10 +576,58 @@ class _WorklogState extends State<Worklog> {
                           log["description"] ?? " ",
                           style: Theme.of(context).textTheme.labelSmall,
                         ),
+
+                        const SizedBox(height: 5),
+                        if (log["imageUrl"] != null &&
+                            log["imageUrl"].toString().isNotEmpty)
+                          GestureDetector(
+                            onTap: () {
+                              final fullUrl =
+                                  "${ApiConstants.Uploaded}${log["imageUrl"].toString()}";
+
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      FullScreenImageViewer(imageUrl: fullUrl),
+                                ),
+                              );
+                            },
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(10),
+                              child: SizedBox(
+                                height: 150,
+                                width: double.infinity,
+                                child: Image.network(
+                                  "${ApiConstants.Uploaded}${log["imageUrl"]}",
+                                  fit: BoxFit.cover,
+                                  loadingBuilder:
+                                      (context, child, loadingProgress) {
+                                        if (loadingProgress == null)
+                                          return child;
+
+                                        return const Center(
+                                          child: RotatingFlower(),
+                                        );
+                                      },
+                                  errorBuilder: (context, error, stackTrace) {
+                                    return const Center(
+                                      child: Icon(Icons.broken_image),
+                                    );
+                                  },
+                                ),
+                              ),
+                            ),
+                          ),
                         const SizedBox(height: 8),
-                        Text(
-                          "Duration: ${formatHoursToHM(hours)}",
-                          style: Theme.of(context).textTheme.titleMedium,
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            Text(
+                              "Duration: ${formatHoursToHM(hours)}",
+                              style: Theme.of(context).textTheme.titleMedium,
+                            ),
+                          ],
                         ),
                       ],
                     ),

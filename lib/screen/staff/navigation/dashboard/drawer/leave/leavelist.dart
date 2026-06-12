@@ -20,6 +20,7 @@ class _LeavelistState extends State<Leavelist>
   bool showPermissions = false;
   late TabController _tabController;
   final tabs = ["All", "Pending", "Approved", "Rejected"];
+  final permissionTabs = ["All", "Pending", "Approved", "Rejected"];
   Set<int> expandedItems = {};
   String? _topMessage;
   bool _isErrorMessage = true;
@@ -31,7 +32,7 @@ class _LeavelistState extends State<Leavelist>
     _tabController = TabController(length: 4, vsync: this);
     loadItems();
     _tabController.addListener(() {
-      if (!showPermissions) filterItems();
+      filterItems();
     });
   }
 
@@ -57,10 +58,13 @@ class _LeavelistState extends State<Leavelist>
       filteredItems = data;
       isLoading = false;
     });
+    filterItems();
   }
 
   void filterItems() {
-    String selected = tabs[_tabController.index];
+    String selected = showPermissions
+        ? permissionTabs[_tabController.index]
+        : tabs[_tabController.index];
     setState(() {
       if (selected == "All") {
         filteredItems = allItems;
@@ -144,16 +148,20 @@ class _LeavelistState extends State<Leavelist>
         actions: [
           IconButton(
             icon: const Icon(Icons.add),
-            onPressed: () {
-              Navigator.push(
+            onPressed: () async {
+              final result = await Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => Leaveapply()),
+                MaterialPageRoute(builder: (_) => const Leaveapply()),
               );
+
+              if (result == true) {
+                loadItems(); // refresh immediately
+              }
             },
           ),
         ],
         bottom: PreferredSize(
-          preferredSize: Size.fromHeight(showPermissions ? 60 : 100),
+          preferredSize: Size.fromHeight(100),
           child: Column(
             children: [
               Padding(
@@ -166,12 +174,10 @@ class _LeavelistState extends State<Leavelist>
                     Expanded(
                       child: GestureDetector(
                         onTap: () {
-                          if (showPermissions) {
-                            setState(() {
-                              showPermissions = false;
-                            });
-                            loadItems();
-                          }
+                          setState(() {
+                            showPermissions = false;
+                          });
+                          loadItems();
                         },
                         child: Container(
                           padding: const EdgeInsets.symmetric(
@@ -197,12 +203,10 @@ class _LeavelistState extends State<Leavelist>
                     Expanded(
                       child: GestureDetector(
                         onTap: () {
-                          if (!showPermissions) {
-                            setState(() {
-                              showPermissions = true;
-                            });
-                            loadItems();
-                          }
+                          setState(() {
+                            showPermissions = true;
+                          });
+                          loadItems();
                         },
                         child: Container(
                           padding: const EdgeInsets.symmetric(
@@ -227,26 +231,28 @@ class _LeavelistState extends State<Leavelist>
                   ],
                 ),
               ),
-              if (!showPermissions)
-                TabBar(
-                  controller: _tabController,
-                  indicator: UnderlineTabIndicator(
-                    borderSide: BorderSide(
-                      width: 3,
-                      color: Theme.of(context).colorScheme.onPrimary,
-                    ),
-                    insets: EdgeInsets.symmetric(horizontal: 20),
-                  ),
-                  indicatorSize: TabBarIndicatorSize.label,
-                  labelColor: Theme.of(context).colorScheme.onPrimary,
-                  unselectedLabelColor: Theme.of(context).colorScheme.tertiary,
-                  labelStyle: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                  ),
 
-                  tabs: tabs.map((e) => Tab(text: e)).toList(),
+              TabBar(
+                controller: _tabController,
+                indicator: UnderlineTabIndicator(
+                  borderSide: BorderSide(
+                    width: 3,
+                    color: Theme.of(context).colorScheme.onPrimary,
+                  ),
+                  insets: EdgeInsets.symmetric(horizontal: 20),
                 ),
+                indicatorSize: TabBarIndicatorSize.label,
+                labelColor: Theme.of(context).colorScheme.onPrimary,
+                unselectedLabelColor: Theme.of(context).colorScheme.tertiary,
+                labelStyle: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                ),
+
+                tabs: (showPermissions ? permissionTabs : tabs)
+                    .map((e) => Tab(text: e))
+                    .toList(),
+              ),
             ],
           ),
         ),
@@ -328,7 +334,41 @@ class _LeavelistState extends State<Leavelist>
               });
             },
             onLongPress: () async {
-              if (isPermission) return; // No delete for permissions
+              if (isPermission) {
+                if (status != "pending") {
+                  showTopMessage(
+                    "Only pending permission can be deleted",
+                    isError: true,
+                  );
+                  return;
+                }
+
+                final confirmed = await showConfirmDialog(
+                  context,
+                  "Delete",
+                  "permission",
+                );
+
+                if (confirmed == true) {
+                  bool success = await AdminService.deletePermission(e["id"]);
+
+                  if (success) {
+                    showTopMessage(
+                      "Permission deleted successfully",
+                      isError: false,
+                    );
+                  } else {
+                    showTopMessage(
+                      "Failed to delete permission",
+                      isError: true,
+                    );
+                  }
+
+                  await loadItems();
+                }
+
+                return;
+              }
               if (status != "pending") {
                 showTopMessage(
                   "Only pending leave can be deleted",
@@ -384,7 +424,7 @@ class _LeavelistState extends State<Leavelist>
                         if (isPermission) ...[
                           const SizedBox(height: 4),
                           Text(
-                           e["totalHours"].toString() + " hours",
+                            e["totalHours"].toString() + " hours",
                             style: Theme.of(context).textTheme.headlineMedium,
                           ),
                         ] else ...[
@@ -397,25 +437,25 @@ class _LeavelistState extends State<Leavelist>
                       ],
                     ),
                   ),
-                  if (!isPermission)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 3,
-                      ),
-                      decoration: BoxDecoration(
-                        color: statusColor(status).withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        status.toUpperCase(),
-                        style: TextStyle(
-                          color: statusColor(status),
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                        ),
+                  // if (!isPermission)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: statusColor(status).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      status.toUpperCase(),
+                      style: TextStyle(
+                        color: statusColor(status),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
+                  ),
                 ],
               ),
             ),

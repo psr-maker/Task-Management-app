@@ -1,8 +1,11 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:staff_work_track/core/widgets/buttons.dart';
 import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
+import 'package:staff_work_track/core/providers/data_refresh_provider.dart';
 import 'package:staff_work_track/services/announ_service.dart';
 import 'package:staff_work_track/widgets/customfieldwidget.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
@@ -26,6 +29,8 @@ class _PostAnnouncementPageState extends State<PostAnnouncementPage> {
   bool _showTopMessage = false;
 
   File? selectedFile;
+  Uint8List? selectedBytes;
+  String? selectedFileName;
 
   void showTopMessage(String message, {bool isError = true}) {
     setState(() {
@@ -40,57 +45,87 @@ class _PostAnnouncementPageState extends State<PostAnnouncementPage> {
     });
   }
 
- Future<void> pickFile() async {
-  FilePickerResult? result = await FilePicker.platform.pickFiles(
-    type: FileType.image,
-  );
-
-  if (result != null && result.files.single.path != null) {
-    final originalFile = File(result.files.single.path!);
-
-    print("Original Size: ${await originalFile.length()}");
-
-    final compressedFile =
-        await FlutterImageCompress.compressAndGetFile(
-      originalFile.path,
-      "${originalFile.path}_compressed.jpg",
-      quality: 70,
+  // ---------------- PICK FILE ----------------
+  Future<void> pickFile() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: [
+        'jpg',
+        'jpeg',
+        'png',
+        'pdf',
+        'doc',
+        'docx',
+        'xls',
+        'xlsx',
+        'csv',
+      ],
+      withData: true,
     );
 
-    if (compressedFile != null) {
-      print("Compressed Size: ${await compressedFile.length()}");
+    if (result == null || result.files.isEmpty) return;
 
-      setState(() {
-        selectedFile = File(compressedFile.path);
-      });
+    final file = result.files.single;
+    final ext = file.extension?.toLowerCase() ?? '';
+
+    selectedFileName = file.name;
+
+    if (kIsWeb) {
+      // WEB
+      selectedBytes = file.bytes;
+      selectedFile = null;
+    } else {
+      // MOBILE
+      final f = File(file.path!);
+
+      if (['jpg', 'jpeg', 'png'].contains(ext)) {
+        final compressed = await FlutterImageCompress.compressAndGetFile(
+          f.path,
+          "${f.path}_compressed.jpg",
+          quality: 50,
+        );
+
+        if (compressed != null) {
+          selectedFile = File(compressed.path);
+        }
+      } else {
+        selectedFile = f;
+      }
+
+      selectedBytes = null;
+    }
+
+    setState(() {});
+  }
+
+  Future<void> uploadAnnouncement() async {
+    if (titleController.text.trim().isEmpty || targetRole == null) {
+      showTopMessage("Please fill required fields");
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    bool success = await AnnouncementService.postAnnouncement(
+      title: titleController.text.trim(),
+      description: descController.text.trim(),
+      targetRole: targetRole!,
+      file: selectedFile,
+      fileBytes: selectedBytes,
+      fileName: selectedFileName,
+    );
+
+    setState(() => _isLoading = false);
+
+    if (success) {
+      showTopMessage("Uploaded Successfully", isError: false);
+      context.read<DataRefreshNotifier>().refreshAnnouncements();
+      Navigator.pop(context, true);
+    } else {
+      showTopMessage("Upload Failed");
     }
   }
-}
 
- Future<void> uploadAnnouncement() async {
-  if (titleController.text.trim().isEmpty || targetRole == null) {
-    showTopMessage("Please fill required fields");
-    return;
-  }
-
-  setState(() => _isLoading = true);
-
-  bool success = await AnnouncementService.postAnnouncement(
-    title: titleController.text.trim(),
-    description: descController.text.trim(),
-    targetRole: targetRole!,
-    file: selectedFile,
-  );
-
-  setState(() => _isLoading = false);
-
-  if (success) {
-    showTopMessage("Uploaded Successfully", isError: false);
-    Navigator.pop(context, true);
-  } else {
-    showTopMessage("Upload Failed");
-  }
-}
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -144,7 +179,7 @@ class _PostAnnouncementPageState extends State<PostAnnouncementPage> {
                   const SizedBox(height: 15),
 
                   TextButton(onPressed: pickFile, child: Text("Select File")),
-                  if (selectedFile != null) _buildFilePreview(),
+                  if (selectedFileName != null) _buildFilePreview(),
 
                   const SizedBox(height: 30),
 
@@ -178,16 +213,25 @@ class _PostAnnouncementPageState extends State<PostAnnouncementPage> {
     );
   }
 
+  // ---------------- FILE PREVIEW ----------------
   Widget _buildFilePreview() {
-    final fileName = selectedFile!.path.split('/').last;
-    final extension = fileName.split('.').last.toLowerCase();
+    final fileName = selectedFileName ?? "file";
+    final ext = fileName.split('.').last.toLowerCase();
 
-    if (["jpg", "jpeg", "png"].contains(extension)) {
+    final isImage = ext == "jpg" || ext == "jpeg" || ext == "png";
+
+    if (isImage) {
       return Padding(
         padding: const EdgeInsets.only(top: 10),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(10),
-          child: Image.file(selectedFile!, height: 150, fit: BoxFit.cover),
+          child: kIsWeb
+              ? Image.memory(
+                  selectedBytes ?? Uint8List(0),
+                  height: 150,
+                  fit: BoxFit.cover,
+                )
+              : Image.file(selectedFile!, height: 150, fit: BoxFit.cover),
         ),
       );
     }
@@ -195,13 +239,13 @@ class _PostAnnouncementPageState extends State<PostAnnouncementPage> {
     IconData icon;
     Color color;
 
-    if (extension == "pdf") {
+    if (ext == "pdf") {
       icon = Icons.picture_as_pdf;
       color = Colors.red;
-    } else if (["doc", "docx"].contains(extension)) {
+    } else if (["doc", "docx"].contains(ext)) {
       icon = Icons.description;
       color = Colors.blue;
-    } else if (["xls", "xlsx", "csv"].contains(extension)) {
+    } else if (["xls", "xlsx", "csv"].contains(ext)) {
       icon = Icons.table_chart;
       color = Colors.green;
     } else {
@@ -223,7 +267,13 @@ class _PostAnnouncementPageState extends State<PostAnnouncementPage> {
           Expanded(child: Text(fileName, overflow: TextOverflow.ellipsis)),
           IconButton(
             icon: const Icon(Icons.close, color: Colors.red),
-            onPressed: () => setState(() => selectedFile = null),
+            onPressed: () {
+              setState(() {
+                selectedFile = null;
+                selectedBytes = null;
+                selectedFileName = null;
+              });
+            },
           ),
         ],
       ),

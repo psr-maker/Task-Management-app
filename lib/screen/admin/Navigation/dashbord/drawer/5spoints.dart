@@ -72,6 +72,16 @@ class _FiveSpointsState extends State<FiveSpoints> {
 
     if (success) {
       showTopMessage("Points saved successfully", isError: false);
+      setState(() {
+        selectedDept = null;
+        selectedUser = null;
+        filteredUsers = [];
+
+        selectedMonth = DateTime.now().month;
+        selectedWeek = _getCurrentWeek();
+      });
+
+      pointsController.clear();
     } else {
       showTopMessage("Failed to save points", isError: true);
     }

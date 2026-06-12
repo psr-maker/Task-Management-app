@@ -30,14 +30,28 @@ class _EmployeetabState extends State<Employeetab> {
     selectedempIds.clear();
   }
 
-  void employees() async {
-    employeeFuture = SuperAdminService.getEmployees();
+  // void employees() async {
+  //   employeeFuture = SuperAdminService.getEmployees();
 
-    employeeFuture.then((data) {
-      setState(() {
-        allEmp = data;
-        filteredemp = data;
-      });
+  //   employeeFuture.then((data) {
+  //     setState(() {
+  //       allEmp = data;
+  //       filteredemp = data;
+  //     });
+  //   });
+  // }
+  Future<void> employees() async {
+    setState(() {
+      employeeFuture = SuperAdminService.getEmployees();
+    });
+
+    final data = await employeeFuture;
+
+    if (!mounted) return;
+
+    setState(() {
+      allEmp = data;
+      filteredemp = data;
     });
   }
 

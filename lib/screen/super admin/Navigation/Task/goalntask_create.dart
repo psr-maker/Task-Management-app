@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:staff_work_track/services/superadmin_service.dart';
 import 'package:staff_work_track/core/widgets/buttons.dart';
+import 'package:staff_work_track/core/providers/data_refresh_provider.dart';
 import 'package:staff_work_track/widgets/customfieldwidget.dart';
 import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
 
@@ -56,10 +58,21 @@ class _CreateTaskPageState extends State<Createtask> {
     DateTime firstDate = DateTime(2000);
     DateTime lastDate = DateTime(2100);
 
-    // ✅ Apply goal date restriction ONLY for task
+    // Restrict within Goal dates
     if (isTask && goalStartDate != null && goalDueDate != null) {
       firstDate = goalStartDate!;
       lastDate = goalDueDate!;
+    }
+
+    // If selecting Task Due Date, it cannot be before Task Start Date
+    if (!isCreated && createdDate != null) {
+      firstDate = createdDate!;
+
+      if (goalDueDate != null) {
+        lastDate = goalDueDate!;
+      }
+
+      initialDate = createdDate!;
     }
 
     DateTime? picked = await showDatePicker(
@@ -76,6 +89,12 @@ class _CreateTaskPageState extends State<Createtask> {
       setState(() {
         if (isCreated) {
           createdDate = picked;
+
+          // Clear due date if invalid
+          if (dueDate != null && dueDate!.isBefore(createdDate!)) {
+            dueDate = null;
+            dueDateController.clear();
+          }
         } else {
           dueDate = picked;
         }
@@ -108,6 +127,13 @@ class _CreateTaskPageState extends State<Createtask> {
       showTopMessage("Please fill the All Fields", isError: true);
       return;
     }
+    if (dueDate!.isBefore(createdDate!)) {
+      showTopMessage(
+        "Task due date cannot be before start date",
+        isError: true,
+      );
+      return;
+    }
     setState(() => _isLoading = true);
 
     bool success = await SuperAdminService.createTask(
@@ -125,7 +151,11 @@ class _CreateTaskPageState extends State<Createtask> {
     if (success) {
       showTopMessage("Task Created Succesfully", isError: false);
       await Future.delayed(const Duration(seconds: 3));
-      Navigator.pop(context, true);
+      if (mounted) {
+        context.read<DataRefreshNotifier>().refreshTasks();
+        context.read<DataRefreshNotifier>().refreshGoals();
+        Navigator.pop(context, true);
+      }
     } else {
       showTopMessage("Failed to create Task", isError: true);
     }
@@ -137,11 +167,17 @@ class _CreateTaskPageState extends State<Createtask> {
     bool isCreated,
   ) async {
     DateTime initialDate = DateTime.now();
+    DateTime firstDate = DateTime(2000);
+
+    if (controller == goalDueController && goalStartDate != null) {
+      firstDate = goalStartDate!;
+      initialDate = goalStartDate!;
+    }
 
     DateTime? picked = await showDatePicker(
       context: context,
       initialDate: initialDate,
-      firstDate: DateTime(2000),
+      firstDate: firstDate,
       lastDate: DateTime(2100),
     );
 
@@ -150,12 +186,13 @@ class _CreateTaskPageState extends State<Createtask> {
           "${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}";
 
       setState(() {
-        if (controller == createdDateController) {
-          createdDate = picked;
-        } else if (controller == dueDateController) {
-          dueDate = picked;
-        } else if (controller == goalStartController) {
+        if (controller == goalStartController) {
           goalStartDate = picked;
+
+          if (goalDueDate != null && goalDueDate!.isBefore(goalStartDate!)) {
+            goalDueDate = null;
+            goalDueController.clear();
+          }
         } else if (controller == goalDueController) {
           goalDueDate = picked;
         }
@@ -187,7 +224,11 @@ class _CreateTaskPageState extends State<Createtask> {
     if (success) {
       showTopMessage("Goal Created Successfully", isError: false);
       await Future.delayed(const Duration(seconds: 2));
-      Navigator.pop(context, true);
+      if (mounted) {
+        context.read<DataRefreshNotifier>().refreshGoals();
+        context.read<DataRefreshNotifier>().refreshTasks();
+        Navigator.pop(context, true);
+      }
     } else {
       showTopMessage("Failed to create Goal", isError: true);
     }

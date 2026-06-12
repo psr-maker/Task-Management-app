@@ -432,7 +432,7 @@ class _TaskDetailsState extends State<TaskDetails> {
                   const SizedBox(height: 10),
 
                   if (isReviewLoading)
-                    const Center(child: CircularProgressIndicator())
+                    const Center(child: RotatingFlower())
                   else if (reviewData != null)
                     _buildReviewCard()
                   else

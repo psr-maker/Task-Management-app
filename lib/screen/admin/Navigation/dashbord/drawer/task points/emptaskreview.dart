@@ -38,6 +38,13 @@ class _TaskpointsState extends State<Taskpoints> {
     });
   }
 
+  Future<void> _refreshTasks() async {
+    setState(() {
+      expandedIndex = null;
+      tasksFuture = AdminService.getCompletedTaskPoints();
+    });
+  }
+
   @override
   void initState() {
     super.initState();
@@ -68,9 +75,11 @@ class _TaskpointsState extends State<Taskpoints> {
                 context,
                 message: _topMessage!,
                 isError: _isErrorMessage,
-                backgroundColor: _isErrorMessage ? Colors.red : Theme.of(context).colorScheme.onPrimary,
+                backgroundColor: _isErrorMessage
+                    ? Colors.red
+                    : Theme.of(context).colorScheme.onPrimary,
                 textColor: Theme.of(context).colorScheme.secondary,
-                iconColor: Theme.of(context).colorScheme.secondary
+                iconColor: Theme.of(context).colorScheme.secondary,
               ),
             ),
         ],
@@ -175,6 +184,7 @@ class _TaskpointsState extends State<Taskpoints> {
                     onShowMessage: (msg, {isError = true}) {
                       showTopMessage(msg, isError: isError);
                     },
+                    onReviewSubmitted: _refreshTasks,
                   ),
                 )
               : const SizedBox(),

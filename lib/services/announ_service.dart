@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
@@ -37,11 +38,58 @@ class AnnouncementService {
     }
   }
 
+  // static Future<bool> postAnnouncement({
+  //   required String title,
+  //   required String description,
+  //   required String targetRole,
+  //   File? file,
+  // }) async {
+  //   try {
+  //     final token = await AuthService.getToken();
+
+  //     var request = http.MultipartRequest(
+  //       "POST",
+  //       Uri.parse("$baseUrl/Announcement/postannouncements"),
+  //     );
+
+  //     // 🔐 AUTH
+  //     request.headers["Authorization"] = "Bearer $token";
+
+  //     // 📝 FIELDS
+  //     request.fields['title'] = title;
+  //     request.fields['description'] = description;
+  //     request.fields['targetRole'] = targetRole;
+
+  //     // 📎 FILE (SAFE CHECK)
+  //     if (file != null && await file.exists()) {
+  //       request.files.add(await http.MultipartFile.fromPath('file', file.path));
+  //     }
+
+  //     // 🔥 SEND
+  //     final response = await request.send();
+  //     final body = await response.stream.bytesToString();
+
+  //     print("STATUS: ${response.statusCode}");
+  //     print("BODY: $body");
+
+  //     return response.statusCode == 200;
+  //   } catch (e) {
+  //     print("ERROR: $e");
+  //     return false;
+  //   }
+  // }
+
   static Future<bool> postAnnouncement({
     required String title,
     required String description,
     required String targetRole,
+
+    // mobile
     File? file,
+
+    // web
+    Uint8List? fileBytes,
+    String? fileName,
   }) async {
     try {
       final token = await AuthService.getToken();
@@ -59,9 +107,25 @@ class AnnouncementService {
       request.fields['description'] = description;
       request.fields['targetRole'] = targetRole;
 
-      // 📎 FILE (SAFE CHECK)
-      if (file != null && await file.exists()) {
-        request.files.add(await http.MultipartFile.fromPath('file', file.path));
+      // 📎 FILE HANDLING (FIXED)
+      if (kIsWeb) {
+        // 🌐 WEB
+        if (fileBytes != null) {
+          request.files.add(
+            http.MultipartFile.fromBytes(
+              'file',
+              fileBytes,
+              filename: fileName ?? "upload.jpg",
+            ),
+          );
+        }
+      } else {
+        // 📱 MOBILE
+        if (file != null && await file.exists()) {
+          request.files.add(
+            await http.MultipartFile.fromPath('file', file.path),
+          );
+        }
       }
 
       // 🔥 SEND

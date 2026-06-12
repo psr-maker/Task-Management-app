@@ -19,13 +19,13 @@ final Map<UserRole, List<NavItem>> roleNavItems = {
   UserRole.admin: [
     NavItem(Icons.dashboard, "Dashboard"),
     NavItem(Icons.people, "Employees"),
-    NavItem(Icons.work, " my Work"),
+    NavItem(Icons.work, " My Works"),
     NavItem(Icons.fact_check, "WorkLog"),
   ],
 
   UserRole.staff: [
     NavItem(Icons.home, "Home"),
-    NavItem(Icons.assignment, "My Work"),
+    NavItem(Icons.assignment, "My Works"),
     NavItem(Icons.edit_note, "WorkLog"),
     NavItem(Icons.sticky_note_2, "Updates"),
   ],

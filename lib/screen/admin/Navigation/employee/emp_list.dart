@@ -68,116 +68,115 @@ class _EmployeeListState extends State<EmployeeList> {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.all(10),
-      child: Column(
-        children: [
-          if (isAdmin)
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                Expanded(
-                  child: isSearching
-                      ? TextField(
-                          controller: searchController,
-                          decoration: InputDecoration(
-                            hintText: "Search employee",
-                            hintStyle: Theme.of(
-                              context,
-                            ).textTheme.headlineSmall,
-
-                            border: InputBorder.none,
-                            enabledBorder: InputBorder.none,
-                            focusedBorder: InputBorder.none,
+      child: SingleChildScrollView(
+        child: Column(
+          children: [
+            if (isAdmin)
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  Expanded(
+                    child: isSearching
+                        ? TextField(
+                            controller: searchController,
+                            decoration: InputDecoration(
+                              hintText: "Search employee",
+                              hintStyle: Theme.of(
+                                context,
+                              ).textTheme.headlineSmall,
+        
+                              border: InputBorder.none,
+                              enabledBorder: InputBorder.none,
+                              focusedBorder: InputBorder.none,
+                            ),
+                            onChanged: (_) => setState(() {}),
+                          )
+                        : Text(
+                            "Staff List",
+                            style: Theme.of(context).textTheme.displaySmall,
                           ),
-                          onChanged: (_) => setState(() {}),
-                        )
-                      : Text(
-                          "Staff List",
-                          style: Theme.of(context).textTheme.displaySmall,
-                        ),
-                ),
-
-                IconButton(
-                  icon: Icon(isSearching ? Icons.close : Icons.search),
-                  onPressed: () {
-                    setState(() {
-                      isSearching = !isSearching;
-                      searchController.clear();
-                    });
-                  },
-                ),
-
-                GestureDetector(
-                  onTap: () async {
-                    if (selectedEmpIds.isNotEmpty) {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => Createtask(
-                            assignedToIds: selectedEmpIds.toList(),
+                  ),
+        
+                  IconButton(
+                    icon: Icon(isSearching ? Icons.close : Icons.search),
+                    onPressed: () {
+                      setState(() {
+                        isSearching = !isSearching;
+                        searchController.clear();
+                      });
+                    },
+                  ),
+        
+                  GestureDetector(
+                    onTap: () async {
+                      if (selectedEmpIds.isNotEmpty) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => Createtask(
+                              assignedToIds: selectedEmpIds.toList(),
+                            ),
                           ),
-                        ),
-                      );
-                    } else {
-                      final result = await Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => CreateUsers(role: selectedRole),
-                        ),
-                      );
-                      if (result == true) {
-                        setState(() {
-                          employeesFuture =
-                              AdminService.getEmployeesByDepartment(
-                                widget.department,
-                              );
-                        });
+                        );
+                      } else {
+                        final result = await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => CreateUsers(role: selectedRole),
+                          ),
+                        );
+                        if (result == true) {
+                          setState(() {
+                            employeesFuture =
+                                AdminService.getEmployeesByDepartment(
+                                  widget.department,
+                                );
+                          });
+                        }
                       }
-                    }
-                  },
-
-                  child: Chip(
-                    backgroundColor: Theme.of(context).colorScheme.secondary,
-                    label: Text(
-                      selectedEmpIds.isNotEmpty ? "Add Task" : "Staff +",
-                      style: Theme.of(context).textTheme.titleMedium,
+                    },
+        
+                    child: Chip(
+                      backgroundColor: Theme.of(context).colorScheme.secondary,
+                      label: Text(
+                        selectedEmpIds.isNotEmpty ? "Add Task" : "Staff +",
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
                     ),
                   ),
-                ),
-              ],
-            ),
-          SizedBox(height: 10),
-          FutureBuilder<List<UserModel>>(
-            future: employeesFuture,
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: RotatingFlower());
-              }
-              if (snapshot.hasError) {
-                return Center(
-                  child: Text(
-                    snapshot.error.toString(),
-                    style: const TextStyle(color: Colors.red),
-                  ),
-                );
-              }
-              if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                return const Center(child: Text("No Employees Found"));
-              }
-              final employees = snapshot.data!;
-              final filteredEmployees = employees.where((emp) {
-                // final query = widget.searchQuery.trim().toLowerCase();
-                final query =
-                    searchController.text.trim().toLowerCase().isNotEmpty
-                    ? searchController.text.toLowerCase()
-                    : widget.searchQuery;
-                if (query.isEmpty) return true;
-                return emp.name.toLowerCase().contains(query) ||
-                    emp.email.toLowerCase().contains(query) ||
-                    emp.department.toLowerCase().contains(query);
-              }).toList();
-              return SingleChildScrollView(
-                scrollDirection: Axis.vertical,
-                child: ListView.builder(
+                ],
+              ),
+            SizedBox(height: 10),
+            FutureBuilder<List<UserModel>>(
+              future: employeesFuture,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: RotatingFlower());
+                }
+                if (snapshot.hasError) {
+                  return Center(
+                    child: Text(
+                      snapshot.error.toString(),
+                      style: const TextStyle(color: Colors.red),
+                    ),
+                  );
+                }
+                if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                  return const Center(child: Text("No Employees Found"));
+                }
+                final employees = snapshot.data!;
+                final filteredEmployees = employees.where((emp) {
+                  // final query = widget.searchQuery.trim().toLowerCase();
+                  final query =
+                      searchController.text.trim().toLowerCase().isNotEmpty
+                      ? searchController.text.toLowerCase()
+                      : widget.searchQuery;
+                  if (query.isEmpty) return true;
+                  return emp.name.toLowerCase().contains(query) ||
+                      emp.email.toLowerCase().contains(query) ||
+                      emp.department.toLowerCase().contains(query);
+                }).toList();
+                return ListView.builder(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
                   itemCount: filteredEmployees.length,
@@ -246,11 +245,11 @@ class _EmployeeListState extends State<EmployeeList> {
                       ),
                     );
                   },
-                ),
-              );
-            },
-          ),
-        ],
+                );
+              },
+            ),
+          ],
+        ),
       ),
     );
   }

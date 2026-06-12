@@ -40,14 +40,14 @@ class TaskFilterDropdown extends StatelessWidget {
                   text: 'Clear',
                   onPressed: onClear,
                   color: Theme.of(context).colorScheme.secondary,
-                  txtcolor: Theme.of(context).colorScheme.background,
+                  txtcolor: Colors.white
                 ),
                 const Spacer(),
                 AppButton(
                   text: 'Apply',
                   onPressed: onApply,
                   color: Theme.of(context).colorScheme.secondary,
-                  txtcolor: Theme.of(context).colorScheme.background,
+                  txtcolor: Colors.white
                 ),
               ],
             ),

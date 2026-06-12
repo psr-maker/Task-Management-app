@@ -73,12 +73,16 @@ class _EditUserState extends State<EditUser> {
       if (response['message'] == "User updated successfully") {
         showTopMessage("User updated successfully", isError: false);
         await Future.delayed(const Duration(seconds: 1));
-        Navigator.pop(context, true);
+        Navigator.pop(context, {
+          "name": usernameController.text,
+          "email": emailController.text,
+          "department": selectedDepartment,
+        });
       } else {
         showTopMessage("Failed to update user", isError: true);
       }
     } catch (e) {
-     showTopMessage(e.toString(), isError: true);
+      showTopMessage(e.toString(), isError: true);
     } finally {
       setState(() => _isLoading = false);
     }

@@ -2,6 +2,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:staff_work_track/Models/warning_model.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
+import 'package:staff_work_track/screen/admin/Navigation/dashbord/drawer/deptovertime.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/admin_approval.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/drawer/anouncement.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/drawer/auditlog.dart';
@@ -17,7 +18,7 @@ import 'package:staff_work_track/utils/enum.dart';
 import 'package:staff_work_track/widgets/StatCard.dart';
 import 'package:staff_work_track/widgets/monthlytrend.dart';
 import 'package:staff_work_track/widgets/kpicard.dart';
- 
+
 class SuperAdminDashboard extends StatefulWidget {
   final DateTime? fromDate;
   final DateTime? toDate;
@@ -147,9 +148,10 @@ class _OverallReportsTabState extends State<SuperAdminDashboard> {
                 onPressed: () async {
                   await Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (_) => NotificationPage()),
+                    MaterialPageRoute(builder: (_) => const NotificationPage()),
                   );
-                  //  _fetchNotifications();
+
+                  _fetchNotifications();
                 },
               ),
 
@@ -492,6 +494,23 @@ class _OverallReportsTabState extends State<SuperAdminDashboard> {
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => UsersWorklog()),
+              );
+            },
+          ),
+            ListTile(
+            leading: Icon(
+              Icons.access_time_sharp,
+              color: Theme.of(context).colorScheme.secondary,
+            ),
+            title: Text(
+              "OverTime History",
+              style: Theme.of(context).textTheme.headlineMedium,
+            ),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => DeptOvertimeList()),
               );
             },
           ),

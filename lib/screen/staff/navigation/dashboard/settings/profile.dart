@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:staff_work_track/core/constant/apiurl.dart';
 import 'package:staff_work_track/core/theme/theme_provider.dart';
+import 'package:staff_work_track/core/widgets/loading.dart';
 import 'package:staff_work_track/screen/staff/navigation/dashboard/settings/users_edit_pro.dart';
 import 'package:staff_work_track/screen/staff/navigation/fullimg.dart';
 import 'package:staff_work_track/services/auth_service.dart';
@@ -40,11 +41,15 @@ class _SettingsState extends State<Profile> {
           actions: [
             IconButton(
               icon: const Icon(Icons.edit),
-              onPressed: () {
-                Navigator.push(
+              onPressed: () async {
+                final result = await Navigator.push(
                   context,
                   MaterialPageRoute(builder: (_) => const UserEditProfile()),
                 );
+
+                if (result == true) {
+                  setState(() {}); // rebuilds FutureBuilder
+                }
               },
             ),
           ],
@@ -53,7 +58,7 @@ class _SettingsState extends State<Profile> {
           future: AuthService.getMyProfile(),
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
+              return const Center(child: RotatingFlower());
             }
 
             if (snapshot.hasError) {

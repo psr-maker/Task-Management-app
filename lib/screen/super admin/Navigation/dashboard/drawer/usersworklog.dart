@@ -475,7 +475,7 @@ class _UsersWorklogState extends State<UsersWorklog> {
                               child: GestureDetector(
                                 onTap: () {
                                   final fullUrl =
-                                      "${ApiConstants.Uploaded}${log["imageUrl"].toString().replaceFirst('/uploads/', '')}";
+                                      "${ApiConstants.Uploaded}${log["imageUrl"].toString()}";
 
                                   Navigator.push(
                                     context,
@@ -486,13 +486,39 @@ class _UsersWorklogState extends State<UsersWorklog> {
                                     ),
                                   );
                                 },
+                                // child: ClipRRect(
+                                //   borderRadius: BorderRadius.circular(10),
+                                //   child: Image.network(
+                                //     "${ApiConstants.Uploaded}${log["imageUrl"].toString()}",
+                                //     height: 150,
+                                //     width: double.infinity,
+                                //     fit: BoxFit.cover,
+                                //   ),
+                                // ),
                                 child: ClipRRect(
                                   borderRadius: BorderRadius.circular(10),
-                                  child: Image.network(
-                                    "${ApiConstants.Uploaded}${log["imageUrl"].toString().replaceFirst('/uploads/', '')}",
+                                  child: SizedBox(
                                     height: 150,
                                     width: double.infinity,
-                                    fit: BoxFit.cover,
+                                    child: Image.network(
+                                      "${ApiConstants.Uploaded}${log["imageUrl"]}",
+                                      fit: BoxFit.cover,
+                                      loadingBuilder:
+                                          (context, child, loadingProgress) {
+                                            if (loadingProgress == null)
+                                              return child;
+
+                                            return const Center(
+                                              child: RotatingFlower(),
+                                            );
+                                          },
+                                      errorBuilder:
+                                          (context, error, stackTrace) {
+                                            return const Center(
+                                              child: Icon(Icons.broken_image),
+                                            );
+                                          },
+                                    ),
                                   ),
                                 ),
                               ),

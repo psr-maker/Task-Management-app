@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:staff_work_track/core/theme/theme_provider.dart';
+import 'package:staff_work_track/core/providers/data_refresh_provider.dart';
 import 'package:staff_work_track/screen/splashscreen.dart';
 
 void main() {
@@ -12,8 +13,11 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => ThemeProvider(),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => ThemeProvider()),
+        ChangeNotifierProvider(create: (_) => DataRefreshNotifier()),
+      ],
       child: Consumer<ThemeProvider>(
         builder: (context, themeProvider, _) {
           return MaterialApp(

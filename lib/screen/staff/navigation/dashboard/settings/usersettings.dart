@@ -86,7 +86,7 @@ class _UsersSettingsState extends State<UsersSettings> {
           icon: const Icon(Icons.arrow_back_ios),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text("UsersSettings"),
+        title: const Text("User Settings"),
       ),
       body: ListView(
         padding: const EdgeInsets.all(20),

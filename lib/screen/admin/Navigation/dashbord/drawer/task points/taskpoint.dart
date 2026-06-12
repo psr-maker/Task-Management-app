@@ -15,6 +15,7 @@ class TaskPointDetail extends StatefulWidget {
   final String? delayReason;
   final String? comment;
   final Function(String message, {bool isError})? onShowMessage;
+  final VoidCallback? onReviewSubmitted;
   const TaskPointDetail({
     super.key,
     required this.taskName,
@@ -26,7 +27,8 @@ class TaskPointDetail extends StatefulWidget {
     required this.delayJustified,
     this.delayReason,
     this.comment,
-    this.onShowMessage,
+    this.onShowMessage, 
+    this.onReviewSubmitted,
   });
 
   @override
@@ -82,6 +84,7 @@ class _TaskPointDetailState extends State<TaskPointDetail> {
         "Review submitted successfully",
         isError: false,
       );
+        widget.onReviewSubmitted?.call(); 
     } catch (e) {
       widget.onShowMessage?.call(e.toString(), isError: true);
     }

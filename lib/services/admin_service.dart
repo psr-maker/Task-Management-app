@@ -423,6 +423,43 @@ class AdminService {
     }
   }
 
+  static Future<bool> updatePermissionStatus({
+    required int id,
+    required String status,
+  }) async {
+    try {
+      final token = await AuthService.getToken();
+      final response = await http.post(
+        Uri.parse(
+          "$baseUrl/Manager/update-permission-status?id=$id&status=$status",
+        ),
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer $token",
+        },
+      );
+
+      return response.statusCode == 200;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  static Future<bool> deletePermission(int id) async {
+    try {
+      final token = await AuthService.getToken();
+
+      final response = await http.delete(
+        Uri.parse("$baseUrl/Manager/delete-permission/$id"),
+        headers: {"Authorization": "Bearer $token"},
+      );
+
+      return response.statusCode == 200;
+    } catch (e) {
+      return false;
+    }
+  }
+
   static Future<List<dynamic>> getPermissions() async {
     try {
       final token = await AuthService.getToken();
@@ -497,5 +534,89 @@ class AdminService {
     } catch (e) {
       throw Exception("Error: $e");
     }
+  }
+
+  static Future<void> applyOvertime({
+    required int uid,
+    required String dept,
+    required String date,
+    required String startTime,
+    required String endTime,
+    required String reason,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/Manager/overtime-entry'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        "uid": uid,
+        "dept": dept,
+        "date": date,
+        "fromTime": startTime,
+        "toTime": endTime,
+        "reason": reason,
+      }),
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception("Failed to apply overtime");
+    }
+  }
+
+  static Future<List<dynamic>> getMyOverTimes() async {
+    final token = await AuthService.getToken();
+
+    final response = await http.get(
+      Uri.parse('$baseUrl/Manager/my-overtimes'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    }
+
+    throw Exception("Failed to load my overtime data");
+  }
+
+  static Future<List<dynamic>> getDepartmentOverTimes() async {
+    final token = await AuthService.getToken();
+
+    final response = await http.get(
+      Uri.parse('$baseUrl/Manager/department-overtimes'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    }
+
+    throw Exception("Failed to load department overtime data");
+  }
+
+  static Future<Map<String, dynamic>> approveOvertime(
+    int id,
+    bool isApproved,
+  ) async {
+    final token = await AuthService.getToken();
+
+    final response = await http.put(
+      Uri.parse("$baseUrl/Manager/overtime-approve/$id"),
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer $token",
+      },
+      body: jsonEncode({"isApproved": isApproved}),
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    }
+
+    throw Exception(response.body);
   }
 }

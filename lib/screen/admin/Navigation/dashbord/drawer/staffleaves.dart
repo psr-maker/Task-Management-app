@@ -25,6 +25,7 @@ class _StaffLeavesState extends State<StaffLeaves>
 
   late TabController _tabController;
   final tabs = ["All", "Pending", "Approved", "Rejected"];
+  final permissionTabs = ["All", "Pending", "Approved", "Rejected"];
   Set<int> expandedItems = {};
 
   @override
@@ -33,7 +34,7 @@ class _StaffLeavesState extends State<StaffLeaves>
     _tabController = TabController(length: 4, vsync: this);
     loadItems();
     _tabController.addListener(() {
-      if (!showPermissions) filterItems();
+      filterItems();
     });
   }
 
@@ -54,6 +55,7 @@ class _StaffLeavesState extends State<StaffLeaves>
       filteredItems = data;
       isLoading = false;
     });
+    filterItems();
   }
 
   void showTopMessage(String message, {bool isError = true}) {
@@ -72,17 +74,18 @@ class _StaffLeavesState extends State<StaffLeaves>
   }
 
   void filterItems() {
-    String selected = tabs[_tabController.index];
+    String selected = showPermissions
+        ? permissionTabs[_tabController.index]
+        : tabs[_tabController.index];
+
     setState(() {
       if (selected == "All") {
         filteredItems = allItems;
       } else {
-        filteredItems = allItems
-            .where(
-              (e) =>
-                  (e["status"] ?? "").toLowerCase() == selected.toLowerCase(),
-            )
-            .toList();
+        filteredItems = allItems.where((item) {
+          return (item["status"] ?? "").toString().toLowerCase() ==
+              selected.toLowerCase();
+        }).toList();
       }
     });
   }
@@ -144,7 +147,7 @@ class _StaffLeavesState extends State<StaffLeaves>
           icon: const Icon(Icons.arrow_back_ios),
         ),
         bottom: PreferredSize(
-          preferredSize: Size.fromHeight(showPermissions ? 60 : 100),
+          preferredSize: Size.fromHeight(100),
           child: Column(
             children: [
               Padding(
@@ -157,12 +160,11 @@ class _StaffLeavesState extends State<StaffLeaves>
                     Expanded(
                       child: GestureDetector(
                         onTap: () {
-                          if (showPermissions) {
-                            setState(() {
-                              showPermissions = false;
-                            });
-                            loadItems();
-                          }
+                          setState(() {
+                            showPermissions = false;
+                            _tabController.index = 0;
+                          });
+                          loadItems();
                         },
                         child: Container(
                           padding: const EdgeInsets.symmetric(
@@ -188,12 +190,11 @@ class _StaffLeavesState extends State<StaffLeaves>
                     Expanded(
                       child: GestureDetector(
                         onTap: () {
-                          if (!showPermissions) {
-                            setState(() {
-                              showPermissions = true;
-                            });
-                            loadItems();
-                          }
+                          setState(() {
+                            showPermissions = true;
+                            _tabController.index = 0;
+                          });
+                          loadItems();
                         },
                         child: Container(
                           padding: const EdgeInsets.symmetric(
@@ -218,22 +219,24 @@ class _StaffLeavesState extends State<StaffLeaves>
                   ],
                 ),
               ),
-              if (!showPermissions)
-                TabBar(
-                  controller: _tabController,
-                  indicator: UnderlineTabIndicator(
-                    borderSide: const BorderSide(width: 3, color: Colors.white),
-                    insets: const EdgeInsets.symmetric(horizontal: 20),
-                  ),
-                  indicatorSize: TabBarIndicatorSize.label,
-                  labelColor: Colors.white,
-                  unselectedLabelColor: Colors.white70,
-                  labelStyle: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  tabs: tabs.map((e) => Tab(text: e)).toList(),
+              //if (!showPermissions)
+              TabBar(
+                controller: _tabController,
+                indicator: UnderlineTabIndicator(
+                  borderSide: const BorderSide(width: 3, color: Colors.white),
+                  insets: const EdgeInsets.symmetric(horizontal: 20),
                 ),
+                indicatorSize: TabBarIndicatorSize.label,
+                labelColor: Colors.white,
+                unselectedLabelColor: Colors.white70,
+                labelStyle: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                ),
+                tabs: (showPermissions ? permissionTabs : tabs)
+                    .map((e) => Tab(text: e))
+                    .toList(),
+              ),
             ],
           ),
         ),
@@ -357,25 +360,25 @@ class _StaffLeavesState extends State<StaffLeaves>
                       ],
                     ),
                   ),
-                  if (!isPermission)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 3,
-                      ),
-                      decoration: BoxDecoration(
-                        color: statusColor(status).withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        status.toUpperCase(),
-                        style: TextStyle(
-                          color: statusColor(status),
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                        ),
+                  //  if (!isPermission)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: statusColor(status).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      status.toUpperCase(),
+                      style: TextStyle(
+                        color: statusColor(status),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
+                  ),
                 ],
               ),
             ),
@@ -394,6 +397,7 @@ class _StaffLeavesState extends State<StaffLeaves>
                     infoRow("To Time", formatTime(e["toTime"])),
                     infoRow("Total Hours", e["totalHours"] ?? "-"),
                     infoRow("Reason", e["reason"]),
+                    if (status == "pending") buildPermissionActionSection(e),
                   ] else ...[
                     infoRow("Designation", e["designation"]),
                     infoRow("Reason", e["reason"]),
@@ -474,8 +478,8 @@ class _StaffLeavesState extends State<StaffLeaves>
                           "Failed to approve leave",
                           isError: true,
                         );
-                        await loadItems();
                       }
+                      await loadItems();
                     },
                     color: Theme.of(context).colorScheme.secondary,
                     txtcolor: Theme.of(context).colorScheme.onPrimary,
@@ -542,6 +546,70 @@ class _StaffLeavesState extends State<StaffLeaves>
           ],
         );
       },
+    );
+  }
+
+  Widget buildPermissionActionSection(dynamic e) {
+    return Column(
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: AppButton(
+                text: "Approve",
+                isLoading: _isLoading,
+                onPressed: () async {
+                  bool success = await AdminService.updatePermissionStatus(
+                    id: e["id"],
+                    status: "Approved",
+                  );
+
+                  if (success) {
+                    showTopMessage(
+                      "Permission approved successfully",
+                      isError: false,
+                    );
+                  } else {
+                    showTopMessage("Failed to approve permission");
+                  }
+
+                  await loadItems();
+                },
+                color: Theme.of(context).colorScheme.secondary,
+                txtcolor: Theme.of(context).colorScheme.onPrimary,
+              ),
+            ),
+
+            const SizedBox(width: 10),
+
+            Expanded(
+              child: AppButton(
+                text: "Reject",
+                isLoading: _isLoading,
+                onPressed: () async {
+                  bool success = await AdminService.updatePermissionStatus(
+                    id: e["id"],
+                    status: "Rejected",
+                  );
+
+                  if (success) {
+                    showTopMessage(
+                      "Permission rejected successfully",
+                      isError: false,
+                    );
+                  } else {
+                    showTopMessage("Failed to reject permission");
+                  }
+
+                  await loadItems();
+                },
+                color: Theme.of(context).colorScheme.error,
+                txtcolor: Theme.of(context).colorScheme.onPrimary,
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }

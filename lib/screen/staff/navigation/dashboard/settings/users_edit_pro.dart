@@ -110,7 +110,7 @@ class _UserEditProfileState extends State<UserEditProfile> {
       }, _profileImage);
 
       showTopMessage("Profile updated", isError: false);
-      Navigator.pop(context);
+      Navigator.pop(context, true);
     } catch (e) {
       showTopMessage("Update failed", isError: true);
     }
@@ -118,24 +118,25 @@ class _UserEditProfileState extends State<UserEditProfile> {
     if (mounted) setState(() => _saving = false);
   }
 
-Future<void> _pickImage(ImageSource source) async {
-  final picker = ImagePicker();
+  Future<void> _pickImage(ImageSource source) async {
+    final picker = ImagePicker();
 
-  final picked = await picker.pickImage(
-    source: source,
+    final picked = await picker.pickImage(
+      source: source,
 
-    // reduce size
-    imageQuality: 40,
-    maxWidth: 800,
-    maxHeight: 800,
-  );
+      // reduce size
+      imageQuality: 40,
+      maxWidth: 800,
+      maxHeight: 800,
+    );
 
-  if (picked != null) {
-    setState(() {
-      _profileImage = File(picked.path);
-    });
+    if (picked != null) {
+      setState(() {
+        _profileImage = File(picked.path);
+      });
+    }
   }
-}
+
   String? getProfileImageUrl(Map<String, dynamic> data) {
     final path = data["profileImage"];
     if (path == null || path.isEmpty) return "";
@@ -304,8 +305,30 @@ Future<void> _pickImage(ImageSource source) async {
                       ),
 
                       const SizedBox(height: 12),
-                      field("Contact Number", _contact),
-                      field("Emergency Contact", _emergency),
+                      // field("Contact Number", _contact),
+                      TextField(
+                        controller: _contact,
+                        keyboardType: TextInputType.phone,
+                        maxLength: 10,
+                        decoration: InputDecoration(
+                          labelText: "Contact Number",
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                      ),
+                      // field("Emergency Contact", _emergency),
+                      TextField(
+                        controller: _emergency,
+                        keyboardType: TextInputType.phone,
+                        maxLength: 10,
+                        decoration: InputDecoration(
+                          labelText: "Emergency Contact",
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                      ),
                       field("Address", _address),
 
                       const SizedBox(height: 20),

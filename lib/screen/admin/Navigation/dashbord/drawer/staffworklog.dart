@@ -329,13 +329,39 @@ class _UsersWorklogState extends State<Staffworklog> {
                                     ),
                                   );
                                 },
+                                // child: ClipRRect(
+                                //   borderRadius: BorderRadius.circular(10),
+                                //   child: Image.network(
+                                //     "${ApiConstants.Uploaded}${log["imageUrl"].toString()}",
+                                //     height: 150,
+                                //     width: double.infinity,
+                                //     fit: BoxFit.cover,
+                                //   ),
+                                // ),
                                 child: ClipRRect(
                                   borderRadius: BorderRadius.circular(10),
-                                  child: Image.network(
-                                    "${ApiConstants.Uploaded}${log["imageUrl"].toString()}",
+                                  child: SizedBox(
                                     height: 150,
                                     width: double.infinity,
-                                    fit: BoxFit.cover,
+                                    child: Image.network(
+                                      "${ApiConstants.Uploaded}${log["imageUrl"]}",
+                                      fit: BoxFit.cover,
+                                      loadingBuilder:
+                                          (context, child, loadingProgress) {
+                                            if (loadingProgress == null)
+                                              return child;
+
+                                            return const Center(
+                                              child: RotatingFlower(),
+                                            );
+                                          },
+                                      errorBuilder:
+                                          (context, error, stackTrace) {
+                                            return const Center(
+                                              child: Icon(Icons.broken_image),
+                                            );
+                                          },
+                                    ),
                                   ),
                                 ),
                               ),

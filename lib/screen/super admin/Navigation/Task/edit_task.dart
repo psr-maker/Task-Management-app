@@ -44,7 +44,7 @@ class _EditTaskState extends State<EditTask> {
     selectedPriority = widget.task.priority;
 
     createdDateController.text = widget.task.createdAt.split("T").first;
-  
+
     if (widget.task.dueDate != null) {
       dueDate = DateTime.tryParse(widget.task.dueDate!);
       dueDateController.text = widget.task.dueDate!.split("T").first;
@@ -123,24 +123,45 @@ class _EditTaskState extends State<EditTask> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  const SizedBox(height: 10),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
-                      TextButton.icon(
+                      // TextButton.icon(
+                      //   onPressed: _assignUsers,
+                      //   icon: const Icon(Icons.person_add),
+                      //   label: Text(
+                      //     "Assign Users",
+                      //     style: Theme.of(context).textTheme.titleLarge,
+                      //   ),
+                      // ),
+                      ElevatedButton.icon(
                         onPressed: _assignUsers,
-                        icon: const Icon(Icons.person_add),
-                        label: Text(
-                          "Assign Users",
-                          style: Theme.of(context).textTheme.titleLarge,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Theme.of(
+                            context,
+                          ).colorScheme.secondary,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 15,
+                            vertical: 10,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
                         ),
+                        icon: const Icon(Icons.person_add),
+                        label: const Text("Assign Users"),
                       ),
                     ],
                   ),
                   CustomFormWidgets.label(context, "Task Name"),
+                  const SizedBox(height: 10),
                   CustomFormWidgets.textField(context, nameController),
 
                   const SizedBox(height: 20),
                   CustomFormWidgets.label(context, "Description"),
+                  const SizedBox(height: 10),
                   CustomFormWidgets.textField(
                     context,
                     descriController,
@@ -149,6 +170,7 @@ class _EditTaskState extends State<EditTask> {
 
                   const SizedBox(height: 20),
                   CustomFormWidgets.label(context, "Priority"),
+                  const SizedBox(height: 10),
                   CustomFormWidgets.dropdown(
                     context: context,
                     value: selectedPriority,
@@ -157,6 +179,7 @@ class _EditTaskState extends State<EditTask> {
                   ),
                   const SizedBox(height: 20),
                   CustomFormWidgets.label(context, "Start Date"),
+                  const SizedBox(height: 10),
                   CustomFormWidgets.dateField(
                     controller: createdDateController,
                     onTap: () {},
@@ -164,6 +187,7 @@ class _EditTaskState extends State<EditTask> {
                   ),
                   const SizedBox(height: 20),
                   CustomFormWidgets.label(context, "Due Date"),
+                  const SizedBox(height: 10),
                   CustomFormWidgets.dateField(
                     controller: dueDateController,
                     onTap: _selectDueDate,
@@ -171,6 +195,7 @@ class _EditTaskState extends State<EditTask> {
 
                   const SizedBox(height: 20),
                   CustomFormWidgets.label(context, "Assigned Members"),
+                  const SizedBox(height: 10),
                   const SizedBox(height: 8),
                   Wrap(
                     spacing: 8,

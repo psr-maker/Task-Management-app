@@ -1,6 +1,7 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:percent_indicator/circular_percent_indicator.dart';
+import 'package:staff_work_track/core/widgets/loading.dart';
 import 'package:staff_work_track/services/dashboard_service.dart';
 import 'package:staff_work_track/utils/TaskUtils.dart';
 import 'package:staff_work_track/utils/enum.dart';
@@ -845,89 +846,85 @@ class _AlldeptproducticityState extends State<Alldeptproducticity> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        FutureBuilder<List<Map<String, dynamic>>>(
-          future: futureData,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Padding(
-                padding: EdgeInsets.all(20),
-                child: Center(child: CircularProgressIndicator()),
-              );
-            } else if (snapshot.hasError) {
-              return Center(child: Text('Error: ${snapshot.error}'));
-            } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-              return const SizedBox();
-            }
-            final departments = snapshot.data!;
-            return Column(
-              children: [
-                Text(
-                  'Department Productivity',
-                  style: Theme.of(context).textTheme.displaySmall,
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: futureData,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Padding(
+            padding: EdgeInsets.all(20),
+            child: Center(child: RotatingFlower()),
+          );
+        } else if (snapshot.hasError) {
+          return Center(child: Text('Error: ${snapshot.error}'));
+        } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          return const SizedBox();
+        }
+        final departments = snapshot.data!;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Department Productivity',
+              style: Theme.of(context).textTheme.displaySmall,
+            ),
+            const SizedBox(height: 12),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(15),
+              child: Container(
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey),
                 ),
-                const SizedBox(height: 12),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(15),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey),
-                    ),
-                    child: Table(
-                      columnWidths: const {
-                        0: FlexColumnWidth(3),
-                        1: FlexColumnWidth(2),
-                        2: FlexColumnWidth(2),
-                      },
-                      border: TableBorder(
-                        verticalInside: BorderSide(color: Colors.grey),
-                        horizontalInside: BorderSide(color: Colors.grey),
+                child: Table(
+                  columnWidths: const {
+                    0: FlexColumnWidth(3),
+                    1: FlexColumnWidth(2),
+                    2: FlexColumnWidth(2),
+                  },
+                  border: TableBorder(
+                    verticalInside: BorderSide(color: Colors.grey),
+                    horizontalInside: BorderSide(color: Colors.grey),
+                  ),
+                  children: [
+                    TableRow(
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.secondary,
                       ),
                       children: [
-                        TableRow(
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).colorScheme.secondary,
-                          ),
-                          children: [
-                            _tableHeader('Department'),
-                            _tableHeader('Month'),
-                            _tableHeader('Productivity'),
-                          ],
-                        ),
-                        ...departments.map((dept) {
-                          final monthlyData = List<Map<String, dynamic>>.from(
-                            dept['monthlyData'],
-                          );
-                          int month = currentMonth > 1 ? currentMonth - 1 : 1;
-                          double productivity = 0;
-                          if (monthlyData.isNotEmpty) {
-                            month = monthlyData.first['month'];
-                            productivity =
-                                (monthlyData.first['productivity'] as num)
-                                    .toDouble();
-                          }
-                          return TableRow(
-                            children: [
-                              _tableCell(dept['department']),
-                              _tableCell(_getMonthName(month)),
-                              _tableCell(
-                                '${productivity.toInt()} %',
-                                color: _getProductivityColor(productivity),
-                              ),
-                            ],
-                          );
-                        }).toList(),
+                        _tableHeader('Department'),
+                        _tableHeader('Month'),
+                        _tableHeader('Productivity'),
                       ],
                     ),
-                  ),
+                    ...departments.map((dept) {
+                      final monthlyData = List<Map<String, dynamic>>.from(
+                        dept['monthlyData'],
+                      );
+                      int month = currentMonth > 1 ? currentMonth - 1 : 1;
+                      double productivity = 0;
+                      if (monthlyData.isNotEmpty) {
+                        month = monthlyData.first['month'];
+                        productivity =
+                            (monthlyData.first['productivity'] as num)
+                                .toDouble();
+                      }
+                      return TableRow(
+                        children: [
+                          _tableCell(dept['department']),
+                          _tableCell(_getMonthName(month)),
+                          _tableCell(
+                            '${productivity.toInt()} %',
+                            color: _getProductivityColor(productivity),
+                          ),
+                        ],
+                      );
+                    }).toList(),
+                  ],
                 ),
-              ],
-            );
-          },
-        ),
-      ],
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 

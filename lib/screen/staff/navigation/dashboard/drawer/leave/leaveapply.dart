@@ -130,7 +130,8 @@ class _LeaveapplyState extends State<Leaveapply> {
     setState(() => _isLoading = false);
     if (success) {
       showTopMessage("Leave Applied Successfully", isError: false);
-      Navigator.pop(context);
+
+      Navigator.pop(context, true);
     } else {
       showTopMessage("Failed to apply leave", isError: true);
     }
@@ -140,6 +141,19 @@ class _LeaveapplyState extends State<Leaveapply> {
     final picked = await showTimePicker(
       context: context,
       initialTime: TimeOfDay.now(),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.light(
+              primary: Theme.of(context).colorScheme.secondary,
+              onPrimary: Colors.white,
+              surface: Colors.white,
+              onSurface: Colors.black,
+            ),
+          ),
+          child: child!,
+        );
+      },
     );
 
     if (picked != null) {
@@ -154,6 +168,19 @@ class _LeaveapplyState extends State<Leaveapply> {
     final picked = await showTimePicker(
       context: context,
       initialTime: TimeOfDay.now(),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.light(
+              primary: Theme.of(context).colorScheme.secondary,
+              onPrimary: Colors.white,
+              surface: Colors.white,
+              onSurface: Colors.black,
+            ),
+          ),
+          child: child!,
+        );
+      },
     );
 
     if (picked != null) {
@@ -245,7 +272,7 @@ class _LeaveapplyState extends State<Leaveapply> {
         toTime = null;
         totalMinutes = 0;
       });
-      Navigator.pop(context);
+      Navigator.pop(context, true);
     } else {
       showTopMessage("Failed to apply permission", isError: true);
     }
@@ -340,12 +367,10 @@ class _LeaveapplyState extends State<Leaveapply> {
                           ),
                           trailing: DropdownButton<String>(
                             value: day["type"],
-                            dropdownColor: Colors.white,
-                            style: Theme.of(context).textTheme.bodyMedium
-                                ?.copyWith(
-                                  color: Colors.black,
-                                  fontWeight: FontWeight.w500,
-                                ),
+                            dropdownColor: Theme.of(
+                              context,
+                            ).colorScheme.background,
+                            style: Theme.of(context).textTheme.bodyMedium,
                             iconEnabledColor: Colors.black,
                             items: const [
                               DropdownMenuItem(
@@ -400,7 +425,18 @@ class _LeaveapplyState extends State<Leaveapply> {
                 const SizedBox(height: 20),
                 sectionTitle("Emergency Contact"),
                 const SizedBox(height: 20),
-                inputField("Phone Number", emergencyController),
+
+                TextField(
+                  controller: emergencyController,
+                  keyboardType: TextInputType.phone,
+                  maxLength: 10,
+                  decoration: InputDecoration(
+                    labelText: "Phone Number",
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
               ],
               if (applicationType == "Permission") ...[
                 sectionTitle("Permission Details"),

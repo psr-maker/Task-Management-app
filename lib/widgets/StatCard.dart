@@ -220,7 +220,9 @@ class _TaskCardState extends State<Taskstatus> {
 
       final loginUserId = JwtHelper.getuid(token)?.toString().trim();
       final userRole = JwtHelper.getRole(token)?.toLowerCase().trim();
-      final userDepartment = JwtHelper.getDepartment(token)?.toLowerCase().trim();
+      final userDepartment = JwtHelper.getDepartment(
+        token,
+      )?.toLowerCase().trim();
 
       if (loginUserId == null || userRole == null) {
         setState(() {
@@ -290,7 +292,9 @@ class _TaskCardState extends State<Taskstatus> {
       bool hasStaffInDepartment = false;
       for (var staff in assignedTo) {
         if (staff is Map<String, dynamic>) {
-          final staffDept = (staff["department"] as String?)?.toLowerCase().trim();
+          final staffDept = (staff["department"] as String?)
+              ?.toLowerCase()
+              .trim();
           if (staffDept == userDepartment) {
             hasStaffInDepartment = true;
             break;
@@ -426,8 +430,8 @@ class _TaskCardState extends State<Taskstatus> {
                   message: !_permissionChecked
                       ? "Loading permissions..."
                       : !_canEditStatus
-                          ? "Permission denied: Managers can only edit their department staff tasks"
-                          : "Click to change status",
+                      ? "Permission denied: Managers can only edit their department staff tasks"
+                      : "Click to change status",
                   child: Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 8,
@@ -437,7 +441,10 @@ class _TaskCardState extends State<Taskstatus> {
                       color: statusColor.withOpacity(0.12),
                       borderRadius: BorderRadius.circular(20),
                       border: !_permissionChecked || !_canEditStatus
-                          ? Border.all(color: Colors.red.withOpacity(0.3), width: 1)
+                          ? Border.all(
+                              color: Colors.red.withOpacity(0.3),
+                              width: 1,
+                            )
                           : null,
                     ),
                     child: DropdownButton<TaskStatus>(
@@ -463,7 +470,11 @@ class _TaskCardState extends State<Taskstatus> {
                         );
                       }).toList(),
 
-                      onChanged: (isUpdating || isCompleted || !_canEditStatus || !_permissionChecked)
+                      onChanged:
+                          (isUpdating ||
+                              isCompleted ||
+                              !_canEditStatus ||
+                              !_permissionChecked)
                           ? null
                           : (value) async {
                               if (value == null) return;
@@ -612,34 +623,39 @@ class _GoalCardState extends State<GoalCard> {
                   style: Theme.of(context).textTheme.displaySmall,
                 ),
               ),
-              TextButton.icon(
-                onPressed: () async {
-                  final confirmed = await showConfirmDialog(
-                    context,
-                    "Delete",
-                    "Goal",
-                  );
-                  if (confirmed == true) {
-                    final success = await SuperAdminService.deleteGoal(
-                      widget.goal["goalCode"],
+              if ((widget.goal["status"] ?? "").toString().toLowerCase() !=
+                  "completed")
+                TextButton.icon(
+                  onPressed: () async {
+                    final confirmed = await showConfirmDialog(
+                      context,
+                      "Delete",
+                      "Goal",
                     );
-                    if (success) {
-                      Navigator.pop(context);
-                      widget.onDelete?.call("Goal deleted successfully", false);
-                      widget.onRefresh?.call();
+                    if (confirmed == true) {
+                      final success = await SuperAdminService.deleteGoal(
+                        widget.goal["goalCode"],
+                      );
+                      if (success) {
+                        Navigator.pop(context);
+                        widget.onDelete?.call(
+                          "Goal deleted successfully",
+                          false,
+                        );
+                        widget.onRefresh?.call();
+                      }
                     }
-                  }
-                },
+                  },
 
-                label: Text(
-                  "Delete",
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.error,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
+                  label: Text(
+                    "Delete",
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
-              ),
             ],
           ),
         ],

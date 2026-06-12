@@ -200,6 +200,11 @@ class _OtpverifyState extends State<Otpverify> {
                 context,
                 message: _topMessage!,
                 isError: _isErrorMessage,
+                backgroundColor: _isErrorMessage
+                    ? Colors.red
+                    : Theme.of(context).colorScheme.onPrimary,
+                textColor: Theme.of(context).colorScheme.secondary,
+                iconColor: Theme.of(context).colorScheme.secondary,
               ),
             ),
           Padding(

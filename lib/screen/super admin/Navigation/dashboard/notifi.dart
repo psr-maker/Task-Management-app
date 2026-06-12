@@ -16,10 +16,12 @@ class _NotificationPageState extends State<NotificationPage> {
   String? _topMessage;
   bool _isErrorMessage = true;
   bool _showTopMessage = false;
+  bool _isLoading = false;
   @override
   void initState() {
     super.initState();
     notifications = NotificationService.getMyNotifications();
+      NotificationService.markAllRead();
   }
 
   void showTopMessage(String message, {bool isError = true}) {
@@ -35,6 +37,34 @@ class _NotificationPageState extends State<NotificationPage> {
     });
   }
 
+  Future<void> clearall() async {
+    try {
+      setState(() {
+        _isLoading = true;
+      });
+
+      bool success = await NotificationService.deleteAllNotifications();
+
+      if (success) {
+        setState(() {
+          notifications = NotificationService.getMyNotifications();
+        });
+
+        showTopMessage("All notifications cleared", isError: false);
+      } else {
+        showTopMessage("Failed to clear notifications", isError: true);
+      }
+    } catch (e) {
+      showTopMessage("Failed to clear notifications", isError: true);
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -48,148 +78,183 @@ class _NotificationPageState extends State<NotificationPage> {
 
       body: Stack(
         children: [
-          FutureBuilder<List<dynamic>>(
-            future: notifications,
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: RotatingFlower());
-              }
-
-              if (snapshot.hasError) {
-                return const Center(child: Text("Error loading notifications"));
-              }
-
-              if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                return const Center(child: Text("No notifications found"));
-              }
-
-              final data = snapshot.data!;
-
-              return ListView.builder(
-                padding: const EdgeInsets.all(15),
-                itemCount: data.length,
-                itemBuilder: (context, index) {
-                  final item = data[index];
-                  final String title = item["title"] ?? "";
-                  final String message = item["message"] ?? "";
-                  final String type = title.toLowerCase();
-                  final bool isDelete = type.contains("delete");
-
-                  final Color accentColor = isDelete
-                      ? Colors.red
-                      : Colors.orange;
-                  return Dismissible(
-                    key: Key(item["id"].toString()),
-                    direction: DismissDirection.endToStart,
-
-                    background: Container(
-                      alignment: Alignment.centerRight,
-                      padding: const EdgeInsets.only(right: 20),
-                      color: const Color.fromARGB(255, 231, 112, 103),
-                      child: const Icon(Icons.delete, color: Colors.white),
+          Padding(
+            padding: const EdgeInsets.only(left: 15, right: 15, top: 5),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: _isLoading ? null : clearall,
+                      child: const Text("CLEAR ALL"),
                     ),
-
-                    onDismissed: (direction) async {
-                      int id = item["id"];
-
-                      bool success =
-                          await NotificationService.deleteNotification(id);
-
-                      if (success) {
-                        setState(() {
-                          data.removeAt(index);
-                        });
-                        showTopMessage(
-                          "Notification deleted successfully",
-                          isError: false,
-                        );
-                      } else {
-                        showTopMessage(
-                          "Failed to delete notification",
-                          isError: true,
-                        );
-                        setState(() {
-                          notifications =
-                              NotificationService.getMyNotifications();
-                        });
+                  ],
+                ),
+                SizedBox(height: 10),
+                Expanded(
+                  child: FutureBuilder<List<dynamic>>(
+                    future: notifications,
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const Center(child: RotatingFlower());
                       }
-                    },
 
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Column(
-                          children: [
-                            Container(
-                              width: 2,
-                              height: 25,
-                              color: Theme.of(context).colorScheme.secondary,
-                            ),
-                            CircleAvatar(
-                              radius: 15,
-                              backgroundColor: accentColor,
-                              child: Icon(Icons.notifications_none),
-                            ),
-                            Container(
-                              width: 2,
-                              height: 25,
-                              color: Theme.of(context).colorScheme.secondary,
-                            ),
-                          ],
-                        ),
+                      if (snapshot.hasError) {
+                        return const Center(
+                          child: Text("Error loading notifications"),
+                        );
+                      }
 
-                        const SizedBox(width: 15),
+                      if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                        return const Center(
+                          child: Text("No notifications found"),
+                        );
+                      }
 
-                        Expanded(
-                          child: Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(15),
-                              border: Border.all(
-                                color: accentColor.withOpacity(0.3),
-                                width: 1,
+                      final data = snapshot.data!;
+
+                      return ListView.builder(
+                        itemCount: data.length,
+                        itemBuilder: (context, index) {
+                          final item = data[index];
+                          final String title = item["title"] ?? "";
+                          final String message = item["message"] ?? "";
+                          final String type = title.toLowerCase();
+                          final bool isDelete = type.contains("delete");
+
+                          final Color accentColor = isDelete
+                              ? Colors.red
+                              : Colors.orange;
+                          return Dismissible(
+                            key: Key(item["id"].toString()),
+                            direction: DismissDirection.endToStart,
+
+                            background: Container(
+                              alignment: Alignment.centerRight,
+                              padding: const EdgeInsets.only(right: 20),
+                              color: const Color.fromARGB(255, 231, 112, 103),
+                              child: const Icon(
+                                Icons.delete,
+                                color: Colors.white,
                               ),
                             ),
-                            child: Column(
+
+                            onDismissed: (direction) async {
+                              int id = item["id"];
+
+                              bool success =
+                                  await NotificationService.deleteNotification(
+                                    id,
+                                  );
+
+                              if (success) {
+                                setState(() {
+                                  data.removeAt(index);
+                                });
+                                showTopMessage(
+                                  "Notification deleted successfully",
+                                  isError: false,
+                                );
+                              } else {
+                                showTopMessage(
+                                  "Failed to delete notification",
+                                  isError: true,
+                                );
+                                setState(() {
+                                  notifications =
+                                      NotificationService.getMyNotifications();
+                                });
+                              }
+                            },
+
+                            child: Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
+                                Column(
                                   children: [
-                                    Text(
-                                      title,
-                                      style: Theme.of(
+                                    Container(
+                                      width: 2,
+                                      height: 25,
+                                      color: Theme.of(
                                         context,
-                                      ).textTheme.labelMedium,
+                                      ).colorScheme.secondary,
                                     ),
-                                    Text(
-                                      AppHelpers.formatDate(
-                                        item["createdAt"] ?? "",
-                                      ),
-                                      style: Theme.of(
+                                    CircleAvatar(
+                                      radius: 15,
+                                      backgroundColor: accentColor,
+                                      child: Icon(Icons.notifications_none),
+                                    ),
+                                    Container(
+                                      width: 2,
+                                      height: 25,
+                                      color: Theme.of(
                                         context,
-                                      ).textTheme.labelSmall,
+                                      ).colorScheme.secondary,
                                     ),
                                   ],
                                 ),
 
-                                const SizedBox(height: 10),
+                                const SizedBox(width: 15),
 
-                                Text(
-                                  message,
-                                  style: Theme.of(context).textTheme.labelSmall,
+                                Expanded(
+                                  child: Container(
+                                    padding: const EdgeInsets.all(10),
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(15),
+                                      border: Border.all(
+                                        color: accentColor.withOpacity(0.3),
+                                        width: 1,
+                                      ),
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Text(
+                                              title,
+                                              style: Theme.of(
+                                                context,
+                                              ).textTheme.labelMedium,
+                                            ),
+                                            Text(
+                                              AppHelpers.formatDate(
+                                                item["createdAt"] ?? "",
+                                              ),
+                                              style: Theme.of(
+                                                context,
+                                              ).textTheme.labelSmall,
+                                            ),
+                                          ],
+                                        ),
+
+                                        const SizedBox(height: 10),
+
+                                        Text(
+                                          message,
+                                          style: Theme.of(
+                                            context,
+                                          ).textTheme.labelSmall,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
                                 ),
                               ],
                             ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              );
-            },
+                          );
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
           ),
           if (_topMessage != null)
             AnimatedPositioned(

@@ -88,9 +88,10 @@ class _DepartmentReportsTabState extends State<DepartmentReportsTab> {
       warnings: [],
       completionPercentage: (summaryReportData["goalCompletionPercentage"] ?? 0)
           .toDouble(),
-      onTimePercentage: (summaryReportData["onTimeGoalCompletionPercentage"] ?? 0)
+      onTimePercentage:
+          (summaryReportData["onTimeGoalCompletionPercentage"] ?? 0).toDouble(),
+      delayedGoalPercent: (summaryReportData["delayedGoalPercentage"] ?? 0)
           .toDouble(),
-      delayedGoalPercent: (summaryReportData["delayedGoalPercentage"] ?? 0).toDouble(),
       reportData: tableReportData,
       topPerformer: summaryReportData["topPerformer"],
       lowPerformer: summaryReportData["lowPerformer"],
@@ -329,44 +330,57 @@ class _DepartmentReportsTabState extends State<DepartmentReportsTab> {
   }
 
   Widget _buildPerformanceSection(Map<String, dynamic> data) {
-    final top = data["topPerformer"];
-    final low = data["lowPerformer"];
+    final List<dynamic> topList = data["topPerformer"] ?? [];
+    final List<dynamic> lowList = data["lowPerformer"] ?? [];
 
-    final showTop = top != null && (top["completedTasks"] ?? 0) > 0;
-    // final showLow = low != null && (low["completedTasks"] ?? 0) > 0;
-    final showLow = low != null;
+    final Map<String, dynamic>? top = topList.isNotEmpty
+        ? Map<String, dynamic>.from(topList.first)
+        : null;
 
-    if (!showTop && !showLow) return const SizedBox.shrink();
+    final Map<String, dynamic>? low = lowList.isNotEmpty
+        ? Map<String, dynamic>.from(lowList.first)
+        : null;
+
+    final bool showTop = top != null;
+    final bool showLow = low != null;
+
+    if (!showTop && !showLow) {
+      return const SizedBox.shrink();
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const SizedBox(height: 25),
+
         Text(
           "Performance Metrics",
           style: Theme.of(context).textTheme.displaySmall,
         ),
+
         const SizedBox(height: 10),
 
         if (showTop)
           _advancedPerformerCard(
             title: "Top Performer",
-            name: top!["user"] ?? "-",
+            name: top["user"] ?? "-",
             completedCount: top["completedTasks"] ?? 0,
-            totalTasks: top["totalTasks"] ?? 0, // we will fix below
+            totalTasks: top["assignedTasks"] ?? 0,
+            score: (top["score"] as num?)?.toDouble() ?? 0,
             startColor: Theme.of(context).colorScheme.primary,
             endColor: Theme.of(context).colorScheme.secondary,
             icon: Icons.emoji_events,
           ),
 
-        if (showTop) const SizedBox(height: 5),
+        if (showTop) const SizedBox(height: 8),
 
         if (showLow)
           _advancedPerformerCard(
             title: "Low Performer",
-            name: low!["user"] ?? "-",
+            name: low["user"] ?? "-",
             completedCount: low["completedTasks"] ?? 0,
-            totalTasks: low["totalTasks"] ?? 0,
+            totalTasks: low["assignedTasks"] ?? 0,
+            score: (low["score"] as num?)?.toDouble() ?? 0,
             startColor: Colors.redAccent,
             endColor: Colors.red,
             icon: Icons.thumb_down,
@@ -380,12 +394,12 @@ class _DepartmentReportsTabState extends State<DepartmentReportsTab> {
     required String name,
     required int completedCount,
     required int totalTasks,
+    required double score,
     required Color startColor,
     required Color endColor,
     required IconData icon,
   }) {
-    final double progress = totalTasks > 0 ? (completedCount / totalTasks) : 0;
-    final int percentage = (progress * 100).round();
+    final double progress = (score / 100).clamp(0.0, 1.0);
 
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 4),
@@ -424,9 +438,11 @@ class _DepartmentReportsTabState extends State<DepartmentReportsTab> {
                 ),
               ],
             ),
+
             const SizedBox(height: 5),
 
             Text(name, style: Theme.of(context).textTheme.labelMedium),
+
             const SizedBox(height: 5),
 
             Stack(
@@ -462,6 +478,7 @@ class _DepartmentReportsTabState extends State<DepartmentReportsTab> {
                 ),
               ],
             ),
+
             const SizedBox(height: 5),
 
             Row(
@@ -481,7 +498,7 @@ class _DepartmentReportsTabState extends State<DepartmentReportsTab> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
-                    "$percentage%",
+                    "${score.toStringAsFixed(1)}%",
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.bold,

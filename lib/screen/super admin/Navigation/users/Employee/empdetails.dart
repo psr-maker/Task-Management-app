@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:staff_work_track/Models/getusers.dart';
 import 'package:staff_work_track/common/filter_model.dart';
 import 'package:staff_work_track/common/search_filter_page.dart';
 import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
+import 'package:staff_work_track/core/providers/data_refresh_provider.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/Task/goalntask_create.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/drawer/auditlog.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/warnings/craete_warnings.dart';
@@ -41,7 +43,8 @@ class _EmployeeDetailState extends State<EmployeeDetail> {
   bool _isErrorMessage = true;
   bool _showTopMessage = false;
   List<dynamic> staffGoals = [];
-  bool _statusInitialized = false;
+  DateTime? _lastRefreshTime;
+  late UserModel employee;
 
   List<dynamic> applyGoalSearch(List<dynamic> goals) {
     List<dynamic> filtered = goals;
@@ -68,11 +71,19 @@ class _EmployeeDetailState extends State<EmployeeDetail> {
     // STATUS FILTER
     if (taskFilter.status != null && taskFilter.status!.isNotEmpty) {
       filtered = filtered.where((goal) {
-        return (goal["status"] ?? "").toString().toLowerCase() ==
-            taskFilter.status!.toLowerCase();
+        String goalStatus = (goal["status"] ?? "")
+            .toString()
+            .toLowerCase()
+            .replaceAll(' ', '');
+
+        String filterStatus = taskFilter.status!.toLowerCase().replaceAll(
+          ' ',
+          '',
+        );
+
+        return goalStatus == filterStatus;
       }).toList();
     }
-
     // PRIORITY FILTER
     if (taskFilter.priority != null && taskFilter.priority!.isNotEmpty) {
       filtered = filtered.where((goal) {
@@ -95,9 +106,73 @@ class _EmployeeDetailState extends State<EmployeeDetail> {
   @override
   void initState() {
     super.initState();
+    _initializeData();
+    employee = widget.employee;
+  }
 
+  void _initializeData() {
     _checkEditPermission(widget.employee);
+    _reloadEmployeeStatus();
     loadEmployeeGoals();
+  }
+
+  /// Reload the latest employee status from server
+  Future<void> _reloadEmployeeStatus() async {
+    try {
+      // Fetch fresh employee data from server
+      final users = await SuperAdminService.getEmployees();
+
+      if (mounted) {
+        // Find the current employee in the fresh list
+        for (var user in users) {
+          if (user.userId == widget.employee.userId) {
+            setState(() {
+              isActive = user.status.toLowerCase() == "active";
+            });
+            return;
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint("Failed to reload employee status: $e");
+    }
+  }
+
+  @override
+  void didUpdateWidget(EmployeeDetail oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Reload data if the employee parameter changed
+    if (oldWidget.employee.userId != widget.employee.userId) {
+      _initializeData();
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    // Listen for refresh signals and reload data
+    final refreshNotifier = context.watch<DataRefreshNotifier>();
+
+    // Reload if user refresh signal changed
+    if (refreshNotifier.lastUserRefresh != null &&
+        (_lastRefreshTime == null ||
+            refreshNotifier.lastUserRefresh!.isAfter(_lastRefreshTime!))) {
+      _lastRefreshTime = refreshNotifier.lastUserRefresh;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _reloadEmployeeStatus();
+      });
+    }
+
+    // Reload if goal refresh signal changed
+    if (refreshNotifier.lastGoalRefresh != null &&
+        (_lastRefreshTime == null ||
+            refreshNotifier.lastGoalRefresh!.isAfter(_lastRefreshTime!))) {
+      _lastRefreshTime = refreshNotifier.lastGoalRefresh;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) loadEmployeeGoals();
+      });
+    }
   }
 
   Future<void> loadEmployeeGoals() async {
@@ -236,8 +311,19 @@ class _EmployeeDetailState extends State<EmployeeDetail> {
                   ),
                 );
 
-                if (result == true) {
-                  loadEmployeeGoals();
+                if (result != null) {
+                  setState(() {
+                    employee = UserModel(
+                      userId: employee.userId,
+                      name: result["name"],
+                      email: result["email"],
+                      department: result["department"],
+                      status: employee.status,
+                      createdBy: employee.createdBy,
+                      wasEdited: employee.wasEdited,
+                      role: employee.role,
+                    );
+                  });
                 }
               }
 
@@ -278,7 +364,7 @@ class _EmployeeDetailState extends State<EmployeeDetail> {
                   MaterialPageRoute(
                     builder: (_) => SendWarningPage(
                       receiverId: widget.employee.userId,
-                      receivername: widget.employee.name,
+                      receivername: employee.name,
                     ),
                   ),
                 );
@@ -326,10 +412,6 @@ class _EmployeeDetailState extends State<EmployeeDetail> {
     final filteredGoals = applyGoalSearch(staffGoals);
 
     final allTasks = staffGoals.expand((g) => (g["tasks"] ?? [])).toList();
-    if (!_statusInitialized) {
-      isActive = widget.employee.status.toLowerCase() == "active";
-      _statusInitialized = true;
-    }
 
     final now = DateTime.now();
 
@@ -424,6 +506,7 @@ class _EmployeeDetailState extends State<EmployeeDetail> {
                           ),
                         );
                         if (result == true) {
+                          context.read<DataRefreshNotifier>().refreshGoals();
                           loadEmployeeGoals();
                         }
                       },
@@ -446,7 +529,7 @@ class _EmployeeDetailState extends State<EmployeeDetail> {
                   itemCount: filteredGoals.length,
                   itemBuilder: (context, index) {
                     final goal = filteredGoals[index];
-                    return GoalCard(goal: goal);
+                    return GoalCard(goal: goal, onRefresh: loadEmployeeGoals);
                   },
                 ),
               ],
@@ -514,11 +597,11 @@ class _EmployeeDetailState extends State<EmployeeDetail> {
             const SizedBox(width: 10),
             Expanded(
               child: Text(
-                widget.employee.name,
+                employee.name,
                 style: Theme.of(context).textTheme.headlineLarge,
               ),
             ),
-            if (widget.employee.wasEdited == true)
+            if (employee.wasEdited == true)
               IconButton(
                 onPressed: () async {
                   final token = await AuthService.getToken();
@@ -528,7 +611,7 @@ class _EmployeeDetailState extends State<EmployeeDetail> {
                       context,
                       MaterialPageRoute(
                         builder: (_) => AuditLogPage(
-                          highlightid: widget.employee.userId.toString(),
+                          highlightid: employee.userId.toString(),
                         ),
                       ),
                     );
@@ -539,9 +622,9 @@ class _EmployeeDetailState extends State<EmployeeDetail> {
           ],
         ),
         const SizedBox(height: 10),
-        _row(Icons.email, widget.employee.email),
+        _row(Icons.email, employee.email),
         const SizedBox(height: 10),
-        _row(Icons.business, widget.employee.department),
+        _row(Icons.business, employee.department),
 
         Row(
           children: [
@@ -575,9 +658,18 @@ class _EmployeeDetailState extends State<EmployeeDetail> {
 
                         try {
                           await SuperAdminService.updateusersstatus(
-                            widget.employee.userId,
+                            employee.userId,
                             value ? "Active" : "Deactive",
                           );
+
+                          // Notify other screens to refresh
+                          if (mounted) {
+                            context.read<DataRefreshNotifier>().refreshUsers();
+                            showTopMessage(
+                              "Status updated successfully",
+                              isError: false,
+                            );
+                          }
                         } catch (e) {
                           if (mounted) {
                             setState(() {
@@ -609,9 +701,9 @@ class _EmployeeDetailState extends State<EmployeeDetail> {
           children: [
             Text("Created By", style: Theme.of(context).textTheme.titleLarge),
             Text(
-              widget.employee.createdBy.split('-').length > 1
-                  ? widget.employee.createdBy.split('-')[1]
-                  : widget.employee.createdBy,
+              employee.createdBy.split('-').length > 1
+                  ? employee.createdBy.split('-')[1]
+                  : employee.createdBy,
               style: Theme.of(context).textTheme.headlineMedium,
             ),
           ],
