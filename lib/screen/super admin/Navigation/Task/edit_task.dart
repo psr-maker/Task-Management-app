@@ -21,7 +21,7 @@ class _EditTaskState extends State<EditTask> {
   final TextEditingController descriController = TextEditingController();
   final TextEditingController createdDateController = TextEditingController();
   final TextEditingController dueDateController = TextEditingController();
-
+  List<RemovedUser> removedUsers = [];
   String? selectedPriority;
   DateTime? dueDate;
 
@@ -101,8 +101,44 @@ class _EditTaskState extends State<EditTask> {
     if (result != null && result is List<UserModel>) {
       setState(() {
         assignedUsers = result;
+
+        removedUsers.removeWhere(
+          (removed) => assignedUsers.any(
+            (assigned) => assigned.userId == removed.userId,
+          ),
+        );
       });
     }
+  }
+
+  Future<String?> showReasonDialog() async {
+    final controller = TextEditingController();
+
+    return await showDialog<String>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text("Removal Reason"),
+          content: TextField(
+            controller: controller,
+            maxLines: 3,
+            decoration: const InputDecoration(hintText: "Enter reason"),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("Cancel"),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(context, controller.text.trim());
+              },
+              child: const Text("Submit"),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override
@@ -127,14 +163,6 @@ class _EditTaskState extends State<EditTask> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
-                      // TextButton.icon(
-                      //   onPressed: _assignUsers,
-                      //   icon: const Icon(Icons.person_add),
-                      //   label: Text(
-                      //     "Assign Users",
-                      //     style: Theme.of(context).textTheme.titleLarge,
-                      //   ),
-                      // ),
                       ElevatedButton.icon(
                         onPressed: _assignUsers,
                         style: ElevatedButton.styleFrom(
@@ -207,8 +235,16 @@ class _EditTaskState extends State<EditTask> {
                           Icons.close,
                           color: Colors.white,
                         ),
-                        onDeleted: () {
+                        onDeleted: () async {
+                          final reason = await showReasonDialog();
+
+                          if (reason == null) return;
+
                           setState(() {
+                            removedUsers.add(
+                              RemovedUser(userId: user.userId, reason: reason),
+                            );
+
                             assignedUsers.removeWhere(
                               (u) => u.userId == user.userId,
                             );
@@ -241,6 +277,7 @@ class _EditTaskState extends State<EditTask> {
                             assignedToIds: assignedUsers
                                 .map((u) => u.userId)
                                 .toList(),
+                            removedUsers: removedUsers,
                           ),
                         );
 

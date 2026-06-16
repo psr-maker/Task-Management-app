@@ -149,6 +149,7 @@ class _AssignUsersPageState extends State<AssignUsersPage> {
             ? TextField(
                 controller: searchController,
                 autofocus: true,
+                style: Theme.of(context).textTheme.titleMedium,
                 decoration: InputDecoration(
                   hintText: "Search users...",
                   hintStyle: Theme.of(context).textTheme.titleMedium,

@@ -98,7 +98,7 @@ class _ApplyOvertimeState extends State<ApplyOvertime> {
       if (!mounted) return;
 
       showTopMessage("Overtime request submitted successfully", isError: false);
-      Navigator.pop(context);
+      Navigator.pop(context,true);
 
       setState(() {
         _dateController.clear();

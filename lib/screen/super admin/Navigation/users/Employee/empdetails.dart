@@ -533,7 +533,7 @@ class _EmployeeDetailState extends State<EmployeeDetail> {
                   },
                 ),
               ],
-            ),
+            ), 
           ),
 
           // 🔽 FILTER UI

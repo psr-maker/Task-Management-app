@@ -69,6 +69,7 @@ class EditTaskRequest {
   final String priority;
   final DateTime dueDate;
   final List<int> assignedToIds;
+  final List<RemovedUser> removedUsers;
 
   EditTaskRequest({
     required this.taskCode,
@@ -77,6 +78,7 @@ class EditTaskRequest {
     required this.priority,
     required this.dueDate,
     required this.assignedToIds,
+    required this.removedUsers,
   });
 
   Map<String, dynamic> toJson() {
@@ -87,6 +89,19 @@ class EditTaskRequest {
       "priority": priority,
       "due_Date": dueDate.toIso8601String(),
       "assignedToIds": assignedToIds,
+      // CHANGE THIS
+      "removedMembers": removedUsers.map((e) => e.toJson()).toList(),
     };
+  }
+}
+
+class RemovedUser {
+  final int userId;
+  final String reason;
+
+  RemovedUser({required this.userId, required this.reason});
+
+  Map<String, dynamic> toJson() {
+    return {"userId": userId, "reason": reason};
   }
 }

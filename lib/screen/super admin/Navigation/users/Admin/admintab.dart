@@ -67,6 +67,7 @@ class AdmintabState extends State<Admintab> {
                   child: isSearching
                       ? TextField(
                           controller: searchController,
+                          style: Theme.of(context).textTheme.titleMedium,
                           decoration: InputDecoration(
                             hintText: "Search Manager...",
                             hintStyle: Theme.of(context).textTheme.bodyMedium,

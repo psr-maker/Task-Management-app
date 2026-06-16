@@ -67,6 +67,7 @@ class _TaskListPageState extends State<UsersTasklist> {
         title: isSearching
             ? TextField(
                 controller: searchController,
+                style: Theme.of(context).textTheme.titleMedium,
                 decoration: InputDecoration(
                   hintText: "Search goals...",
                   hintStyle: Theme.of(context).textTheme.titleMedium,

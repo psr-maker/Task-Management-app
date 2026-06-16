@@ -28,6 +28,7 @@ class _DepartmentReportsTabState extends State<DepartmentReportsTab> {
   late Future<Map<String, dynamic>> reportFuture;
   Map<String, dynamic>? data;
   bool isLoading = true;
+  bool _isDownloadingPdf = false;
   DateTime selectedYear = DateTime.now();
   @override
   void initState() {
@@ -66,6 +67,9 @@ class _DepartmentReportsTabState extends State<DepartmentReportsTab> {
   }
 
   Future<void> generateAndDownloadPDF() async {
+    setState(() {
+      _isDownloadingPdf = true;
+    });
     Map<String, dynamic> summaryReportData = {};
     Map<String, dynamic> tableReportData = {};
 
@@ -76,28 +80,43 @@ class _DepartmentReportsTabState extends State<DepartmentReportsTab> {
       tableReportData = await ReportsService.getFullReport(
         department: widget.department,
       );
+      final pdfGenerator = EmployeeReportPdfGenerator(
+        department: widget.department,
+        reportYear: selectedYear.year,
+        summaryData: summaryReportData,
+        monthlyData: data?["monthlyData"] ?? [],
+        warnings: [],
+        completionPercentage:
+            (summaryReportData["goalCompletionPercentage"] ?? 0).toDouble(),
+        onTimePercentage:
+            (summaryReportData["onTimeGoalCompletionPercentage"] ?? 0)
+                .toDouble(),
+        delayedGoalPercent: (summaryReportData["delayedGoalPercentage"] ?? 0)
+            .toDouble(),
+        reportData: tableReportData,
+        // topPerformer: summaryReportData["topPerformer"],
+        // lowPerformer: summaryReportData["lowPerformer"],
+        topPerformer:
+            (summaryReportData["topPerformer"] as List?)?.isNotEmpty == true
+            ? Map<String, dynamic>.from(summaryReportData["topPerformer"][0])
+            : null,
+
+        lowPerformer:
+            (summaryReportData["lowPerformer"] as List?)?.isNotEmpty == true
+            ? Map<String, dynamic>.from(summaryReportData["lowPerformer"][0])
+            : null,
+      );
+
+      await pdfGenerator.generateAndDownloadPDF();
     } catch (e) {
-      print("Error fetching department reports: $e");
+      print(e);
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isDownloadingPdf = false;
+        });
+      }
     }
-
-    final pdfGenerator = EmployeeReportPdfGenerator(
-      department: widget.department,
-      reportYear: selectedYear.year,
-      summaryData: summaryReportData,
-      monthlyData: data?["monthlyData"] ?? [],
-      warnings: [],
-      completionPercentage: (summaryReportData["goalCompletionPercentage"] ?? 0)
-          .toDouble(),
-      onTimePercentage:
-          (summaryReportData["onTimeGoalCompletionPercentage"] ?? 0).toDouble(),
-      delayedGoalPercent: (summaryReportData["delayedGoalPercentage"] ?? 0)
-          .toDouble(),
-      reportData: tableReportData,
-      topPerformer: summaryReportData["topPerformer"],
-      lowPerformer: summaryReportData["lowPerformer"],
-    );
-
-    await pdfGenerator.generateAndDownloadPDF();
   }
 
   @override
@@ -111,8 +130,17 @@ class _DepartmentReportsTabState extends State<DepartmentReportsTab> {
         title: Text(widget.department),
         actions: [
           IconButton(
-            onPressed: generateAndDownloadPDF,
-            icon: Icon(Icons.download),
+            onPressed: _isDownloadingPdf ? null : generateAndDownloadPDF,
+            icon: _isDownloadingPdf
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : const Icon(Icons.download),
           ),
           IconButton(
             onPressed: () {

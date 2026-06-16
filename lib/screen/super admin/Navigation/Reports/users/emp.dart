@@ -34,7 +34,7 @@ class _EmployeeReportPageState extends State<EmployeeReportPage> {
   double completionPercentage = 0;
   double onTimePercentage = 0;
   double delayedGoalPercent = 0;
-
+  bool _isDownloadingPdf = false;
   @override
   void initState() {
     super.initState();
@@ -100,29 +100,39 @@ class _EmployeeReportPageState extends State<EmployeeReportPage> {
   }
 
   Future<void> generateAndDownloadPDF() async {
+    setState(() {
+      _isDownloadingPdf = true;
+    });
     Map<String, dynamic> reportData = {};
     try {
       reportData = await ReportsService.getFullReport(userId: widget.userid);
+
+      final pdfGenerator = EmployeeReportPdfGenerator(
+        userId: widget.userid,
+        username: widget.username,
+        reportYear: selectedYear.year,
+        summaryData: data!,
+        monthlyData: monthlyData,
+        warnings: apiWarnings,
+        completionPercentage: completionPercentage,
+        onTimePercentage: onTimePercentage,
+        delayedGoalPercent: delayedGoalPercent,
+        reportData: reportData,
+      );
+      await pdfGenerator.generateAndDownloadPDF();
     } catch (e) {
-      print("Error fetching full report: $e");
+      print(e);
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isDownloadingPdf = false;
+        });
+      }
     }
-    final pdfGenerator = EmployeeReportPdfGenerator(
-      userId: widget.userid,
-      username: widget.username,
-      reportYear: selectedYear.year,
-      summaryData: data!,
-      monthlyData: monthlyData,
-      warnings: apiWarnings,
-      completionPercentage: completionPercentage,
-      onTimePercentage: onTimePercentage,
-      delayedGoalPercent: delayedGoalPercent,
-      reportData: reportData,
-    );
-    await pdfGenerator.generateAndDownloadPDF();
   }
 
   @override
-  Widget build(BuildContext context) { 
+  Widget build(BuildContext context) {
     final List list = data?["leavePermissionMonthly"] ?? [];
     const months = [
       "Jan",
@@ -162,8 +172,17 @@ class _EmployeeReportPageState extends State<EmployeeReportPage> {
         ),
         actions: [
           IconButton(
-            onPressed: generateAndDownloadPDF,
-            icon: Icon(Icons.download),
+            onPressed: _isDownloadingPdf ? null : generateAndDownloadPDF,
+            icon: _isDownloadingPdf
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : const Icon(Icons.download),
           ),
           IconButton(
             onPressed: () {
@@ -343,7 +362,7 @@ class _EmployeeReportPageState extends State<EmployeeReportPage> {
                         .toDouble(),
                   ),
             const SizedBox(height: 20),
-           LeavePermissionChart(attendance: attendanceMap),
+            LeavePermissionChart(attendance: attendanceMap),
             const SizedBox(height: 20),
             MonthlyTrendChart(
               monthlyData: (data?["monthlyTrend"] as List? ?? [])

@@ -607,6 +607,8 @@ class CapsuleBarChart extends StatelessWidget {
     String monthName = getMonthName(item["month"] ?? 1);
     final leaveAdj = item["leaveadjust"] ?? 0;
     final permissionAdj = item["permisadjust"] ?? 0;
+    final overtime = item["overtimeadjust"] ?? 0;
+    final taskpenalty = item["taskpenaltypoints"] ?? 0;
     String formatValue(dynamic value) {
       if (value == null) return "0";
       if (value > 0) return "+$value";
@@ -696,6 +698,24 @@ class CapsuleBarChart extends StatelessWidget {
                             : Theme.of(context).colorScheme.secondary,
                       ),
                     ),
+                    const SizedBox(height: 6),
+                    if (overtime != 0)
+                      Text(
+                        "Overtime Points  ${formatValue(overtime)}",
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Theme.of(context).colorScheme.secondary,
+                        ),
+                      ),
+                    const SizedBox(height: 6),
+                    if (taskpenalty != 0)
+                      Text(
+                        "Task Penalty Points  ${formatValue(taskpenalty)}",
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Theme.of(context).colorScheme.error,
+                        ),
+                      ),
                   ],
                 ),
               ),

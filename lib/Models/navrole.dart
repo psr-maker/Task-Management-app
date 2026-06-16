@@ -12,7 +12,7 @@ final Map<UserRole, List<NavItem>> roleNavItems = {
   UserRole.superAdmin: [
     NavItem(Icons.dashboard, "Dashboard"),
     NavItem(Icons.group, "Users"),
-    NavItem(Icons.checklist, "Tasks"),
+    NavItem(Icons.checklist, "Goals"),
     NavItem(Icons.assignment, "Reports"),
   ],
 

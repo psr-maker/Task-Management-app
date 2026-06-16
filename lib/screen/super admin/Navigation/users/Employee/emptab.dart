@@ -81,7 +81,7 @@ class _EmployeetabState extends State<Employeetab> {
                       ? TextField(
                           controller: searchController,
                           autofocus: true,
-
+                          style: Theme.of(context).textTheme.titleMedium,
                           decoration: InputDecoration(
                             hintText: "Search Staff",
                             hintStyle: Theme.of(context).textTheme.bodyMedium,

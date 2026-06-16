@@ -1,5 +1,4 @@
 import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:geocoding/geocoding.dart';
@@ -118,19 +117,13 @@ class _AddWorklogPageState extends State<AddWorklogPage> {
           permission == LocationPermission.deniedForever) {
         throw Exception("Location permission required");
       }
-
-      // 🔥 STEP 2: CHECK SERVICE (GPS)
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
         throw Exception("Please enable location services");
       }
-
-      // 🔥 STEP 3: GET LOCATION
       Position position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
       );
-
-      // 🔥 NEW: Get location name
       List<Placemark> placemarks = await placemarkFromCoordinates(
         position.latitude,
         position.longitude,
@@ -139,18 +132,21 @@ class _AddWorklogPageState extends State<AddWorklogPage> {
       Placemark place = placemarks.first;
 
       String fullAddress = [
-        place.name, 
-        place.street, 
-        place.subLocality, 
-        place.locality, 
+        place.name,
+        place.street,
+        place.subLocality,
+        place.locality,
         place.subAdministrativeArea,
         place.administrativeArea,
         place.postalCode,
         place.country,
       ].where((e) => e != null && e.isNotEmpty).join(', ');
-      String locationName = fullAddress.isNotEmpty
-          ? fullAddress
-          : "Unknown Location";
+      String currentDateTime = DateFormat(
+        'dd MMM yyyy - hh:mm a',
+      ).format(DateTime.now());
+
+      String locationName =
+          "${fullAddress.isNotEmpty ? fullAddress : "Unknown Location"} | $currentDateTime";
       await AnnouncementService.addWorkLog(
         title: titleController.text.trim(),
         description: descriptionController.text.trim(),

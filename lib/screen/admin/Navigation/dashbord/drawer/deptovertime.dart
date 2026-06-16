@@ -3,7 +3,6 @@ import 'package:intl/intl.dart';
 import 'package:staff_work_track/core/widgets/buttons.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
 import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
-import 'package:staff_work_track/screen/staff/navigation/dashboard/drawer/overtime/overtime_entry.dart';
 import 'package:staff_work_track/services/admin_service.dart';
 
 class DeptOvertimeList extends StatefulWidget {
@@ -24,7 +23,7 @@ class _DeptOvertimeListState extends State<DeptOvertimeList> {
   bool _isLoading = false;
   DateTime? fromDate;
   DateTime? toDate;
-  double regularHoursPerDay = 8.5;
+  double regularHoursPerDay = 8;
   String statusFilter = "All";
 
   double get totalOvertimeHours {
@@ -186,20 +185,6 @@ class _DeptOvertimeListState extends State<DeptOvertimeList> {
                 child: Text("Not Approved"),
               ),
             ],
-          ),
-
-          IconButton(
-            icon: const Icon(Icons.add),
-            onPressed: () async {
-              final result = await Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const ApplyOvertime()),
-              );
-
-              if (result == true) {
-                loadData();
-              }
-            },
           ),
         ],
       ),

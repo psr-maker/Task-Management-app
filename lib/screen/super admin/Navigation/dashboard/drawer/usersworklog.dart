@@ -106,51 +106,6 @@ class _UsersWorklogState extends State<UsersWorklog> {
     });
   }
 
-  void _showDepartmentFilter() {
-    showModalBottomSheet(
-      context: context,
-      builder: (context) {
-        return SizedBox(
-          height: 300,
-          child: ListView(
-            children: [
-              ListTile(
-                title: Center(
-                  child: Text(
-                    "All Departments",
-                    style: Theme.of(context).textTheme.displaySmall,
-                  ),
-                ),
-                onTap: () {
-                  setState(() {
-                    selectedDepartment = null;
-                    applyFilter();
-                  });
-                  Navigator.pop(context);
-                },
-              ),
-              ...departments.map(
-                (d) => ListTile(
-                  title: Text(
-                    d,
-                    style: Theme.of(context).textTheme.headlineMedium,
-                  ),
-                  onTap: () {
-                    setState(() {
-                      selectedDepartment = d;
-                      applyFilter();
-                    });
-                    Navigator.pop(context);
-                  },
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
   void _showDateMonthPicker() {
     int tempYear = selectedDate?.year ?? DateTime.now().year;
     int tempMonth = selectedDate?.month ?? DateTime.now().month;
@@ -158,101 +113,134 @@ class _UsersWorklogState extends State<UsersWorklog> {
 
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       builder: (context) {
-        return Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                "Select Date or Month",
-                style: Theme.of(context).textTheme.displaySmall,
-              ),
-              const SizedBox(height: 16),
-              // Year picker
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            // Ensure day doesn't exceed month's max days
+            final maxDays = DateTime(tempYear, tempMonth + 1, 0).day;
+
+            if (tempDay > maxDays) {
+              tempDay = maxDays;
+            }
+
+            return Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    "Year",
-                    style: Theme.of(context).textTheme.headlineLarge,
+                    "Select Date",
+                    style: Theme.of(context).textTheme.displaySmall,
                   ),
-                  DropdownButton<int>(
-                    value: tempYear,
-                    style: Theme.of(context).textTheme.headlineSmall,
-                    items: List.generate(10, (i) => DateTime.now().year - i)
-                        .map(
-                          (y) => DropdownMenuItem(value: y, child: Text("$y")),
-                        )
-                        .toList(),
-                    onChanged: (v) => tempYear = v!,
-                  ),
-                ],
-              ),
-              // Month picker
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    "Month",
-                    style: Theme.of(context).textTheme.headlineLarge,
-                  ),
-                  DropdownButton<int>(
-                    value: tempMonth,
-                    style: Theme.of(context).textTheme.headlineSmall,
-                    items: List.generate(12, (i) {
-                      return DropdownMenuItem(
-                        value: i + 1,
-                        child: Text(
-                          DateFormat('MMMM').format(DateTime(0, i + 1)),
-                        ),
-                      );
-                    }),
-                    onChanged: (v) => tempMonth = v!,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              // Day picker (optional)
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text("Day", style: Theme.of(context).textTheme.headlineLarge),
-                  DropdownButton<int>(
-                    value: tempDay,
-                    style: Theme.of(context).textTheme.headlineSmall,
-                    items:
-                        List.generate(
-                              DateTime(tempYear, tempMonth + 1, 0).day,
-                              (i) => i + 1,
-                            )
-                            .map(
-                              (d) =>
-                                  DropdownMenuItem(value: d, child: Text("$d")),
-                            )
+
+                  const SizedBox(height: 20),
+
+                  // YEAR
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        "Year",
+                        style: Theme.of(context).textTheme.headlineLarge,
+                      ),
+                      DropdownButton<int>(
+                        value: tempYear,
+                        style: Theme.of(context).textTheme.headlineSmall,
+                        items: List.generate(10, (i) => DateTime.now().year - i)
+                            .map((year) {
+                              return DropdownMenuItem(
+                                value: year,
+                                child: Text("$year"),
+                              );
+                            })
                             .toList(),
-                    onChanged: (v) => tempDay = v!,
+                        onChanged: (value) {
+                          setModalState(() {
+                            tempYear = value!;
+                          });
+                        },
+                      ),
+                    ],
                   ),
+
+                  // MONTH
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        "Month",
+                        style: Theme.of(context).textTheme.headlineLarge,
+                      ),
+                      DropdownButton<int>(
+                        value: tempMonth,
+                        style: Theme.of(context).textTheme.headlineSmall,
+                        items: List.generate(12, (i) {
+                          return DropdownMenuItem(
+                            value: i + 1,
+                            child: Text(
+                              DateFormat('MMMM').format(DateTime(2025, i + 1)),
+                            ),
+                          );
+                        }),
+                        onChanged: (value) {
+                          setModalState(() {
+                            tempMonth = value!;
+                          });
+                        },
+                      ),
+                    ],
+                  ),
+
+                  // DAY
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        "Day",
+                        style: Theme.of(context).textTheme.headlineLarge,
+                      ),
+                      DropdownButton<int>(
+                        value: tempDay,
+                        style: Theme.of(context).textTheme.headlineSmall,
+                        items: List.generate(maxDays, (i) => i + 1).map((day) {
+                          return DropdownMenuItem(
+                            value: day,
+                            child: Text("$day"),
+                          );
+                        }).toList(),
+                        onChanged: (value) {
+                          setModalState(() {
+                            tempDay = value!;
+                          });
+                        },
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  AppButton(
+                    text: "Apply",
+                    isLoading: false,
+                    onPressed: () {
+                      setState(() {
+                        selectedDate = DateTime(tempYear, tempMonth, tempDay);
+
+                        applyFilter();
+                      });
+
+                      Navigator.pop(context);
+                    },
+                    color: Theme.of(context).colorScheme.secondary,
+                    txtcolor: Theme.of(context).colorScheme.onPrimary,
+                  ),
+
+                  const SizedBox(height: 10),
                 ],
               ),
-              const SizedBox(height: 16),
-              Center(
-                child: AppButton(
-                  text: "Apply",
-                  isLoading: isLoading,
-                  onPressed: () {
-                    setState(() {
-                      selectedDate = DateTime(tempYear, tempMonth, tempDay);
-                      applyFilter();
-                    });
-                    Navigator.pop(context);
-                  },
-                  color: Theme.of(context).colorScheme.secondary,
-                  txtcolor: Theme.of(context).colorScheme.onPrimary,
-                ),
-              ),
-            ],
-          ),
+            );
+          },
         );
       },
     );
@@ -316,11 +304,50 @@ class _UsersWorklogState extends State<UsersWorklog> {
             },
           ),
 
-          IconButton(
-            onPressed: _showDepartmentFilter,
+          PopupMenuButton<String?>(
             icon: const Icon(Icons.filter_alt),
-          ),
+            onSelected: (value) {
+              setState(() {
+                selectedDepartment = value;
+                applyFilter();
+              });
+            },
+            itemBuilder: (context) => [
+              PopupMenuItem<String?>(
+                value: null,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        "All Departments",
+                        style: Theme.of(context).textTheme.headlineMedium,
+                      ),
+                    ),
+                    if (selectedDepartment == null)
+                      const Icon(Icons.check, color: Colors.green),
+                  ],
+                ),
+              ),
 
+              ...departments.map(
+                (d) => PopupMenuItem<String?>(
+                  value: d,
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          d,
+                          style: Theme.of(context).textTheme.headlineMedium,
+                        ),
+                      ),
+                      if (selectedDepartment == d)
+                        const Icon(Icons.check, color: Colors.green),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
           IconButton(
             onPressed: _showDateMonthPicker,
             icon: const Icon(Icons.calendar_today),

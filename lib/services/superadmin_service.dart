@@ -272,6 +272,56 @@ class SuperAdminService {
     }
   }
 
+  static Future<List<dynamic>> getTaskMemberRemovals() async {
+    try {
+      final token = await AuthService.getToken();
+
+      final response = await http.get(
+        Uri.parse("$baseUrl/Director/task-member-removals"),
+        headers: {"Authorization": "Bearer $token"},
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      }
+
+      return [];
+    } catch (e) {
+      debugPrint("Error: $e");
+      return [];
+    }
+  }
+
+  static Future<bool> processRemovalRequest({
+    required String taskCode,
+    required int userId,
+    required bool applyPenalty,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse(
+          "$baseUrl/Director/penalty-points"
+          "?taskCode=$taskCode"
+          "&userId=$userId"
+          "&applyPenalty=$applyPenalty",
+        ),
+        headers: {"Content-Type": "application/json"},
+      );
+
+      if (response.statusCode == 200) {
+        return true;
+      }
+
+      debugPrint(
+        "Process removal failed: ${response.statusCode} ${response.body}",
+      );
+      return false;
+    } catch (e) {
+      debugPrint("Process removal error: $e");
+      return false;
+    }
+  }
+
   static Future<bool> deleteTask(String taskCode) async {
     try {
       final response = await http.delete(

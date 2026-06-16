@@ -619,4 +619,21 @@ class AdminService {
 
     throw Exception(response.body);
   }
+
+  static Future<List<dynamic>> getApprovedOvertimes() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/Manager/getovertimes'),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        throw Exception('Failed to load overtimes: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Error fetching overtimes: $e');
+    }
+  }
 }

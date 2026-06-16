@@ -8,10 +8,13 @@ class AuditCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark
+            ? Theme.of(context).colorScheme.background
+            : Theme.of(context).colorScheme.onPrimary,
         borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(

@@ -582,6 +582,7 @@ class EmployeeReportPdfGenerator {
                   5: const pw.FlexColumnWidth(1),
                   6: const pw.FlexColumnWidth(1),
                   7: const pw.FlexColumnWidth(1),
+                  8: const pw.FlexColumnWidth(1),
                 },
                 children: [
                   /// HEADER
@@ -594,6 +595,7 @@ class EmployeeReportPdfGenerator {
                       _buildCell("To Time", boldFont),
                       _buildCell("Total Hours", boldFont),
                       _buildCell("Submitted Date", boldFont),
+                      _buildCell("Status", boldFont),
                     ],
                   ),
 
@@ -627,6 +629,10 @@ class EmployeeReportPdfGenerator {
                           AppHelpers.formatDate(
                             permission["submdate"]?.toString() ?? "-",
                           ),
+                          null,
+                        ),
+                        _buildCell(
+                          (permission["status"] ?? "-").toString(),
                           null,
                         ),
                       ],

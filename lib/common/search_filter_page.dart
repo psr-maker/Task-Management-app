@@ -65,7 +65,7 @@ class TaskFilterDropdown extends StatelessWidget {
       items: departments,
       onChanged: (v) => filter.department = v,
       itemBuilder: (e) =>
-          Text(e, style: Theme.of(context).textTheme.headlineSmall),
+          Text(e, style: Theme.of(context).textTheme.titleSmall),
       context: context,
     );
   }
@@ -200,7 +200,7 @@ class TaskFilterDropdown extends StatelessWidget {
             value: null,
             child: Text(
               "All",
-              style: Theme.of(context).textTheme.headlineSmall,
+             style: Theme.of(context).textTheme.titleSmall
             ),
           ),
 

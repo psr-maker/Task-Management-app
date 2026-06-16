@@ -54,13 +54,14 @@ class _AdmindetailsState extends State<Admindetails> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    
+
     // Listen for refresh signals and reload data
     final refreshNotifier = context.watch<DataRefreshNotifier>();
-    
+
     // Reload if user refresh signal changed
-    if (refreshNotifier.lastUserRefresh != null && 
-        (_lastRefreshTime == null || refreshNotifier.lastUserRefresh!.isAfter(_lastRefreshTime!))) {
+    if (refreshNotifier.lastUserRefresh != null &&
+        (_lastRefreshTime == null ||
+            refreshNotifier.lastUserRefresh!.isAfter(_lastRefreshTime!))) {
       _lastRefreshTime = refreshNotifier.lastUserRefresh;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
@@ -157,7 +158,7 @@ class _AdmindetailsState extends State<Admindetails> {
       createdById = user.createdBy.trim();
     }
 
-    final isSuperAdmin = loginUserRole == "Director";
+    final isSuperAdmin = loginUserRole == "director";
 
     final canEdit = isSuperAdmin || (loginUserId == createdById);
 
@@ -207,6 +208,36 @@ class _AdmindetailsState extends State<Admindetails> {
     }
   }
 
+  Future<void> _refreshPage() async {
+    await _loadGoalCounts();
+    await _loadAdminDetails();
+  }
+
+  Future<void> _loadAdminDetails() async {
+    final details = await SuperAdminService.getAdminDetails(widget.adminId);
+
+    _admin = details;
+
+    await _checkEditPermission(
+      UserModel(
+        userId: details.userId,
+        name: details.name,
+        email: details.email,
+        department: details.department,
+        role: details.role,
+        status: details.status,
+        createdBy: details.createdBy,
+        wasEdited: details.wasEdited,
+      ),
+    );
+
+    if (mounted) {
+      setState(() {
+        adminFuture = Future.value(details);
+      });
+    }
+  }
+
   @override
   void dispose() {
     searchController.dispose();
@@ -225,7 +256,7 @@ class _AdmindetailsState extends State<Admindetails> {
             ? TextField(
                 controller: searchController,
                 autofocus: true,
-                style: Theme.of(context).textTheme.bodyLarge,
+                style: Theme.of(context).textTheme.titleMedium,
                 decoration: InputDecoration(
                   hintText: "Search...",
                   hintStyle: Theme.of(context).textTheme.titleMedium,
@@ -274,13 +305,10 @@ class _AdmindetailsState extends State<Admindetails> {
                         ),
                       );
 
-                      if (result == true) {
-                        setState(() {
-                          adminFuture = SuperAdminService.getAdminDetails(
-                            widget.adminId,
-                          );
-                          _admin = null;
-                        });
+                      if (result != null) {
+                        await _loadGoalCounts();
+
+                        await _loadAdminDetails();
                       }
                     }
 
@@ -330,13 +358,8 @@ class _AdmindetailsState extends State<Admindetails> {
                         ),
                       );
 
-                      if (result == true) {
-                        setState(() {
-                          adminFuture = SuperAdminService.getAdminDetails(
-                            widget.adminId,
-                          );
-                          _admin = null;
-                        });
+                      if (result != null) {
+                        await _loadAdminDetails();
                       }
                     }
                   }
@@ -384,94 +407,96 @@ class _AdmindetailsState extends State<Admindetails> {
           }
 
           final admin = snapshot.data!;
-          _admin ??= admin;
-          // Always use the fresh data from snapshot
-          isActive = admin.status.toLowerCase() == "active";
 
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(15),
-            child: Stack(
-              children: [
-                Column(
-                  children: [
-                    _detailCard(admin),
-                    SizedBox(height: 5),
+          if (_admin == null) {
+            _admin = admin;
+            isActive = admin.status.toLowerCase() == "active";
+          }
 
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        GestureDetector(
-                          onTap: () async {
-                            final result = await Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) =>
-                                    Createtask(assignedToIds: [admin.userId]),
+          return RefreshIndicator(
+            onRefresh: _refreshPage,
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(15),
+              child: Stack(
+                children: [
+                  Column(
+                    children: [
+                      _detailCard(admin),
+                      SizedBox(height: 5),
+
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          GestureDetector(
+                            onTap: () async {
+                              final result = await Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      Createtask(assignedToIds: [admin.userId]),
+                                ),
+                              );
+                              if (result == true) {
+                                await _loadGoalCounts();
+                                await _loadAdminDetails();
+                              }
+                            },
+                            child: Chip(
+                              backgroundColor: Theme.of(context).primaryColor,
+                              label: Text(
+                                "Add Goal/Task",
+                                style: Theme.of(context).textTheme.titleMedium,
                               ),
-                            );
-                            if (result == true) {
-                              setState(() {
-                                adminFuture = SuperAdminService.getAdminDetails(
-                                  widget.adminId,
-                                );
-                              });
-                            }
-                          },
-                          child: Chip(
-                            backgroundColor: Theme.of(context).primaryColor,
-                            label: Text(
-                              "Add Goal/Task",
-                              style: Theme.of(context).textTheme.titleMedium,
                             ),
                           ),
+                        ],
+                      ),
+                      SizedBox(height: 5),
+                      _statsRow(admin),
+                    ],
+                  ),
+                  if (showFilter && (showAdminTasks || showAssignedTasks))
+                    Positioned(
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      child: Material(
+                        elevation: 8,
+                        borderRadius: const BorderRadius.vertical(
+                          bottom: Radius.circular(20),
                         ),
-                      ],
-                    ),
-                    SizedBox(height: 5),
-                    _statsRow(admin),
-                  ],
-                ),
-                if (showFilter && (showAdminTasks || showAssignedTasks))
-                  Positioned(
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    child: Material(
-                      elevation: 8,
-                      borderRadius: const BorderRadius.vertical(
-                        bottom: Radius.circular(20),
-                      ),
-                      child: TaskFilterDropdown(
-                        filter: taskFilter,
-                        departments: departmentsList,
-                        //  users: usersList,
-                        onClear: () {
-                          setState(() {
-                            taskFilter.clear();
-                            showFilter = false;
-                          });
-                        },
-                        onApply: () {
-                          setState(() {
-                            showFilter = false;
-                          });
-                        },
+                        child: TaskFilterDropdown(
+                          filter: taskFilter,
+                          departments: departmentsList,
+                          //  users: usersList,
+                          onClear: () {
+                            setState(() {
+                              taskFilter.clear();
+                              showFilter = false;
+                            });
+                          },
+                          onApply: () {
+                            setState(() {
+                              showFilter = false;
+                            });
+                          },
+                        ),
                       ),
                     ),
-                  ),
-                if (_topMessage != null)
-                  AnimatedPositioned(
-                    top: _showTopMessage ? 0 : -120,
-                    left: 16,
-                    right: 16,
-                    duration: const Duration(milliseconds: 300),
-                    child: Msgsnackbar(
-                      context,
-                      message: _topMessage!,
-                      isError: _isErrorMessage,
+                  if (_topMessage != null)
+                    AnimatedPositioned(
+                      top: _showTopMessage ? 0 : -120,
+                      left: 16,
+                      right: 16,
+                      duration: const Duration(milliseconds: 300),
+                      child: Msgsnackbar(
+                        context,
+                        message: _topMessage!,
+                        isError: _isErrorMessage,
+                      ),
                     ),
-                  ),
-              ],
+                ],
+              ),
             ),
           );
         },
@@ -556,7 +581,7 @@ class _AdmindetailsState extends State<Admindetails> {
                             admin.userId,
                             value ? "Active" : "Deactive",
                           );
-                          
+
                           // Notify other screens to refresh
                           if (mounted) {
                             context.read<DataRefreshNotifier>().refreshUsers();

@@ -493,6 +493,7 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
         DataColumn(label: Text("To Time")),
         DataColumn(label: Text("Total Hours")),
         DataColumn(label: Text("Submitted Date")),
+        DataColumn(label: Text("Status")),
       ],
       rows: filteredPermissions.map((item) {
         return DataRow(
@@ -531,6 +532,20 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
               Text(
                 AppHelpers.formatDate(item["submdate"] ?? "-"),
                 style: Theme.of(context).textTheme.labelMedium,
+              ),
+            ),
+            DataCell(
+              Text(
+                item["status"] ?? "",
+                style: TextStyle(
+                  color: item["status"] == "Approved"
+                      ? Colors.green
+                      : item["status"] == "Rejected"
+                      ? Colors.red
+                      : Colors.orange,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
           ],
