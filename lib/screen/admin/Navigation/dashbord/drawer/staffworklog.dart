@@ -205,7 +205,21 @@ class _UsersWorklogState extends State<Staffworklog> {
 
   Widget buildTimelineItem(BuildContext context, dynamic log) {
     final accentColor = Theme.of(context).colorScheme.secondary;
+    final String workType = (log["workType"] ?? "").toString().toUpperCase();
 
+    String displayTime = "--:--";
+
+    if (log["time"] != null) {
+      try {
+        final DateTime time = DateTime.parse(log["time"].toString());
+
+        displayTime = DateFormat("hh:mm a").format(time);
+      } catch (e) {
+        displayTime = log["time"].toString();
+      }
+    }
+
+    final bool isIn = workType == "IN";
     return StatefulBuilder(
       builder: (context, setLocalState) {
         bool isExpanded = false;
@@ -248,38 +262,59 @@ class _UsersWorklogState extends State<Staffworklog> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text(
-                              log["userName"] ?? "",
-                              style: Theme.of(context).textTheme.displaySmall,
+                            // IN / OUT
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 9,
+                                vertical: 5,
+                              ),
+
+                              decoration: BoxDecoration(
+                                color: isIn
+                                    ? Colors.green.withOpacity(0.12)
+                                    : Colors.orange.withOpacity(0.12),
+
+                                borderRadius: BorderRadius.circular(7),
+                              ),
+
+                              child: Text(
+                                workType.isEmpty ? "-" : workType,
+
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                  color: isIn
+                                      ? Colors.green.shade700
+                                      : Colors.orange.shade700,
+                                ),
+                              ),
                             ),
-                            Row(
-                              children: [
-                                Text(
-                                  formatHours(
-                                    (log["totalHours"] ?? 0).toDouble(),
-                                  ),
-                                  style: Theme.of(
-                                    context,
-                                  ).textTheme.labelMedium,
-                                ),
-                                IconButton(
-                                  icon: Icon(
-                                    isExpanded
-                                        ? Icons.keyboard_arrow_up
-                                        : Icons.keyboard_arrow_down,
-                                  ),
-                                  onPressed: () {
-                                    setStateItem(() {
-                                      isExpanded = !isExpanded;
-                                    });
-                                  },
-                                ),
-                              ],
+
+                            const Spacer(),
+
+                            // TIME
+                            Text(
+                              displayTime,
+                              style: Theme.of(context).textTheme.labelMedium
+                                  ?.copyWith(fontWeight: FontWeight.bold),
+                            ),
+
+                            IconButton(
+                              icon: Icon(
+                                isExpanded
+                                    ? Icons.keyboard_arrow_up
+                                    : Icons.keyboard_arrow_down,
+                              ),
+                              onPressed: () {
+                                setStateItem(() {
+                                  isExpanded = !isExpanded;
+                                });
+                              },
                             ),
                           ],
                         ),
+                        const SizedBox(height: 5),
                         Text(
                           log["title"] ?? "",
                           style: Theme.of(context).textTheme.labelMedium,
@@ -297,16 +332,7 @@ class _UsersWorklogState extends State<Staffworklog> {
                         if (isExpanded) ...[
                           Divider(color: accentColor),
                           const SizedBox(height: 5),
-                          Text(
-                            "Start Time: ${formatTime(log["startTime"])}",
-                            style: Theme.of(context).textTheme.labelMedium,
-                          ),
-                          const SizedBox(height: 5),
-                          Text(
-                            "End Time: ${formatTime(log["endTime"])}",
-                            style: Theme.of(context).textTheme.labelMedium,
-                          ),
-                          const SizedBox(height: 5),
+
                           Text(
                             "Description: ${log["description"] ?? ""}",
                             style: Theme.of(context).textTheme.labelMedium,
@@ -329,15 +355,7 @@ class _UsersWorklogState extends State<Staffworklog> {
                                     ),
                                   );
                                 },
-                                // child: ClipRRect(
-                                //   borderRadius: BorderRadius.circular(10),
-                                //   child: Image.network(
-                                //     "${ApiConstants.Uploaded}${log["imageUrl"].toString()}",
-                                //     height: 150,
-                                //     width: double.infinity,
-                                //     fit: BoxFit.cover,
-                                //   ),
-                                // ),
+
                                 child: ClipRRect(
                                   borderRadius: BorderRadius.circular(10),
                                   child: SizedBox(

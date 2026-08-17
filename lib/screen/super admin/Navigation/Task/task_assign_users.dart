@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:jwt_decoder/jwt_decoder.dart';
 import 'package:staff_work_track/Models/getusers.dart';
+import 'package:staff_work_track/Models/rolesmodel.dart';
 import 'package:staff_work_track/core/widgets/buttons.dart';
 import 'package:staff_work_track/services/auth_service.dart';
+import 'package:staff_work_track/services/superadmin_service.dart';
 
 class AssignUsersPage extends StatefulWidget {
   final List<UserModel> users;
@@ -20,7 +22,9 @@ class AssignUsersPage extends StatefulWidget {
 
 class _AssignUsersPageState extends State<AssignUsersPage> {
   late List<UserModel> selected;
+  List<UserModel> allowedUsers = [];
   List<UserModel> filteredUsers = [];
+  List<Role> roles = [];
 
   bool isSearching = false;
   bool isLoading = false;
@@ -28,6 +32,7 @@ class _AssignUsersPageState extends State<AssignUsersPage> {
 
   String? loginRole;
   String? loginDepartment;
+  int? loginRolePosition;
 
   TextEditingController searchController = TextEditingController();
 
@@ -51,6 +56,10 @@ class _AssignUsersPageState extends State<AssignUsersPage> {
 
       loginRole = decoded['Role'];
 
+      // Load roles metadata for position-based filtering
+      roles = await SuperAdminService.getRoles();
+      loginRolePosition = _getRolePosition(loginRole);
+
       // ✅ Find current user in the provided users list to get their department
       UserModel? currentUser;
       for (var user in widget.users) {
@@ -62,7 +71,9 @@ class _AssignUsersPageState extends State<AssignUsersPage> {
 
       if (currentUser != null) {
         loginDepartment = currentUser.department;
-        debugPrint("✅ Got manager department from users list: $loginDepartment");
+        debugPrint(
+          "✅ Got manager department from users list: $loginDepartment",
+        );
       } else {
         debugPrint("⚠️ Current user not found in users list. userId: $userId");
       }
@@ -84,55 +95,89 @@ class _AssignUsersPageState extends State<AssignUsersPage> {
       return;
     }
 
-    List<UserModel> users = widget.users;
+    final List<UserModel> users = [];
+    final loginPosition = loginRolePosition;
 
-    if (loginRole == "Director") {
-      users = users.where((u) => u.role != "Director").toList();
-    } else if (loginRole == "Manager") {
-      // Filter users by: same department AND not director
-      if (loginDepartment != null && loginDepartment!.isNotEmpty) {
-        users = users
-            .where((u) =>
-                u.department.toLowerCase().trim() ==
-                    loginDepartment!.toLowerCase().trim() &&
-                u.role != "Director")
-            .toList();
+    for (final user in widget.users) {
+      if (loginRole != null && user.role == loginRole) continue;
+
+      final roleMeta = _roleForUser(user);
+      if (roleMeta == null) continue;
+
+      if (loginPosition != null) {
+        if (roleMeta.position > loginPosition) {
+          users.add(user);
+        }
       } else {
-        // If department is not available, show no users
-        users = [];
-        debugPrint(
-            "⚠️ Manager department not found. loginDepartment: $loginDepartment");
+        // fallback to old logic when position metadata is unavailable
+        if (loginRole == "1") {
+          if (user.role != "1") users.add(user);
+        } else if (loginRole == "2") {
+          if (loginDepartment != null && loginDepartment!.isNotEmpty) {
+            if (user.department.toLowerCase().trim() ==
+                    loginDepartment!.toLowerCase().trim() &&
+                user.role != "1") {
+              users.add(user);
+            }
+          }
+        }
       }
     }
 
     setState(() {
+      allowedUsers = users;
       filteredUsers = users;
     });
+  }
+
+  int? _getRolePosition(String? roleValue) {
+    if (roleValue == null || roleValue.isEmpty) return null;
+
+    final roleId = int.tryParse(roleValue);
+    if (roleId != null) {
+      for (final role in roles) {
+        if (role.id == roleId) return role.position;
+      }
+    }
+
+    for (final role in roles) {
+      if (role.name.toLowerCase() == roleValue.toLowerCase()) {
+        return role.position;
+      }
+    }
+
+    return null;
+  }
+
+  Role? _roleForUser(UserModel user) {
+    if (user.role.isEmpty) return null;
+
+    final roleId = int.tryParse(user.role);
+    if (roleId != null) {
+      for (final role in roles) {
+        if (role.id == roleId) return role;
+      }
+    }
+
+    for (final role in roles) {
+      if (role.name.toLowerCase() == user.role.toLowerCase()) {
+        return role;
+      }
+    }
+
+    return null;
   }
 
   void applySearch(String query) {
     final text = query.toLowerCase().trim();
 
-    // Start with role-filtered users
-    List<UserModel> baseUsers = [];
-    
-    if (loginRole == "Director") {
-      baseUsers = widget.users.where((u) => u.role != "Director").toList();
-    } else if (loginRole == "Manager" && loginDepartment != null) {
-      baseUsers = widget.users
-          .where((u) =>
-              u.department.toLowerCase().trim() ==
-                  loginDepartment!.toLowerCase().trim() &&
-              u.role != "Director")
-          .toList();
-    }
-
-    // Then search within those users
     setState(() {
-      filteredUsers = baseUsers.where((user) {
+      filteredUsers = allowedUsers.where((user) {
+        final roleMeta = _roleForUser(user);
+        final roleLabel = roleMeta != null ? roleMeta.name : user.role;
         return user.name.toLowerCase().contains(text) ||
             user.department.toLowerCase().contains(text) ||
-            user.role.toLowerCase().contains(text);
+            roleLabel.toLowerCase().contains(text);
       }).toList();
     });
   }
@@ -192,7 +237,11 @@ class _AssignUsersPageState extends State<AssignUsersPage> {
                               final isSelected = selected.any(
                                 (u) => u.userId == user.userId,
                               );
-                    
+                              final roleMeta = _roleForUser(user);
+                              final roleLabel = roleMeta != null
+                                  ? roleMeta.name
+                                  : user.role;
+
                               return GestureDetector(
                                 onTap: () {
                                   setState(() {
@@ -234,7 +283,8 @@ class _AssignUsersPageState extends State<AssignUsersPage> {
                                                 selected.add(user);
                                               } else {
                                                 selected.removeWhere(
-                                                  (u) => u.userId == user.userId,
+                                                  (u) =>
+                                                      u.userId == user.userId,
                                                 );
                                               }
                                             });
@@ -248,7 +298,9 @@ class _AssignUsersPageState extends State<AssignUsersPage> {
                                             99,
                                             49,
                                           ),
-                                          child: Text(user.name[0].toUpperCase()),
+                                          child: Text(
+                                            user.name[0].toUpperCase(),
+                                          ),
                                         ),
                                         const SizedBox(width: 15),
                                         Expanded(
@@ -264,7 +316,7 @@ class _AssignUsersPageState extends State<AssignUsersPage> {
                                               ),
                                               const SizedBox(height: 3),
                                               Text(
-                                                "${user.role} • ${user.department}",
+                                                "$roleLabel - ${user.department}",
                                                 style: Theme.of(
                                                   context,
                                                 ).textTheme.labelMedium,
@@ -292,12 +344,15 @@ class _AssignUsersPageState extends State<AssignUsersPage> {
                 ],
               )
             : Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Center(
                     child: Text(
                       "You can't assign any staff",
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                 ],

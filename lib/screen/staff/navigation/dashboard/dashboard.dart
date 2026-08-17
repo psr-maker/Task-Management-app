@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:staff_work_track/Models/warning_model.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
+import 'package:staff_work_track/screen/staff/navigation/dashboard/drawer/extrawork/workapply.dart';
 import 'package:staff_work_track/screen/staff/navigation/dashboard/drawer/leave/leavelist.dart';
 import 'package:staff_work_track/screen/staff/navigation/dashboard/drawer/overtime/overtimelist.dart';
+import 'package:staff_work_track/screen/staff/navigation/dashboard/drawer/punch/punchcorr_apply.dart';
+import 'package:staff_work_track/screen/staff/navigation/dashboard/drawer/punch/punchlist.dart';
 import 'package:staff_work_track/screen/staff/navigation/dashboard/settings/usersettings.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/Reports/reports_table.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/notifi.dart';
@@ -501,7 +504,19 @@ class _StaffDashboardState extends State<StaffDashboard> {
               );
             },
           ),
-             _buildDrawerItem(
+          _buildDrawerItem(
+            context,
+            icon: Icons.task_alt_rounded,
+            title: "Compensation Leave Request",
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => ExtraWorkApply()),
+              ); 
+            },
+          ),
+          _buildDrawerItem(
             context,
             icon: Icons.timelapse_sharp,
             title: "OverTime",
@@ -511,6 +526,18 @@ class _StaffDashboardState extends State<StaffDashboard> {
                 context,
                 MaterialPageRoute(builder: (_) => OvertimeList()),
               );
+            },
+          ),
+            _buildDrawerItem(
+            context,
+            icon: Icons.task_alt_rounded,
+            title: "Punch Correction",
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => PunchCorrectionList()),
+              ); 
             },
           ),
         ],

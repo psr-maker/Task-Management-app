@@ -53,10 +53,12 @@ class CustomFormWidgets {
     TextEditingController controller, {
     String? hint,
     int maxLines = 5,
+    TextInputType? keyboardType,
   }) {
     return TextField(
       controller: controller,
       maxLines: maxLines,
+      keyboardType: keyboardType ?? TextInputType.text,
       decoration: InputDecoration(
         hintText: hint,
         hintStyle: Theme.of(context).textTheme.headlineSmall,
@@ -127,6 +129,45 @@ class CustomFormWidgets {
           Icons.calendar_today,
           color: enabled ? const Color.fromARGB(255, 25, 77, 38) : Colors.grey,
           size: 15,
+        ),
+        contentPadding: const EdgeInsets.symmetric(
+          vertical: 14,
+          horizontal: 12,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color.fromARGB(255, 25, 77, 38)),
+        ),
+        disabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.grey.shade400),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color.fromARGB(255, 25, 77, 38)),
+        ),
+      ),
+      style: TextStyle(
+        color: enabled ? const Color.fromARGB(255, 25, 77, 38) : Colors.grey,
+      ),
+    );
+  }
+
+  static Widget timeField({
+    required TextEditingController controller,
+    VoidCallback? onTap,
+    bool enabled = true,
+  }) {
+    return TextField(
+      controller: controller,
+      readOnly: true,
+      enabled: enabled,
+      onTap: enabled ? onTap : null,
+      decoration: InputDecoration(
+        suffixIcon: Icon(
+          Icons.access_time,
+          color: enabled ? const Color.fromARGB(255, 25, 77, 38) : Colors.grey,
+          size: 18,
         ),
         contentPadding: const EdgeInsets.symmetric(
           vertical: 14,

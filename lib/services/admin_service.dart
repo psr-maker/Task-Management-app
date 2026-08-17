@@ -222,7 +222,6 @@ class AdminService {
   }
 
   static Future<bool> saveFiveSPoints({
-    required int staffId,
     required String dept,
     required int month,
     required int week,
@@ -233,7 +232,6 @@ class AdminService {
         Uri.parse("$baseUrl/Manager/fiveSpoints"),
         headers: {"Content-Type": "application/json"},
         body: jsonEncode({
-          "staffId": staffId,
           "department": dept,
           "month": month,
           "week": week,
@@ -283,6 +281,8 @@ class AdminService {
     required String leaveType,
     required double totalDays,
     required String contactNumber,
+    required String leavetyp,
+    int? compensationExtraWorkId,
   }) async {
     try {
       final response = await http.post(
@@ -298,6 +298,9 @@ class AdminService {
           "leaveType": leaveType,
           "totalDays": totalDays,
           "contactNumber": contactNumber,
+          "leavetyp": leavetyp,
+          if (compensationExtraWorkId != null)
+            "compensationExtraWorkId": compensationExtraWorkId,
         }),
       );
       if (response.statusCode == 200) {
@@ -634,6 +637,395 @@ class AdminService {
       }
     } catch (e) {
       throw Exception('Error fetching overtimes: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> addExtraWork({
+    required DateTime workedDate,
+    required String workType,
+    required String startTime,
+    required String endTime,
+    required String reason,
+  }) async {
+    final token = await AuthService.getToken();
+
+    if (token == null || token.isEmpty) {
+      throw Exception('Token not found');
+    }
+
+    final url = Uri.parse('$baseUrl/Manager/extra-work');
+
+    final body = {
+      'workedDate': workedDate.toIso8601String(),
+      'workType': workType,
+      'startTime': startTime,
+      'endTime': endTime,
+      'reason': reason,
+    };
+
+    final response = await http.post(
+      url,
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode(body),
+    );
+
+    final responseData = response.body.isNotEmpty
+        ? jsonDecode(response.body)
+        : {};
+
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return responseData;
+    }
+
+    throw Exception(
+      responseData['message'] ??
+          responseData['title'] ??
+          'Failed to submit extra work',
+    );
+  }
+
+  Future<List<dynamic>> getMyExtraWork() async {
+    final token = await AuthService.getToken();
+
+    final url = Uri.parse('$baseUrl/Manager/get-extra-work');
+
+    final response = await http.get(
+      url,
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+    );
+
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      final data = jsonDecode(response.body);
+
+      if (data is List) {
+        return data;
+      }
+
+      return [];
+    }
+
+    final data = _decodeResponse(response);
+
+    throw Exception(
+      data['message'] ?? data['title'] ?? 'Failed to get extra work',
+    );
+  }
+
+  Future<List<dynamic>> getDepartmentExtraWork() async {
+    final token = await AuthService.getToken();
+
+    final url = Uri.parse('$baseUrl/Manager/get-department-extra-work');
+
+    final response = await http.get(
+      url,
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+    );
+
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      final data = jsonDecode(response.body);
+
+      if (data is List) {
+        return data;
+      }
+
+      return [];
+    }
+
+    final data = _decodeResponse(response);
+
+    throw Exception(
+      data['message'] ?? data['title'] ?? 'Failed to get department extra work',
+    );
+  }
+
+  Future<Map<String, dynamic>> updateExtraWorkStatus({
+    required int id,
+    required String status,
+    String? remarks,
+  }) async {
+    final token = await AuthService.getToken();
+
+    final url = Uri.parse('$baseUrl/Manager/approve-extra-work/$id');
+
+    final body = {'status': status, 'remarks': remarks};
+
+    final response = await http.put(
+      url,
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode(body),
+    );
+
+    final data = _decodeResponse(response);
+
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return data;
+    }
+
+    throw Exception(
+      data['message'] ?? data['title'] ?? 'Failed to update extra work status',
+    );
+  }
+
+  Map<String, dynamic> _decodeResponse(http.Response response) {
+    if (response.body.isEmpty) {
+      return {};
+    }
+
+    try {
+      final decoded = jsonDecode(response.body);
+
+      if (decoded is Map<String, dynamic>) {
+        return decoded;
+      }
+
+      return {'data': decoded};
+    } catch (_) {
+      return {'message': response.body};
+    }
+  }
+
+  static Future<bool> createPunchCorrection({
+    required DateTime date,
+    required String correctionType,
+    required String punchTime,
+    required String reason,
+  }) async {
+    try {
+      final token = await AuthService.getToken();
+      final response = await http.post(
+        Uri.parse("$baseUrl/Manager/punch-correction"),
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer $token",
+        },
+        body: jsonEncode({
+          "date": date.toIso8601String(),
+          "correctionType": correctionType,
+          "punchTime": punchTime,
+          "reason": reason,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        return true;
+      } else {
+        print("Punch Correction Error: ${response.body}");
+        return false;
+      }
+    } catch (e) {
+      print("Punch Correction Error: $e");
+      return false;
+    }
+  }
+
+  static Future<bool> managerPunchCorrection({
+    required int id,
+    required bool approved,
+  }) async {
+    try {
+      final token = await AuthService.getToken();
+
+      if (token == null || token.isEmpty) {
+        print("Token not found");
+        return false;
+      }
+
+      final response = await http.put(
+        Uri.parse("$baseUrl/Manager/punch-correction/$id"),
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer $token",
+        },
+        body: jsonEncode({"approved": approved}),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+
+        print("Punch Correction Updated");
+        print("Status: ${data["status"]}");
+
+        return true;
+      } else if (response.statusCode == 401) {
+        print("Unauthorized - token expired or invalid");
+        return false;
+      } else if (response.statusCode == 404) {
+        print("Punch correction not found");
+        return false;
+      } else if (response.statusCode == 400) {
+        print("Already processed: ${response.body}");
+        return false;
+      } else {
+        print(
+          "Manager Punch Correction Error: "
+          "${response.statusCode} ${response.body}",
+        );
+        return false;
+      }
+    } catch (e) {
+      print("Manager Punch Correction Error: $e");
+      return false;
+    }
+  }
+
+  static Future<List<dynamic>> getDepartmentPunchCorrections() async {
+    try {
+      final token = await AuthService.getToken();
+
+      if (token == null || token.isEmpty) {
+        print("Token not found");
+        return [];
+      }
+
+      final response = await http.get(
+        Uri.parse("$baseUrl/Manager/department-punch-corrections"),
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer $token",
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+
+        print("Department: ${data["department"]}");
+        print("Count: ${data["count"]}");
+
+        return data["data"] ?? [];
+      } else if (response.statusCode == 403) {
+        print("User does not have permission to view department corrections");
+        return [];
+      } else if (response.statusCode == 401) {
+        print("Unauthorized - token expired or invalid");
+        return [];
+      } else {
+        print(
+          "Department Punch Correction Error: "
+          "${response.statusCode} ${response.body}",
+        );
+
+        return [];
+      }
+    } catch (e) {
+      print("Department Punch Correction Error: $e");
+      return [];
+    }
+  }
+
+  static Future<List<dynamic>> getMyPunchCorrections() async {
+    try {
+      final token = await AuthService.getToken();
+
+      if (token == null || token.isEmpty) {
+        print("Token not found");
+        return [];
+      }
+
+      final response = await http.get(
+        Uri.parse("$baseUrl/Manager/my-punch-corrections"),
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer $token",
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+
+        return data["data"] ?? [];
+      } else {
+        print(
+          "My Punch Correction Error: "
+          "${response.statusCode} ${response.body}",
+        );
+
+        return [];
+      }
+    } catch (e) {
+      print("My Punch Correction Error: $e");
+      return [];
+    }
+  }
+
+  static Future<bool> addAttitudeBehaviourScore({
+    required int staffId,
+    required int communication,
+    required int punctuality,
+    required int integrity,
+    required DateTime date,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/Manager/add-attitude-behaviour-score'),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({
+          "staffId": staffId,
+          "communication": communication,
+          "punctuality": punctuality,
+          "integrity": integrity,
+          "date": date.toIso8601String(),
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        return true;
+      } else {
+        print(
+          "Add Attitude Behaviour Score Error: "
+          "${response.statusCode} - ${response.body}",
+        );
+        return false;
+      }
+    } catch (e) {
+      print("Add Attitude Behaviour Score Exception: $e");
+      return false;
+    }
+  }
+
+  static Future<List<Map<String, dynamic>>>
+  getDepartmentAttitudeBehaviourScores() async {
+    try {
+      final token = await AuthService.getToken();
+      final response = await http.get(
+        Uri.parse('$baseUrl/Manager/department-attitude-behaviour-scores'),
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer $token",
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+
+        final List scores = data['scores'] ?? [];
+
+        return scores
+            .map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e))
+            .toList();
+      }
+
+      print(
+        "Get Department Behaviour Scores Error: "
+        "${response.statusCode} - ${response.body}",
+      );
+
+      throw Exception("Failed to load attitude & behaviour scores");
+    } catch (e) {
+      print("Get Department Behaviour Scores Exception: $e");
+
+      rethrow;
     }
   }
 }

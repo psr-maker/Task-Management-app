@@ -158,7 +158,7 @@ class _AdmindetailsState extends State<Admindetails> {
       createdById = user.createdBy.trim();
     }
 
-    final isSuperAdmin = loginUserRole == "director";
+    final isSuperAdmin = loginUserRole == "1";
 
     final canEdit = isSuperAdmin || (loginUserId == createdById);
 
@@ -524,7 +524,7 @@ class _AdmindetailsState extends State<Admindetails> {
                 onPressed: () async {
                   final token = await AuthService.getToken();
                   final role = JwtHelper.getRole(token!)?.toLowerCase().trim();
-                  if (role == "director") {
+                  if (role == "1") {
                     Navigator.push(
                       context,
                       MaterialPageRoute(

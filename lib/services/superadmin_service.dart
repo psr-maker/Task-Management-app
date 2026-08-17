@@ -5,6 +5,7 @@ import 'package:staff_work_track/Models/auditlog.dart';
 import 'package:staff_work_track/Models/department.dart';
 
 import 'package:staff_work_track/Models/getusers.dart';
+import 'package:staff_work_track/Models/rolesmodel.dart';
 import 'package:staff_work_track/Models/userstask.dart';
 import 'package:staff_work_track/services/auth_service.dart';
 import 'package:staff_work_track/core/constant/apiurl.dart';
@@ -113,9 +114,14 @@ class SuperAdminService {
   // update users status
 
   static Future<void> updateusersstatus(int userId, String status) async {
+    final token = await AuthService.getToken();
+
     final response = await http.put(
       Uri.parse("$baseUrl/Director/update-usersstatus/$userId/"),
-      headers: {"Content-Type": "application/json"},
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer $token",
+      },
       body: jsonEncode({"Status": status}),
     );
 
@@ -183,7 +189,10 @@ class SuperAdminService {
     required String priority,
     required DateTime assignedAt,
     required DateTime dueDate,
-
+    required String performanceType,
+    int? quantity,
+    String? startTime,
+    String? endTime,
     required List<int> assignedToIds,
   }) async {
     try {
@@ -203,6 +212,10 @@ class SuperAdminService {
           "priority": priority,
           "start_date": assignedAt.toIso8601String(),
           "due_Date": dueDate.toIso8601String(),
+          "performanceType": performanceType,
+          if (quantity != null) "quantity": quantity,
+          if (startTime != null) "startTime": startTime,
+          if (endTime != null) "endTime": endTime,
           "assignedToIds": assignedToIds,
         }),
       );
@@ -465,5 +478,120 @@ class SuperAdminService {
     );
 
     return response.statusCode == 200;
+  }
+
+  static Future<List<Role>> getRoles() async {
+    final url = Uri.parse('$baseUrl/Director/getall-roles');
+
+    final response = await http.get(
+      url,
+      headers: {'Content-Type': 'application/json'},
+    );
+
+    if (response.statusCode == 200) {
+      final List<dynamic> data = jsonDecode(response.body);
+
+      return data.map((json) => Role.fromJson(json)).toList();
+    }
+
+    throw Exception(
+      'Failed to load roles. Status code: ${response.statusCode}',
+    );
+  }
+
+  static Future<Role> addRole({
+    required String name,
+    required int position,
+    required bool status,
+  }) async {
+    final url = Uri.parse('$baseUrl/Director/addnewrole');
+
+    final response = await http.post(
+      url,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'roleName': name,
+        'position': position,
+        'status': status,
+      }),
+    );
+
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      return Role.fromJson(jsonDecode(response.body));
+    }
+
+    if (response.statusCode == 409) {
+      throw Exception('Role already exists');
+    }
+
+    if (response.statusCode == 400) {
+      final data = jsonDecode(response.body);
+
+      throw Exception(data['message'] ?? 'Invalid role data');
+    }
+
+    throw Exception('Failed to add role. Status code: ${response.statusCode}');
+  }
+
+  static Future<Role> updateRole({
+    required int id,
+    required String name,
+    required int position,
+    required bool status,
+  }) async {
+    final url = Uri.parse('$baseUrl/Director/editrole/$id');
+
+    final response = await http.put(
+      url,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'roleName': name,
+        'position': position,
+        'status': status,
+      }),
+    );
+
+    if (response.statusCode == 200) {
+      return Role.fromJson(jsonDecode(response.body));
+    }
+
+    if (response.statusCode == 404) {
+      throw Exception('Role not found');
+    }
+
+    if (response.statusCode == 409) {
+      throw Exception('Another role with this name already exists');
+    }
+
+    if (response.statusCode == 400) {
+      final data = jsonDecode(response.body);
+
+      throw Exception(data['message'] ?? 'Invalid role data');
+    }
+
+    throw Exception(
+      'Failed to update role. Status code: ${response.statusCode}',
+    );
+  }
+
+  static Future<void> deleteRole(int id) async {
+    final url = Uri.parse('$baseUrl/Director/deleterole/$id');
+
+    final response = await http.delete(
+      url,
+      headers: {'Content-Type': 'application/json'},
+    );
+
+    if (response.statusCode == 200) {
+      return;
+    }
+
+    if (response.statusCode == 404) {
+      throw Exception('Role not found');
+    }
+
+    throw Exception(
+      'Failed to delete role. Status code: ${response.statusCode}',
+    );
   }
 }

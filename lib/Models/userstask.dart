@@ -17,6 +17,11 @@ class TaskModel {
   final String? assignerDepartment;
   final List assignedTo;
   final bool wasEdited;
+  final String performanceType;
+  final int? quantity;
+  final String? goalCode;
+  final String? startTime;
+  final String? endTime;
   TaskModel({
     required this.taskCode,
     required this.task,
@@ -36,6 +41,11 @@ class TaskModel {
     required this.completedCount,
     required this.wasEdited,
     this.completed_date,
+    required this.performanceType,
+    this.quantity,
+    this.goalCode,
+    this.startTime,
+    this.endTime,
   });
 
   factory TaskModel.fromJson(Map<String, dynamic> json) {
@@ -58,6 +68,11 @@ class TaskModel {
       completedCount: json["completedCount"] ?? 0,
       wasEdited: json["wasEdited"] ?? false,
       completed_date: json['completed_date'],
+      performanceType: json['performanceType'] ?? 'Default',
+      quantity: json['quantity'],
+      goalCode: json['goalCode'],
+      startTime: json['startTime'],
+      endTime: json['endTime'],
     );
   }
 }
@@ -70,6 +85,9 @@ class EditTaskRequest {
   final DateTime dueDate;
   final List<int> assignedToIds;
   final List<RemovedUser> removedUsers;
+  final int? quantity;
+  final String? startTime;
+  final String? endTime;
 
   EditTaskRequest({
     required this.taskCode,
@@ -79,6 +97,9 @@ class EditTaskRequest {
     required this.dueDate,
     required this.assignedToIds,
     required this.removedUsers,
+    this.quantity,
+    this.startTime,
+    this.endTime,
   });
 
   Map<String, dynamic> toJson() {
@@ -91,6 +112,9 @@ class EditTaskRequest {
       "assignedToIds": assignedToIds,
       // CHANGE THIS
       "removedMembers": removedUsers.map((e) => e.toJson()).toList(),
+      "quantity": quantity,
+      "startTime": startTime,
+      "endTime": endTime,
     };
   }
 }

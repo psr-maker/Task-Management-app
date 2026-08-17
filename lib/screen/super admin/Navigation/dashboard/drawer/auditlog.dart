@@ -170,7 +170,7 @@ class _AuditLogPageState extends State<AuditLogPage> {
   }
 
   void _navigateToUserDetails(BuildContext context, UserModel user) {
-    if (user.role.toLowerCase() == "director") {
+    if (user.role == "1") {
       Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => Admindetails(adminId: user.userId)),
@@ -200,7 +200,7 @@ class _AuditLogPageState extends State<AuditLogPage> {
     return log.entityId;
   }
 
-  Widget _buildTitle(AuditLogGroupModel log) {
+  Widget _buildTitle(AuditLogGroupModel log, Map<String, UserModel> users) {
     final action = log.action.toLowerCase();
     final color = actionColor(log.action);
     if (action == "login") {
@@ -215,6 +215,17 @@ class _AuditLogPageState extends State<AuditLogPage> {
         style: Theme.of(context).textTheme.labelMedium,
       );
     }
+    if (log.entityType == "User") {
+      final affectedUserName = _getAffectedUserName(log, users);
+
+      if (log.action.toLowerCase() == "status update") {
+        return Text(
+          "User $affectedUserName status was changed",
+          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+        );
+      }
+    }
+
     if (log.entityType == "User") {
       final userName = _getUserName(log);
       if (action == "delete") {
@@ -315,6 +326,14 @@ class _AuditLogPageState extends State<AuditLogPage> {
       "${log.entityType} : ${log.entityId}",
       style: const TextStyle(fontSize: 13),
     );
+  }
+
+  String _getAffectedUserName(
+    AuditLogGroupModel log,
+    Map<String, UserModel> users,
+  ) {
+    final user = users[log.entityId];
+    return user?.name ?? "Unknown User";
   }
 
   @override
@@ -475,7 +494,7 @@ class _AuditLogPageState extends State<AuditLogPage> {
                           ],
                         ),
                         const SizedBox(height: 10),
-                        _buildTitle(log),
+                        _buildTitle(log, users),
                         if (log.action.toLowerCase() != "delete") ...[
                           const Divider(height: 20),
                           Text(

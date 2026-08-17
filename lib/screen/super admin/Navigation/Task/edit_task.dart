@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:staff_work_track/Models/getusers.dart';
 import 'package:staff_work_track/Models/userstask.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/Task/task_assign_users.dart';
+import 'package:staff_work_track/screen/super%20admin/Navigation/Task/goalntask_create.dart';
 import 'package:staff_work_track/services/superadmin_service.dart';
 import 'package:staff_work_track/core/widgets/buttons.dart';
 import 'package:staff_work_track/widgets/customfieldwidget.dart';
@@ -21,9 +22,14 @@ class _EditTaskState extends State<EditTask> {
   final TextEditingController descriController = TextEditingController();
   final TextEditingController createdDateController = TextEditingController();
   final TextEditingController dueDateController = TextEditingController();
+  final TextEditingController startTimeController = TextEditingController();
+  final TextEditingController endTimeController = TextEditingController();
+  final TextEditingController quantityController = TextEditingController();
   List<RemovedUser> removedUsers = [];
   String? selectedPriority;
   DateTime? dueDate;
+  TimeOfDay? startTime;
+  TimeOfDay? endTime;
 
   bool _isLoading = false;
   String? _topMessage;
@@ -38,6 +44,19 @@ class _EditTaskState extends State<EditTask> {
     _setInitialData();
   }
 
+  TimeOfDay? _parseTimeOfDay(String? value) {
+    if (value == null || value.isEmpty) return null;
+
+    final parts = value.split(':');
+    if (parts.length < 2) return null;
+
+    final hour = int.tryParse(parts[0]);
+    final minute = int.tryParse(parts[1]);
+    if (hour == null || minute == null) return null;
+
+    return TimeOfDay(hour: hour, minute: minute);
+  }
+
   void _setInitialData() {
     nameController.text = widget.task.task;
     descriController.text = widget.task.description;
@@ -48,6 +67,21 @@ class _EditTaskState extends State<EditTask> {
     if (widget.task.dueDate != null) {
       dueDate = DateTime.tryParse(widget.task.dueDate!);
       dueDateController.text = widget.task.dueDate!.split("T").first;
+    }
+
+    if (widget.task.startTime != null) {
+      startTime = _parseTimeOfDay(widget.task.startTime);
+      startTimeController.text = widget.task.startTime!;
+    }
+
+    if (widget.task.endTime != null) {
+      endTime = _parseTimeOfDay(widget.task.endTime);
+      endTimeController.text = widget.task.endTime!;
+    }
+
+    // Quantity
+    if (widget.task.quantity != null) {
+      quantityController.text = widget.task.quantity.toString();
     }
 
     // SAFE assigned users parsing
@@ -70,6 +104,31 @@ class _EditTaskState extends State<EditTask> {
         dueDate = picked;
         dueDateController.text =
             "${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}";
+      });
+    }
+  }
+
+  Future<void> _selectTime(bool isStart) async {
+    final initial = isStart
+        ? startTime ?? const TimeOfDay(hour: 9, minute: 0)
+        : endTime ?? const TimeOfDay(hour: 10, minute: 0);
+
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: initial,
+    );
+
+    if (picked != null) {
+      setState(() {
+        if (isStart) {
+          startTime = picked;
+          startTimeController.text =
+              "${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}";
+        } else {
+          endTime = picked;
+          endTimeController.text =
+              "${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}";
+        }
       });
     }
   }
@@ -141,6 +200,44 @@ class _EditTaskState extends State<EditTask> {
     );
   }
 
+  Future<bool?> showQuantityReductionDialog({
+    required int oldQuantity,
+    required int newQuantity,
+  }) async {
+    final remaining = oldQuantity - newQuantity;
+
+    return await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text("Quantity Reduced"),
+          content: Text(
+            "Original quantity: $oldQuantity\n"
+            "New quantity: $newQuantity\n"
+            "Remaining quantity: $remaining\n\n"
+            "Do you want to create a new task for the remaining "
+            "$remaining quantity?",
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context, false);
+              },
+              child: const Text("No"),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(context, true);
+              },
+              child: const Text("Yes"),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -195,7 +292,19 @@ class _EditTaskState extends State<EditTask> {
                     descriController,
                     maxLines: 4,
                   ),
+                  if (widget.task.performanceType.toLowerCase() == "qty") ...[
+                    const SizedBox(height: 20),
 
+                    CustomFormWidgets.label(context, "Quantity"),
+
+                    const SizedBox(height: 10),
+
+                    CustomFormWidgets.textField(
+                      context,
+                      quantityController,
+                      keyboardType: TextInputType.number,
+                    ),
+                  ],
                   const SizedBox(height: 20),
                   CustomFormWidgets.label(context, "Priority"),
                   const SizedBox(height: 10),
@@ -219,6 +328,22 @@ class _EditTaskState extends State<EditTask> {
                   CustomFormWidgets.dateField(
                     controller: dueDateController,
                     onTap: _selectDueDate,
+                  ),
+
+                  const SizedBox(height: 20),
+                  CustomFormWidgets.label(context, "Start Time"),
+                  const SizedBox(height: 10),
+                  CustomFormWidgets.timeField(
+                    controller: startTimeController,
+                    onTap: () => _selectTime(true),
+                  ),
+
+                  const SizedBox(height: 20),
+                  CustomFormWidgets.label(context, "End Time"),
+                  const SizedBox(height: 10),
+                  CustomFormWidgets.timeField(
+                    controller: endTimeController,
+                    onTap: () => _selectTime(false),
                   ),
 
                   const SizedBox(height: 20),
@@ -265,6 +390,40 @@ class _EditTaskState extends State<EditTask> {
                           return;
                         }
 
+                        // Check quantity reduction
+                        bool createRemainingTask = false;
+                        if (widget.task.performanceType.toLowerCase() == "qty") {
+                          final oldQuantity = widget.task.quantity ?? 0;
+
+                          final newQuantity = int.tryParse(
+                            quantityController.text.trim(),
+                          );
+
+                          if (newQuantity == null) {
+                            showTopMessage("Please enter a valid quantity");
+                            return;
+                          }
+
+                          if (newQuantity <= 0) {
+                            showTopMessage("Quantity must be greater than 0");
+                            return;
+                          }
+
+                          // Quantity was reduced
+                          if (newQuantity < oldQuantity) {
+                            final result = await showQuantityReductionDialog(
+                              oldQuantity: oldQuantity,
+                              newQuantity: newQuantity,
+                            );
+
+                            // User closed dialog
+                            if (result == null) {
+                              return;
+                            }
+
+                            createRemainingTask = result;
+                          }
+                        }
                         setState(() => _isLoading = true);
 
                         final success = await SuperAdminService.updateTask(
@@ -274,6 +433,17 @@ class _EditTaskState extends State<EditTask> {
                             description: descriController.text.trim(),
                             priority: selectedPriority!,
                             dueDate: dueDate!,
+                            quantity:
+                                widget.task.performanceType.toLowerCase() ==
+                                    "qty"
+                                ? int.tryParse(quantityController.text.trim())
+                                : null,
+                            startTime: startTimeController.text.isNotEmpty
+                                ? startTimeController.text
+                                : null,
+                            endTime: endTimeController.text.isNotEmpty
+                                ? endTimeController.text
+                                : null,
                             assignedToIds: assignedUsers
                                 .map((u) => u.userId)
                                 .toList(),
@@ -284,6 +454,50 @@ class _EditTaskState extends State<EditTask> {
                         setState(() => _isLoading = false);
 
                         if (success) {
+                          if (createRemainingTask &&
+                              widget.task.performanceType.toLowerCase() ==
+                                  "qty") {
+                            final oldQuantity = widget.task.quantity ?? 0;
+                            final newQuantity = int.tryParse(
+                              quantityController.text.trim(),
+                            );
+                            final remaining = oldQuantity - (newQuantity ?? 0);
+
+                            if (remaining > 0) {
+                              final initialAssignedAt =
+                                  DateTime.tryParse(widget.task.createdAt.split("T").first) ??
+                                      DateTime.now();
+
+                              await Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => Createtask(
+                                    assignedToIds: assignedUsers
+                                        .map((u) => u.userId)
+                                        .toList(),
+                                    initialTaskName: nameController.text.trim(),
+                                    initialDescription: descriController.text.trim(),
+                                    initialGoalCode: widget.task.goalCode,
+                                    initialPriority: selectedPriority,
+                                    initialPerformanceType:
+                                        widget.task.performanceType,
+                                    initialQuantity: remaining,
+                                    initialAssignedAt: initialAssignedAt,
+                                    initialDueDate: dueDate,
+                                    initialStartTime:
+                                        startTimeController.text.isNotEmpty
+                                            ? startTimeController.text
+                                            : null,
+                                    initialEndTime: endTimeController.text.isNotEmpty
+                                        ? endTimeController.text
+                                        : widget.task.endTime,
+                                    initialIsTask: true,
+                                  ),
+                                ),
+                              );
+                            }
+                          }
+
                           showTopMessage(
                             "Task updated successfully",
                             isError: false,

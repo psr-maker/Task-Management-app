@@ -21,11 +21,12 @@ class _StaffLeavesState extends State<StaffLeaves>
   String? _topMessage;
   bool _isErrorMessage = true;
   bool _showTopMessage = false;
-  bool showPermissions = false;
+  String activeTab = "Leave"; // "Leave", "Permission", "Department Compensation"
 
   late TabController _tabController;
   final tabs = ["All", "Pending", "Approved", "Rejected"];
   final permissionTabs = ["All", "Pending", "Approved", "Rejected"];
+  final compensationTabs = ["All", "Pending", "Approved", "Rejected"];
   Set<int> expandedItems = {};
 
   @override
@@ -46,16 +47,32 @@ class _StaffLeavesState extends State<StaffLeaves>
       expandedItems.clear();
     });
 
-    final data = showPermissions
-        ? await AdminService.getDepartmentPermissions()
-        : await AdminService.getDepartmentLeaves();
+    try {
+      List data = [];
+      
+      if (activeTab == "Leave") {
+        data = await AdminService.getDepartmentLeaves();
+      } else if (activeTab == "Permission") {
+        data = await AdminService.getDepartmentPermissions();
+      } else if (activeTab == "Department Compensation") {
+        final service = AdminService();
+        data = await service.getDepartmentExtraWork();
+      }
 
-    setState(() {
-      allItems = data;
-      filteredItems = data;
-      isLoading = false;
-    });
-    filterItems();
+      setState(() {
+        allItems = data;
+        filteredItems = data;
+        isLoading = false;
+      });
+      filterItems();
+    } catch (e) {
+      setState(() {
+        isLoading = false;
+        allItems = [];
+        filteredItems = [];
+      });
+      showTopMessage("Error loading data: $e", isError: true);
+    }
   }
 
   void showTopMessage(String message, {bool isError = true}) {
@@ -74,9 +91,17 @@ class _StaffLeavesState extends State<StaffLeaves>
   }
 
   void filterItems() {
-    String selected = showPermissions
-        ? permissionTabs[_tabController.index]
-        : tabs[_tabController.index];
+    String selected;
+    
+    if (activeTab == "Leave") {
+      selected = tabs[_tabController.index];
+    } else if (activeTab == "Permission") {
+      selected = permissionTabs[_tabController.index];
+    } else if (activeTab == "Department Compensation") {
+      selected = compensationTabs[_tabController.index];
+    } else {
+      selected = tabs[_tabController.index];
+    }
 
     setState(() {
       if (selected == "All") {
@@ -93,8 +118,9 @@ class _StaffLeavesState extends State<StaffLeaves>
   Map<String, List> groupByMonth(List data) {
     Map<String, List> grouped = {};
     for (var item in data) {
-      final dateString =
-          item["fromDate"] ?? item["date"] ?? item["submittedDate"];
+      final dateString = activeTab == "Department Compensation"
+          ? item["workedDate"]
+          : (item["fromDate"] ?? item["date"] ?? item["submittedDate"]);
       final date = dateString != null
           ? DateTime.parse(dateString)
           : DateTime.now();
@@ -141,7 +167,7 @@ class _StaffLeavesState extends State<StaffLeaves>
     final groupedData = groupByMonth(filteredItems);
     return Scaffold(
       appBar: AppBar(
-        title: Text(showPermissions ? "Permissions" : "Leaves"),
+        title: Text(activeTab),
         leading: IconButton(
           onPressed: () => Navigator.pop(context),
           icon: const Icon(Icons.arrow_back_ios),
@@ -152,7 +178,7 @@ class _StaffLeavesState extends State<StaffLeaves>
             children: [
               Padding(
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
+                  horizontal: 8,
                   vertical: 5,
                 ),
                 child: Row(
@@ -161,7 +187,7 @@ class _StaffLeavesState extends State<StaffLeaves>
                       child: GestureDetector(
                         onTap: () {
                           setState(() {
-                            showPermissions = false;
+                            activeTab = "Leave";
                             _tabController.index = 0;
                           });
                           loadItems();
@@ -172,9 +198,9 @@ class _StaffLeavesState extends State<StaffLeaves>
                             horizontal: 10,
                           ),
                           decoration: BoxDecoration(
-                            color: showPermissions
-                                ? Colors.transparent
-                                : Colors.white24,
+                            color: activeTab == "Leave"
+                                ? Colors.white24
+                                : Colors.transparent,
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Center(
@@ -186,12 +212,12 @@ class _StaffLeavesState extends State<StaffLeaves>
                         ),
                       ),
                     ),
-                    const SizedBox(width: 10),
+                    const SizedBox(width: 5),
                     Expanded(
                       child: GestureDetector(
                         onTap: () {
                           setState(() {
-                            showPermissions = true;
+                            activeTab = "Permission";
                             _tabController.index = 0;
                           });
                           loadItems();
@@ -202,7 +228,7 @@ class _StaffLeavesState extends State<StaffLeaves>
                             horizontal: 10,
                           ),
                           decoration: BoxDecoration(
-                            color: showPermissions
+                            color: activeTab == "Permission"
                                 ? Colors.white24
                                 : Colors.transparent,
                             borderRadius: BorderRadius.circular(8),
@@ -216,10 +242,39 @@ class _StaffLeavesState extends State<StaffLeaves>
                         ),
                       ),
                     ),
+                    const SizedBox(width: 5),
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            activeTab = "Department Compensation";
+                            _tabController.index = 0;
+                          });
+                          loadItems();
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 5,
+                            horizontal: 10,
+                          ),
+                          decoration: BoxDecoration(
+                            color: activeTab == "Department Compensation"
+                                ? Colors.white24
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Center(
+                            child: Text(
+                              'Dept Comp.',
+                              style: Theme.of(context).textTheme.labelLarge,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
-              //if (!showPermissions)
               TabBar(
                 controller: _tabController,
                 indicator: UnderlineTabIndicator(
@@ -233,7 +288,11 @@ class _StaffLeavesState extends State<StaffLeaves>
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
                 ),
-                tabs: (showPermissions ? permissionTabs : tabs)
+                tabs: (activeTab == "Leave"
+                        ? tabs
+                        : activeTab == "Permission"
+                            ? permissionTabs
+                            : compensationTabs)
                     .map((e) => Tab(text: e))
                     .toList(),
               ),
@@ -244,11 +303,15 @@ class _StaffLeavesState extends State<StaffLeaves>
       body: isLoading
           ? const Center(child: RotatingFlower())
           : filteredItems.isEmpty
-          ? Center(
-              child: Text(
-                showPermissions ? "No Permission Found" : "No Leave Found",
-              ),
-            )
+              ? Center(
+                  child: Text(
+                    activeTab == "Leave"
+                        ? "No Leave Found"
+                        : activeTab == "Permission"
+                            ? "No Permission Found"
+                            : "No Compensation Found",
+                  ),
+                )
           : Stack(
               children: [
                 ListView(
@@ -284,7 +347,7 @@ class _StaffLeavesState extends State<StaffLeaves>
                     duration: const Duration(milliseconds: 300),
                     child: Msgsnackbar(
                       context,
-                      message: _topMessage!,
+                      message: _topMessage!, 
                       isError: _isErrorMessage,
                     ),
                   ),
@@ -294,7 +357,8 @@ class _StaffLeavesState extends State<StaffLeaves>
   }
 
   Widget buildItem(dynamic e, int index) {
-    final isPermission = showPermissions;
+    final isPermission = activeTab == "Permission";
+    final isCompensation = activeTab == "Department Compensation";
     final status = (e["status"] ?? "").toString().toLowerCase();
     final isExpanded = expandedItems.contains(index);
 
@@ -333,24 +397,42 @@ class _StaffLeavesState extends State<StaffLeaves>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          e["name"] ?? "",
+                          isCompensation
+                              ? e["workType"] ?? "Work"
+                              : (e["name"] ?? ""),
                           style: Theme.of(context).textTheme.headlineLarge,
                         ),
                         const SizedBox(height: 4),
-                        Text(
-                          isPermission
-                              ? formatDate(e["date"] ?? e["fromDate"])
-                              : e["leaveType"] ?? "",
-                          style: Theme.of(context).textTheme.labelMedium,
-                        ),
-                        const SizedBox(height: 5),
-                        Text(
-                          isPermission
-                              ? e["totalHours"].toString() + " hours"
-                              : formatDate(e["fromDate"] ?? e["date"]),
-                          style: Theme.of(context).textTheme.headlineMedium,
-                        ),
-                        if (!isPermission) ...[
+                        if (isCompensation) ...[
+                          Text(
+                            formatDate(e["workedDate"]),
+                            style: Theme.of(context).textTheme.labelMedium,
+                          ),
+                          const SizedBox(height: 5),
+                          Text(
+                            "${formatTime(e["startTime"])} - ${formatTime(e["endTime"])}",
+                            style: Theme.of(context).textTheme.headlineMedium,
+                          ),
+                        ] else if (isPermission) ...[
+                          Text(
+                            formatDate(e["date"] ?? e["fromDate"]),
+                            style: Theme.of(context).textTheme.labelMedium,
+                          ),
+                          const SizedBox(height: 5),
+                          Text(
+                            e["totalHours"].toString() + " hours",
+                            style: Theme.of(context).textTheme.headlineMedium,
+                          ),
+                        ] else ...[
+                          Text(
+                            "${e["leaveType"]} - ${e["leaveTyp"]}",
+                            style: Theme.of(context).textTheme.labelMedium,
+                          ),
+                          const SizedBox(height: 5),
+                          Text(
+                            formatDate(e["fromDate"] ?? e["date"]),
+                            style: Theme.of(context).textTheme.headlineMedium,
+                          ),
                           const SizedBox(height: 4),
                           Text(
                             "Applied on ${AppHelpers.formatDate(e["submittedDate"])}",
@@ -360,7 +442,6 @@ class _StaffLeavesState extends State<StaffLeaves>
                       ],
                     ),
                   ),
-                  //  if (!isPermission)
                   Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 8,
@@ -390,8 +471,54 @@ class _StaffLeavesState extends State<StaffLeaves>
               child: Column(
                 children: [
                   Divider(color: Colors.grey.shade200),
-                  infoRow("Name", e["name"]),
-                  if (isPermission) ...[
+                  if (isCompensation) ...[
+                    infoRow("Staff Name", e["staffName"] ?? "-"),
+                    infoRow("Work Type", e["workType"]),
+                    infoRow("Date", formatDate(e["workedDate"])),
+                    infoRow("From Time", formatTime(e["startTime"])),
+                    infoRow("To Time", formatTime(e["endTime"])),
+                    infoRow("Reason", e["reason"]),
+                    if (e["remarks"] != null && e["remarks"].toString().isNotEmpty)
+                      infoRow("Remarks", e["remarks"]),
+                    if (status == "pending")
+                      Padding(
+                        padding: const EdgeInsets.only(top: 12),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: ElevatedButton.icon(
+                                onPressed: () => _handleCompensationStatus(
+                                  e["id"],
+                                  "approved",
+                                ),
+                                icon: const Icon(Icons.check_circle),
+                                label: const Text("Approve"),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.green,
+                                  foregroundColor: Colors.white,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: ElevatedButton.icon(
+                                onPressed: () => _handleCompensationStatus(
+                                  e["id"],
+                                  "rejected",
+                                ),
+                                icon: const Icon(Icons.cancel),
+                                label: const Text("Reject"),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.red,
+                                  foregroundColor: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ] else if (isPermission) ...[
+                    infoRow("Name", e["name"]),
                     infoRow("Date", formatDate(e["date"] ?? e["fromDate"])),
                     infoRow("From Time", formatTime(e["fromTime"])),
                     infoRow("To Time", formatTime(e["toTime"])),
@@ -399,9 +526,25 @@ class _StaffLeavesState extends State<StaffLeaves>
                     infoRow("Reason", e["reason"]),
                     if (status == "pending") buildPermissionActionSection(e),
                   ] else ...[
+                    infoRow("Name", e["name"]),
                     infoRow("Designation", e["designation"]),
                     infoRow("Reason", e["reason"]),
                     infoRow("Contact", e["contactNumber"]),
+                    if (e["applicationSource"] == "PermissionExceeded")
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(8),
+                          color: Colors.orange.withOpacity(0.1),
+                        ),
+                        child: const Text(
+                          "Application Source: Permission Exceeded",
+                          style: TextStyle(fontSize: 15),
+                        ),
+                      ),
                     const SizedBox(height: 8),
                     if (status.toLowerCase() == "pending")
                       buildActionSection(e),
@@ -611,5 +754,32 @@ class _StaffLeavesState extends State<StaffLeaves>
         ),
       ],
     );
+  }
+
+  Future<void> _handleCompensationStatus(int id, String status) async {
+    try {
+      setState(() => _isLoading = true);
+      
+      final service = AdminService();
+      await service.updateExtraWorkStatus(
+        id: id,
+        status: status,
+        remarks: null,
+      );
+
+      showTopMessage(
+        "Compensation ${status == 'approved' ? 'approved' : 'rejected'} successfully",
+        isError: false,
+      );
+
+      await loadItems();
+    } catch (e) {
+      showTopMessage(
+        "Error: ${e.toString()}",
+        isError: true,
+      );
+    } finally {
+      setState(() => _isLoading = false);
+    }
   }
 }

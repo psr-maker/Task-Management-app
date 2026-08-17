@@ -18,6 +18,7 @@ class _LeaveapplyState extends State<Leaveapply> {
   final designationController = TextEditingController();
   final reasonController = TextEditingController();
   final emergencyController = TextEditingController();
+  final leavetypController = TextEditingController();
   bool _isLoading = false;
   DateTime? fromDate;
   DateTime? toDate;
@@ -31,6 +32,53 @@ class _LeaveapplyState extends State<Leaveapply> {
   TimeOfDay? toTime;
   double totalHours = 0;
   int totalMinutes = 0;
+
+  bool hasApprovedCompensation = false;
+  bool _checkingCompensation = true;
+
+  List<Map<String, dynamic>> availableCompensation = [];
+
+  static const List<String> leaveCategories = ["CL", "LOP", "Compensation"];
+
+  @override
+  void initState() {
+    super.initState();
+    checkCompensationEligibility();
+  }
+
+  Future<void> checkCompensationEligibility() async {
+    try {
+      final service = AdminService();
+      final data = await service.getMyExtraWork();
+      // Only rows that are Approved AND not already consumed by a
+      // previous compensation leave should ever be selectable.
+      final approvedUnused = data.where((e) {
+        final status = (e["status"] ?? "").toString().toLowerCase();
+        final used = e["isCompensationUsed"] == true;
+        return status == "approved" && !used;
+      }).toList();
+      if (!mounted) return;
+      setState(() {
+        hasApprovedCompensation = approvedUnused.isNotEmpty;
+        availableCompensation = approvedUnused
+            .map(
+              (e) => {
+                "id": e["id"],
+                "date": DateTime.parse(e["workedDate"].toString()),
+              },
+            )
+            .toList();
+        _checkingCompensation = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        hasApprovedCompensation = false;
+        _checkingCompensation = false;
+      });
+    }
+  }
+
   Future pickFromDate() async {
     DateTime? picked = await showDatePicker(
       context: context,
@@ -66,7 +114,13 @@ class _LeaveapplyState extends State<Leaveapply> {
     leaveDays.clear();
     DateTime current = fromDate!;
     while (!current.isAfter(toDate!)) {
-      leaveDays.add({"date": current, "type": "Full Day"});
+      leaveDays.add({
+        "date": current,
+        "type": "Full Day", // Full Day / First Half / Second Half / Holiday
+        "leavetyp": "CL", // CL / LOP / Compensation
+        "compensationId":
+            null, // ExtraWork.Id selected when leavetyp == Compensation
+      });
       current = current.add(const Duration(days: 1));
     }
     calculateTotal();
@@ -112,8 +166,30 @@ class _LeaveapplyState extends State<Leaveapply> {
       showTopMessage("Please fill all fields", isError: true);
       return;
     }
+    final missingCompensation = leaveDays.any(
+      (d) => d["leavetyp"] == "Compensation" && d["compensationId"] == null,
+    );
+    if (missingCompensation) {
+      showTopMessage(
+        "Please select a compensation day for each Compensation entry",
+        isError: true,
+      );
+      return;
+    }
+
     setState(() => _isLoading = true);
     String leaveType = leaveDays.map((e) => e["type"]).join(",");
+
+    String leavetyp = leaveDays.map((e) => e["leavetyp"]).join(",");
+
+    final compensationDays = leaveDays
+        .where((d) => d["leavetyp"] == "Compensation")
+        .toList();
+
+    final int? compensationExtraWorkId = compensationDays.isNotEmpty
+        ? compensationDays.first["compensationId"] as int?
+        : null;
+
     final token = await AuthService.getToken();
     final senderId = JwtHelper.getuid(token!);
     final success = await AdminService.applyLeave(
@@ -126,6 +202,8 @@ class _LeaveapplyState extends State<Leaveapply> {
       leaveType: leaveType,
       totalDays: totalLeave,
       contactNumber: emergencyController.text,
+      leavetyp: leavetyp,
+      compensationExtraWorkId: compensationExtraWorkId,
     );
     setState(() => _isLoading = false);
     if (success) {
@@ -189,20 +267,6 @@ class _LeaveapplyState extends State<Leaveapply> {
       });
       calculateHours(); // ✅ IMPORTANT
     }
-  }
-
-  Widget timeTile(String label, TimeOfDay? time, VoidCallback onTap) {
-    return Card(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(10),
-        side: BorderSide(color: Colors.grey.shade300),
-      ),
-      child: ListTile(
-        leading: const Icon(Icons.access_time),
-        title: Text(time == null ? label : time.format(context)),
-        onTap: onTap,
-      ),
-    );
   }
 
   void calculateHours() {
@@ -361,41 +425,220 @@ class _LeaveapplyState extends State<Leaveapply> {
                     child: Column(
                       children: leaveDays.map((day) {
                         int index = leaveDays.indexOf(day);
-                        return ListTile(
-                          title: Text(
-                            DateFormat("dd MMM yyyy").format(day["date"]),
+                        bool isLast = index == leaveDays.length - 1;
+
+                        // Build the leave-category options for this day.
+                        // "Compensation" only shows once the staff has an
+                        // approved compensation entry.
+                        final categoryItems = leaveCategories
+                            .where(
+                              (c) =>
+                                  c != "Compensation" ||
+                                  hasApprovedCompensation,
+                            )
+                            .map(
+                              (c) => DropdownMenuItem(value: c, child: Text(c)),
+                            )
+                            .toList();
+
+                        // Guard against a stale "Compensation" selection if
+                        // eligibility changes after the row was set.
+                        final currentCategory =
+                            categoryItems.any((i) => i.value == day["leavetyp"])
+                            ? day["leavetyp"]
+                            : "CL";
+
+                        return Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
                           ),
-                          trailing: DropdownButton<String>(
-                            value: day["type"],
-                            dropdownColor: Theme.of(
-                              context,
-                            ).colorScheme.background,
-                            style: Theme.of(context).textTheme.bodyMedium,
-                            iconEnabledColor: Colors.black,
-                            items: const [
-                              DropdownMenuItem(
-                                value: "Full Day",
-                                child: Text("Full Day"),
+                          decoration: BoxDecoration(
+                            border: isLast
+                                ? null
+                                : Border(
+                                    bottom: BorderSide(
+                                      color: Colors.grey.shade200,
+                                    ),
+                                  ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                DateFormat("dd MMM yyyy").format(day["date"]),
+                                style: Theme.of(context).textTheme.bodyMedium
+                                    ?.copyWith(fontWeight: FontWeight.w600),
                               ),
-                              DropdownMenuItem(
-                                value: "First Half",
-                                child: Text("First Half"),
+                              const SizedBox(height: 10),
+                              Row(
+                                children: [
+                                  // Row 1: Full Day / First Half / Second Half / Holiday
+                                  Expanded(
+                                    child: DropdownButtonFormField<String>(
+                                      value: day["type"],
+                                      isExpanded: true,
+                                      decoration: InputDecoration(
+                                        labelText: "Day Type",
+                                        isDense: true,
+                                        border: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
+                                        ),
+                                      ),
+                                      dropdownColor: Theme.of(
+                                        context,
+                                      ).colorScheme.background,
+                                      style: Theme.of(
+                                        context,
+                                      ).textTheme.bodyMedium,
+                                      items: const [
+                                        DropdownMenuItem(
+                                          value: "Full Day",
+                                          child: Text("Full Day"),
+                                        ),
+                                        DropdownMenuItem(
+                                          value: "First Half",
+                                          child: Text("First Half"),
+                                        ),
+                                        DropdownMenuItem(
+                                          value: "Second Half",
+                                          child: Text("Second Half"),
+                                        ),
+                                        DropdownMenuItem(
+                                          value: "Holiday",
+                                          child: Text("Holiday"),
+                                        ),
+                                      ],
+                                      onChanged: (value) {
+                                        setState(() {
+                                          leaveDays[index]["type"] = value;
+                                          calculateTotal();
+                                        });
+                                      },
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  // Row 2: CL / LOP / Compensation
+                                  Expanded(
+                                    child: DropdownButtonFormField<String>(
+                                      value: currentCategory,
+                                      isExpanded: true,
+                                      decoration: InputDecoration(
+                                        labelText: "Leave Type",
+                                        isDense: true,
+                                        border: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
+                                        ),
+                                      ),
+                                      dropdownColor: Theme.of(
+                                        context,
+                                      ).colorScheme.background,
+                                      style: Theme.of(
+                                        context,
+                                      ).textTheme.bodyMedium,
+                                      items: categoryItems,
+                                      onChanged: (value) {
+                                        setState(() {
+                                          leaveDays[index]["leavetyp"] = value;
+                                          if (value != "Compensation") {
+                                            leaveDays[index]["compensationId"] =
+                                                null;
+                                          }
+                                        });
+                                      },
+                                    ),
+                                  ),
+                                ],
                               ),
-                              DropdownMenuItem(
-                                value: "Second Half",
-                                child: Text("Second Half"),
-                              ),
-                              DropdownMenuItem(
-                                value: "Holiday",
-                                child: Text("Holiday"),
-                              ),
+                              if (day["leavetyp"] == "Compensation" &&
+                                  !hasApprovedCompensation)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 6),
+                                  child: Text(
+                                    "No approved compensation off available",
+                                    style: TextStyle(
+                                      color: Colors.red.shade400,
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                ),
+                              if (day["leavetyp"] == "Compensation" &&
+                                  hasApprovedCompensation) ...[
+                                const SizedBox(height: 10),
+                                Builder(
+                                  builder: (context) {
+                                    // Ids already chosen on OTHER days in this
+                                    // same application shouldn't be pickable again.
+                                    final pickedElsewhere = leaveDays
+                                        .asMap()
+                                        .entries
+                                        .where((e) => e.key != index)
+                                        .map((e) => e.value["compensationId"])
+                                        .where((id) => id != null)
+                                        .toSet();
+
+                                    final options = availableCompensation
+                                        .where(
+                                          (c) => !pickedElsewhere.contains(
+                                            c["id"],
+                                          ),
+                                        )
+                                        .toList();
+
+                                    final currentValue =
+                                        options.any(
+                                          (c) =>
+                                              c["id"] == day["compensationId"],
+                                        )
+                                        ? day["compensationId"]
+                                        : null;
+
+                                    return DropdownButtonFormField<int>(
+                                      value: currentValue,
+                                      isExpanded: true,
+                                      decoration: InputDecoration(
+                                        labelText: "Select Compensation Day",
+                                        isDense: true,
+                                        border: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
+                                        ),
+                                      ),
+                                      dropdownColor: Theme.of(
+                                        context,
+                                      ).colorScheme.background,
+                                      style: Theme.of(
+                                        context,
+                                      ).textTheme.bodyMedium,
+                                      hint: const Text("Choose a date"),
+                                      items: options
+                                          .map(
+                                            (c) => DropdownMenuItem<int>(
+                                              value: c["id"] as int,
+                                              child: Text(
+                                                DateFormat(
+                                                  "dd MMM yyyy",
+                                                ).format(c["date"]),
+                                              ),
+                                            ),
+                                          )
+                                          .toList(),
+                                      onChanged: (value) {
+                                        setState(() {
+                                          leaveDays[index]["compensationId"] =
+                                              value;
+                                        });
+                                      },
+                                    );
+                                  },
+                                ),
+                              ],
                             ],
-                            onChanged: (value) {
-                              setState(() {
-                                leaveDays[index]["type"] = value;
-                                calculateTotal();
-                              });
-                            },
                           ),
                         );
                       }).toList(),
@@ -627,6 +870,20 @@ class _LeaveapplyState extends State<Leaveapply> {
         title: Text(
           date == null ? label : DateFormat("dd MMM yyyy").format(date),
         ),
+        onTap: onTap,
+      ),
+    );
+  }
+
+  Widget timeTile(String label, TimeOfDay? time, VoidCallback onTap) {
+    return Card(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+        side: BorderSide(color: Colors.grey.shade300),
+      ),
+      child: ListTile(
+        leading: const Icon(Icons.access_time),
+        title: Text(time == null ? label : time.format(context)),
         onTap: onTap,
       ),
     );

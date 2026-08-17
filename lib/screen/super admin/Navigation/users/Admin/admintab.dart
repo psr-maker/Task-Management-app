@@ -18,7 +18,7 @@ class AdmintabState extends State<Admintab> {
   List<int> selectedAdminIds = [];
   bool isSelectionMode = false;
   bool isSearching = false;
-  String selectedRole = "Manager";
+  String selectedRole = "2";
   TextEditingController searchController = TextEditingController();
   List<UserModel> allAdmin = [];
   List<UserModel> filteredadmin = [];
@@ -118,7 +118,7 @@ class AdmintabState extends State<Admintab> {
                           final result = await Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) => CreateUsers(role: selectedRole),
+                              builder: (_) => CreateUsers(),
                             ),
                           );
                           if (result == true) {

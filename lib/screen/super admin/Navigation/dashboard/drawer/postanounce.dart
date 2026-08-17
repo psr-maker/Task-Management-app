@@ -171,7 +171,7 @@ class _PostAnnouncementPageState extends State<PostAnnouncementPage> {
                   CustomFormWidgets.dropdown(
                     context: context,
                     value: targetRole,
-                    items: const ["All", "Manager", "Staff"],
+                    items: const ["All", "2", "Staff"],
                     onChanged: (v) => setState(() => targetRole = v),
                     hint: "Select target",
                   ),

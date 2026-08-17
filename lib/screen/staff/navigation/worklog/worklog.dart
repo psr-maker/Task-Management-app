@@ -6,7 +6,7 @@ import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
 import 'package:staff_work_track/screen/staff/navigation/fullimg.dart';
 import 'package:staff_work_track/screen/staff/navigation/worklog/addworklog.dart';
 import 'package:staff_work_track/core/widgets/buttons.dart';
-import 'package:staff_work_track/screen/staff/navigation/worklog/edit_worklog.dart';
+import 'package:staff_work_track/screen/staff/navigation/worklog/offline_worklogs.dart';
 import 'package:staff_work_track/services/announ_service.dart';
 
 class Worklog extends StatefulWidget {
@@ -240,24 +240,14 @@ class _WorklogState extends State<Worklog> {
 
       setState(() {
         logs = data.map((item) {
-          final startDateTime = DateTime.parse(item["startTime"]);
-          final endDateTime = DateTime.parse(item["endTime"]);
-
           return {
-            "start": TimeOfDay(
-              hour: startDateTime.hour,
-              minute: startDateTime.minute,
-            ),
-            "end": TimeOfDay(
-              hour: endDateTime.hour,
-              minute: endDateTime.minute,
-            ),
             "description": item["description"],
             "title": item["title"],
             "status": item["status"],
             "id": item["id"],
-            "totalHours": (item["totalHours"] as num).toDouble(),
             "imageUrl": item["imageUrl"],
+            "workType": item["workType"],
+            "time": item["time"],
           };
         }).toList();
       });
@@ -328,12 +318,33 @@ class _WorklogState extends State<Worklog> {
   }
 
   bool get canSubmit => logs.any((log) => log["status"] == "Draft");
+  String _formatTime(String value) {
+    try {
+      final dateTime = DateTime.parse(value);
+
+      return DateFormat('hh:mm a').format(dateTime);
+    } catch (_) {
+      return value;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text("Daily Worklog"),
         actions: [
+          IconButton(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const OfflineWorkLogs(),
+                ),
+              );
+            },
+            icon: Icon(Icons.upload),
+          ),
           if (logs.isNotEmpty)
             TextButton(
               onPressed: canSubmit ? _submitDrafts : null,
@@ -484,158 +495,189 @@ class _WorklogState extends State<Worklog> {
     }
 
     return ListView.builder(
+      padding: const EdgeInsets.only(bottom: 20),
       itemCount: logs.length,
       itemBuilder: (context, index) {
         final log = logs[index];
-        final double hours = log["totalHours"] ?? 0;
 
-        return GestureDetector(
-          onLongPress: () async {
-            if (log["status"] != "Draft") {
-              showTopMessage("Cannot edit a submitted worklog.", isError: true);
+        final String workType = (log["workType"] ?? "")
+            .toString()
+            .toUpperCase();
 
-              return;
-            }
+        final String time = log["time"] != null
+            ? _formatTime(log["time"].toString())
+            : "--:--";
 
-            final int? worklogId = log["id"] as int?;
-            if (worklogId == null) return;
+        final String workTitle = (log["workTitle"] ?? log["title"] ?? "")
+            .toString();
 
-            final result = await Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => EditWorklogPage(
-                  worklogId: worklogId,
-                  title: log["title"] ?? "",
-                  description: log["description"] ?? "",
-                  startTime: log["start"],
-                  endTime: log["end"],
-                  workDate: selectedDate,
-                ),
-              ),
-            );
+        final String description = (log["description"] ?? "").toString();
 
-            if (result == true) {
-              await _loadLogs();
-            }
-          },
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SizedBox(
-                width: 50,
-                height: 72,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      log["start"].format(context),
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                    Text(
-                      log["end"].format(context),
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                  ],
-                ),
-              ),
-              Column(
+        final String? imageUrl = log["imageUrl"]?.toString();
+
+        final bool isIn = workType == "IN";
+
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ==============================
+            // TIME + IN / OUT
+            // ==============================
+            SizedBox(
+              width: 60,
+              child: Column(
                 children: [
-                  Container(
-                    width: 12,
-                    height: 12,
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.secondary,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  Container(
-                    width: 2,
-                    height: 60,
-                    color: Theme.of(context).colorScheme.primary,
+                  Text(
+                    time,
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.titleSmall,
                   ),
                 ],
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Card(
-                  color: Theme.of(context).colorScheme.background,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+            ),
+
+            const SizedBox(width: 8),
+
+            // ==============================
+            // TIMELINE
+            // ==============================
+            SizedBox(
+              width: 10,
+              child: Column(
+                children: [
+                  Container(
+                    width: 10,
+                    height: 10,
+                    decoration: BoxDecoration(
+                      color: isIn
+                          ? Theme.of(context).colorScheme.secondary
+                          : Colors.orange,
+                      shape: BoxShape.circle,
+                    ),
                   ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
+
+                  if (index != logs.length - 1)
+                    Container(
+                      width: 2,
+                      height: 150,
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.primary.withOpacity(.25),
+                    ),
+                ],
+              ),
+            ),
+
+            const SizedBox(width: 10),
+
+            // ==============================
+            // WORKLOG CARD
+            // ==============================
+            Expanded(
+              child: Card(
+                margin: const EdgeInsets.only(bottom: 15),
+                color: Theme.of(context).colorScheme.background,
+                elevation: 1,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(15),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // WORK TYPE + TIME
+                      Row(
+                        children: [
+                          Icon(
+                            isIn ? Icons.login_rounded : Icons.logout_rounded,
+                            size: 20,
+                            color: isIn
+                                ? Theme.of(context).colorScheme.primary
+                                : Colors.orange,
+                          ),
+
+                          const SizedBox(width: 8),
+
+                          Text(
+                            isIn ? "Check In" : "Check Out",
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 12),
+
+                      // WORK TITLE
+                      if (workTitle.isNotEmpty)
                         Text(
-                          log["title"] ?? "",
+                          workTitle,
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+
+                      // DESCRIPTION
+                      if (description.isNotEmpty) ...[
+                        const SizedBox(height: 6),
+
+                        Text(
+                          description,
                           style: Theme.of(context).textTheme.labelMedium,
                         ),
-                        const SizedBox(height: 5),
-                        Text(
-                          log["description"] ?? " ",
-                          style: Theme.of(context).textTheme.labelSmall,
-                        ),
+                      ],
 
-                        const SizedBox(height: 5),
-                        if (log["imageUrl"] != null &&
-                            log["imageUrl"].toString().isNotEmpty)
-                          GestureDetector(
-                            onTap: () {
-                              final fullUrl =
-                                  "${ApiConstants.Uploaded}${log["imageUrl"].toString()}";
+                      // IMAGE
+                      if (imageUrl != null && imageUrl.isNotEmpty) ...[
+                        const SizedBox(height: 12),
 
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) =>
-                                      FullScreenImageViewer(imageUrl: fullUrl),
-                                ),
-                              );
-                            },
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(10),
-                              child: SizedBox(
-                                height: 150,
-                                width: double.infinity,
-                                child: Image.network(
-                                  "${ApiConstants.Uploaded}${log["imageUrl"]}",
-                                  fit: BoxFit.cover,
-                                  loadingBuilder:
-                                      (context, child, loadingProgress) {
-                                        if (loadingProgress == null)
-                                          return child;
+                        GestureDetector(
+                          onTap: () {
+                            final fullUrl = "${ApiConstants.Uploaded}$imageUrl";
 
-                                        return const Center(
-                                          child: RotatingFlower(),
-                                        );
-                                      },
-                                  errorBuilder: (context, error, stackTrace) {
-                                    return const Center(
-                                      child: Icon(Icons.broken_image),
-                                    );
-                                  },
-                                ),
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    FullScreenImageViewer(imageUrl: fullUrl),
+                              ),
+                            );
+                          },
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(10),
+                            child: SizedBox(
+                              height: 150,
+                              width: double.infinity,
+                              child: Image.network(
+                                "${ApiConstants.Uploaded}$imageUrl",
+                                fit: BoxFit.cover,
+
+                                loadingBuilder:
+                                    (context, child, loadingProgress) {
+                                      if (loadingProgress == null) {
+                                        return child;
+                                      }
+
+                                      return const Center(
+                                        child: RotatingFlower(),
+                                      );
+                                    },
+
+                                errorBuilder: (context, error, stackTrace) {
+                                  return const Center(
+                                    child: Icon(Icons.broken_image, size: 40),
+                                  );
+                                },
                               ),
                             ),
                           ),
-                        const SizedBox(height: 8),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            Text(
-                              "Duration: ${formatHoursToHM(hours)}",
-                              style: Theme.of(context).textTheme.titleMedium,
-                            ),
-                          ],
                         ),
                       ],
-                    ),
+                    ],
                   ),
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         );
       },
     );

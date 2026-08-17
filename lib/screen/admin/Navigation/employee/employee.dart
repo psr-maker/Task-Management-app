@@ -71,23 +71,28 @@ class _EmployeelistState extends State<Employeelist>
     return Scaffold(
       appBar: AppBar(
         title: Text(department),
-        bottom: TabBar(
-          controller: _tabController,
-          indicatorColor: Colors.white,
-          labelColor: Colors.white,
-          labelStyle: Theme.of(context).textTheme.labelLarge,
-          unselectedLabelStyle: TextStyle(color: Colors.grey),
-          tabs: tabs.map((e) => Tab(text: e)).toList(),
-        ),
+        // bottom: TabBar(
+        //   controller: _tabController,
+        //   indicatorColor: Colors.white,
+        //   labelColor: Colors.white,
+        //   labelStyle: Theme.of(context).textTheme.labelLarge,
+        //   unselectedLabelStyle: TextStyle(color: Colors.grey),
+        //   tabs: tabs.map((e) => Tab(text: e)).toList(),
+        // ),
       ),
-      body: TabBarView(
-        controller: _tabController,
+      body:Column(
         children: [
           EmployeeList(department: department, searchQuery: ''),
-          Empgoals(department: department),
-          
         ],
       ),
+      // TabBarView(
+      //   controller: _tabController,
+      //   children: [
+      //     EmployeeList(department: department, searchQuery: ''),
+      //     Empgoals(department: department),
+          
+      //   ],
+      // ),
     );
   }
 }

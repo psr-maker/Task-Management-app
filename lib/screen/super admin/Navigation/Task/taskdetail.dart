@@ -131,8 +131,8 @@ class _TaskDetailsState extends State<TaskDetails> {
       createdById = task.assignedBy!.trim();
     }
 
-    final isDirector = loginUserRole.contains("director");
-    final isManager = loginUserRole.contains("manager");
+    final isDirector = loginUserRole.contains("1");
+    final isManager = loginUserRole.contains("2");
 
     // ✅ Directors can always edit
     if (isDirector) {
@@ -292,7 +292,7 @@ class _TaskDetailsState extends State<TaskDetails> {
                           final role = JwtHelper.getRole(
                             token!,
                           )?.toLowerCase().trim();
-                          if (role == "director") {
+                          if (role == "1") {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
@@ -350,18 +350,18 @@ class _TaskDetailsState extends State<TaskDetails> {
                   "Assignment Summary",
                   style: Theme.of(context).textTheme.headlineLarge,
                 ),
-                const SizedBox(height: 10),
-                if (memberRoles.isNotEmpty) ...[
-                  Text("Role", style: Theme.of(context).textTheme.labelMedium),
-                  const SizedBox(height: 5),
-                  Wrap(
-                    spacing: 5,
-                    runSpacing: 5,
-                    children: memberRoles
-                        .map((role) => Chip(label: Text(role)))
-                        .toList(),
-                  ),
-                ],
+                // const SizedBox(height: 10),
+                // if (memberRoles.isNotEmpty) ...[
+                //   Text("Role", style: Theme.of(context).textTheme.labelMedium),
+                //   const SizedBox(height: 5),
+                //   Wrap(
+                //     spacing: 5,
+                //     runSpacing: 5,
+                //     children: memberRoles
+                //         .map((role) => Chip(label: Text(role)))
+                //         .toList(),
+                //   ),
+                // ],
                 const SizedBox(height: 10),
                 if (departments.isNotEmpty) ...[
                   Text(
@@ -470,6 +470,7 @@ class _TaskDetailsState extends State<TaskDetails> {
 
   Widget _infoCard() {
     final theme = Theme.of(context);
+    final isQty = task!.performanceType.toLowerCase().trim() == "qty";
     return Container(
       padding: EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -492,6 +493,39 @@ class _TaskDetailsState extends State<TaskDetails> {
             "Due Date",
             AppHelpers.formatDate(task!.dueDate),
           ),
+          // Performance Type
+          const SizedBox(height: 14),
+
+          _infoRow(
+            Icons.track_changes,
+            "Performance Type",
+            task!.performanceType,
+          ),
+
+          // Qty task only
+          if (isQty && task!.quantity != null) ...[
+            const SizedBox(height: 14),
+
+            _infoRow(
+              Icons.production_quantity_limits,
+              "Quantity",
+              task!.quantity.toString(),
+            ),
+          ],
+
+          // Qty task only
+          if (task!.startTime != null) ...[
+            const SizedBox(height: 14),
+
+            _infoRow(Icons.access_time, "Start Time", task!.startTime!),
+          ],
+
+          if (task!.endTime != null) ...[
+            const SizedBox(height: 14),
+
+            _infoRow(Icons.access_time_filled, "End Time", task!.endTime!),
+          ],
+
           if (task!.status.toLowerCase() == "completed") ...[
             const SizedBox(height: 14),
             _infoRow(

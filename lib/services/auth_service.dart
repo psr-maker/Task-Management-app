@@ -1,6 +1,7 @@
 import 'dart:convert';
-import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:image_picker/image_picker.dart';
 import 'package:staff_work_track/core/constant/apiurl.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
@@ -99,7 +100,7 @@ class AuthService {
   /// ✅ UPDATE PROFILE (FULL DATA)
   static Future<void> updateProfile(
     Map<String, dynamic> data,
-    File? image,
+    XFile? image,
   ) async {
     final token = await getToken();
 
@@ -115,13 +116,21 @@ class AuthService {
       request.fields[key] = value?.toString() ?? "";
     });
 
-    // 🔹 add image
     if (image != null) {
-      request.files.add(
-        await http.MultipartFile.fromPath("ProfileImage", image.path),
-      );
+      if (kIsWeb) {
+        request.files.add(
+          http.MultipartFile.fromBytes(
+            "ProfileImage",
+            await image.readAsBytes(),
+            filename: image.name,
+          ),
+        );
+      } else {
+        request.files.add(
+          await http.MultipartFile.fromPath("ProfileImage", image.path),
+        );
+      }
     }
-
     var response = await request.send();
 
     if (response.statusCode != 200) {

@@ -222,8 +222,8 @@ class _EmployeeDetailState extends State<EmployeeDetail> {
       }
     }
 
-    final isDirector = loginUserRole.contains("director");
-    final isManager = loginUserRole.contains("manager");
+    final isDirector = loginUserRole.contains("1");
+    final isManager = loginUserRole.contains("2");
 
     // ✅ RULES
     final allowEditDelete = isDirector || (loginUserId == createdById);
@@ -606,7 +606,7 @@ class _EmployeeDetailState extends State<EmployeeDetail> {
                 onPressed: () async {
                   final token = await AuthService.getToken();
                   final role = JwtHelper.getRole(token!)?.toLowerCase().trim();
-                  if (role == "director") {
+                  if (role == "1") {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
@@ -625,6 +625,8 @@ class _EmployeeDetailState extends State<EmployeeDetail> {
         _row(Icons.email, employee.email),
         const SizedBox(height: 10),
         _row(Icons.business, employee.department),
+         const SizedBox(height: 10),
+        _row(Icons.work, employee.role),
 
         Row(
           children: [
@@ -701,9 +703,7 @@ class _EmployeeDetailState extends State<EmployeeDetail> {
           children: [
             Text("Created By", style: Theme.of(context).textTheme.titleLarge),
             Text(
-              employee.createdBy.split('-').length > 1
-                  ? employee.createdBy.split('-')[1]
-                  : employee.createdBy,
+              employee.createdBy,
               style: Theme.of(context).textTheme.headlineMedium,
             ),
           ],

@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:staff_work_track/core/constant/apiurl.dart';
@@ -34,7 +35,7 @@ class _UserEditProfileState extends State<UserEditProfile> {
   final _manager = TextEditingController();
 
   late Future<Map<String, dynamic>> _future;
-  File? _profileImage;
+  XFile? _profileImage;
   String? gender;
   bool _init = false;
   bool _saving = false;
@@ -132,7 +133,7 @@ class _UserEditProfileState extends State<UserEditProfile> {
 
     if (picked != null) {
       setState(() {
-        _profileImage = File(picked.path);
+        _profileImage = picked;
       });
     }
   }
@@ -186,17 +187,19 @@ class _UserEditProfileState extends State<UserEditProfile> {
                               backgroundColor: Colors.grey.shade300,
 
                               backgroundImage: _profileImage != null
-                                  ? FileImage(_profileImage!)
-                                  : (getProfileImageUrl(d) != null
-                                            ? NetworkImage(
-                                                getProfileImageUrl(d)!,
-                                              )
-                                            : null)
-                                        as ImageProvider?,
+                                  ? (kIsWeb
+                                        ? NetworkImage(_profileImage!.path)
+                                        : FileImage(File(_profileImage!.path))
+                                              as ImageProvider)
+                                  : (getProfileImageUrl(d) != null &&
+                                            getProfileImageUrl(d)!.isNotEmpty
+                                        ? NetworkImage(getProfileImageUrl(d)!)
+                                        : null),
 
                               child:
                                   (_profileImage == null &&
-                                      getProfileImageUrl(d) == null)
+                                      (getProfileImageUrl(d) == null ||
+                                          getProfileImageUrl(d)!.isEmpty))
                                   ? const Icon(Icons.person, size: 50)
                                   : null,
                             ),

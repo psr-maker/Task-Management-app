@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:staff_work_track/Models/rolesmodel.dart';
 import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
 import 'package:staff_work_track/services/auth_service.dart';
 import 'package:staff_work_track/core/widgets/buttons.dart';
@@ -6,8 +7,7 @@ import 'package:staff_work_track/services/superadmin_service.dart';
 import 'package:staff_work_track/widgets/customfieldwidget.dart';
 
 class CreateUsers extends StatefulWidget {
-  final String role;
-  const CreateUsers({super.key, required this.role});
+  const CreateUsers({super.key});
 
   @override
   State<CreateUsers> createState() => _CreateUsersState();
@@ -16,21 +16,37 @@ class CreateUsers extends StatefulWidget {
 class _CreateUsersState extends State<CreateUsers> {
   final usernameController = TextEditingController();
   final emailController = TextEditingController();
-  List<String> departments = [];
+
+  List departments = [];
+  List<Role> roles = [];
+
   bool _isLoading = false;
 
   String? selectedDepartment;
+  Role? selectedRole;
 
   String? _topMessage;
   bool _isErrorMessage = true;
   bool _showTopMessage = false;
+
   @override
   void initState() {
     super.initState();
     _fetchDepartments();
+    _loadRoles();
   }
 
-  void showTopMessage(String message, {bool isError = true}) {
+  @override
+  void dispose() {
+    usernameController.dispose();
+    emailController.dispose();
+    super.dispose();
+  }
+
+  void showTopMessage(
+    String message, {
+    bool isError = true,
+  }) {
     setState(() {
       _topMessage = message;
       _isErrorMessage = isError;
@@ -39,194 +55,501 @@ class _CreateUsersState extends State<CreateUsers> {
 
     Future.delayed(const Duration(seconds: 3), () {
       if (!mounted) return;
+
       setState(() {
         _showTopMessage = false;
       });
     });
   }
 
+  // =========================
+  // CREATE USER
+  // =========================
+
   Future<void> createUser() async {
     if (usernameController.text.trim().isEmpty) {
-      showTopMessage("Please enter username", isError: true);
+      showTopMessage(
+        "Please enter username",
+        isError: true,
+      );
       return;
     }
 
     if (emailController.text.trim().isEmpty) {
-      showTopMessage("Please enter email", isError: true);
+      showTopMessage(
+        "Please enter email",
+        isError: true,
+      );
       return;
     }
 
     if (selectedDepartment == null) {
-      showTopMessage("Please select department", isError: true);
+      showTopMessage(
+        "Please select department",
+        isError: true,
+      );
       return;
     }
 
-    setState(() => _isLoading = true);
+    if (selectedRole == null) {
+      showTopMessage(
+        "Please select role",
+        isError: true,
+      );
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+    });
 
     try {
       final response = await AuthService().createUser(
         name: usernameController.text.trim(),
         email: emailController.text.trim(),
         department: selectedDepartment!,
-        role: widget.role,
+
+        // IMPORTANT:
+        // Send Role ID, not Role Name
+        role: selectedRole!.id.toString(),
       );
 
       showTopMessage(
-        response['message'] ?? "User created successfully 🎉",
+        response['message'] ??
+            "User created successfully 🎉",
         isError: false,
       );
 
-      await Future.delayed(const Duration(seconds: 2));
+      await Future.delayed(
+        const Duration(seconds: 2),
+      );
 
       if (!mounted) return;
+
       Navigator.pop(context, true);
     } catch (e) {
-      showTopMessage(e.toString(), isError: true);
+      showTopMessage(
+        e.toString().replaceFirst(
+          'Exception: ',
+          '',
+        ),
+        isError: true,
+      );
     } finally {
       if (mounted) {
-        setState(() => _isLoading = false);
+        setState(() {
+          _isLoading = false;
+        });
       }
     }
   }
 
-  void _fetchDepartments() async {
+  // =========================
+  // FETCH DEPARTMENTS
+  // =========================
+
+  Future<void> _fetchDepartments() async {
     try {
-      final deptList = await SuperAdminService().getDepartments();
+      final deptList =
+          await SuperAdminService().getDepartments();
+
+      if (!mounted) return;
+
       setState(() {
-        departments = deptList.map((d) => d.departmentName).toSet().toList();
+        departments = deptList
+            .map((d) => d.departmentName)
+            .toSet()
+            .toList();
       });
     } catch (e) {
-      debugPrint("Failed to fetch departments: $e");
-      showTopMessage("Failed to load departments", isError: true);
+      debugPrint(
+        "Failed to fetch departments: $e",
+      );
+
+      if (!mounted) return;
+
+      showTopMessage(
+        "Failed to load departments",
+        isError: true,
+      );
     }
   }
+
+  // =========================
+  // FETCH ROLES
+  // =========================
+
+  Future<void> _loadRoles() async {
+    try {
+      final rolesList =
+          await SuperAdminService.getRoles();
+
+      if (!mounted) return;
+
+      setState(() {
+        roles = rolesList;
+      });
+    } catch (e) {
+      debugPrint(
+        "Failed to fetch Roles: $e",
+      );
+
+      if (!mounted) return;
+
+      showTopMessage(
+        "Failed to load roles",
+        isError: true,
+      );
+    }
+  }
+
+  // =========================
+  // UI
+  // =========================
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text("Add New ${widget.role}"),
+        title: const Text("Add New User"),
+
         leading: IconButton(
           onPressed: () {
             Navigator.pop(context);
           },
-          icon: Icon(Icons.arrow_back_ios),
+          icon: const Icon(
+            Icons.arrow_back_ios,
+          ),
         ),
       ),
+
       body: Padding(
-        padding: const EdgeInsets.only(left: 20, right: 20, top: 40),
+        padding: const EdgeInsets.only(
+          left: 20,
+          right: 20,
+          top: 40,
+        ),
+
         child: SingleChildScrollView(
-          scrollDirection: Axis.vertical,
           child: Stack(
             children: [
+
               Column(
                 children: [
-                  Center(child: Icon(Icons.person_add, size: 65)),
-                  SizedBox(height: 20),
+
+                  // USER ICON
+                  const Center(
+                    child: Icon(
+                      Icons.person_add,
+                      size: 65,
+                    ),
+                  ),
+
+                  const SizedBox(height: 20),
+
                   Container(
-                    width: MediaQuery.of(context).size.width,
+                    width: double.infinity,
+
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius:
+                          BorderRadius.circular(10),
+
                       border: Border.all(
-                        color: Theme.of(context).colorScheme.primary,
+                        color: Theme.of(context)
+                            .colorScheme
+                            .primary,
                         width: 2,
                       ),
                     ),
+
                     child: Padding(
-                      padding: const EdgeInsets.all(20),
-                      child: SingleChildScrollView(
-                        scrollDirection: Axis.vertical,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              "Enter UserName",
-                              style: Theme.of(context).textTheme.headlineLarge,
-                            ),
-                            const SizedBox(height: 8),
-                            CustomTextField(controller: usernameController),
-                            const SizedBox(height: 20),
+                      padding:
+                          const EdgeInsets.all(20),
 
-                            Text(
-                              "Enter Email",
-                              style: Theme.of(context).textTheme.headlineLarge,
-                            ),
-                            const SizedBox(height: 8),
-                            CustomTextField(
-                              controller: emailController,
-                              isEmail: true,
-                            ),
-                            const SizedBox(height: 20),
+                      child: Column(
+                        crossAxisAlignment:
+                            CrossAxisAlignment.start,
 
-                            Text(
-                              "Select Department",
-                              style: Theme.of(context).textTheme.headlineLarge,
-                            ),
-                            const SizedBox(height: 8),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                              ),
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(
-                                  color: Theme.of(context).colorScheme.primary,
-                                ),
-                              ),
-                              child: DropdownButton<String>(
-                                value: selectedDepartment,
-                                isExpanded: true,
-                                underline: const SizedBox(),
-                                hint: Text(
-                                  "Select Department",
-                                        style: Theme.of(context).textTheme.headlineSmall,
-                                ),
-                                       style: Theme.of(context).textTheme.headlineSmall,
-                                items: departments.map((dept) {
-                                  return DropdownMenuItem(
-                                    value: dept,
-                                    child: Text(
-                                      dept,
-                                           style: Theme.of(context).textTheme.headlineSmall,
-                                    ),
-                                  );
-                                }).toList(),
-                                onChanged: (value) {
-                                  setState(() => selectedDepartment = value);
-                                },
-                              ),
+                        children: [
+
+                          // =====================
+                          // USERNAME
+                          // =====================
+
+                          Text(
+                            "Enter UserName",
+                            style: Theme.of(context)
+                                .textTheme
+                                .headlineLarge,
+                          ),
+
+                          const SizedBox(height: 8),
+
+                          CustomTextField(
+                            controller:
+                                usernameController,
+                          ),
+
+                          const SizedBox(height: 20),
+
+                          // =====================
+                          // EMAIL
+                          // =====================
+
+                          Text(
+                            "Enter Email",
+                            style: Theme.of(context)
+                                .textTheme
+                                .headlineLarge,
+                          ),
+
+                          const SizedBox(height: 8),
+
+                          CustomTextField(
+                            controller:
+                                emailController,
+                            isEmail: true,
+                          ),
+
+                          const SizedBox(height: 20),
+
+                          // =====================
+                          // DEPARTMENT
+                          // =====================
+
+                          Text(
+                            "Select Department",
+                            style: Theme.of(context)
+                                .textTheme
+                                .headlineLarge,
+                          ),
+
+                          const SizedBox(height: 8),
+
+                          Container(
+                            padding:
+                                const EdgeInsets
+                                    .symmetric(
+                              horizontal: 12,
                             ),
 
-                            const SizedBox(height: 40),
+                            decoration:
+                                BoxDecoration(
+                              borderRadius:
+                                  BorderRadius
+                                      .circular(8),
 
-                            Center(
-                              child: AppButton(
-                                text: "Create ${widget.role}",
-                                isLoading: _isLoading,
-                                onPressed: _isLoading ? null : createUser,
-                                color: Theme.of(context).colorScheme.secondary,
-                                txtcolor: Theme.of(
+                              border: Border.all(
+                                color: Theme.of(
                                   context,
-                                ).colorScheme.onPrimary,
+                                )
+                                    .colorScheme
+                                    .primary,
                               ),
                             ),
-                          ],
-                        ),
+
+                            child:
+                                DropdownButton<String>(
+                              value:
+                                  selectedDepartment,
+
+                              isExpanded: true,
+
+                              underline:
+                                  const SizedBox(),
+
+                              hint: Text(
+                                "Select Department",
+                                style: Theme.of(
+                                  context,
+                                )
+                                    .textTheme
+                                    .headlineSmall,
+                              ),
+
+                              style: Theme.of(
+                                context,
+                              )
+                                  .textTheme
+                                  .headlineSmall,
+
+                              items: departments
+                                  .map((dept) {
+                                return DropdownMenuItem<
+                                    String>(
+                                  value: dept,
+
+                                  child: Text(
+                                    dept,
+
+                                    style: Theme.of(
+                                      context,
+                                    )
+                                        .textTheme
+                                        .headlineSmall,
+                                  ),
+                                );
+                              }).toList(),
+
+                              onChanged: (value) {
+                                setState(() {
+                                  selectedDepartment =
+                                      value;
+                                });
+                              },
+                            ),
+                          ),
+
+                          const SizedBox(height: 20),
+
+                          // =====================
+                          // ROLE
+                          // =====================
+
+                          Text(
+                            "Select Role",
+                            style: Theme.of(context)
+                                .textTheme
+                                .headlineLarge,
+                          ),
+
+                          const SizedBox(height: 8),
+
+                          Container(
+                            padding:
+                                const EdgeInsets
+                                    .symmetric(
+                              horizontal: 12,
+                            ),
+
+                            decoration:
+                                BoxDecoration(
+                              borderRadius:
+                                  BorderRadius
+                                      .circular(8),
+
+                              border: Border.all(
+                                color: Theme.of(
+                                  context,
+                                )
+                                    .colorScheme
+                                    .primary,
+                              ),
+                            ),
+
+                            child:
+                                DropdownButton<Role>(
+                              value: selectedRole,
+
+                              isExpanded: true,
+
+                              underline:
+                                  const SizedBox(),
+
+                              hint: Text(
+                                "Select Role",
+                                style: Theme.of(
+                                  context,
+                                )
+                                    .textTheme
+                                    .headlineSmall,
+                              ),
+
+                              style: Theme.of(
+                                context,
+                              )
+                                  .textTheme
+                                  .headlineSmall,
+
+                              items: roles.map((role) {
+                                return DropdownMenuItem<
+                                    Role>(
+                                  value: role,
+
+                                  child: Text(
+                                    role.name,
+
+                                    style: Theme.of(
+                                      context,
+                                    )
+                                        .textTheme
+                                        .headlineSmall,
+                                  ),
+                                );
+                              }).toList(),
+
+                              onChanged: (value) {
+                                setState(() {
+                                  selectedRole =
+                                      value;
+                                });
+                              },
+                            ),
+                          ),
+
+                          const SizedBox(height: 40),
+
+                          // =====================
+                          // CREATE BUTTON
+                          // =====================
+
+                          Center(
+                            child: AppButton(
+                              text: "Create User",
+
+                              isLoading:
+                                  _isLoading,
+
+                              onPressed: _isLoading
+                                  ? null
+                                  : createUser,
+
+                              color: Theme.of(
+                                context,
+                              )
+                                  .colorScheme
+                                  .secondary,
+
+                              txtcolor: Theme.of(
+                                context,
+                              )
+                                  .colorScheme
+                                  .onPrimary,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
                 ],
               ),
+
+              // =========================
+              // TOP MESSAGE
+              // =========================
+
               if (_topMessage != null)
                 AnimatedPositioned(
-                  top: _showTopMessage ? 0 : -120,
+                  top: _showTopMessage
+                      ? 0
+                      : -120,
+
                   left: 16,
                   right: 16,
-                  duration: const Duration(milliseconds: 300),
+
+                  duration:
+                      const Duration(
+                    milliseconds: 300,
+                  ),
+
                   child: Msgsnackbar(
                     context,
-                    message: _topMessage!,
-                    isError: _isErrorMessage,
+
+                    message:
+                        _topMessage!,
+
+                    isError:
+                        _isErrorMessage,
                   ),
                 ),
             ],

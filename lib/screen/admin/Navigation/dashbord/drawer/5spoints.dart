@@ -60,10 +60,9 @@ class _FiveSpointsState extends State<FiveSpoints> {
   }
 
   void _savePoints() async {
-    if (selectedUser == null || selectedDept == null) return;
+    if (selectedDept == null) return;
 
     final success = await AdminService.saveFiveSPoints(
-      staffId: selectedUser!.userId,
       dept: selectedDept!,
       month: selectedMonth,
       week: selectedWeek,
@@ -74,7 +73,6 @@ class _FiveSpointsState extends State<FiveSpoints> {
       showTopMessage("Points saved successfully", isError: false);
       setState(() {
         selectedDept = null;
-        selectedUser = null;
         filteredUsers = [];
 
         selectedMonth = DateTime.now().month;
@@ -154,28 +152,28 @@ class _FiveSpointsState extends State<FiveSpoints> {
                     decoration: _inputDecoration(),
                   ),
 
-                  const SizedBox(height: 15),
+                  // const SizedBox(height: 15),
 
-                  _label("Staff"),
-                  const SizedBox(height: 10),
-                  DropdownButtonFormField<UserModel>(
-                    value: selectedUser,
-                    dropdownColor: isDark
-                        ? Theme.of(context).colorScheme.background
-                        : Theme.of(context).colorScheme.onPrimary,
-                    style: Theme.of(context).textTheme.headlineSmall,
-                    items: filteredUsers.map((u) {
-                      return DropdownMenuItem(
-                        value: u,
-                        child: Text(
-                          u.name,
-                          style: Theme.of(context).textTheme.headlineSmall,
-                        ),
-                      );
-                    }).toList(),
-                    onChanged: (val) => setState(() => selectedUser = val),
-                    decoration: _inputDecoration(),
-                  ),
+                  // _label("Staff"),
+                  // const SizedBox(height: 10),
+                  // DropdownButtonFormField<UserModel>(
+                  //   value: selectedUser,
+                  //   dropdownColor: isDark
+                  //       ? Theme.of(context).colorScheme.background
+                  //       : Theme.of(context).colorScheme.onPrimary,
+                  //   style: Theme.of(context).textTheme.headlineSmall,
+                  //   items: filteredUsers.map((u) {
+                  //     return DropdownMenuItem(
+                  //       value: u,
+                  //       child: Text(
+                  //         u.name,
+                  //         style: Theme.of(context).textTheme.headlineSmall,
+                  //       ),
+                  //     );
+                  //   }).toList(),
+                  //   onChanged: (val) => setState(() => selectedUser = val),
+                  //   decoration: _inputDecoration(),
+                  // ),
 
                   const SizedBox(height: 15),
 

@@ -3,7 +3,9 @@ import 'package:staff_work_track/Models/warning_model.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
 import 'package:staff_work_track/screen/admin/Navigation/dashbord/deptwarnings.dart';
 import 'package:staff_work_track/screen/admin/Navigation/dashbord/drawer/5spoints.dart';
+import 'package:staff_work_track/screen/admin/Navigation/dashbord/drawer/attinbhvscore/scoredisplay.dart';
 import 'package:staff_work_track/screen/admin/Navigation/dashbord/drawer/deptovertime.dart';
+import 'package:staff_work_track/screen/admin/Navigation/dashbord/drawer/punchdeptlist.dart';
 import 'package:staff_work_track/screen/admin/Navigation/dashbord/drawer/staffleaves.dart';
 import 'package:staff_work_track/screen/admin/Navigation/dashbord/drawer/staffworklog.dart';
 import 'package:staff_work_track/screen/admin/Navigation/dashbord/drawer/task%20points/emptaskreview.dart';
@@ -97,20 +99,6 @@ class _AdminState extends State<AdminDashboard> {
     });
   }
 
-  // Future<void> loadData() async {
-  //   try {
-  //     final res = await ReportsService.getdeptMonthlyProductivity(
-  //       widget.department,
-  //       selectedYear.year,
-  //     );
-  //     setState(() {
-  //       data = res;
-  //       isLoading = false;
-  //     });
-  //   } catch (e) {
-  //     setState(() => isLoading = false);
-  //   }
-  // }
   Future<void> loadData() async {
     try {
       final res = await ReportsService.getdeptMonthlyProductivity(
@@ -681,142 +669,6 @@ class _AdminState extends State<AdminDashboard> {
     );
   }
 
-  //  Widget _buildDrawerItem(
-  //   BuildContext context, {
-  //   required IconData icon,
-  //   required String title,
-  //   required VoidCallback onTap,
-  // }) {
-  //   return ListTile(
-  //     leading: Icon(icon),
-  //     title: Text(
-  //       title,
-  //       style: Theme.of(context).textTheme.headlineMedium,
-  //     ),
-  //     trailing: const Icon(Icons.arrow_forward_ios),
-  //     onTap: onTap,
-  //   );
-  // }
-
-  //   Widget _buildDrawer(BuildContext context) {
-  //     final theme = Theme.of(context);
-  //     final isDark = theme.brightness == Brightness.dark;
-  //     return Drawer(
-  //       backgroundColor: isDark
-  //           ? theme.colorScheme.primary
-  //           : theme.colorScheme.onPrimary,
-  //       child: Column(
-  //         crossAxisAlignment: CrossAxisAlignment.start,
-  //         children: [
-  //           Container(
-  //             width: double.infinity,
-  //             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
-  //             decoration: BoxDecoration(color: theme.colorScheme.secondary),
-  //             child: Column(
-  //               crossAxisAlignment: CrossAxisAlignment.start,
-  //               children: [
-  //                 Icon(
-  //                   Icons.dashboard_rounded,
-  //                   color: theme.colorScheme.onPrimary,
-  //                   size: 32,
-  //                 ),
-  //                 const SizedBox(height: 12),
-  //                 Text(
-  //                   "Manager Panel",
-  //                   style: Theme.of(context).textTheme.bodySmall,
-  //                 ),
-  //               ],
-  //             ),
-  //           ),
-  //           SizedBox(height: 20),
-  //           _buildDrawerItem(
-  //             context,
-  //             icon: Icons.task_alt_rounded,
-  //             title: "Task Review Points",
-  //             onTap: () {
-  //               Navigator.pop(context);
-  //               Navigator.push(
-  //                 context,
-  //                 MaterialPageRoute(builder: (_) => Taskpoints()),
-  //               );
-  //             },
-  //           ),
-  //           _buildDrawerItem(
-  //             context,
-  //             icon: Icons.workspace_premium_rounded,
-  //             title: "5S Points",
-  //             onTap: () {
-  //               Navigator.pop(context);
-  //               Navigator.push(
-  //                 context,
-  //                 MaterialPageRoute(builder: (_) => FiveSpoints()),
-  //               );
-  //             },
-  //           ),
-  //           _buildDrawerItem(
-  //             context,
-  //             icon: Icons.filter_vintage_sharp,
-  //             title: "Warrenty Points",
-  //             onTap: () {
-  //               Navigator.pop(context);
-  //               Navigator.push(
-  //                 context,
-  //                 MaterialPageRoute(builder: (_) => Warrentypoints()),
-  //               );
-  //             },
-  //           ),
-  //           _buildDrawerItem(
-  //             context,
-  //             icon: Icons.history_toggle_off_rounded,
-  //             title: "Audit Log",
-  //             onTap: () {
-  //               Navigator.pop(context);
-  //               Navigator.push(
-  //                 context,
-  //                 MaterialPageRoute(builder: (_) => AuditLogPage()),
-  //               );
-  //             },
-  //           ),
-  //           _buildDrawerItem(
-  //             context,
-  //             icon: Icons.message,
-  //             title: "Anouncements",
-  //             onTap: () {
-  //               Navigator.pop(context);
-  //               Navigator.push(
-  //                 context,
-  //                 MaterialPageRoute(builder: (_) => Anounce()),
-  //               );
-  //             },
-  //           ),
-  //           _buildDrawerItem(
-  //             context,
-  //             icon: Icons.access_time_sharp,
-  //             title: "Worklog",
-  //             onTap: () {
-  //               Navigator.pop(context);
-  //               Navigator.push(
-  //                 context,
-  //                 MaterialPageRoute(builder: (_) => Staffworklog()),
-  //               );
-  //             },
-  //           ),
-  //           _buildDrawerItem(
-  //             context,
-  //             icon: Icons.align_horizontal_right_rounded,
-  //             title: "Leave Request",
-  //             onTap: () {
-  //               Navigator.pop(context);
-  //               Navigator.push(
-  //                 context,
-  //                 MaterialPageRoute(builder: (_) => StaffLeaves()),
-  //               );
-  //             },
-  //           ),
-  //         ],
-  //       ),
-  //     );
-  //   }
   Widget _buildDrawerItem(
     BuildContext context, {
     required IconData icon,
@@ -895,19 +747,18 @@ class _AdminState extends State<AdminDashboard> {
                   },
                 ),
 
-                _buildDrawerItem(
-                  context,
-                  icon: Icons.filter_vintage_sharp,
-                  title: "Warranty Points",
-                  onTap: () {
-                    Navigator.pop(context);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => Warrentypoints()),
-                    );
-                  },
-                ),
-
+                // _buildDrawerItem(
+                //   context,
+                //   icon: Icons.filter_vintage_sharp,
+                //   title: "Warranty Points",
+                //   onTap: () {
+                //     Navigator.pop(context);
+                //     Navigator.push(
+                //       context,
+                //       MaterialPageRoute(builder: (_) => Warrentypoints()),
+                //     );
+                //   },
+                // ),
                 _buildDrawerItem(
                   context,
                   icon: Icons.history_toggle_off_rounded,
@@ -961,6 +812,18 @@ class _AdminState extends State<AdminDashboard> {
                 ),
                 _buildDrawerItem(
                   context,
+                  icon: Icons.align_horizontal_right_rounded,
+                  title: "Punch Correction Request",
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => PunchCorrdeptlist()),
+                    );
+                  },
+                ),
+                _buildDrawerItem(
+                  context,
                   icon: Icons.history_rounded,
                   title: "OverTime History",
                   onTap: () {
@@ -980,6 +843,21 @@ class _AdminState extends State<AdminDashboard> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(builder: (_) => TaskRemovalRequest()),
+                    );
+                  },
+                ),
+                _buildDrawerItem(
+                  context,
+                  icon: Icons.highlight_remove_sharp,
+                  title: "Attitute & Behaviour Sore",
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            BehaviourScoreDisplay(Dept: widget.department),
+                      ),
                     );
                   },
                 ),

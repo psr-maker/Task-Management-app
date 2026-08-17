@@ -122,7 +122,7 @@ class _EmployeetabState extends State<Employeetab> {
                           final result = await Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) => CreateUsers(role: selectedRole),
+                              builder: (_) => CreateUsers(),
                             ),
                           );
 

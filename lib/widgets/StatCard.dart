@@ -242,7 +242,7 @@ class _TaskCardState extends State<Taskstatus> {
       }
 
       // Directors can edit any task (no restrictions)
-      if (userRole == "director") {
+      if (userRole == "1") {
         setState(() {
           _canEditStatus = true;
           _permissionChecked = true;
@@ -263,7 +263,7 @@ class _TaskCardState extends State<Taskstatus> {
       }
 
       // Staff can only edit if task is assigned to them
-      if (userRole != "manager") {
+      if (userRole != "2") {
         setState(() {
           _canEditStatus = isAssignedToUser;
           _permissionChecked = true;

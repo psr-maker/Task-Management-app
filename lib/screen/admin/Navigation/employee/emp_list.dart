@@ -46,7 +46,7 @@ class _EmployeeListState extends State<EmployeeList> {
     final role = JwtHelper.getRole(token);
 
     setState(() {
-      isAdmin = role == "Manager";
+      isAdmin = role == "2";
     });
   }
 
@@ -92,7 +92,7 @@ class _EmployeeListState extends State<EmployeeList> {
                             onChanged: (_) => setState(() {}),
                           )
                         : Text(
-                            "Staff List",
+                            "Users List",
                             style: Theme.of(context).textTheme.displaySmall,
                           ),
                   ),
@@ -122,7 +122,7 @@ class _EmployeeListState extends State<EmployeeList> {
                         final result = await Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (_) => CreateUsers(role: selectedRole),
+                            builder: (_) => CreateUsers(),
                           ),
                         );
                         if (result == true) {
@@ -139,7 +139,7 @@ class _EmployeeListState extends State<EmployeeList> {
                     child: Chip(
                       backgroundColor: Theme.of(context).colorScheme.secondary,
                       label: Text(
-                        selectedEmpIds.isNotEmpty ? "Add Task" : "Staff +",
+                        selectedEmpIds.isNotEmpty ? "Add Task" : "Users +",
                         style: Theme.of(context).textTheme.titleMedium,
                       ),
                     ),

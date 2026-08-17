@@ -5,6 +5,7 @@ import 'package:staff_work_track/core/widgets/buttons.dart';
 import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
 import 'package:staff_work_track/screen/authen/login_selection.dart';
 import 'package:staff_work_track/screen/super admin/Navigation/dashboard/settings/add_dept.dart';
+import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/settings/roles/roles.dart';
 import 'package:staff_work_track/services/auth_service.dart';
 
 class Settings extends StatefulWidget {
@@ -136,7 +137,21 @@ class _SettingsState extends State<Settings> {
               );
             },
           ),
-
+          const SizedBox(height: 30),
+          Settings._sectionTitle("Roles & Permissions"),
+          const SizedBox(height: 10),
+          Settings._buildTile(
+            context,
+            icon: Icons.apartment_outlined,
+            title: "Manage Roles & Permissions",
+            subtitle: "Add or update roles and permissions",
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const RolesList()),
+              );
+            },
+          ),
           const SizedBox(height: 40),
 
           Center(

@@ -37,9 +37,9 @@ class _SplashScreenState extends State<SplashScreen>
       return;
     }
     final role = JwtHelper.getRole(token);
-    if (role == "Director") {
+    if (role == "1") {
       _go(const SuperAdmin());
-    } else if (role == "Manager") {
+    } else if (role == "2") {
       _go(const Admin());
     } else {
       _go(const Staff());

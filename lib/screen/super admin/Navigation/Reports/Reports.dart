@@ -44,7 +44,7 @@ class _ReportsState extends State<Reports> with SingleTickerProviderStateMixin {
         controller: _tabController,
         children: const [
           DepartmentListPage(),
-          EmployeeReportsList(role: 'Manager'),
+          EmployeeReportsList(role: '2'),
           EmployeeReportsList(role: 'Staff'),
         ],
       ),
