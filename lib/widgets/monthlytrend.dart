@@ -333,7 +333,7 @@ class ProductivityBarChart extends StatelessWidget {
                   ? MainAxisAlignment.center
                   : MainAxisAlignment.start,
               children: List.generate(data.length, (index) {
-                final value = (data[index]["productivity"] ?? 0)
+                final value = (data[index]["totalscore"] ?? 0)
                     .toDouble()
                     .clamp(0, 100);
                 return GestureDetector(
@@ -394,7 +394,7 @@ class ProductivityBarChart extends StatelessWidget {
   }
 
   List<Color> _getColor(double value) {
-    if (value >= 90) return [Colors.green, Colors.greenAccent];
+    if (value >= 90) return [Colors.green, const Color.fromARGB(255, 31, 131, 83)];
     if (value >= 70) return [Colors.blue, Colors.lightBlueAccent];
     if (value >= 40) return [Colors.orange, Colors.amber];
     return [Colors.red, Colors.redAccent];
@@ -437,7 +437,7 @@ class ProductivityBarChart extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    "${item["productivity"]}%",
+                    "${item["totalscore"]}%",
                     style: const TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
@@ -452,12 +452,13 @@ class ProductivityBarChart extends StatelessWidget {
                   "Productivity",
                   style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
                 ),
+                
               ),
               const SizedBox(height: 20),
               _cleanRow(context, "Task Points", item["taskPoints"]),
               _cleanRow(context, "Goal Points", item["goalPoints"]),
-              _cleanRow(context, "5S Points", item["fiveSPoints"]),
-              _cleanRow(context, "Warranty Points", item["warrantyPoints"]),
+              _cleanRow(context, "5S Points", item["fiveS"]),
+              _cleanRow(context, "Attitute & Behaviour", item["attitudeScore"]),
               const SizedBox(height: 10),
             ],
           ),
@@ -507,6 +508,18 @@ class CapsuleBarChart extends StatelessWidget {
     return months[month - 1];
   }
 
+  String formatScore(dynamic value) {
+    if (value == null) return "0";
+
+    final num number = value is num
+        ? value
+        : num.tryParse(value.toString()) ?? 0;
+
+    // 85.0 → 85
+    // 85.5 → 85.5
+    return number % 1 == 0 ? number.toInt().toString() : number.toString();
+  }
+
   @override
   Widget build(BuildContext context) {
     const double maxHeight = 180;
@@ -533,9 +546,12 @@ class CapsuleBarChart extends StatelessWidget {
                 : MainAxisAlignment.start,
             crossAxisAlignment: CrossAxisAlignment.end,
             children: data.map((item) {
-              final int month = item["month"] ?? 1;
-              final int value = item["productivity"] ?? 0;
-              final double fillHeight = (value / 100) * maxHeight;
+              final int month = (item["month"] as num?)?.toInt() ?? 1;
+
+              final double value =
+                  (item["productivity"] as num?)?.toDouble() ?? 0.0;
+
+              final double fillHeight = (value / 100.0) * maxHeight;
               return Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 8),
                 child: Column(
@@ -596,7 +612,7 @@ class CapsuleBarChart extends StatelessWidget {
     );
   }
 
-  Color _getColor(int value) {
+  Color _getColor(double value) {
     if (value >= 90) return Colors.green;
     if (value >= 70) return Colors.blue;
     if (value >= 40) return Colors.orange;
@@ -605,14 +621,17 @@ class CapsuleBarChart extends StatelessWidget {
 
   void _showDetails(BuildContext context, Map item) {
     String monthName = getMonthName(item["month"] ?? 1);
-    final leaveAdj = item["leaveadjust"] ?? 0;
-    final permissionAdj = item["permisadjust"] ?? 0;
-    final overtime = item["overtimeadjust"] ?? 0;
     final taskpenalty = item["taskpenaltypoints"] ?? 0;
-    String formatValue(dynamic value) {
+    String formatScore(dynamic value) {
       if (value == null) return "0";
-      if (value > 0) return "+$value";
-      return "$value";
+
+      final num number = value is num
+          ? value
+          : num.tryParse(value.toString()) ?? 0;
+
+      // 85.0 → 85
+      // 85.5 → 85.5
+      return number % 1 == 0 ? number.toInt().toString() : number.toString();
     }
 
     showModalBottomSheet(
@@ -649,7 +668,7 @@ class CapsuleBarChart extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    "${item["productivity"]}%",
+                    "${formatScore(item["totalScore"])}%",
                     style: const TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
@@ -672,58 +691,36 @@ class CapsuleBarChart extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      "Base Productivity      ${item["progress"] ?? 0}%",
-                      style: const TextStyle(
+                      "Base Productivity                    ${formatScore(item["productivity"])}%",
+                      style: const TextStyle( 
                         fontSize: 14,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      "Leave Adjustment       ${formatValue(leaveAdj)}",
-                      style: TextStyle(
+                      "Attitute & Behaviour Score      ${formatScore(item["attitudeScore"])}%",
+                      style: const TextStyle(
                         fontSize: 14,
-                        color: leaveAdj < 0
-                            ? Theme.of(context).colorScheme.error
-                            : Theme.of(context).colorScheme.secondary,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
-                    const SizedBox(height: 6),
-                    Text(
-                      "Permission Adjustment  ${formatValue(permissionAdj)}",
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: permissionAdj < 0
-                            ? Theme.of(context).colorScheme.error
-                            : Theme.of(context).colorScheme.secondary,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    if (overtime != 0)
+                    if (taskpenalty != 0) ...[
+                      const SizedBox(height: 6),
                       Text(
-                        "Overtime Points  ${formatValue(overtime)}",
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Theme.of(context).colorScheme.secondary,
-                        ),
-                      ),
-                    const SizedBox(height: 6),
-                    if (taskpenalty != 0)
-                      Text(
-                        "Task Penalty Points  ${formatValue(taskpenalty)}",
+                        "Task Penalty Points  ${formatScore(taskpenalty)}",
                         style: TextStyle(
                           fontSize: 14,
                           color: Theme.of(context).colorScheme.error,
                         ),
                       ),
+                    ],
                   ],
                 ),
               ),
               const SizedBox(height: 16),
               _cleanRow(context, "Task Points", item["taskPoints"]),
               _cleanRow(context, "Goal Points", item["goalPoints"]),
-              _cleanRow(context, "5S Points", item["fiveSPoints"]),
-              _cleanRow(context, "Warranty Points", item["warrantyPoints"]),
               const SizedBox(height: 10),
             ],
           ),
@@ -743,7 +740,7 @@ class CapsuleBarChart extends StatelessWidget {
         children: [
           Text(title, style: Theme.of(context).textTheme.headlineLarge),
           Text(
-            value?.toString() ?? "0",
+            formatScore(value),
             style: Theme.of(context).textTheme.labelMedium,
           ),
         ],

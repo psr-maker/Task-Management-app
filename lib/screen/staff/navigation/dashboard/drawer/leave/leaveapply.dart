@@ -34,7 +34,6 @@ class _LeaveapplyState extends State<Leaveapply> {
   int totalMinutes = 0;
 
   bool hasApprovedCompensation = false;
-  bool _checkingCompensation = true;
 
   List<Map<String, dynamic>> availableCompensation = [];
 
@@ -68,13 +67,11 @@ class _LeaveapplyState extends State<Leaveapply> {
               },
             )
             .toList();
-        _checkingCompensation = false;
       });
     } catch (e) {
       if (!mounted) return;
       setState(() {
         hasApprovedCompensation = false;
-        _checkingCompensation = false;
       });
     }
   }

@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:staff_work_track/services/local_worklog_db.dart';
 import 'package:staff_work_track/services/worklog_sync_service.dart';
 

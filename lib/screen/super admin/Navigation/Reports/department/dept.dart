@@ -94,17 +94,15 @@ class _DepartmentReportsTabState extends State<DepartmentReportsTab> {
         delayedGoalPercent: (summaryReportData["delayedGoalPercentage"] ?? 0)
             .toDouble(),
         reportData: tableReportData,
-        // topPerformer: summaryReportData["topPerformer"],
-        // lowPerformer: summaryReportData["lowPerformer"],
-        topPerformer:
-            (summaryReportData["topPerformer"] as List?)?.isNotEmpty == true
-            ? Map<String, dynamic>.from(summaryReportData["topPerformer"][0])
-            : null,
+        // topPerformer:
+        //     (summaryReportData["topPerformer"] as List?)?.isNotEmpty == true
+        //     ? Map<String, dynamic>.from(summaryReportData["topPerformer"][0])
+        //     : null,
 
-        lowPerformer:
-            (summaryReportData["lowPerformer"] as List?)?.isNotEmpty == true
-            ? Map<String, dynamic>.from(summaryReportData["lowPerformer"][0])
-            : null,
+        // lowPerformer:
+        //     (summaryReportData["lowPerformer"] as List?)?.isNotEmpty == true
+        //     ? Map<String, dynamic>.from(summaryReportData["lowPerformer"][0])
+        //     : null,
       );
 
       await pdfGenerator.generateAndDownloadPDF();
@@ -331,12 +329,13 @@ class _DepartmentReportsTabState extends State<DepartmentReportsTab> {
                   data: monthlyData
                       .map(
                         (e) => {
-                          "month": e["month"],
-                          "productivity": e["productivity"],
-                          "taskPoints": e["taskPoints"],
-                          "goalPoints": e["goalPoints"],
-                          "fiveSPoints": e["fiveSPoints"],
-                          "warrantyPoints": e["warrantyPoints"],
+                          "month": e["month"] ?? 0,
+                          "taskPoints": e["taskPoints"] ?? 0,
+                          "goalPoints": e["goalPoints"] ?? 0,
+                          "attitudeScore": e["attitudeScore"] ?? 0,
+                          "fiveS": e["fiveS"] ?? 0,
+                          "productivity": e["productivity"] ?? 0,
+                          "totalscore": e["totalScore"] ?? 0,
                         },
                       )
                       .toList(),

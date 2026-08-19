@@ -254,7 +254,7 @@ class _TaskCardState extends State<Taskstatus> {
       bool isAssignedToUser = false;
       for (var staff in assignedTo) {
         if (staff is Map<String, dynamic>) {
-          final staffUserId = (staff["userId"] as dynamic?)?.toString().trim();
+          final staffUserId = (staff["userId"] as dynamic)?.toString().trim();
           if (staffUserId == loginUserId) {
             isAssignedToUser = true;
             break;

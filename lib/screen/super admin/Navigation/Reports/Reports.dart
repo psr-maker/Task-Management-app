@@ -12,7 +12,7 @@ class Reports extends StatefulWidget {
 class _ReportsState extends State<Reports> with SingleTickerProviderStateMixin {   
   late TabController _tabController;
 
-  final List<String> tabs = ["Departments", "Managers", "Staff's"];
+  final List<String> tabs = ["Departments", "Users"];
 
   @override
   void initState() {
@@ -44,8 +44,7 @@ class _ReportsState extends State<Reports> with SingleTickerProviderStateMixin {
         controller: _tabController,
         children: const [
           DepartmentListPage(),
-          EmployeeReportsList(role: '2'),
-          EmployeeReportsList(role: 'Staff'),
+          EmployeeReportsList(),
         ],
       ),
     );

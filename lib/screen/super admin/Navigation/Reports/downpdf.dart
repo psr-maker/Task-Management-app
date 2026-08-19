@@ -197,93 +197,92 @@ class EmployeeReportPdfGenerator {
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
                   pw.Text(_getMonthName(m)),
-                  pw.Text("${item["productivity"] ?? 0}%"),
+                  pw.Text("${item["totalScore"] ?? 0}%"),
                 ],
               );
             }).toList(),
           ),
 
-          pw.SizedBox(height: 20),
+          // pw.SizedBox(height: 20),
 
-          /// PERFORMANCE METRICS (TOP & LOW PERFORMERS)
-          if (topPerformer != null || lowPerformer != null) ...[
-            pw.Text(
-              "Performance Metrics",
-              style: pw.TextStyle(font: boldFont, fontSize: 16),
-            ),
-            pw.Divider(),
+          // /// PERFORMANCE METRICS (TOP & LOW PERFORMERS)
+          // if (topPerformer != null || lowPerformer != null) ...[
+          //   pw.Text(
+          //     "Performance Metrics",
+          //     style: pw.TextStyle(font: boldFont, fontSize: 16),
+          //   ),
+          //   pw.Divider(),
 
-            if (topPerformer != null) ...[
-              pw.Container(
-                margin: const pw.EdgeInsets.only(bottom: 10),
-                padding: const pw.EdgeInsets.all(10),
-                decoration: pw.BoxDecoration(
-                  border: pw.Border.all(color: PdfColors.green),
-                  borderRadius: pw.BorderRadius.circular(8),
-                ),
-                child: pw.Column(
-                  crossAxisAlignment: pw.CrossAxisAlignment.start,
-                  children: [
-                    pw.Text(
-                      "Top Performer",
-                      style: pw.TextStyle(
-                        font: boldFont,
-                        fontSize: 14,
-                        color: PdfColors.green,
-                      ),
-                    ),
-                    pw.SizedBox(height: 5),
-                    pw.Text("Name: ${topPerformer!["user"] ?? "-"}"),
-                    pw.Text(
-                      "Completed Tasks: ${topPerformer!["completedTasks"] ?? 0}",
-                    ),
-                    pw.Text("Total Tasks: ${topPerformer!["totalTasks"] ?? 0}"),
-                    if (topPerformer!["totalTasks"] != null &&
-                        topPerformer!["totalTasks"] > 0)
-                      pw.Text(
-                        "Completion Rate: ${((topPerformer!["completedTasks"] ?? 0) / topPerformer!["totalTasks"] * 100).round()}%",
-                      ),
-                  ],
-                ),
-              ),
-            ],
+          //   if (topPerformer != null) ...[
+          //     pw.Container(
+          //       margin: const pw.EdgeInsets.only(bottom: 10),
+          //       padding: const pw.EdgeInsets.all(10),
+          //       decoration: pw.BoxDecoration(
+          //         border: pw.Border.all(color: PdfColors.green),
+          //         borderRadius: pw.BorderRadius.circular(8),
+          //       ),
+          //       child: pw.Column(
+          //         crossAxisAlignment: pw.CrossAxisAlignment.start,
+          //         children: [
+          //           pw.Text(
+          //             "Top Performer",
+          //             style: pw.TextStyle(
+          //               font: boldFont,
+          //               fontSize: 14,
+          //               color: PdfColors.green,
+          //             ),
+          //           ),
+          //           pw.SizedBox(height: 5),
+          //           pw.Text("Name: ${topPerformer!["user"] ?? "-"}"),
+          //           pw.Text(
+          //             "Completed Tasks: ${topPerformer!["completedTasks"] ?? 0}",
+          //           ),
+          //           pw.Text("Total Tasks: ${topPerformer!["totalTasks"] ?? 0}"),
+          //           if (topPerformer!["totalTasks"] != null &&
+          //               topPerformer!["totalTasks"] > 0)
+          //             pw.Text(
+          //               "Completion Rate: ${((topPerformer!["completedTasks"] ?? 0) / topPerformer!["totalTasks"] * 100).round()}%",
+          //             ),
+          //         ],
+          //       ),
+          //     ),
+          //   ],
 
-            if (lowPerformer != null) ...[
-              pw.Container(
-                margin: const pw.EdgeInsets.only(bottom: 10),
-                padding: const pw.EdgeInsets.all(10),
-                decoration: pw.BoxDecoration(
-                  border: pw.Border.all(color: PdfColors.red),
-                  borderRadius: pw.BorderRadius.circular(8),
-                ),
-                child: pw.Column(
-                  crossAxisAlignment: pw.CrossAxisAlignment.start,
-                  children: [
-                    pw.Text(
-                      "Low Performer",
-                      style: pw.TextStyle(
-                        font: boldFont,
-                        fontSize: 14,
-                        color: PdfColors.red,
-                      ),
-                    ),
-                    pw.SizedBox(height: 5),
-                    pw.Text("Name: ${lowPerformer!["user"] ?? "-"}"),
-                    pw.Text(
-                      "Completed Tasks: ${lowPerformer!["completedTasks"] ?? 0}",
-                    ),
-                    pw.Text("Total Tasks: ${lowPerformer!["totalTasks"] ?? 0}"),
-                    if (lowPerformer!["totalTasks"] != null &&
-                        lowPerformer!["totalTasks"] > 0)
-                      pw.Text(
-                        "Completion Rate: ${((lowPerformer!["completedTasks"] ?? 0) / lowPerformer!["totalTasks"] * 100).round()}%",
-                      ),
-                  ],
-                ),
-              ),
-            ],
-          ],
-
+          //   if (lowPerformer != null) ...[
+          //     pw.Container(
+          //       margin: const pw.EdgeInsets.only(bottom: 10),
+          //       padding: const pw.EdgeInsets.all(10),
+          //       decoration: pw.BoxDecoration(
+          //         border: pw.Border.all(color: PdfColors.red),
+          //         borderRadius: pw.BorderRadius.circular(8),
+          //       ),
+          //       child: pw.Column(
+          //         crossAxisAlignment: pw.CrossAxisAlignment.start,
+          //         children: [
+          //           pw.Text(
+          //             "Low Performer",
+          //             style: pw.TextStyle(
+          //               font: boldFont,
+          //               fontSize: 14,
+          //               color: PdfColors.red,
+          //             ),
+          //           ),
+          //           pw.SizedBox(height: 5),
+          //           pw.Text("Name: ${lowPerformer!["user"] ?? "-"}"),
+          //           pw.Text(
+          //             "Completed Tasks: ${lowPerformer!["completedTasks"] ?? 0}",
+          //           ),
+          //           pw.Text("Total Tasks: ${lowPerformer!["totalTasks"] ?? 0}"),
+          //           if (lowPerformer!["totalTasks"] != null &&
+          //               lowPerformer!["totalTasks"] > 0)
+          //             pw.Text(
+          //               "Completion Rate: ${((lowPerformer!["completedTasks"] ?? 0) / lowPerformer!["totalTasks"] * 100).round()}%",
+          //             ),
+          //         ],
+          //       ),
+          //     ),
+          //   ],
+          // ],
           pw.SizedBox(height: 20),
 
           /// WARNINGS (FIXED FORMAT)
@@ -508,14 +507,14 @@ class EmployeeReportPdfGenerator {
                   pw.TableRow(
                     decoration: pw.BoxDecoration(color: PdfColors.grey300),
                     children: [
+                      _buildCell("Leave Category", boldFont),
                       _buildCell("Leave Type", boldFont),
-                      _buildCell("Reason", boldFont),
                       _buildCell("Date", boldFont),
-                      _buildCell("Submitted Date", boldFont),
+                      _buildCell("Reason", boldFont),
                       _buildCell("Status", boldFont),
-                      _buildCell("Reject Reason", boldFont),
                       _buildCell("Approved Date", boldFont),
-                      _buildCell("Contact Number", boldFont),
+                      _buildCell("Reject Reason", boldFont),
+                      _buildCell("Compensation Date", boldFont),
                     ],
                   ),
 
@@ -523,32 +522,36 @@ class EmployeeReportPdfGenerator {
                   ...(reportData["leaveList"] as List).map((leave) {
                     return pw.TableRow(
                       children: [
+                        _buildCell(
+                          leave["leavecategory"]?.toString() ?? "-",
+                          null,
+                        ),
                         _buildCell(leave["type"]?.toString() ?? "-", null),
-                        _buildCell(leave["reason"]?.toString() ?? "-", null),
                         _buildCell(
                           AppHelpers.formatDate(
                             leave["fromDate"]?.toString() ?? "-",
                           ),
                           null,
                         ),
-                        _buildCell(
-                          AppHelpers.formatDate(
-                            leave["submdate"]?.toString() ?? "-",
-                          ),
-                          null,
-                        ),
+                        _buildCell(leave["reason"]?.toString() ?? "-", null),
                         _buildCell((leave["status"] ?? "-").toString(), null),
-                        _buildCell(
-                          (leave["rejreason"] ?? "-").toString(),
-                          null,
-                        ),
+
                         _buildCell(
                           AppHelpers.formatDate(
                             leave["approvedate"]?.toString() ?? "-",
                           ),
                           null,
                         ),
-                        _buildCell(leave["contactno"]?.toString() ?? "-", null),
+                        _buildCell(
+                          (leave["rejreason"] ?? "-").toString(),
+                          null,
+                        ),
+                        _buildCell(
+                          AppHelpers.formatDate(
+                            leave["compensationDate"]?.toString() ?? "-",
+                          ),
+                          null,
+                        ),
                       ],
                     );
                   }).toList(),

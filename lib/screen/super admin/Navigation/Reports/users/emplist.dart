@@ -5,9 +5,9 @@ import 'package:staff_work_track/services/superadmin_service.dart';
 import 'emp.dart';
 
 class EmployeeReportsList extends StatefulWidget {
-  final String role;
 
-  const EmployeeReportsList({super.key, required this.role});
+
+  const EmployeeReportsList({super.key});
 
   @override
   State<EmployeeReportsList> createState() => _EmployeeReportsListState();
@@ -42,9 +42,9 @@ class _EmployeeReportsListState extends State<EmployeeReportsList> {
 
         // ✅ FILTER BY ROLE
         final filteredByRole = snapshot.data!
-            .where(
-              (user) => user.role.toLowerCase() == widget.role.toLowerCase(),
-            )
+            // .where(
+            //   (user) => user.role.toLowerCase() == widget.role.toLowerCase(),
+            // )
             .toList();
 
         final query = searchController.text.toLowerCase();
@@ -56,7 +56,7 @@ class _EmployeeReportsListState extends State<EmployeeReportsList> {
         }).toList();
 
         if (finalList.isEmpty) {
-          return Center(child: Text("No ${widget.role}s Found"));
+          return Center(child: Text("No User's Found"));
         }
 
         return Padding(
@@ -66,7 +66,7 @@ class _EmployeeReportsListState extends State<EmployeeReportsList> {
               TextField(
                 controller: searchController,
                 decoration: InputDecoration(
-                  hintText: "Search ${widget.role}...",
+                  hintText: "Search Users...",
                   hintStyle: Theme.of(context).textTheme.labelMedium,
                   border: InputBorder.none,
                   enabledBorder: InputBorder.none,

@@ -406,27 +406,27 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
       ),
       headingTextStyle: Theme.of(context).textTheme.labelLarge,
       columns: const [
+        DataColumn(label: Text("Leave Category")),
         DataColumn(label: Text("Leave Type")),
-        DataColumn(label: Text("Reason")),
         DataColumn(label: Text("Date")),
-        DataColumn(label: Text("Submitted Date")),
+        DataColumn(label: Text("Reason")),
         DataColumn(label: Text("Status")),
-        DataColumn(label: Text("Reject Reason")),
         DataColumn(label: Text("Approved Date")),
-        DataColumn(label: Text("Contact Number")),
+        DataColumn(label: Text("Reject Reason")),
+        DataColumn(label: Text("Compensation Date")),
       ],
       rows: filteredLeaves.map((item) {
         return DataRow(
           cells: [
             DataCell(
               Text(
-                item["type"] ?? "-",
+                item["leavecategory"] ?? "-",
                 style: Theme.of(context).textTheme.labelMedium,
               ),
             ),
             DataCell(
               Text(
-                item["reason"] ?? "",
+                item["type"] ?? "-",
                 style: Theme.of(context).textTheme.labelMedium,
               ),
             ),
@@ -438,10 +438,11 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
             ),
             DataCell(
               Text(
-                AppHelpers.formatDate(item["submdate"] ?? "-"),
+                item["reason"] ?? "",
                 style: Theme.of(context).textTheme.labelMedium,
               ),
             ),
+
             DataCell(
               Text(
                 item["status"] ?? "",
@@ -458,19 +459,20 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
             ),
             DataCell(
               Text(
-                item["rejreason"] ?? "-",
-                style: Theme.of(context).textTheme.labelMedium,
-              ),
-            ),
-            DataCell(
-              Text(
                 AppHelpers.formatDate(item["approvedate"] ?? "-"),
                 style: Theme.of(context).textTheme.labelMedium,
               ),
             ),
             DataCell(
               Text(
-                item["contactno"] ?? "-",
+                item["rejreason"] ?? "-",
+                style: Theme.of(context).textTheme.labelMedium,
+              ),
+            ),
+
+            DataCell(
+              Text(
+                AppHelpers.formatDate(item["compensationDate"] ?? "-"),
                 style: Theme.of(context).textTheme.labelMedium,
               ),
             ),

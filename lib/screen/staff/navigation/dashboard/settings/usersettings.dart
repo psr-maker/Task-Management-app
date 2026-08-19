@@ -110,33 +110,33 @@ class _UsersSettingsState extends State<UsersSettings> {
 
           const SizedBox(height: 30),
 
-          /// ===== APPEARANCE =====
-          UsersSettings._sectionTitle("Appearance"),
-          const SizedBox(height: 10),
+          // /// ===== APPEARANCE =====
+          // UsersSettings._sectionTitle("Appearance"),
+          // const SizedBox(height: 10),
 
-          Card(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: SwitchListTile(
-              value: themeProvider.isDarkMode,
-              activeColor: Theme.of(context).primaryColor,
-              secondary: Icon(
-                themeProvider.isDarkMode ? Icons.dark_mode : Icons.light_mode,
-              ),
-              title: Text(
-                themeProvider.isDarkMode ? "Dark Mode" : "Light Mode",
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
-              subtitle: Text(
-                "Toggle application theme",
-                style: Theme.of(context).textTheme.labelMedium,
-              ),
-              onChanged: (value) {
-                themeProvider.toggleTheme();
-              },
-            ),
-          ),
+          // Card(
+          //   shape: RoundedRectangleBorder(
+          //     borderRadius: BorderRadius.circular(16),
+          //   ),
+          //   child: SwitchListTile(
+          //     value: themeProvider.isDarkMode,
+          //     activeColor: Theme.of(context).primaryColor,
+          //     secondary: Icon(
+          //       themeProvider.isDarkMode ? Icons.dark_mode : Icons.light_mode,
+          //     ),
+          //     title: Text(
+          //       themeProvider.isDarkMode ? "Dark Mode" : "Light Mode",
+          //       style: Theme.of(context).textTheme.bodyMedium,
+          //     ),
+          //     subtitle: Text(
+          //       "Toggle application theme",
+          //       style: Theme.of(context).textTheme.labelMedium,
+          //     ),
+          //     onChanged: (value) {
+          //       themeProvider.toggleTheme();
+          //     },
+          //   ),
+          // ),
 
           // const SizedBox(height: 30),
 

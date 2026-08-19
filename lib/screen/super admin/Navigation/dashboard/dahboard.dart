@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:staff_work_track/Models/warning_model.dart';
@@ -227,22 +229,14 @@ class _OverallReportsTabState extends State<SuperAdminDashboard> {
                   children: [
                     Expanded(
                       child: SmallStatCard(
-                        title: "Managers",
+                        title: "Users",
                         value: data["totalManagers"].toString(),
-                        icon: Icons.person,
-                        color: Theme.of(context).colorScheme.secondary,
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: SmallStatCard(
-                        title: "Staff's",
-                        value: data["totalStaff"].toString(),
                         icon: Icons.people,
                         color: Theme.of(context).colorScheme.secondary,
                       ),
                     ),
                     const SizedBox(width: 10),
+                   
                     Expanded(
                       child: SmallStatCard(
                         title: "Departments",
@@ -497,7 +491,7 @@ class _OverallReportsTabState extends State<SuperAdminDashboard> {
               );
             },
           ),
-            ListTile(
+          ListTile(
             leading: Icon(
               Icons.history,
               color: Theme.of(context).colorScheme.secondary,
@@ -561,97 +555,179 @@ class _OverallReportsTabState extends State<SuperAdminDashboard> {
   }
 
   Widget _buildDepartmentChart(List departments) {
+    const double departmentWidth = 100;
+
+    final double chartWidth = math.max(
+      MediaQuery.of(context).size.width,
+      departments.length * departmentWidth,
+    );
+
     return SizedBox(
-      height: 200,
-      child: BarChart(
-        BarChartData(
-          alignment: BarChartAlignment.spaceAround,
-          barGroups: _generateBarGroups(departments),
-          titlesData: FlTitlesData(
-            leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            topTitles: AxisTitles(
-              sideTitles: SideTitles(
-                showTitles: true,
-                getTitlesWidget: (value, meta) {
-                  if (value.toInt() >= departments.length) {
-                    return const SizedBox();
-                  }
-                  final dept = departments[value.toInt()];
-                  final data = selectedType == 0
-                      ? dept["tasks"]
-                      : dept["goals"];
-                  final total = (data["total"] ?? 0).toString();
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 6),
-                    child: Text(
-                      total,
-                      style: Theme.of(context).textTheme.headlineLarge,
-                    ),
-                  );
-                },
-              ),
-            ),
-            bottomTitles: AxisTitles(
-              sideTitles: SideTitles(
-                showTitles: true,
-                interval: 1,
-                getTitlesWidget: (value, meta) {
-                  if (value.toInt() >= departments.length) {
-                    return const SizedBox();
-                  }
-                  final deptName = departments[value.toInt()]["department"]
-                      .toString()
-                      .replaceAll("Department", "")
-                      .trim();
-                  return Padding(
-                    padding: const EdgeInsets.only(top: 8),
-                    child: Text(
-                      deptName,
-                      style: Theme.of(context).textTheme.headlineSmall,
-                    ),
-                  );
-                },
-              ),
-            ),
-          ),
-          borderData: FlBorderData(
-            show: true,
-            border: const Border(
-              left: BorderSide(color: Colors.grey, width: 1),
-              bottom: BorderSide(color: Colors.grey, width: 1),
-            ),
-          ),
-          barTouchData: BarTouchData(
-            enabled: true,
-            touchTooltipData: BarTouchTooltipData(
-              getTooltipItem: (group, groupIndex, rod, rodIndex) {
-                final dept = departments[groupIndex];
-                final data = selectedType == 0 ? dept["tasks"] : dept["goals"];
-                final completed = data["completed"] ?? 0;
-                final pending = data["pending"] ?? 0;
-                final overdue = data["overdue"] ?? 0;
-                final total = data["total"] ?? 0;
-                final title = selectedType == 0 ? "Task" : "Goal";
-                return BarTooltipItem(
-                  "${dept["department"]}\n\n"
-                  "Total $title: $total\n"
-                  "Completed: $completed\n"
-                  "Pending: $pending\n"
-                  "Overdue: $overdue",
-                  const TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
+      height: 220,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        child: SizedBox(
+          width: chartWidth,
+          child: BarChart(
+            BarChartData(
+              alignment: BarChartAlignment.spaceAround,
+              barGroups: _generateBarGroups(departments),
+
+              maxY: _getMaxChartValue(departments),
+
+              titlesData: FlTitlesData(
+                leftTitles: AxisTitles(
+                  sideTitles: SideTitles(showTitles: false),
+                ),
+
+                rightTitles: AxisTitles(
+                  sideTitles: SideTitles(showTitles: false),
+                ),
+
+                topTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 28,
+                    getTitlesWidget: (value, meta) {
+                      final index = value.toInt();
+
+                      if (index < 0 || index >= departments.length) {
+                        return const SizedBox();
+                      }
+
+                      final dept = departments[index];
+
+                      final data = selectedType == 0
+                          ? dept["tasks"]
+                          : dept["goals"];
+
+                      final total = (data["total"] ?? 0).toString();
+
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 4),
+                        child: Text(
+                          total,
+                          style: Theme.of(context).textTheme.labelLarge
+                              ?.copyWith(fontWeight: FontWeight.bold),
+                        ),
+                      );
+                    },
                   ),
-                );
-              },
+                ),
+
+                bottomTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    interval: 1,
+                    reservedSize: 45,
+                    getTitlesWidget: (value, meta) {
+                      final index = value.toInt();
+
+                      if (index < 0 || index >= departments.length) {
+                        return const SizedBox();
+                      }
+
+                      final deptName = departments[index]["department"]
+                          .toString()
+                          .replaceAll("Department", "")
+                          .trim();
+
+                      return SizedBox(
+                        width: departmentWidth - 10,
+                        child: Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Text(
+                            deptName,
+                            textAlign: TextAlign.center,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.labelMedium
+                                ?.copyWith(fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+
+              borderData: FlBorderData(
+                show: true,
+                border: const Border(
+                  left: BorderSide(color: Colors.grey, width: 1),
+                  bottom: BorderSide(color: Colors.grey, width: 1),
+                ),
+              ),
+
+              barTouchData: BarTouchData(
+                enabled: true,
+                touchTooltipData: BarTouchTooltipData(
+                  getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                    final dept = departments[groupIndex];
+
+                    final data = selectedType == 0
+                        ? dept["tasks"]
+                        : dept["goals"];
+
+                    final completed = data["completed"] ?? 0;
+                    final pending = data["pending"] ?? 0;
+                    final overdue = data["overdue"] ?? 0;
+                    final total = data["total"] ?? 0;
+
+                    final title = selectedType == 0 ? "Task" : "Goal";
+
+                    return BarTooltipItem(
+                      "${dept["department"]}\n\n"
+                      "Total $title: $total\n"
+                      "Completed: $completed\n"
+                      "Pending: $pending\n"
+                      "Overdue: $overdue",
+                      const TextStyle(
+                        color: Colors.white,
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    );
+                  },
+                ),
+              ),
+
+              gridData: FlGridData(show: false),
             ),
           ),
-          gridData: FlGridData(show: false),
         ),
       ),
     );
+  }
+
+  double _getMaxChartValue(List departments) {
+    if (departments.isEmpty) {
+      return 10;
+    }
+
+    double maxValue = 0;
+
+    for (final dept in departments) {
+      final data = selectedType == 0 ? dept["tasks"] : dept["goals"];
+
+      final completed = (data["completed"] ?? 0).toDouble();
+      final pending = (data["pending"] ?? 0).toDouble();
+      final overdue = (data["overdue"] ?? 0).toDouble();
+
+      final total = completed + pending + overdue;
+
+      if (total > maxValue) {
+        maxValue = total;
+      }
+    }
+
+    // Add some space above tallest bar
+    if (maxValue == 0) {
+      return 10;
+    }
+
+    return maxValue * 1.2;
   }
 
   List<BarChartGroupData> _generateBarGroups(List departments) {

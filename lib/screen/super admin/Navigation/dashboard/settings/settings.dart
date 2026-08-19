@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import 'package:staff_work_track/core/theme/theme_provider.dart';
+// import 'package:provider/provider.dart';
+// import 'package:staff_work_track/core/theme/theme_provider.dart';
 import 'package:staff_work_track/core/widgets/buttons.dart';
 import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
 import 'package:staff_work_track/screen/authen/login_selection.dart';
@@ -79,7 +79,7 @@ class _SettingsState extends State<Settings> {
 
   @override
   Widget build(BuildContext context) {
-    final themeProvider = Provider.of<ThemeProvider>(context);
+    //final themeProvider = Provider.of<ThemeProvider>(context);
 
     return Scaffold(
       appBar: AppBar(
@@ -92,35 +92,35 @@ class _SettingsState extends State<Settings> {
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
-          /// ===== APPEARANCE =====
-          Settings._sectionTitle("Appearance"),
-          const SizedBox(height: 10),
+          // /// ===== APPEARANCE =====
+          // Settings._sectionTitle("Appearance"),
+          // const SizedBox(height: 10),
 
-          Card(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: SwitchListTile(
-              value: themeProvider.isDarkMode,
-              activeColor: Theme.of(context).primaryColor,
-              secondary: Icon(
-                themeProvider.isDarkMode ? Icons.dark_mode : Icons.light_mode,
-              ),
-              title: Text(
-                themeProvider.isDarkMode ? "Dark Mode" : "Light Mode",
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
-              subtitle: Text(
-                "Toggle application theme",
-                style: Theme.of(context).textTheme.labelMedium,
-              ),
-              onChanged: (value) {
-                themeProvider.toggleTheme();
-              },
-            ),
-          ),
+          // Card(
+          //   shape: RoundedRectangleBorder(
+          //     borderRadius: BorderRadius.circular(16),
+          //   ),
+          //   child: SwitchListTile(
+          //     value: themeProvider.isDarkMode,
+          //     activeColor: Theme.of(context).primaryColor,
+          //     secondary: Icon(
+          //       themeProvider.isDarkMode ? Icons.dark_mode : Icons.light_mode,
+          //     ),
+          //     title: Text(
+          //       themeProvider.isDarkMode ? "Dark Mode" : "Light Mode",
+          //       style: Theme.of(context).textTheme.bodyMedium,
+          //     ),
+          //     subtitle: Text(
+          //       "Toggle application theme",
+          //       style: Theme.of(context).textTheme.labelMedium,
+          //     ),
+          //     onChanged: (value) {
+          //       themeProvider.toggleTheme();
+          //     },
+          //   ),
+          // ),
 
-          const SizedBox(height: 30),
+          //const SizedBox(height: 30),
 
           /// ===== ORGANIZATION =====
           Settings._sectionTitle("Organization"),

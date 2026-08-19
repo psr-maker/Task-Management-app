@@ -10,7 +10,6 @@ import 'package:staff_work_track/screen/admin/Navigation/dashbord/drawer/staffle
 import 'package:staff_work_track/screen/admin/Navigation/dashbord/drawer/staffworklog.dart';
 import 'package:staff_work_track/screen/admin/Navigation/dashbord/drawer/task%20points/emptaskreview.dart';
 import 'package:staff_work_track/screen/admin/Navigation/dashbord/drawer/task_member_rmvlst.dart';
-import 'package:staff_work_track/screen/admin/Navigation/dashbord/drawer/warrentypoints.dart';
 import 'package:staff_work_track/screen/staff/navigation/dashboard/dashboard.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/Reports/reports_table.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/drawer/anouncement.dart';
@@ -421,20 +420,19 @@ class _AdminState extends State<AdminDashboard> {
                           ),
                           const SizedBox(height: 20),
                           ProductivityBarChart(
-                            data: monthlyData
-                                .map(
-                                  (e) => {
-                                    "month": e["month"],
-                                    "productivity": e["productivity"],
-                                    "taskPoints": e["taskPoints"],
-                                    "goalPoints": e["goalPoints"],
-                                    "fiveSPoints": e["fiveSPoints"],
-                                    "warrantyPoints": e["warrantyPoints"],
-                                  },
-                                )
-                                .toList(),
+                            data: monthlyData.map((e) {
+                              return {
+                                "month": e["month"] ?? 0,
+                                "taskPoints": e["taskPoints"] ?? 0,
+                                "goalPoints": e["goalPoints"] ?? 0,
+                                "attitudeScore": e["attitudeScore"] ?? 0,
+                                "fiveS": e["fiveS"] ?? 0,
+                                "productivity": e["productivity"] ?? 0,
+                                "totalscore": e["totalScore"] ?? 0,
+                              };
+                            }).toList(),
                           ),
-                          _buildPerformanceSection(data),
+                          // _buildPerformanceSection(data),
                         ],
                       ),
                       if (showSwitch) _buildSwitchContainer(),
@@ -484,190 +482,190 @@ class _AdminState extends State<AdminDashboard> {
     );
   }
 
-  Widget _buildPerformanceSection(Map<String, dynamic> data) {
-    final List<dynamic> topList = data["topPerformer"] ?? [];
-    final List<dynamic> lowList = data["lowPerformer"] ?? [];
+  // Widget _buildPerformanceSection(Map<String, dynamic> data) {
+  //   final List<dynamic> topList = data["topPerformer"] ?? [];
+  //   final List<dynamic> lowList = data["lowPerformer"] ?? [];
 
-    final Map<String, dynamic>? top = topList.isNotEmpty
-        ? Map<String, dynamic>.from(topList.first)
-        : null;
+  //   final Map<String, dynamic>? top = topList.isNotEmpty
+  //       ? Map<String, dynamic>.from(topList.first)
+  //       : null;
 
-    final Map<String, dynamic>? low = lowList.isNotEmpty
-        ? Map<String, dynamic>.from(lowList.first)
-        : null;
+  //   final Map<String, dynamic>? low = lowList.isNotEmpty
+  //       ? Map<String, dynamic>.from(lowList.first)
+  //       : null;
 
-    final bool showTop = top != null;
-    final bool showLow = low != null;
+  //   final bool showTop = top != null;
+  //   final bool showLow = low != null;
 
-    if (!showTop && !showLow) {
-      return const SizedBox.shrink();
-    }
+  //   if (!showTop && !showLow) {
+  //     return const SizedBox.shrink();
+  //   }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const SizedBox(height: 25),
+  //   return Column(
+  //     crossAxisAlignment: CrossAxisAlignment.start,
+  //     children: [
+  //       const SizedBox(height: 25),
 
-        Text(
-          "Performance Metrics",
-          style: Theme.of(context).textTheme.displaySmall,
-        ),
+  //       Text(
+  //         "Performance Metrics",
+  //         style: Theme.of(context).textTheme.displaySmall,
+  //       ),
 
-        const SizedBox(height: 10),
+  //       const SizedBox(height: 10),
 
-        if (showTop)
-          _advancedPerformerCard(
-            title: "Top Performer",
-            name: top["user"] ?? "-",
-            completedCount: top["completedTasks"] ?? 0,
-            totalTasks: top["assignedTasks"] ?? 0,
-            score: (top["score"] as num?)?.toDouble() ?? 0,
-            startColor: Theme.of(context).colorScheme.primary,
-            endColor: Theme.of(context).colorScheme.secondary,
-            icon: Icons.emoji_events,
-          ),
+  //       if (showTop)
+  //         _advancedPerformerCard(
+  //           title: "Top Performer",
+  //           name: top["user"] ?? "-",
+  //           completedCount: top["completedTasks"] ?? 0,
+  //           totalTasks: top["assignedTasks"] ?? 0,
+  //           score: (top["score"] as num?)?.toDouble() ?? 0,
+  //           startColor: Theme.of(context).colorScheme.primary,
+  //           endColor: Theme.of(context).colorScheme.secondary,
+  //           icon: Icons.emoji_events,
+  //         ),
 
-        if (showTop) const SizedBox(height: 8),
+  //       if (showTop) const SizedBox(height: 8),
 
-        if (showLow)
-          _advancedPerformerCard(
-            title: "Low Performer",
-            name: low["user"] ?? "-",
-            completedCount: low["completedTasks"] ?? 0,
-            totalTasks: low["assignedTasks"] ?? 0,
-            score: (low["score"] as num?)?.toDouble() ?? 0,
-            startColor: Colors.redAccent,
-            endColor: Colors.red,
-            icon: Icons.thumb_down,
-          ),
-      ],
-    );
-  }
+  //       if (showLow)
+  //         _advancedPerformerCard(
+  //           title: "Low Performer",
+  //           name: low["user"] ?? "-",
+  //           completedCount: low["completedTasks"] ?? 0,
+  //           totalTasks: low["assignedTasks"] ?? 0,
+  //           score: (low["score"] as num?)?.toDouble() ?? 0,
+  //           startColor: Colors.redAccent,
+  //           endColor: Colors.red,
+  //           icon: Icons.thumb_down,
+  //         ),
+  //     ],
+  //   );
+  // }
 
-  Widget _advancedPerformerCard({
-    required String title,
-    required String name,
-    required int completedCount,
-    required int totalTasks,
-    required double score,
-    required Color startColor,
-    required Color endColor,
-    required IconData icon,
-  }) {
-    final double progress = (score / 100).clamp(0.0, 1.0);
+  // Widget _advancedPerformerCard({
+  //   required String title,
+  //   required String name,
+  //   required int completedCount,
+  //   required int totalTasks,
+  //   required double score,
+  //   required Color startColor,
+  //   required Color endColor,
+  //   required IconData icon,
+  // }) {
+  //   final double progress = (score / 100).clamp(0.0, 1.0);
 
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 4),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        gradient: LinearGradient(
-          colors: [startColor.withOpacity(0.2), endColor.withOpacity(0.1)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(10),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(2),
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: LinearGradient(colors: [startColor, endColor]),
-                  ),
-                  child: Icon(icon, color: Colors.white, size: 15),
-                ),
-                const SizedBox(width: 12),
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: endColor,
-                    fontSize: 14,
-                  ),
-                ),
-              ],
-            ),
+  //   return Container(
+  //     margin: const EdgeInsets.symmetric(vertical: 4),
+  //     decoration: BoxDecoration(
+  //       borderRadius: BorderRadius.circular(20),
+  //       gradient: LinearGradient(
+  //         colors: [startColor.withOpacity(0.2), endColor.withOpacity(0.1)],
+  //         begin: Alignment.topLeft,
+  //         end: Alignment.bottomRight,
+  //       ),
+  //     ),
+  //     child: Padding(
+  //       padding: const EdgeInsets.all(10),
+  //       child: Column(
+  //         crossAxisAlignment: CrossAxisAlignment.start,
+  //         mainAxisSize: MainAxisSize.min,
+  //         children: [
+  //           Row(
+  //             children: [
+  //               Container(
+  //                 padding: const EdgeInsets.all(2),
+  //                 decoration: BoxDecoration(
+  //                   shape: BoxShape.circle,
+  //                   gradient: LinearGradient(colors: [startColor, endColor]),
+  //                 ),
+  //                 child: Icon(icon, color: Colors.white, size: 15),
+  //               ),
+  //               const SizedBox(width: 12),
+  //               Text(
+  //                 title,
+  //                 style: TextStyle(
+  //                   fontWeight: FontWeight.bold,
+  //                   color: endColor,
+  //                   fontSize: 14,
+  //                 ),
+  //               ),
+  //             ],
+  //           ),
 
-            const SizedBox(height: 5),
+  //           const SizedBox(height: 5),
 
-            Text(name, style: Theme.of(context).textTheme.labelMedium),
+  //           Text(name, style: Theme.of(context).textTheme.labelMedium),
 
-            const SizedBox(height: 5),
+  //           const SizedBox(height: 5),
 
-            Stack(
-              children: [
-                Container(
-                  height: 8,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(6),
-                    color: Colors.grey.shade300,
-                  ),
-                ),
-                LayoutBuilder(
-                  builder: (context, constraints) {
-                    return AnimatedContainer(
-                      duration: const Duration(milliseconds: 800),
-                      height: 8,
-                      width: constraints.maxWidth * progress,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(6),
-                        gradient: LinearGradient(
-                          colors: [startColor, endColor],
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: endColor.withOpacity(0.3),
-                            blurRadius: 4,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
-              ],
-            ),
+  //           Stack(
+  //             children: [
+  //               Container(
+  //                 height: 8,
+  //                 decoration: BoxDecoration(
+  //                   borderRadius: BorderRadius.circular(6),
+  //                   color: Colors.grey.shade300,
+  //                 ),
+  //               ),
+  //               LayoutBuilder(
+  //                 builder: (context, constraints) {
+  //                   return AnimatedContainer(
+  //                     duration: const Duration(milliseconds: 800),
+  //                     height: 8,
+  //                     width: constraints.maxWidth * progress,
+  //                     decoration: BoxDecoration(
+  //                       borderRadius: BorderRadius.circular(6),
+  //                       gradient: LinearGradient(
+  //                         colors: [startColor, endColor],
+  //                       ),
+  //                       boxShadow: [
+  //                         BoxShadow(
+  //                           color: endColor.withOpacity(0.3),
+  //                           blurRadius: 4,
+  //                           offset: const Offset(0, 2),
+  //                         ),
+  //                       ],
+  //                     ),
+  //                   );
+  //                 },
+  //               ),
+  //             ],
+  //           ),
 
-            const SizedBox(height: 5),
+  //           const SizedBox(height: 5),
 
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  "$completedCount / $totalTasks tasks completed",
-                  style: Theme.of(context).textTheme.labelMedium,
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 2,
-                  ),
-                  decoration: BoxDecoration(
-                    color: endColor.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    "${score.toStringAsFixed(1)}%",
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: endColor,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  //           Row(
+  //             mainAxisAlignment: MainAxisAlignment.spaceBetween,
+  //             children: [
+  //               Text(
+  //                 "$completedCount / $totalTasks tasks completed",
+  //                 style: Theme.of(context).textTheme.labelMedium,
+  //               ),
+  //               Container(
+  //                 padding: const EdgeInsets.symmetric(
+  //                   horizontal: 8,
+  //                   vertical: 2,
+  //                 ),
+  //                 decoration: BoxDecoration(
+  //                   color: endColor.withOpacity(0.2),
+  //                   borderRadius: BorderRadius.circular(12),
+  //                 ),
+  //                 child: Text(
+  //                   "${score.toStringAsFixed(1)}%",
+  //                   style: TextStyle(
+  //                     fontSize: 12,
+  //                     fontWeight: FontWeight.bold,
+  //                     color: endColor,
+  //                   ),
+  //                 ),
+  //               ),
+  //             ],
+  //           ),
+  //         ],
+  //       ),
+  //     ),
+  //   );
+  // }
 
   Widget _buildDrawerItem(
     BuildContext context, {
