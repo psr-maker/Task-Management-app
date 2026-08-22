@@ -493,7 +493,7 @@ class _StaffDashboardState extends State<StaffDashboard> {
 
           _buildDrawerItem(
             context,
-            icon: Icons.task_alt_rounded,
+            icon: Icons.event_available_rounded,
             title: "Leave Request",
             onTap: () {
               Navigator.pop(context);
@@ -505,20 +505,20 @@ class _StaffDashboardState extends State<StaffDashboard> {
           ),
           _buildDrawerItem(
             context,
-            icon: Icons.task_alt_rounded,
-            title: "Compensation Leave Request",
+            icon: Icons.event_repeat_rounded,
+            title: "Compensation Leave",
             onTap: () {
               Navigator.pop(context);
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => ExtraWorkApply()),
-              ); 
+              );
             },
           ),
           _buildDrawerItem(
             context,
-            icon: Icons.timelapse_sharp,
-            title: "OverTime",
+            icon: Icons.more_time_rounded,
+            title: "Overtime Request",
             onTap: () {
               Navigator.pop(context);
               Navigator.push(
@@ -527,16 +527,16 @@ class _StaffDashboardState extends State<StaffDashboard> {
               );
             },
           ),
-            _buildDrawerItem(
+          _buildDrawerItem(
             context,
-            icon: Icons.task_alt_rounded,
+            icon: Icons.edit_calendar_rounded,
             title: "Punch Correction",
             onTap: () {
               Navigator.pop(context);
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => PunchCorrectionList()),
-              ); 
+              );
             },
           ),
         ],

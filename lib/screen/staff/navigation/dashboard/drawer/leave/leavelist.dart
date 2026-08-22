@@ -369,7 +369,7 @@ class _LeavelistState extends State<Leavelist>
                           ),
                           child: Center(
                             child: Text(
-                              'Compensation',
+                              'Compen',
                               style: Theme.of(context).textTheme.labelLarge,
                             ),
                           ),

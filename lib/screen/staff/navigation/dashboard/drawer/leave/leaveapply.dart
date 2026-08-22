@@ -394,7 +394,7 @@ class _LeaveapplyState extends State<Leaveapply> {
                   ),
                 ],
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 15),
               if (applicationType == "Leave") ...[
                 sectionTitle("Employee Details"),
                 const SizedBox(height: 20),
@@ -403,11 +403,11 @@ class _LeaveapplyState extends State<Leaveapply> {
                 inputField("Designation", designationController),
                 const SizedBox(height: 5),
                 inputField("Leave Reason", reasonController),
-                const SizedBox(height: 20),
+                const SizedBox(height: 15),
                 sectionTitle("Leave Period"),
                 const SizedBox(height: 20),
                 dateTile("Select From Date", fromDate, pickFromDate),
-                const SizedBox(height: 10),
+                const SizedBox(height: 5),
                 dateTile("Select To Date", toDate, pickToDate),
                 const SizedBox(height: 20),
                 if (leaveDays.isNotEmpty) ...[
@@ -434,7 +434,15 @@ class _LeaveapplyState extends State<Leaveapply> {
                                   hasApprovedCompensation,
                             )
                             .map(
-                              (c) => DropdownMenuItem(value: c, child: Text(c)),
+                              (c) => DropdownMenuItem(
+                                value: c,
+                                child: Text(
+                                  c,
+                                  style: Theme.of(
+                                    context,
+                                  ).textTheme.headlineMedium,
+                                ),
+                              ),
                             )
                             .toList();
 
@@ -464,10 +472,11 @@ class _LeaveapplyState extends State<Leaveapply> {
                             children: [
                               Text(
                                 DateFormat("dd MMM yyyy").format(day["date"]),
-                                style: Theme.of(context).textTheme.bodyMedium
-                                    ?.copyWith(fontWeight: FontWeight.w600),
+                                style: Theme.of(
+                                  context,
+                                ).textTheme.headlineMedium,
                               ),
-                              const SizedBox(height: 10),
+                              const SizedBox(height: 15),
                               Row(
                                 children: [
                                   // Row 1: Full Day / First Half / Second Half / Holiday
@@ -489,7 +498,7 @@ class _LeaveapplyState extends State<Leaveapply> {
                                       ).colorScheme.background,
                                       style: Theme.of(
                                         context,
-                                      ).textTheme.bodyMedium,
+                                      ).textTheme.labelMedium,
                                       items: const [
                                         DropdownMenuItem(
                                           value: "Full Day",
@@ -536,7 +545,7 @@ class _LeaveapplyState extends State<Leaveapply> {
                                       ).colorScheme.background,
                                       style: Theme.of(
                                         context,
-                                      ).textTheme.bodyMedium,
+                                      ).textTheme.labelMedium,
                                       items: categoryItems,
                                       onChanged: (value) {
                                         setState(() {
@@ -611,7 +620,7 @@ class _LeaveapplyState extends State<Leaveapply> {
                                       ).colorScheme.background,
                                       style: Theme.of(
                                         context,
-                                      ).textTheme.bodyMedium,
+                                      ).textTheme.labelMedium,
                                       hint: const Text("Choose a date"),
                                       items: options
                                           .map(

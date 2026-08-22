@@ -203,9 +203,8 @@ class _AddWorklogPageState extends State<AddWorklogPage> {
       print("LONGITUDE: $longitude");
       print("LOCATION: $locationName");
 
-   
       await WorkLogRepository.saveWorkLog(
-    title: titleController.text.trim(),
+        title: titleController.text.trim(),
 
         // IN / OUT
         workType: workType,
@@ -223,7 +222,7 @@ class _AddWorklogPageState extends State<AddWorklogPage> {
         locationName: locationName,
 
         image: _image!,
-);
+      );
 
       if (!mounted) return;
 
@@ -288,33 +287,49 @@ class _AddWorklogPageState extends State<AddWorklogPage> {
                 ),
 
                 const SizedBox(height: 15),
+                Text(
+                  "Work Date",
+                  style: Theme.of(context).textTheme.headlineMedium,
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      DateFormat('yyyy-MM-dd').format(selectedDate),
 
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-
-                  title: Text(
-                    "Work Date",
-                    style: Theme.of(context).textTheme.headlineLarge,
-                  ),
-
-                  subtitle: Text(
-                    DateFormat('yyyy-MM-dd').format(selectedDate),
-
-                    style: Theme.of(context).textTheme.headlineSmall,
-                  ),
-
-                  trailing: const Icon(Icons.calendar_today),
-
-                  onTap: _pickDate,
+                      style: Theme.of(context).textTheme.labelMedium,
+                    ),
+                    IconButton(
+                      onPressed: _pickDate,
+                      icon: Icon(Icons.calendar_today),
+                    ),
+                  ],
                 ),
 
+                // ListTile(
+                //   contentPadding: EdgeInsets.zero,
+
+                //   title: Text(
+                //     "Work Date",
+                //     style: Theme.of(context).textTheme.headlineMedium,
+                //   ),
+
+                //   subtitle: Text(
+                //     DateFormat('yyyy-MM-dd').format(selectedDate),
+
+                //     style: Theme.of(context).textTheme.headlineSmall,
+                //   ),
+
+                //   trailing: const Icon(Icons.calendar_today),
+
+                //   onTap: _pickDate,
+                // ),
                 const SizedBox(height: 15),
 
                 Text(
                   "Work Type",
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: Theme.of(context).textTheme.headlineMedium,
                 ),
 
                 const SizedBox(height: 10),
@@ -357,17 +372,17 @@ class _AddWorklogPageState extends State<AddWorklogPage> {
 
                       Text(
                         "$workType Evidence",
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
+                        style: Theme.of(context).textTheme.bodyMedium,
                       ),
 
                       const SizedBox(height: 5),
 
                       Text(
                         "Capture photo for $workType",
-                        style: const TextStyle(color: Colors.grey),
+                        style: const TextStyle(
+                          color: Colors.grey,
+                          fontSize: 12,
+                        ),
                       ),
 
                       const SizedBox(height: 15),
@@ -419,7 +434,7 @@ class _AddWorklogPageState extends State<AddWorklogPage> {
 
                       // CAPTURE BUTTON
                       SizedBox(
-                        width: double.infinity,
+                        width: 200,
 
                         child: ElevatedButton.icon(
                           onPressed: _isImageLoading ? null : _pickImage,
@@ -441,14 +456,17 @@ class _AddWorklogPageState extends State<AddWorklogPage> {
                               context,
                             ).colorScheme.onPrimary,
 
-                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            padding: const EdgeInsets.symmetric(
+                              vertical: 14,
+                              horizontal: 15,
+                            ),
                           ),
                         ),
                       ),
                     ],
                   ),
                 ),
-
+                const SizedBox(height: 15),
                 Center(
                   child: AppButton(
                     text: "Save $workType",
@@ -506,7 +524,7 @@ class _AddWorklogPageState extends State<AddWorklogPage> {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
 
-        padding: const EdgeInsets.symmetric(vertical: 15),
+        padding: const EdgeInsets.symmetric(vertical: 10),
 
         decoration: BoxDecoration(
           color: selected

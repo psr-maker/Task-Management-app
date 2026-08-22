@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:staff_work_track/core/widgets/loading.dart';
 import 'package:staff_work_track/screen/admin/Navigation/dashbord/drawer/attinbhvscore/addattnbhv.dart';
 import 'package:staff_work_track/services/admin_service.dart';
 
@@ -162,16 +163,15 @@ class _BehaviourScoreDisplayState extends State<BehaviourScoreDisplay> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xfff5f7f6),
-
+   
       appBar: AppBar(
-        backgroundColor: const Color(0xff194d26),
-        foregroundColor: Colors.white,
-        elevation: 0,
-
+        leading: IconButton(
+          onPressed: () => Navigator.pop(context),
+          icon: const Icon(Icons.arrow_back_ios),
+        ),
         title: const Text(
-          "Attitude & Behaviour",
-          style: TextStyle(fontWeight: FontWeight.w600),
+          "Behaviour & Attitude",
+       
         ),
 
         actions: [
@@ -263,9 +263,7 @@ class _BehaviourScoreDisplayState extends State<BehaviourScoreDisplay> {
 
   Widget _buildTable() {
     if (isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(color: Color(0xff194d26)),
-      );
+      return RotatingFlower();
     }
 
     if (errorMessage != null) {

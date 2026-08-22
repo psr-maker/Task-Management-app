@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import 'package:staff_work_track/core/theme/theme_provider.dart';
+// import 'package:provider/provider.dart';
+// import 'package:staff_work_track/core/theme/theme_provider.dart';
 import 'package:staff_work_track/core/widgets/buttons.dart';
 import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
 import 'package:staff_work_track/screen/authen/login_selection.dart';
@@ -78,7 +78,7 @@ class _UsersSettingsState extends State<UsersSettings> {
 
   @override
   Widget build(BuildContext context) {
-    final themeProvider = Provider.of<ThemeProvider>(context);
+   // final themeProvider = Provider.of<ThemeProvider>(context);
 
     return Scaffold(
       appBar: AppBar( 

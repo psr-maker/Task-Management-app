@@ -75,7 +75,7 @@ class CustomFormWidgets {
           borderSide: const BorderSide(color: Color.fromARGB(255, 25, 77, 38)),
         ),
       ),
-      style: Theme.of(context).textTheme.titleLarge,
+      style: Theme.of(context).textTheme.headlineMedium,
     );
   }
 

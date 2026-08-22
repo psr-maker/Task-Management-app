@@ -1,14 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:staff_work_track/Models/getusers.dart';
+import 'package:staff_work_track/core/widgets/buttons.dart';
+import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
 import 'package:staff_work_track/services/admin_service.dart';
 
 class AddBehaviourScore extends StatefulWidget {
   final String department;
 
-  const AddBehaviourScore({
-    super.key,
-    required this.department,
-  });
+  const AddBehaviourScore({super.key, required this.department});
 
   @override
   State<AddBehaviourScore> createState() => _AddBehaviourScoreState();
@@ -29,9 +28,10 @@ class _AddBehaviourScoreState extends State<AddBehaviourScore> {
   bool isLoadingEmployees = true;
   bool isSubmitting = false;
 
-  int get totalScore =>
-      communication + punctuality + integrity;
-
+  int get totalScore => communication + punctuality + integrity;
+  String? _topMessage;
+  bool _isErrorMessage = true;
+  bool _showTopMessage = false;
   @override
   void initState() {
     super.initState();
@@ -40,8 +40,7 @@ class _AddBehaviourScoreState extends State<AddBehaviourScore> {
 
   Future<void> loadEmployees() async {
     try {
-      final result =
-          await AdminService.getEmployeesByDepartment(
+      final result = await AdminService.getEmployeesByDepartment(
         widget.department,
       );
 
@@ -58,13 +57,9 @@ class _AddBehaviourScoreState extends State<AddBehaviourScore> {
         isLoadingEmployees = false;
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            "Failed to load employees: $e",
-          ),
-        ),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Failed to load employees: $e")));
     }
   }
 
@@ -79,11 +74,7 @@ class _AddBehaviourScoreState extends State<AddBehaviourScore> {
 
     if (picked != null) {
       setState(() {
-        selectedMonth = DateTime(
-          picked.year,
-          picked.month,
-          1,
-        );
+        selectedMonth = DateTime(picked.year, picked.month, 1);
       });
     }
   }
@@ -109,26 +100,29 @@ class _AddBehaviourScoreState extends State<AddBehaviourScore> {
         "${selectedMonth.year}";
   }
 
+  void showTopMessage(String message, {bool isError = true}) {
+    setState(() {
+      _topMessage = message;
+      _isErrorMessage = isError;
+      _showTopMessage = true;
+    });
+
+    Future.delayed(const Duration(seconds: 3), () {
+      if (!mounted) return;
+      setState(() {
+        _showTopMessage = false;
+      });
+    });
+  }
+
   Future<void> submitScore() async {
     if (selectedStaffId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Please select a staff"),
-        ),
-      );
+      showTopMessage("Please select a staff", isError: true);
       return;
     }
 
-    if (communication == 0 ||
-        punctuality == 0 ||
-        integrity == 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            "Please give a score for all criteria",
-          ),
-        ),
-      );
+    if (communication == 0 || punctuality == 0 || integrity == 0) {
+      showTopMessage("Please give a score for all criteria", isError: true);
       return;
     }
 
@@ -137,8 +131,7 @@ class _AddBehaviourScoreState extends State<AddBehaviourScore> {
     });
 
     try {
-      final success =
-          await AdminService.addAttitudeBehaviourScore(
+      final success = await AdminService.addAttitudeBehaviourScore(
         staffId: selectedStaffId!,
         communication: communication,
         punctuality: punctuality,
@@ -149,13 +142,9 @@ class _AddBehaviourScoreState extends State<AddBehaviourScore> {
       if (!mounted) return;
 
       if (success) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              "Behaviour score submitted successfully",
-            ),
-            backgroundColor: Colors.green,
-          ),
+        showTopMessage(
+          "Behaviour score submitted successfully",
+          isError: false,
         );
 
         // Reset form
@@ -167,26 +156,12 @@ class _AddBehaviourScoreState extends State<AddBehaviourScore> {
           integrity = 0;
         });
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              "Failed to submit behaviour score",
-            ),
-            backgroundColor: Colors.red,
-          ),
-        );
+        showTopMessage("Failed to submit behaviour score", isError: true);
       }
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            "Error: $e",
-          ),
-          backgroundColor: Colors.red,
-        ),
-      );
+      showTopMessage("Error: $e", isError: true);
     } finally {
       if (mounted) {
         setState(() {
@@ -199,327 +174,251 @@ class _AddBehaviourScoreState extends State<AddBehaviourScore> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-
       appBar: AppBar(
-        
-        title: const Text(
-          "Add Behaviour Score",
-         
+        title: const Text("Add Behaviour Score"),
+        leading: IconButton(
+          onPressed: () => Navigator.pop(context),
+          icon: const Icon(Icons.arrow_back_ios),
         ),
       ),
 
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
 
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Stack(
           children: [
-
-            // ==========================
-            // STAFF
-            // ==========================
-
-            const Text(
-              "Select Staff",
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: Colors.black54,
-              ),
-            ),
-
-            const SizedBox(height: 8),
-
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(
-                horizontal: 14,
-              ),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(
-                  color: Colors.grey.shade200,
-                ),
-              ),
-
-              child: isLoadingEmployees
-                  ? const Padding(
-                      padding: EdgeInsets.all(16),
-                      child: Center(
-                        child: CircularProgressIndicator(),
-                      ),
-                    )
-                  : DropdownButtonHideUnderline(
-                      child: DropdownButton<int>(
-                        value: selectedStaffId,
-                        isExpanded: true,
-                        hint: const Text(
-                          "Select Staff",
-                        ),
-
-                        icon: const Icon(
-                          Icons.keyboard_arrow_down,
-                        ),
-
-                        items: employees.map((employee) {
-
-                          return DropdownMenuItem<int>(
-                            value: employee.userId,
-                            child: Row(
-                              children: [
-
-                                CircleAvatar(
-                                  radius: 18,
-                                  backgroundColor:
-                                      const Color(0xff194d26)
-                                          .withOpacity(.1),
-
-                                  child: const Icon(
-                                    Icons.person,
-                                    size: 20,
-                                    color: Color(0xff194d26),
-                                  ),
-                                ),
-
-                                const SizedBox(width: 10),
-
-                                Text(
-                                  employee.name,
-                                  style: const TextStyle(
-                                    fontWeight:
-                                        FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-
-                        }).toList(),
-
-                        onChanged: (value) {
-
-                          if (value == null) return;
-
-                          final employee =
-                              employees.firstWhere(
-                            (e) => e.userId == value,
-                          );
-
-                          setState(() {
-                            selectedStaffId = value;
-                            selectedStaffName =
-                                employee.name;
-                          });
-                        },
-                      ),
-                    ),
-            ),
-
-        
-            const SizedBox(height: 20),
-
-            // ==========================
-            // MONTH
-            // ==========================
-
-            const Text(
-              "Score Month",
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: Colors.black54,
-              ),
-            ),
-
-            const SizedBox(height: 8),
-
-            GestureDetector(
-              onTap: selectMonth,
-
-              child: Container(
-                height: 52,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                ),
-
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: Colors.grey.shade200,
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  "Select Staff",
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black54,
                   ),
                 ),
 
-                child: Row(
-                  children: [
+                const SizedBox(height: 8),
 
-                    const Icon(
-                      Icons.calendar_month,
-                      color: Color(0xff194d26),
-                    ),
-
-                    const SizedBox(width: 12),
-
-                    Expanded(
-                      child: Text(
-                        monthName,
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-
-                    const Icon(
-                      Icons.keyboard_arrow_down,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 24),
-
-            // ==========================
-            // COMMUNICATION
-            // ==========================
-
-            _scoreCard(
-              title: "Communication",
-              subtitle:
-                  "Ability to communicate clearly and effectively",
-              score: communication,
-              onChanged: (value) {
-                setState(() {
-                  communication = value;
-                });
-              },
-            ),
-
-            const SizedBox(height: 14),
-
-            // ==========================
-            // PUNCTUALITY
-            // ==========================
-
-            _scoreCard(
-              title: "Punctuality & Discipline",
-              subtitle:
-                  "Attendance, punctuality and workplace discipline",
-              score: punctuality,
-              onChanged: (value) {
-                setState(() {
-                  punctuality = value;
-                });
-              },
-            ),
-
-            const SizedBox(height: 14),
-
-            // ==========================
-            // INTEGRITY
-            // ==========================
-
-            _scoreCard(
-              title: "Integrity",
-              subtitle:
-                  "Honesty, responsibility and ethical behaviour",
-              score: integrity,
-              onChanged: (value) {
-                setState(() {
-                  integrity = value;
-                });
-              },
-            ),
-
-            const SizedBox(height: 24),
-
-            // ==========================
-            // TOTAL
-            // ==========================
-
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(20),
-
-              decoration: BoxDecoration(
-                color: const Color(0xff194d26),
-                borderRadius: BorderRadius.circular(18),
-              ),
-
-              child: Column(
-                children: [
-
-                  const Text(
-                    "Total Behaviour Score",
-                    style: TextStyle(
-                      color: Colors.white70,
-                      fontSize: 14,
-                    ),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: Colors.grey.shade200),
                   ),
 
-                  const SizedBox(height: 6),
+                  child: isLoadingEmployees
+                      ? const Padding(
+                          padding: EdgeInsets.all(16),
+                          child: Center(child: CircularProgressIndicator()),
+                        )
+                      : DropdownButtonHideUnderline(
+                          child: DropdownButton<int>(
+                            value: selectedStaffId,
+                            isExpanded: true,
+                            hint: const Text("Select Staff"),
 
-                  Text(
-                    "$totalScore / 15",
-                    style: const TextStyle(
+                            icon: const Icon(Icons.keyboard_arrow_down),
+
+                            items: employees.map((employee) {
+                              return DropdownMenuItem<int>(
+                                value: employee.userId,
+                                child: Row(
+                                  children: [
+                                    CircleAvatar(
+                                      radius: 18,
+                                      backgroundColor: const Color(
+                                        0xff194d26,
+                                      ).withOpacity(.1),
+
+                                      child: const Icon(
+                                        Icons.person,
+                                        size: 20,
+                                        color: Color(0xff194d26),
+                                      ),
+                                    ),
+
+                                    const SizedBox(width: 10),
+
+                                    Text(
+                                      employee.name,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                        color: Color.fromARGB(255, 25, 77, 38),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }).toList(),
+
+                            onChanged: (value) {
+                              if (value == null) return;
+
+                              final employee = employees.firstWhere(
+                                (e) => e.userId == value,
+                              );
+
+                              setState(() {
+                                selectedStaffId = value;
+                                selectedStaffName = employee.name;
+                              });
+                            },
+                          ),
+                        ),
+                ),
+
+                const SizedBox(height: 20),
+
+                const Text(
+                  "Score Month",
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black54,
+                  ),
+                ),
+
+                const SizedBox(height: 8),
+
+                GestureDetector(
+                  onTap: selectMonth,
+
+                  child: Container(
+                    height: 52,
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+
+                    decoration: BoxDecoration(
                       color: Colors.white,
-                      fontSize: 32,
-                      fontWeight: FontWeight.bold,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.grey.shade200),
                     ),
-                  ),
-                ],
-              ),
-            ),
 
-            const SizedBox(height: 25),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.calendar_month,
+                          color: Color(0xff194d26),
+                        ),
 
-            // ==========================
-            // SUBMIT
-            // ==========================
+                        const SizedBox(width: 12),
 
-            SizedBox(
-              width: double.infinity,
-              height: 54,
+                        Expanded(
+                          child: Text(
+                            monthName,
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
 
-              child: ElevatedButton(
-                onPressed:
-                    isSubmitting ? null : submitScore,
-
-                style: ElevatedButton.styleFrom(
-                  backgroundColor:
-                      const Color(0xff194d26),
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-
-                  shape: RoundedRectangleBorder(
-                    borderRadius:
-                        BorderRadius.circular(14),
+                        const Icon(Icons.keyboard_arrow_down),
+                      ],
+                    ),
                   ),
                 ),
 
-                child: isSubmitting
-                    ? const SizedBox(
-                        width: 22,
-                        height: 22,
-                        child:
-                            CircularProgressIndicator(
-                          strokeWidth: 2,
+                const SizedBox(height: 24),
+
+                _scoreCard(
+                  title: "Communication",
+                  subtitle: "Ability to communicate clearly and effectively",
+                  score: communication,
+                  onChanged: (value) {
+                    setState(() {
+                      communication = value;
+                    });
+                  },
+                ),
+
+                const SizedBox(height: 14),
+
+                _scoreCard(
+                  title: "Punctuality & Discipline",
+                  subtitle: "Attendance, punctuality and workplace discipline",
+                  score: punctuality,
+                  onChanged: (value) {
+                    setState(() {
+                      punctuality = value;
+                    });
+                  },
+                ),
+
+                const SizedBox(height: 14),
+
+                _scoreCard(
+                  title: "Ethics",
+                  subtitle: "Honesty, responsibility and ethical behaviour",
+                  score: integrity,
+                  onChanged: (value) {
+                    setState(() {
+                      integrity = value;
+                    });
+                  },
+                ),
+
+                const SizedBox(height: 24),
+
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(20),
+
+                  decoration: BoxDecoration(
+                    color: const Color(0xff194d26),
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+
+                  child: Column(
+                    children: [
+                      const Text(
+                        "Total Behaviour Score",
+                        style: TextStyle(color: Colors.white70, fontSize: 14),
+                      ),
+
+                      const SizedBox(height: 6),
+
+                      Text(
+                        "$totalScore / 15",
+                        style: const TextStyle(
                           color: Colors.white,
-                        ),
-                      )
-                    : const Text(
-                        "SUBMIT SCORE",
-                        style: TextStyle(
-                          fontSize: 15,
+                          fontSize: 18,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-              ),
-            ),
+                    ],
+                  ),
+                ),
 
-            const SizedBox(height: 20),
+                const SizedBox(height: 25),
+                Center(
+                  child: AppButton(
+                    text: "Submit",
+                    isLoading: isSubmitting,
+                    onPressed: isSubmitting ? null : submitScore,
+                    color: const Color(0xff194d26),
+                    txtcolor: Colors.white,
+                  ),
+                ),
+
+                const SizedBox(height: 20),
+              ],
+            ),
+            if (_topMessage != null)
+              AnimatedPositioned(
+                top: _showTopMessage ? 20 : -120,
+                left: 16,
+                right: 16,
+                duration: const Duration(milliseconds: 300),
+                child: Msgsnackbar(
+                  context,
+                  message: _topMessage!,
+                  isError: _isErrorMessage,
+                ),
+              ),
           ],
         ),
       ),
@@ -539,43 +438,31 @@ class _AddBehaviourScoreState extends State<AddBehaviourScore> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: Colors.grey.shade200,
-        ),
+        border: Border.all(color: Colors.grey.shade200),
       ),
 
       child: Column(
-        crossAxisAlignment:
-            CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.start,
 
         children: [
-
           Text(
             title,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-            ),
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
           ),
 
           const SizedBox(height: 5),
 
           Text(
             subtitle,
-            style: const TextStyle(
-              fontSize: 12,
-              color: Colors.grey,
-            ),
+            style: const TextStyle(fontSize: 12, color: Colors.grey),
           ),
 
           const SizedBox(height: 15),
 
           Row(
-            mainAxisAlignment:
-                MainAxisAlignment.spaceBetween,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
 
             children: List.generate(5, (index) {
-
               final value = index + 1;
               final selected = value <= score;
 
@@ -585,8 +472,7 @@ class _AddBehaviourScoreState extends State<AddBehaviourScore> {
                 },
 
                 child: AnimatedContainer(
-                  duration:
-                      const Duration(milliseconds: 200),
+                  duration: const Duration(milliseconds: 200),
 
                   width: 48,
                   height: 48,
@@ -610,12 +496,9 @@ class _AddBehaviourScoreState extends State<AddBehaviourScore> {
                       "$value",
                       style: TextStyle(
                         fontSize: 16,
-                        fontWeight:
-                            FontWeight.bold,
+                        fontWeight: FontWeight.bold,
 
-                        color: selected
-                            ? Colors.white
-                            : Colors.grey.shade600,
+                        color: selected ? Colors.white : Colors.grey.shade600,
                       ),
                     ),
                   ),
@@ -627,24 +510,14 @@ class _AddBehaviourScoreState extends State<AddBehaviourScore> {
           const SizedBox(height: 10),
 
           const Row(
-            mainAxisAlignment:
-                MainAxisAlignment.spaceBetween,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
 
             children: [
-              Text(
-                "Poor",
-                style: TextStyle(
-                  fontSize: 11,
-                  color: Colors.grey,
-                ),
-              ),
+              Text("Poor", style: TextStyle(fontSize: 11, color: Colors.grey)),
 
               Text(
                 "Excellent",
-                style: TextStyle(
-                  fontSize: 11,
-                  color: Colors.grey,
-                ),
+                style: TextStyle(fontSize: 11, color: Colors.grey),
               ),
             ],
           ),

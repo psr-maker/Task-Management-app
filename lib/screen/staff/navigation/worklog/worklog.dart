@@ -268,8 +268,9 @@ class _WorklogState extends State<Worklog> {
           "Submit Drafts",
           style: Theme.of(context).textTheme.displaySmall,
         ),
-        content: const Text(
+        content: Text(
           "Are you sure you want to submit all draft worklogs for this day?",
+           style: Theme.of(context).textTheme.labelMedium,
         ),
         actions: [
           TextButton(

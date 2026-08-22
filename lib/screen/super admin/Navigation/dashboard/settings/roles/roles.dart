@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:staff_work_track/Models/rolesmodel.dart';
+import 'package:staff_work_track/core/widgets/buttons.dart';
+import 'package:staff_work_track/core/widgets/loading.dart';
+import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
 import 'package:staff_work_track/services/superadmin_service.dart';
 
 class RolesList extends StatefulWidget {
@@ -17,18 +20,17 @@ class _RolesListState extends State<RolesList> {
 
   bool _isLoading = false;
   String _statusFilter = 'All';
+  String? _topMessage;
+
+  bool _isErrorMessage = true;
+
+  bool _showTopMessage = false;
 
   @override
   void initState() {
     super.initState();
     _loadRoles();
     _searchController.addListener(_filterRoles);
-  }
-
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
   }
 
   Future<void> _loadRoles() async {
@@ -55,7 +57,10 @@ class _RolesListState extends State<RolesList> {
         _isLoading = false;
       });
 
-      _showMessage(e.toString().replaceFirst('Exception: ', ''), isError: true);
+      showTopMessage(
+        e.toString().replaceFirst('Exception: ', ''),
+        isError: true,
+      );
     }
   }
 
@@ -73,6 +78,22 @@ class _RolesListState extends State<RolesList> {
 
         return matchesSearch && matchesStatus;
       }).toList();
+    });
+  }
+
+  void showTopMessage(String message, {bool isError = true}) {
+    setState(() {
+      _topMessage = message;
+      _isErrorMessage = isError;
+      _showTopMessage = true;
+    });
+
+    Future.delayed(const Duration(seconds: 3), () {
+      if (!mounted) return;
+
+      setState(() {
+        _showTopMessage = false;
+      });
     });
   }
 
@@ -105,77 +126,86 @@ class _RolesListState extends State<RolesList> {
               content: SizedBox(
                 width: 450,
 
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
 
-                  children: [
-                    // ROLE NAME
-                    TextField(
-                      controller: nameController,
-                      enabled: !isSaving,
-                      decoration: InputDecoration(
-                        labelText: 'Role Name',
-                        hintText: 'e.g. Team Leader',
-                        prefixIcon: const Icon(
-                          Icons.admin_panel_settings_outlined,
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    // POSITION
-                    TextField(
-                      controller: positionController,
-                      enabled: !isSaving,
-                      keyboardType: TextInputType.number,
-                      decoration: InputDecoration(
-                        labelText: 'Position',
-                        hintText: 'e.g. 4',
-                        prefixIcon: const Icon(Icons.format_list_numbered),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
+                    children: [
+                      // ROLE NAME
+                      TextField(
+                        controller: nameController,
+                        enabled: !isSaving,
+                        decoration: InputDecoration(
+                          labelText: 'Role Name',
+                          hintText: 'e.g. Team Leader',
+                          helperStyle: TextStyle(
+                            fontSize: 10,
+                            color: Colors.grey.shade600,
+                          ),
+                          prefixIcon: const Icon(
+                            Icons.admin_panel_settings_outlined,
+                            size: 18,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
                         ),
                       ),
-                    ),
 
-                    const SizedBox(height: 8),
+                      const SizedBox(height: 16),
 
-                    const Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        'Lower position number = higher role',
-                        style: TextStyle(fontSize: 12, color: Colors.grey),
+                      // POSITION
+                      TextField(
+                        controller: positionController,
+                        enabled: !isSaving,
+                        keyboardType: TextInputType.number,
+                        decoration: InputDecoration(
+                          labelText: 'Position',
+                          hintText: 'e.g. 4',
+                          helperStyle: TextStyle(
+                            fontSize: 10,
+                            color: Colors.grey.shade600,
+                          ),
+                          prefixIcon: const Icon(
+                            Icons.format_list_numbered,
+                            size: 18,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
                       ),
-                    ),
 
-                    const SizedBox(height: 16),
+                      const SizedBox(height: 8),
 
-                    // STATUS
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-
-                      title: const Text(
-                        'Status',
-                        style: TextStyle(fontWeight: FontWeight.w500),
+                      const Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          'Lower position number = higher role',
+                          style: TextStyle(fontSize: 12, color: Colors.grey),
+                        ),
                       ),
 
-                      subtitle: Text(status ? 'Active' : 'Inactive'),
+                      const SizedBox(height: 16),
 
-                      value: status,
+                      // STATUS
+                      SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
 
-                      onChanged: isSaving
-                          ? null
-                          : (value) {
-                              setDialogState(() {
-                                status = value;
-                              });
-                            },
-                    ),
-                  ],
+                        title: Text(status ? 'Active' : 'Inactive'),
+
+                        value: status,
+
+                        onChanged: isSaving
+                            ? null
+                            : (value) {
+                                setDialogState(() {
+                                  status = value;
+                                });
+                              },
+                      ),
+                    ],
+                  ),
                 ),
               ),
 
@@ -189,9 +219,9 @@ class _RolesListState extends State<RolesList> {
                         },
                   child: const Text('Cancel'),
                 ),
-
-                // SAVE / UPDATE
-                ElevatedButton(
+                AppButton(
+                  text: isEditing ? 'Update' : 'Save',
+                  isLoading: _isLoading,
                   onPressed: isSaving
                       ? null
                       : () async {
@@ -201,7 +231,7 @@ class _RolesListState extends State<RolesList> {
 
                           // Validate role name
                           if (name.isEmpty) {
-                            _showMessage(
+                            showTopMessage(
                               'Role name is required',
                               isError: true,
                             );
@@ -212,7 +242,7 @@ class _RolesListState extends State<RolesList> {
                           final position = int.tryParse(positionText);
 
                           if (position == null || position < 1) {
-                            _showMessage(
+                            showTopMessage(
                               'Enter a valid position',
                               isError: true,
                             );
@@ -245,10 +275,11 @@ class _RolesListState extends State<RolesList> {
 
                             await _loadRoles();
 
-                            _showMessage(
+                            showTopMessage(
                               isEditing
                                   ? 'Role updated successfully'
                                   : 'Role added successfully',
+                                  isError: false
                             );
                           } catch (e) {
                             setDialogState(() {
@@ -257,20 +288,14 @@ class _RolesListState extends State<RolesList> {
 
                             if (!mounted) return;
 
-                            _showMessage(
+                            showTopMessage(
                               e.toString().replaceFirst('Exception: ', ''),
                               isError: true,
                             );
                           }
                         },
-
-                  child: isSaving
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : Text(isEditing ? 'Update' : 'Save'),
+                  color: Color.fromARGB(255, 25, 77, 38),
+                  txtcolor: Colors.white,
                 ),
               ],
             );
@@ -324,7 +349,7 @@ class _RolesListState extends State<RolesList> {
 
       await _loadRoles();
 
-      _showMessage('Role deleted successfully');
+      showTopMessage('Role deleted successfully');
     } catch (e) {
       if (!mounted) return;
 
@@ -332,17 +357,17 @@ class _RolesListState extends State<RolesList> {
         _isLoading = false;
       });
 
-      _showMessage(e.toString().replaceFirst('Exception: ', ''), isError: true);
+      showTopMessage(
+        e.toString().replaceFirst('Exception: ', ''),
+        isError: true,
+      );
     }
   }
 
-  void _showMessage(String message, {bool isError = false}) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: isError ? Colors.red : Colors.green,
-      ),
-    );
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   @override
@@ -350,7 +375,10 @@ class _RolesListState extends State<RolesList> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Roles'),
-
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios),
+          onPressed: () => Navigator.pop(context),
+        ),
         actions: [
           IconButton(
             onPressed: _isLoading ? null : _loadRoles,
@@ -366,200 +394,236 @@ class _RolesListState extends State<RolesList> {
       ),
 
       body: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(15),
 
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-
+        child: Stack(
           children: [
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
 
               children: [
-                const Text(
-                  'Role Management',
-                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+
+                  children: [
+                    const Text(
+                      'Role Management',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+
+                      ),
+                    ),
+
+                    const SizedBox(height: 6),
+
+                    Text(
+                      'Manage system roles and access levels',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                  ],
                 ),
 
-                const SizedBox(height: 6),
+                const SizedBox(height: 20),
 
-                Text(
-                  'Manage system roles and access levels',
-                  style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
-                ),
-              ],
-            ),
+                Expanded(
+                  child: Container(
+                    width: double.infinity,
 
-            const SizedBox(height: 20),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
 
-            Expanded(
-              child: Container(
-                width: double.infinity,
+                      borderRadius: BorderRadius.circular(12),
 
-                decoration: BoxDecoration(
-                  color: Colors.white,
+                      border: Border.all(color: Colors.grey.shade200),
+                    ),
 
-                  borderRadius: BorderRadius.circular(12),
-
-                  border: Border.all(color: Colors.grey.shade200),
-                ),
-
-                child: _isLoading
-                    ? const Center(child: CircularProgressIndicator())
-                    : _filteredRoles.isEmpty
-                    ? const Center(
-                        child: Text(
-                          'No roles found',
-                          style: TextStyle(fontSize: 15, color: Colors.grey),
-                        ),
-                      )
-                    : SingleChildScrollView(
-                        child: SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-
-                          child: DataTable(
-                            columnSpacing: 50,
-
-                            headingRowColor: WidgetStateProperty.all(
-                              const Color(0xFFF8F9FA),
+                    child: _isLoading
+                        ? const Center(child: RotatingFlower())
+                        : _filteredRoles.isEmpty
+                        ? const Center(
+                            child: Text(
+                              'No roles found',
+                              style: TextStyle(
+                                fontSize: 15,
+                                color: Colors.grey,
+                              ),
                             ),
+                          )
+                        : SingleChildScrollView(
+                            child: SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
 
-                            columns: const [
-                              DataColumn(
-                                label: Text(
-                                  'POSITION',
-                                  style: TextStyle(fontWeight: FontWeight.w600),
+                              child: DataTable(
+                                columnSpacing: 50,
+
+                                headingRowColor: WidgetStateProperty.all(
+                                  const Color(0xFFF8F9FA),
                                 ),
-                              ),
 
-                              DataColumn(
-                                label: Text(
-                                  'ROLE',
-                                  style: TextStyle(fontWeight: FontWeight.w600),
-                                ),
-                              ),
-
-                              DataColumn(
-                                label: Text(
-                                  'STATUS',
-                                  style: TextStyle(fontWeight: FontWeight.w600),
-                                ),
-                              ),
-
-                              DataColumn(
-                                label: Text(
-                                  'ACTION',
-                                  style: TextStyle(fontWeight: FontWeight.w600),
-                                ),
-                              ),
-                            ],
-
-                            rows: _filteredRoles.map((role) {
-                              return DataRow(
-                                cells: [
-                                  // POSITION
-                                  DataCell(
-                                    Text(
-                                      role.position.toString(),
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.w600,
-                                      ),
+                                columns: [
+                                  DataColumn(
+                                    label: Text(
+                                      'POSITION',
+                                     style: Theme.of(context).textTheme.headlineLarge,
                                     ),
                                   ),
 
-                                  // ROLE
-                                  DataCell(
-                                    Text(
-                                      role.name,
-                                      style: const TextStyle(
-                                        color: Colors.black87,
-                                        fontWeight: FontWeight.w600,
-                                      ),
+                                   DataColumn(
+                                    label: Text(
+                                      'ROLE',
+                                     style: Theme.of(context).textTheme.headlineLarge,
                                     ),
                                   ),
 
-                                  // STATUS
-                                  DataCell(
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 10,
-                                        vertical: 5,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: role.status
-                                            ? Colors.green.shade50
-                                            : Colors.grey.shade100,
-                                        borderRadius: BorderRadius.circular(20),
-                                      ),
-                                      child: Text(
-                                        role.status ? 'Active' : 'Inactive',
-                                        style: TextStyle(
-                                          color: role.status
-                                              ? Colors.green.shade700
-                                              : Colors.grey.shade700,
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
+                                   DataColumn(
+                                    label: Text(
+                                      'STATUS',
+                                       style: Theme.of(context).textTheme.headlineLarge,
                                     ),
                                   ),
 
-                                  // ACTION
-                                  DataCell(
-                                    PopupMenuButton<String>(
-                                      onSelected: (value) {
-                                        if (value == 'edit') {
-                                          _showRoleDialog(role: role);
-                                        }
-
-                                        if (value == 'delete') {
-                                          _deleteRole(role);
-                                        }
-                                      },
-
-                                      itemBuilder: (context) {
-                                        return const [
-                                          PopupMenuItem(
-                                            value: 'edit',
-                                            child: Row(
-                                              children: [
-                                                Icon(Icons.edit_outlined),
-                                                SizedBox(width: 10),
-                                                Text('Edit Role'),
-                                              ],
-                                            ),
-                                          ),
-
-                                          PopupMenuItem(
-                                            value: 'delete',
-                                            child: Row(
-                                              children: [
-                                                Icon(
-                                                  Icons.delete_outline,
-                                                  color: Colors.red,
-                                                ),
-                                                SizedBox(width: 10),
-                                                Text(
-                                                  'Delete Role',
-                                                  style: TextStyle(
-                                                    color: Colors.red,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        ];
-                                      },
+                                   DataColumn(
+                                    label: Text(
+                                      'ACTION',
+                                       style: Theme.of(context).textTheme.headlineLarge,
                                     ),
                                   ),
                                 ],
-                              );
-                            }).toList(),
+
+                                rows: _filteredRoles.map((role) {
+                                  return DataRow(
+                                    cells: [
+                                      // POSITION
+                                      DataCell(
+                                        Text(
+                                          role.position.toString(),
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 13
+                                          ),
+                                        ),
+                                      ),
+
+                                      // ROLE
+                                      DataCell(
+                                        Text(
+                                          role.name,
+                                          style: const TextStyle(
+                                            color: Colors.black87,
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 13
+                                          ),
+                                        ),
+                                      ),
+
+                                      // STATUS
+                                      DataCell(
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 10,
+                                            vertical: 5,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: role.status
+                                                ? Colors.green.shade50
+                                                : Colors.grey.shade100,
+                                            borderRadius: BorderRadius.circular(
+                                              20,
+                                            ),
+                                          ),
+                                          child: Text(
+                                            role.status ? 'Active' : 'Inactive',
+                                            style: TextStyle(
+                                              color: role.status
+                                                  ? Colors.green.shade700
+                                                  : Colors.grey.shade700,
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+
+                                      // ACTION
+                                      DataCell(
+                                        PopupMenuButton<String>(
+                                          onSelected: (value) {
+                                            if (value == 'edit') {
+                                              _showRoleDialog(role: role);
+                                            }
+
+                                            if (value == 'delete') {
+                                              _deleteRole(role);
+                                            }
+                                          },
+
+                                          itemBuilder: (context) {
+                                            return const [
+                                              PopupMenuItem(
+                                                value: 'edit',
+                                                child: Row(
+                                                  children: [
+                                                    Icon(Icons.edit_outlined),
+                                                    SizedBox(width: 10),
+                                                    Text('Edit Role'),
+                                                  ],
+                                                ),
+                                              ),
+
+                                              PopupMenuItem(
+                                                value: 'delete',
+                                                child: Row(
+                                                  children: [
+                                                    Icon(
+                                                      Icons.delete_outline,
+                                                      color: Colors.red,
+                                                    ),
+                                                    SizedBox(width: 10),
+                                                    Text(
+                                                      'Delete Role',
+                                                      style: TextStyle(
+                                                        color: Colors.red,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ];
+                                          },
+                                        ),
+                                      ),
+                                    ],
+                                  );
+                                }).toList(),
+                              ),
+                            ),
                           ),
-                        ),
-                      ),
-              ),
+                  ),
+                ),
+              ],
             ),
+            if (_topMessage != null)
+              AnimatedPositioned(
+                top: _showTopMessage ? 0 : -120,
+
+                left: 16,
+
+                right: 16,
+
+                duration: const Duration(milliseconds: 300),
+
+                child: Msgsnackbar(
+                  context,
+
+                  message: _topMessage!,
+
+                  isError: _isErrorMessage,
+                ),
+              ),
           ],
         ),
       ),

@@ -21,7 +21,8 @@ class _StaffLeavesState extends State<StaffLeaves>
   String? _topMessage;
   bool _isErrorMessage = true;
   bool _showTopMessage = false;
-  String activeTab = "Leave"; // "Leave", "Permission", "Department Compensation"
+  String activeTab =
+      "Leave"; // "Leave", "Permission", "Department Compensation"
 
   late TabController _tabController;
   final tabs = ["All", "Pending", "Approved", "Rejected"];
@@ -49,7 +50,7 @@ class _StaffLeavesState extends State<StaffLeaves>
 
     try {
       List data = [];
-      
+
       if (activeTab == "Leave") {
         data = await AdminService.getDepartmentLeaves();
       } else if (activeTab == "Permission") {
@@ -92,7 +93,7 @@ class _StaffLeavesState extends State<StaffLeaves>
 
   void filterItems() {
     String selected;
-    
+
     if (activeTab == "Leave") {
       selected = tabs[_tabController.index];
     } else if (activeTab == "Permission") {
@@ -177,10 +178,7 @@ class _StaffLeavesState extends State<StaffLeaves>
           child: Column(
             children: [
               Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 8,
-                  vertical: 5,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
                 child: Row(
                   children: [
                     Expanded(
@@ -288,13 +286,14 @@ class _StaffLeavesState extends State<StaffLeaves>
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
                 ),
-                tabs: (activeTab == "Leave"
-                        ? tabs
-                        : activeTab == "Permission"
+                tabs:
+                    (activeTab == "Leave"
+                            ? tabs
+                            : activeTab == "Permission"
                             ? permissionTabs
                             : compensationTabs)
-                    .map((e) => Tab(text: e))
-                    .toList(),
+                        .map((e) => Tab(text: e))
+                        .toList(),
               ),
             ],
           ),
@@ -303,15 +302,15 @@ class _StaffLeavesState extends State<StaffLeaves>
       body: isLoading
           ? const Center(child: RotatingFlower())
           : filteredItems.isEmpty
-              ? Center(
-                  child: Text(
-                    activeTab == "Leave"
-                        ? "No Leave Found"
-                        : activeTab == "Permission"
-                            ? "No Permission Found"
-                            : "No Compensation Found",
-                  ),
-                )
+          ? Center(
+              child: Text(
+                activeTab == "Leave"
+                    ? "No Leave Found"
+                    : activeTab == "Permission"
+                    ? "No Permission Found"
+                    : "No Compensation Found",
+              ),
+            )
           : Stack(
               children: [
                 ListView(
@@ -347,7 +346,7 @@ class _StaffLeavesState extends State<StaffLeaves>
                     duration: const Duration(milliseconds: 300),
                     child: Msgsnackbar(
                       context,
-                      message: _topMessage!, 
+                      message: _topMessage!,
                       isError: _isErrorMessage,
                     ),
                   ),
@@ -478,7 +477,8 @@ class _StaffLeavesState extends State<StaffLeaves>
                     infoRow("From Time", formatTime(e["startTime"])),
                     infoRow("To Time", formatTime(e["endTime"])),
                     infoRow("Reason", e["reason"]),
-                    if (e["remarks"] != null && e["remarks"].toString().isNotEmpty)
+                    if (e["remarks"] != null &&
+                        e["remarks"].toString().isNotEmpty)
                       infoRow("Remarks", e["remarks"]),
                     if (status == "pending")
                       Padding(
@@ -530,6 +530,13 @@ class _StaffLeavesState extends State<StaffLeaves>
                     infoRow("Designation", e["designation"]),
                     infoRow("Reason", e["reason"]),
                     infoRow("Contact", e["contactNumber"]),
+                    if (e["compensationExtraWorkId"] != null)
+                      infoRow(
+                        "Compensation Date",
+                        AppHelpers.formatDate(
+                          e["compensationWorkedDate"] ?? "-",
+                        ),
+                      ),
                     if (e["applicationSource"] == "PermissionExceeded")
                       Container(
                         padding: const EdgeInsets.symmetric(
@@ -759,7 +766,7 @@ class _StaffLeavesState extends State<StaffLeaves>
   Future<void> _handleCompensationStatus(int id, String status) async {
     try {
       setState(() => _isLoading = true);
-      
+
       final service = AdminService();
       await service.updateExtraWorkStatus(
         id: id,
@@ -774,10 +781,7 @@ class _StaffLeavesState extends State<StaffLeaves>
 
       await loadItems();
     } catch (e) {
-      showTopMessage(
-        "Error: ${e.toString()}",
-        isError: true,
-      );
+      showTopMessage("Error: ${e.toString()}", isError: true);
     } finally {
       setState(() => _isLoading = false);
     }

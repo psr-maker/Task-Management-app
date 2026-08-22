@@ -6,8 +6,8 @@ class ApiConstants {
 
   // local
 
-  static const String apiurl = "http://192.168.1.128:5291/api";
-  static const String Uploaded = "http://192.168.1.128:5291";
+  static const String apiurl = "http://192.168.1.51:5291/api";
+  static const String Uploaded = "http://192.168.1.51:5291";
 
   // publish api Hostinger
 

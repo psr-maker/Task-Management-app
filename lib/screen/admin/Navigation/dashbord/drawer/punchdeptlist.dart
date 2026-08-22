@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:staff_work_track/core/widgets/loading.dart';
+import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
 import 'package:staff_work_track/services/admin_service.dart';
+import 'package:staff_work_track/utils/app_helper.dart';
 
 class PunchCorrdeptlist extends StatefulWidget {
   const PunchCorrdeptlist({super.key});
@@ -18,7 +21,9 @@ class _PunchCorrdeptlistState extends State<PunchCorrdeptlist> {
   String activeFilter = "Pending";
 
   int? _actioningId;
-
+  String? _topMessage;
+  bool _isErrorMessage = true;
+  bool _showTopMessage = false;
   @override
   void initState() {
     super.initState();
@@ -47,6 +52,21 @@ class _PunchCorrdeptlistState extends State<PunchCorrdeptlist> {
     });
   }
 
+  void showTopMessage(String message, {bool isError = true}) {
+    setState(() {
+      _topMessage = message;
+      _isErrorMessage = isError;
+      _showTopMessage = true;
+    });
+
+    Future.delayed(const Duration(seconds: 3), () {
+      if (!mounted) return;
+      setState(() {
+        _showTopMessage = false;
+      });
+    });
+  }
+
   Future<void> handleDecision(int id, bool approved) async {
     setState(() => _actioningId = id);
 
@@ -59,13 +79,9 @@ class _PunchCorrdeptlistState extends State<PunchCorrdeptlist> {
     setState(() => _actioningId = null);
 
     if (success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            approved ? "Punch correction approved" : "Punch correction rejected",
-          ),
-          backgroundColor: approved ? Colors.green : Colors.red,
-        ),
+      showTopMessage(
+        approved ? "Punch correction approved" : "Punch correction rejected",
+        isError: false,
       );
       await loadPunchCorrections(); // refresh so item moves out of Pending
     } else {
@@ -75,6 +91,7 @@ class _PunchCorrdeptlistState extends State<PunchCorrdeptlist> {
           backgroundColor: Colors.red,
         ),
       );
+      showTopMessage("Failed to update punch correction", isError: true);
     }
   }
 
@@ -82,7 +99,11 @@ class _PunchCorrdeptlistState extends State<PunchCorrdeptlist> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Punch Corrections"),
+        leading: IconButton(
+          onPressed: () => Navigator.pop(context),
+          icon: const Icon(Icons.arrow_back_ios),
+        ),
+        title: const Text("Attendance Corrections"),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(50),
           child: Padding(
@@ -108,8 +129,9 @@ class _PunchCorrdeptlistState extends State<PunchCorrdeptlist> {
                           f,
                           style: TextStyle(
                             color: Colors.white,
-                            fontWeight:
-                                isActive ? FontWeight.bold : FontWeight.normal,
+                            fontWeight: isActive
+                                ? FontWeight.bold
+                                : FontWeight.normal,
                             fontSize: 13,
                           ),
                         ),
@@ -123,42 +145,68 @@ class _PunchCorrdeptlistState extends State<PunchCorrdeptlist> {
         ),
       ),
 
-      body: isLoading
-          ? const Center(
-              child: CircularProgressIndicator(color: Color(0xff194d26)),
-            )
-          : filteredCorrections.isEmpty
-          ? Center(
-              child: Text(
-                "No $activeFilter punch corrections found",
-                style: const TextStyle(fontSize: 15, color: Colors.grey),
-              ),
-            )
-          : RefreshIndicator(
-              onRefresh: loadPunchCorrections,
-              color: const Color(0xff194d26),
-              child: ListView.builder(
-                padding: const EdgeInsets.fromLTRB(16, 22, 16, 30),
-                itemCount: filteredCorrections.length,
-                itemBuilder: (context, index) {
-                  final item = filteredCorrections[index];
-                  final id = item["id"];
+      body: Stack(
+        children: [
+          Column(
+            children: [
+              Expanded(
+                child: isLoading
+                    ? const Center(child: RotatingFlower())
+                    : filteredCorrections.isEmpty
+                    ? Center(
+                        child: Text(
+                          "No $activeFilter attendance corrections found",
+                          style: const TextStyle(
+                            fontSize: 15,
+                            color: Colors.grey,
+                          ),
+                        ),
+                      )
+                    : RefreshIndicator(
+                        onRefresh: loadPunchCorrections,
+                        color: const Color(0xff194d26),
+                        child: ListView.builder(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          padding: const EdgeInsets.all(15),
+                          itemCount: filteredCorrections.length,
+                          itemBuilder: (context, index) {
+                            final item = filteredCorrections[index];
 
-                  return _PunchTimelineItem(
-                    name: item["name"] ?? item["employeeName"] ?? "",
-                    date: item["date"] ?? "",
-                    type: item["correctionType"] ?? "",
-                    time: item["punchTime"] ?? "",
-                    reason: item["reason"] ?? "",
-                    status: item["status"] ?? "",
-                    isLast: index == filteredCorrections.length - 1,
-                    isActioning: _actioningId == id,
-                    onApprove: () => handleDecision(id, true),
-                    onReject: () => handleDecision(id, false),
-                  );
-                },
+                            final id = item["id"];
+
+                            return _PunchTimelineItem(
+                              name: item["name"] ?? item["employeeName"] ?? "",
+                              date: AppHelpers.formatDate(item["date"] ?? ""),
+                              type: item["correctionType"] ?? "",
+                              time: item["punchTime"] ?? "",
+                              reason: item["reason"] ?? "",
+                              status: item["status"] ?? "",
+                              isLast: index == filteredCorrections.length - 1,
+                              isActioning: _actioningId == id,
+                              onApprove: () => handleDecision(id, true),
+                              onReject: () => handleDecision(id, false),
+                            );
+                          },
+                        ),
+                      ),
+              ),
+            ],
+          ),
+          if (_topMessage != null)
+            AnimatedPositioned(
+              top: _showTopMessage ? 20 : -120,
+              left: 16,
+              right: 16,
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeOut,
+              child: Msgsnackbar(
+                context,
+                message: _topMessage!,
+                isError: _isErrorMessage,
               ),
             ),
+        ],
+      ),
     );
   }
 }

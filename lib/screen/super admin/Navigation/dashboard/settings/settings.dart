@@ -40,10 +40,10 @@ class Settings extends StatefulWidget {
       margin: const EdgeInsets.only(bottom: 12),
       child: ListTile(
         leading: Icon(icon, size: 20),
-        title: Text(title, style: Theme.of(context).textTheme.bodyMedium),
+        title: Text(title, style: Theme.of(context).textTheme.labelMedium),
         subtitle: Text(
           subtitle,
-          style: Theme.of(context).textTheme.labelMedium,
+          style: Theme.of(context).textTheme.titleLarge,
         ),
         trailing: const Icon(Icons.arrow_forward_ios, size: 16),
         onTap: onTap,

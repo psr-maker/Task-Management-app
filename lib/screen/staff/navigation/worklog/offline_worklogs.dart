@@ -1,6 +1,8 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:staff_work_track/core/widgets/loading.dart';
+import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
 import 'package:staff_work_track/services/local_worklog_db.dart';
 import 'package:staff_work_track/services/worklog_sync_service.dart';
 
@@ -8,13 +10,10 @@ class OfflineWorkLogs extends StatefulWidget {
   const OfflineWorkLogs({super.key});
 
   @override
-  State<OfflineWorkLogs> createState() =>
-      _OfflineWorkLogsState();
+  State<OfflineWorkLogs> createState() => _OfflineWorkLogsState();
 }
 
-class _OfflineWorkLogsState
-    extends State<OfflineWorkLogs> {
-
+class _OfflineWorkLogsState extends State<OfflineWorkLogs> {
   List<Map<String, dynamic>> pendingLogs = [];
 
   bool isLoading = true;
@@ -22,7 +21,11 @@ class _OfflineWorkLogsState
 
   // IDs currently syncing
   final Set<int> syncingIds = {};
+  String? _topMessage;
 
+  bool _isErrorMessage = true;
+
+  bool _showTopMessage = false;
   @override
   void initState() {
     super.initState();
@@ -35,8 +38,7 @@ class _OfflineWorkLogsState
     });
 
     try {
-      final data =
-          await LocalWorkLogDB.getPendingWorkLogs();
+      final data = await LocalWorkLogDB.getPendingWorkLogs();
 
       if (!mounted) return;
 
@@ -51,20 +53,13 @@ class _OfflineWorkLogsState
         isLoading = false;
       });
 
-      _showMessage(
-        "Failed to load offline worklogs",
-        isError: true,
-      );
+      showTopMessage("Failed to load offline worklogs", isError: true);
     }
   }
 
   Future<void> syncAll() async {
-
     if (pendingLogs.isEmpty) {
-      _showMessage(
-        "No pending worklogs",
-        isError: false,
-      );
+      showTopMessage("No pending worklogs", isError: false);
       return;
     }
 
@@ -73,32 +68,21 @@ class _OfflineWorkLogsState
     });
 
     try {
-
       await WorkLogSyncService.syncPendingWorkLogs();
 
       await loadPendingLogs();
 
       if (!mounted) return;
 
-      _showMessage(
-        "Pending worklogs synchronized",
-        isError: false,
-      );
-
+      showTopMessage("Pending worklogs synchronized", isError: false);
     } catch (e) {
-
       if (!mounted) return;
 
-      _showMessage(
-        e.toString().replaceFirst(
-          "Exception: ",
-          "",
-        ),
+      showTopMessage(
+        e.toString().replaceFirst("Exception: ", ""),
         isError: true,
       );
-
     } finally {
-
       if (mounted) {
         setState(() {
           isSyncingAll = false;
@@ -107,98 +91,77 @@ class _OfflineWorkLogsState
     }
   }
 
-  // =====================================================
-  // MESSAGE
-  // =====================================================
+  void showTopMessage(String message, {bool isError = true}) {
+    setState(() {
+      _topMessage = message;
+      _isErrorMessage = isError;
+      _showTopMessage = true;
+    });
 
-  void _showMessage(
-    String message, {
-    bool isError = true,
-  }) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor:
-            isError ? Colors.red : Colors.green,
-      ),
-    );
+    Future.delayed(const Duration(seconds: 3), () {
+      if (!mounted) return;
+
+      setState(() {
+        _showTopMessage = false;
+      });
+    });
   }
-
-  // =====================================================
-  // BUILD
-  // =====================================================
 
   @override
   Widget build(BuildContext context) {
-
     return Scaffold(
-
-    
       appBar: AppBar(
-
-      
-
-        title: const Text(
-          "Offline Worklogs",
-        
+        title: const Text("Offline Worklogs"),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios),
+          onPressed: () => Navigator.pop(context),
         ),
-
         actions: [
-
           IconButton(
             tooltip: "Sync All",
-            onPressed:
-                isSyncingAll
-                    ? null
-                    : syncAll,
-            icon: isSyncingAll
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child:
-                        CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white,
-                    ),
-                  )
-                : const Icon(
-                    Icons.sync,
-                  ),
+            onPressed: isSyncingAll ? null : syncAll,
+            icon: isSyncingAll ? RotatingFlower() : const Icon(Icons.sync),
           ),
-
         ],
       ),
 
-      body: _buildBody(),
+      body: Stack(
+        children: [
+          _buildBody(),
+          if (_topMessage != null)
+            AnimatedPositioned(
+              top: _showTopMessage ? 0 : -120,
+
+              left: 16,
+
+              right: 16,
+
+              duration: const Duration(milliseconds: 300),
+
+              child: Msgsnackbar(
+                context,
+
+                message: _topMessage!,
+
+                isError: _isErrorMessage,
+              ),
+            ),
+        ],
+      ),
     );
   }
 
-  // =====================================================
-  // BODY
-  // =====================================================
-
   Widget _buildBody() {
-
     if (isLoading) {
-
-      return const Center(
-        child:
-            CircularProgressIndicator(
-          color: Color(0xff194d26),
-        ),
-      );
+      return const Center(child: RotatingFlower());
     }
 
     if (pendingLogs.isEmpty) {
-
       return Center(
-
         child: Column(
-          mainAxisAlignment:
-              MainAxisAlignment.center,
+          mainAxisAlignment: MainAxisAlignment.center,
 
           children: [
-
             Icon(
               Icons.cloud_done_outlined,
               size: 70,
@@ -209,21 +172,14 @@ class _OfflineWorkLogsState
 
             const Text(
               "No Pending Worklogs",
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight:
-                    FontWeight.bold,
-              ),
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
 
             const SizedBox(height: 6),
 
             Text(
               "All offline worklogs are synced",
-              style: TextStyle(
-                color:
-                    Colors.grey.shade600,
-              ),
+              style: TextStyle(color: Colors.grey.shade600),
             ),
           ],
         ),
@@ -231,146 +187,83 @@ class _OfflineWorkLogsState
     }
 
     return RefreshIndicator(
-
       onRefresh: loadPendingLogs,
 
       child: ListView.builder(
+        padding: const EdgeInsets.all(16),
 
-        padding:
-            const EdgeInsets.all(16),
+        itemCount: pendingLogs.length,
 
-        itemCount:
-            pendingLogs.length,
+        itemBuilder: (context, index) {
+          final log = pendingLogs[index];
 
-        itemBuilder:
-            (context, index) {
-
-          final log =
-              pendingLogs[index];
-
-          return _buildWorkLogCard(
-            log,
-          );
+          return _buildWorkLogCard(log);
         },
       ),
     );
   }
 
-  // =====================================================
-  // WORKLOG CARD
-  // =====================================================
-
-  Widget _buildWorkLogCard(
-    Map<String, dynamic> log,
-  ) {
-
+  Widget _buildWorkLogCard(Map<String, dynamic> log) {
     final int id = log['id'];
 
-    final bool syncing =
-        syncingIds.contains(id);
+    final bool syncing = syncingIds.contains(id);
 
-    final String workType =
-        log['workType'] ?? "";
+    final String workType = log['workType'] ?? "";
 
-    final String title =
-        log['title'] ?? "";
+    final String title = log['title'] ?? "";
 
-    final String description =
-        log['description'] ?? "";
+    final String description = log['description'] ?? "";
 
-    final String location =
-        log['locationName'] ?? "";
+    final String location = log['locationName'] ?? "";
 
-    final String imagePath =
-        log['imagePath'] ?? "";
+    final String imagePath = log['imagePath'] ?? "";
 
     DateTime? workDate;
 
     try {
-      workDate =
-          DateTime.parse(
-        log['workDate'],
-      );
+      workDate = DateTime.parse(log['workDate']);
     } catch (_) {}
 
     return Container(
+      margin: const EdgeInsets.only(bottom: 14),
 
-      margin:
-          const EdgeInsets.only(
-        bottom: 14,
-      ),
+      padding: const EdgeInsets.all(14),
 
-      padding:
-          const EdgeInsets.all(14),
-
-      decoration:
-          BoxDecoration(
-
+      decoration: BoxDecoration(
         color: Colors.white,
 
-        borderRadius:
-            BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(16),
 
-        border: Border.all(
-          color:
-              Colors.orange.shade200,
-        ),
+        border: Border.all(color: Colors.orange.shade200),
 
         boxShadow: [
-          BoxShadow(
-            color:
-                Colors.black.withOpacity(
-              .04,
-            ),
-            blurRadius: 8,
-          ),
+          BoxShadow(color: Colors.black.withOpacity(.04), blurRadius: 8),
         ],
       ),
 
       child: Column(
-
-        crossAxisAlignment:
-            CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.start,
 
         children: [
-
-          // ==========================================
-          // HEADER
-          // ==========================================
-
           Row(
-
             children: [
-
               Container(
-                padding:
-                    const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 6,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
 
-                decoration:
-                    BoxDecoration(
-                  color:
-                      workType == "IN"
-                          ? Colors.green.shade50
-                          : Colors.red.shade50,
+                decoration: BoxDecoration(
+                  color: workType == "IN"
+                      ? Colors.green.shade50
+                      : Colors.red.shade50,
 
-                  borderRadius:
-                      BorderRadius.circular(
-                    8,
-                  ),
+                  borderRadius: BorderRadius.circular(8),
                 ),
 
                 child: Text(
                   workType,
                   style: TextStyle(
-                    fontWeight:
-                        FontWeight.bold,
-                    color:
-                        workType == "IN"
-                            ? Colors.green
-                            : Colors.red,
+                    fontWeight: FontWeight.bold,
+                    color: workType == "IN" ? Colors.green : Colors.red,
+                    fontSize: 14,
                   ),
                 ),
               ),
@@ -380,37 +273,21 @@ class _OfflineWorkLogsState
               Expanded(
                 child: Text(
                   title,
-                  style:
-                      const TextStyle(
-                    fontSize: 16,
-                    fontWeight:
-                        FontWeight.bold,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
               ),
-
-              // =====================================
-              // SYNC BUTTON
-              // =====================================
-
             ],
           ),
 
           const SizedBox(height: 8),
 
-          // ==========================================
-          // DATE
-          // ==========================================
-
           if (workDate != null)
             Row(
               children: [
-
-                const Icon(
-                  Icons.calendar_today,
-                  size: 15,
-                  color: Colors.grey,
-                ),
+                const Icon(Icons.calendar_today, size: 15, color: Colors.grey),
 
                 const SizedBox(width: 6),
 
@@ -418,43 +295,26 @@ class _OfflineWorkLogsState
                   "${workDate.day.toString().padLeft(2, '0')}/"
                   "${workDate.month.toString().padLeft(2, '0')}/"
                   "${workDate.year}",
-                  style:
-                      const TextStyle(
-                    color: Colors.grey,
-                  ),
+                  style: const TextStyle(color: Colors.grey, fontSize: 12),
                 ),
               ],
             ),
 
           const SizedBox(height: 8),
 
-          // ==========================================
-          // DESCRIPTION
-          // ==========================================
-
           if (description.isNotEmpty)
             Text(
               description,
-              style:
-                  TextStyle(
-                color:
-                    Colors.grey.shade700,
-              ),
+              style: TextStyle(color: Colors.grey.shade700, fontSize: 14),
             ),
 
           const SizedBox(height: 8),
 
-          // ==========================================
-          // LOCATION
-          // ==========================================
-
           if (location.isNotEmpty)
             Row(
-              crossAxisAlignment:
-                  CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.start,
 
               children: [
-
                 const Icon(
                   Icons.location_on,
                   size: 17,
@@ -466,62 +326,39 @@ class _OfflineWorkLogsState
                 Expanded(
                   child: Text(
                     location,
-                    style:
-                        const TextStyle(
+                    style: const TextStyle(
                       fontSize: 12,
-                      color: Colors.grey,
+                      color: Color.fromARGB(255, 100, 100, 100),
                     ),
                   ),
                 ),
               ],
             ),
 
-          // ==========================================
-          // IMAGE
-          // ==========================================
-
           if (imagePath.isNotEmpty)
             Padding(
-              padding:
-                  const EdgeInsets.only(
-                top: 10,
-              ),
+              padding: const EdgeInsets.only(top: 10),
 
               child: ClipRRect(
-                borderRadius:
-                    BorderRadius.circular(
-                  10,
-                ),
+                borderRadius: BorderRadius.circular(10),
 
                 child: kIsWeb
                     ? Image.network(
                         imagePath,
                         height: 150,
-                        width:
-                            double.infinity,
+                        width: double.infinity,
                         fit: BoxFit.cover,
                       )
                     : Image.file(
                         File(imagePath),
                         height: 150,
-                        width:
-                            double.infinity,
+                        width: double.infinity,
                         fit: BoxFit.cover,
-                        errorBuilder:
-                            (
-                          context,
-                          error,
-                          stackTrace,
-                        ) {
+                        errorBuilder: (context, error, stackTrace) {
                           return Container(
                             height: 150,
-                            color:
-                                Colors.grey.shade100,
-                            child:
-                                const Icon(
-                              Icons
-                                  .broken_image,
-                            ),
+                            color: Colors.grey.shade100,
+                            child: const Icon(Icons.broken_image),
                           );
                         },
                       ),
@@ -530,32 +367,18 @@ class _OfflineWorkLogsState
 
           const SizedBox(height: 10),
 
-          // ==========================================
-          // PENDING STATUS
-          // ==========================================
-
           Row(
             children: [
-
-              Icon(
-                Icons.cloud_off,
-                size: 16,
-                color:
-                    Colors.orange.shade700,
-              ),
+              Icon(Icons.cloud_off, size: 16, color: Colors.orange.shade700),
 
               const SizedBox(width: 5),
 
               Text(
-                syncing
-                    ? "Syncing..."
-                    : "Pending Sync",
+                syncing ? "Syncing..." : "Pending Sync",
                 style: TextStyle(
                   fontSize: 12,
-                  fontWeight:
-                      FontWeight.w600,
-                  color:
-                      Colors.orange.shade700,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.orange.shade700,
                 ),
               ),
             ],

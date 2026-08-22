@@ -148,7 +148,7 @@ class _UsersWorklogState extends State<Staffworklog> {
                   });
                 },
               )
-            : const Text("Staff Worklogs"),
+            : const Text("Worklogs"),
         actions: [
           IconButton(
             icon: Icon(isSearching ? Icons.close : Icons.search),

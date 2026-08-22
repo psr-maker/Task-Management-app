@@ -1,21 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:staff_work_track/core/widgets/buttons.dart';
+import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
 import 'package:staff_work_track/services/admin_service.dart';
 
 class ExtraWorkApply extends StatefulWidget {
   const ExtraWorkApply({super.key});
 
   @override
-  State<ExtraWorkApply> createState() =>
-      _ExtraWorkApplyState();
+  State<ExtraWorkApply> createState() => _ExtraWorkApplyState();
 }
 
-class _ExtraWorkApplyState
-    extends State<ExtraWorkApply> {
-
+class _ExtraWorkApplyState extends State<ExtraWorkApply> {
   final AdminService _service = AdminService();
 
-  final TextEditingController reasonController =
-      TextEditingController();
+  final TextEditingController reasonController = TextEditingController();
 
   DateTime? workedDate;
 
@@ -25,24 +23,15 @@ class _ExtraWorkApplyState
   String? workType;
 
   bool isLoading = false;
+  String? _topMessage;
+  bool _isErrorMessage = true;
+  bool _showTopMessage = false;
 
   final List<Map<String, String>> workTypes = [
-    {
-      'value': 'WeeklyOff',
-      'label': 'Weekly Off',
-    },
-    {
-      'value': 'PublicHoliday',
-      'label': 'Public Holiday',
-    },
-    {
-      'value': 'CompanyHoliday',
-      'label': 'Company Holiday',
-    },
-    {
-      'value': 'Other',
-      'label': 'Other',
-    },
+    {'value': 'WeeklyOff', 'label': 'Weekly Off'},
+    {'value': 'PublicHoliday', 'label': 'Public Holiday'},
+    {'value': 'CompanyHoliday', 'label': 'Company Holiday'},
+    {'value': 'Other', 'label': 'Other'},
   ];
 
   @override
@@ -50,10 +39,6 @@ class _ExtraWorkApplyState
     reasonController.dispose();
     super.dispose();
   }
-
-  // --------------------------------------------------
-  // Date Picker
-  // --------------------------------------------------
 
   Future<void> selectDate() async {
     final date = await showDatePicker(
@@ -70,19 +55,24 @@ class _ExtraWorkApplyState
     }
   }
 
-  // --------------------------------------------------
-  // Start Time
-  // --------------------------------------------------
-
   Future<void> selectStartTime() async {
     final time = await showTimePicker(
       context: context,
-      initialTime: const TimeOfDay(
-        hour: 9,
-        minute: 0,
-      ),
+      initialTime: TimeOfDay.now(),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.light(
+              primary: Theme.of(context).colorScheme.secondary,
+              onPrimary: Colors.white,
+              surface: Colors.white,
+              onSurface: Colors.black,
+            ),
+          ),
+          child: child!,
+        );
+      },
     );
-
     if (time != null) {
       setState(() {
         startTime = time;
@@ -90,17 +80,23 @@ class _ExtraWorkApplyState
     }
   }
 
-  // --------------------------------------------------
-  // End Time
-  // --------------------------------------------------
-
   Future<void> selectEndTime() async {
     final time = await showTimePicker(
       context: context,
-      initialTime: const TimeOfDay(
-        hour: 18,
-        minute: 0,
-      ),
+      initialTime: TimeOfDay.now(),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.light(
+              primary: Theme.of(context).colorScheme.secondary,
+              onPrimary: Colors.white,
+              surface: Colors.white,
+              onSurface: Colors.black,
+            ),
+          ),
+          child: child!,
+        );
+      },
     );
 
     if (time != null) {
@@ -110,13 +106,9 @@ class _ExtraWorkApplyState
     }
   }
 
-  // --------------------------------------------------
-  // Format Date
-  // --------------------------------------------------
-
   String formatDate(DateTime? date) {
     if (date == null) {
-      return 'Select worked date';
+      return '00-00-0000';
     }
 
     return '${date.day.toString().padLeft(2, '0')}-'
@@ -124,54 +116,35 @@ class _ExtraWorkApplyState
         '${date.year}';
   }
 
-  // --------------------------------------------------
-  // Format Time
-  // --------------------------------------------------
-
   String formatTime(TimeOfDay? time) {
     if (time == null) {
       return 'Select time';
     }
 
-    final hour = time.hourOfPeriod == 0
-        ? 12
-        : time.hourOfPeriod;
+    final hour = time.hourOfPeriod == 0 ? 12 : time.hourOfPeriod;
 
-    final minute =
-        time.minute.toString().padLeft(2, '0');
+    final minute = time.minute.toString().padLeft(2, '0');
 
-    final period =
-        time.period == DayPeriod.am ? 'AM' : 'PM';
+    final period = time.period == DayPeriod.am ? 'AM' : 'PM';
 
     return '$hour:$minute $period';
   }
-
-  // --------------------------------------------------
-  // API Time Format
-  // --------------------------------------------------
 
   String apiTime(TimeOfDay time) {
     return '${time.hour.toString().padLeft(2, '0')}:'
         '${time.minute.toString().padLeft(2, '0')}:00';
   }
 
-  // --------------------------------------------------
-  // Calculate Hours
-  // --------------------------------------------------
-
   String getTotalHours() {
     if (startTime == null || endTime == null) {
       return '0 Hours';
     }
 
-    final startMinutes =
-        startTime!.hour * 60 + startTime!.minute;
+    final startMinutes = startTime!.hour * 60 + startTime!.minute;
 
-    final endMinutes =
-        endTime!.hour * 60 + endTime!.minute;
+    final endMinutes = endTime!.hour * 60 + endTime!.minute;
 
-    final difference =
-        endMinutes - startMinutes;
+    final difference = endMinutes - startMinutes;
 
     if (difference <= 0) {
       return '0 Hours';
@@ -187,46 +160,38 @@ class _ExtraWorkApplyState
     return '$hours Hours $minutes Minutes';
   }
 
-  // --------------------------------------------------
-  // Submit
-  // --------------------------------------------------
-
   Future<void> submitExtraWork() async {
     if (workedDate == null) {
-      showMessage('Please select worked date');
+      showTopMessage("Please select worked date", isError: true);
       return;
     }
 
     if (workType == null) {
-      showMessage('Please select work type');
+      showTopMessage("Please select work type", isError: true);
       return;
     }
 
     if (startTime == null) {
-      showMessage('Please select start time');
+      showTopMessage("Please select start time", isError: true);
       return;
     }
 
     if (endTime == null) {
-      showMessage('Please select end time');
+      showTopMessage("Please select end time", isError: true);
       return;
     }
 
     if (reasonController.text.trim().isEmpty) {
-      showMessage('Please enter reason');
+      showTopMessage("Please enter reason", isError: true);
       return;
     }
 
-    final startMinutes =
-        startTime!.hour * 60 + startTime!.minute;
+    final startMinutes = startTime!.hour * 60 + startTime!.minute;
 
-    final endMinutes =
-        endTime!.hour * 60 + endTime!.minute;
+    final endMinutes = endTime!.hour * 60 + endTime!.minute;
 
     if (endMinutes <= startMinutes) {
-      showMessage(
-        'End time must be greater than start time',
-      );
+      showTopMessage("End time must be greater than start time", isError: true);
       return;
     }
 
@@ -249,251 +214,207 @@ class _ExtraWorkApplyState
         isLoading = false;
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Extra work application submitted successfully',
-          ),
-        ),
+      showTopMessage(
+        "Extra work application submitted successfully",
+        isError: false,
       );
-
-      Navigator.pop(context);
+      Navigator.pop(context, true);
     } catch (e) {
       if (!mounted) return;
 
       setState(() {
         isLoading = false;
       });
+      showTopMessage("Failed to submit extra work application", isError: true);
 
-      showMessage(
-        e.toString().replaceFirst('Exception: ', ''),
-      );
+      showMessage(e.toString().replaceFirst('Exception: ', ''));
     }
   }
 
-  // --------------------------------------------------
-  // Message
-  // --------------------------------------------------
+  void showTopMessage(String message, {bool isError = true}) {
+    setState(() {
+      _topMessage = message;
+      _isErrorMessage = isError;
+      _showTopMessage = true;
+    });
 
-  void showMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-      ),
-    );
+    Future.delayed(const Duration(seconds: 3), () {
+      if (!mounted) return;
+      setState(() {
+        _showTopMessage = false;
+      });
+    });
   }
 
-  // --------------------------------------------------
-  // UI
-  // --------------------------------------------------
+  void showMessage(String message) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Extra Work'),
+        title: const Text('Duty Off'),
+        leading: IconButton(
+          onPressed: () => Navigator.pop(context),
+          icon: const Icon(Icons.arrow_back_ios),
+        ),
       ),
 
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment:
-                CrossAxisAlignment.start,
+          child: Stack(
             children: [
-
-              const Text(
-                'Extra Work Application',
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-
-          
-
-              const SizedBox(height: 15),
-
-              // -----------------------------------------
-              // Worked Date
-              // -----------------------------------------
-
-              const Text(
-                'Worked Date',
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-
-              const SizedBox(height: 8),
-
-              InkWell(
-                onTap: selectDate,
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 16,
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Extra Duty Application',
+                    style: Theme.of(context).textTheme.bodyMedium,
                   ),
-                  decoration: BoxDecoration(
-                    border: Border.all(
-                      color: Colors.grey.shade300,
+
+                  const SizedBox(height: 15),
+
+                  Text(
+                    'Worked Date',
+                    style: Theme.of(context).textTheme.headlineLarge,
+                  ),
+
+                  const SizedBox(height: 8),
+
+                  InkWell(
+                    onTap: selectDate,
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 16,
+                      ),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey.shade300),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.calendar_month),
+
+                          const SizedBox(width: 12),
+
+                          Text(
+                            formatDate(workedDate),
+                            style: const TextStyle(fontSize: 16),
+                          ),
+                        ],
+                      ),
                     ),
-                    borderRadius:
-                        BorderRadius.circular(12),
                   ),
-                  child: Row(
-                    children: [
 
-                      const Icon(
-                        Icons.calendar_month,
+                  const SizedBox(height: 20),
+
+                  Text(
+                    'Work Type',
+                    style: Theme.of(context).textTheme.headlineLarge,
+                  ),
+
+                  const SizedBox(height: 8),
+
+                  DropdownButtonFormField<String>(
+                    value: workType,
+                    decoration: InputDecoration(
+                      hintText: 'Select work type',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    dropdownColor: Theme.of(context).colorScheme.background,
+                    style: Theme.of(context).textTheme.labelMedium,
+                    items: workTypes.map((item) {
+                      return DropdownMenuItem<String>(
+                        value: item['value'],
+                        child: Text(item['label']!),
+                      );
+                    }).toList(),
+                    onChanged: (value) {
+                      setState(() {
+                        workType = value;
+                      });
+                    },
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _timeField(
+                          title: 'Start Time',
+                          value: formatTime(startTime),
+                          icon: Icons.login,
+                          onTap: selectStartTime,
+                        ),
                       ),
 
                       const SizedBox(width: 12),
 
-                      Text(
-                        formatDate(workedDate),
-                        style: const TextStyle(
-                          fontSize: 16,
+                      Expanded(
+                        child: _timeField(
+                          title: 'End Time',
+                          value: formatTime(endTime),
+                          icon: Icons.logout,
+                          onTap: selectEndTime,
                         ),
                       ),
                     ],
                   ),
-                ),
-              ),
 
-              const SizedBox(height: 20),
+                  const SizedBox(height: 20),
 
-              // -----------------------------------------
-              // Work Type
-              // -----------------------------------------
-
-              const Text(
-                'Work Type',
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-
-              const SizedBox(height: 8),
-
-              DropdownButtonFormField<String>(
-                value: workType,
-                decoration: InputDecoration(
-                  hintText: 'Select work type',
-                  border: OutlineInputBorder(
-                    borderRadius:
-                        BorderRadius.circular(12),
+                  Text(
+                    'Reason',
+                    style: Theme.of(context).textTheme.headlineLarge,
                   ),
-                ),
-                items: workTypes.map((item) {
-                  return DropdownMenuItem<String>(
-                    value: item['value'],
-                    child: Text(item['label']!),
-                  );
-                }).toList(),
-                onChanged: (value) {
-                  setState(() {
-                    workType = value;
-                  });
-                },
-              ),
 
-              const SizedBox(height: 20),
+                  const SizedBox(height: 8),
 
-              // -----------------------------------------
-              // Start / End Time
-              // -----------------------------------------
-
-              Row(
-                children: [
-
-                  Expanded(
-                    child: _timeField(
-                      title: 'Start Time',
-                      value: formatTime(startTime),
-                      icon: Icons.login,
-                      onTap: selectStartTime,
+                  TextField(
+                    controller: reasonController,
+                    maxLines: 4,
+                    decoration: InputDecoration(
+                      hintText: 'Enter reason for extra work',
+                      hintStyle: Theme.of(context).textTheme.labelSmall,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
                   ),
 
-                  const SizedBox(width: 12),
-
-                  Expanded(
-                    child: _timeField(
-                      title: 'End Time',
-                      value: formatTime(endTime),
-                      icon: Icons.logout,
-                      onTap: selectEndTime,
+                  const SizedBox(height: 25),
+                  Center(
+                    child: AppButton(
+                      text: "Submit",
+                      isLoading: isLoading,
+                      onPressed: isLoading ? null : submitExtraWork,
+                      color: Theme.of(context).colorScheme.secondary,
+                      txtcolor: Theme.of(context).colorScheme.onPrimary,
                     ),
                   ),
                 ],
               ),
-
-              const SizedBox(height: 20),
-
-
-        
-
-              // -----------------------------------------
-              // Reason
-              // -----------------------------------------
-
-              const Text(
-                'Reason',
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-
-              const SizedBox(height: 8),
-
-              TextField(
-                controller: reasonController,
-                maxLines: 4,
-                decoration: InputDecoration(
-                  hintText:
-                      'Enter reason for extra work',
-                  border: OutlineInputBorder(
-                    borderRadius:
-                        BorderRadius.circular(12),
+              if (_topMessage != null)
+                AnimatedPositioned(
+                  top: _showTopMessage ? 20 : -120,
+                  left: 16,
+                  right: 16,
+                  duration: const Duration(milliseconds: 300),
+                  child: Msgsnackbar(
+                    context,
+                    message: _topMessage!,
+                    isError: _isErrorMessage,
                   ),
                 ),
-              ),
-
-              const SizedBox(height: 28),
-
-              // -----------------------------------------
-              // Submit
-              // -----------------------------------------
-
-              SizedBox(
-                width: double.infinity,
-                height: 52,
-                child: ElevatedButton(
-                  onPressed:
-                      isLoading
-                          ? null
-                          : submitExtraWork,
-                  child: isLoading
-                      ? const SizedBox(
-                          height: 22,
-                          width: 22,
-                          child:
-                              CircularProgressIndicator(
-                            strokeWidth: 2,
-                          ),
-                        )
-                      : const Text(
-                          'Submit Application',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight:
-                                FontWeight.bold,
-                          ),
-                        ),
-                ),
-              ),
             ],
           ),
         ),
@@ -508,37 +429,23 @@ class _ExtraWorkApplyState
     required VoidCallback onTap,
   }) {
     return Column(
-      crossAxisAlignment:
-          CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        Text(title, style: Theme.of(context).textTheme.headlineLarge),
 
-        Text(
-          title,
-          style: const TextStyle(
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-
-        const SizedBox(height: 8),
+        const SizedBox(height: 10),
 
         InkWell(
           onTap: onTap,
           child: Container(
             width: double.infinity,
-            padding: const EdgeInsets.symmetric(
-              horizontal: 12,
-              vertical: 16,
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
             decoration: BoxDecoration(
-              border: Border.all(
-                color: Colors.grey.shade300,
-              ),
-              borderRadius:
-                  BorderRadius.circular(12),
+              border: Border.all(color: Colors.grey.shade300),
+              borderRadius: BorderRadius.circular(12),
             ),
             child: Row(
               children: [
-
                 Icon(icon, size: 20),
 
                 const SizedBox(width: 8),
@@ -546,8 +453,8 @@ class _ExtraWorkApplyState
                 Expanded(
                   child: Text(
                     value,
-                    overflow:
-                        TextOverflow.ellipsis,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.labelMedium,
                   ),
                 ),
               ],
