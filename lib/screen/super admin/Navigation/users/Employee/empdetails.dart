@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:staff_work_track/Models/getusers.dart';
+import 'package:staff_work_track/Models/rolesmodel.dart';
 import 'package:staff_work_track/common/filter_model.dart';
 import 'package:staff_work_track/common/search_filter_page.dart';
 import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
@@ -45,6 +46,7 @@ class _EmployeeDetailState extends State<EmployeeDetail> {
   List<dynamic> staffGoals = [];
   DateTime? _lastRefreshTime;
   late UserModel employee;
+  List<Role> roles = [];
 
   List<dynamic> applyGoalSearch(List<dynamic> goals) {
     List<dynamic> filtered = goals;
@@ -107,6 +109,7 @@ class _EmployeeDetailState extends State<EmployeeDetail> {
   void initState() {
     super.initState();
     _initializeData();
+    _loadRoles();
     employee = widget.employee;
   }
 
@@ -138,41 +141,38 @@ class _EmployeeDetailState extends State<EmployeeDetail> {
     }
   }
 
-  @override
-  void didUpdateWidget(EmployeeDetail oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    // Reload data if the employee parameter changed
-    if (oldWidget.employee.userId != widget.employee.userId) {
-      _initializeData();
+  Future<void> _loadRoles() async {
+    try {
+      final rolesList = await SuperAdminService.getRoles();
+
+      if (!mounted) return;
+
+      setState(() {
+        roles = rolesList;
+      });
+    } catch (e) {
+      debugPrint("Failed to fetch Roles: $e");
+
+      if (!mounted) return;
+
+      showTopMessage("Failed to load roles", isError: true);
     }
   }
 
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
+  String getRoleName(dynamic roleId) {
+    if (roleId == null) return '-';
 
-    // Listen for refresh signals and reload data
-    final refreshNotifier = context.watch<DataRefreshNotifier>();
+    final id = int.tryParse(roleId.toString());
 
-    // Reload if user refresh signal changed
-    if (refreshNotifier.lastUserRefresh != null &&
-        (_lastRefreshTime == null ||
-            refreshNotifier.lastUserRefresh!.isAfter(_lastRefreshTime!))) {
-      _lastRefreshTime = refreshNotifier.lastUserRefresh;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _reloadEmployeeStatus();
-      });
+    if (id == null) return '-';
+
+    for (final role in roles) {
+      if (role.id == id) {
+        return role.name;
+      }
     }
 
-    // Reload if goal refresh signal changed
-    if (refreshNotifier.lastGoalRefresh != null &&
-        (_lastRefreshTime == null ||
-            refreshNotifier.lastGoalRefresh!.isAfter(_lastRefreshTime!))) {
-      _lastRefreshTime = refreshNotifier.lastGoalRefresh;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) loadEmployeeGoals();
-      });
-    }
+    return '-';
   }
 
   Future<void> loadEmployeeGoals() async {
@@ -255,6 +255,43 @@ class _EmployeeDetailState extends State<EmployeeDetail> {
   }
 
   @override
+  void didUpdateWidget(EmployeeDetail oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Reload data if the employee parameter changed
+    if (oldWidget.employee.userId != widget.employee.userId) {
+      _initializeData();
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    // Listen for refresh signals and reload data
+    final refreshNotifier = context.watch<DataRefreshNotifier>();
+
+    // Reload if user refresh signal changed
+    if (refreshNotifier.lastUserRefresh != null &&
+        (_lastRefreshTime == null ||
+            refreshNotifier.lastUserRefresh!.isAfter(_lastRefreshTime!))) {
+      _lastRefreshTime = refreshNotifier.lastUserRefresh;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _reloadEmployeeStatus();
+      });
+    }
+
+    // Reload if goal refresh signal changed
+    if (refreshNotifier.lastGoalRefresh != null &&
+        (_lastRefreshTime == null ||
+            refreshNotifier.lastGoalRefresh!.isAfter(_lastRefreshTime!))) {
+      _lastRefreshTime = refreshNotifier.lastGoalRefresh;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) loadEmployeeGoals();
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
@@ -272,7 +309,7 @@ class _EmployeeDetailState extends State<EmployeeDetail> {
                   hintStyle: Theme.of(context).textTheme.labelLarge,
                   border: InputBorder.none,
                 ),
-                onChanged: (value) {
+                onChanged: (value) { 
                   setState(() => searchQuery = value);
                 },
               )
@@ -533,7 +570,7 @@ class _EmployeeDetailState extends State<EmployeeDetail> {
                   },
                 ),
               ],
-            ), 
+            ),
           ),
 
           // 🔽 FILTER UI
@@ -625,8 +662,8 @@ class _EmployeeDetailState extends State<EmployeeDetail> {
         _row(Icons.email, employee.email),
         const SizedBox(height: 10),
         _row(Icons.business, employee.department),
-         const SizedBox(height: 10),
-        _row(Icons.work, employee.role),
+        const SizedBox(height: 10),
+        _row(Icons.work, getRoleName(employee.role)),
 
         Row(
           children: [
@@ -698,16 +735,16 @@ class _EmployeeDetailState extends State<EmployeeDetail> {
 
         Divider(height: 10, color: Theme.of(context).colorScheme.secondary),
 
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text("Created By", style: Theme.of(context).textTheme.titleLarge),
-            Text(
-              employee.createdBy,
-              style: Theme.of(context).textTheme.headlineMedium,
-            ),
-          ],
-        ),
+        // Row(
+        //   mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        //   children: [
+        //     Text("Created By", style: Theme.of(context).textTheme.titleLarge),
+        //     Text(
+        //       getRoleName(employee.createdBy),
+        //       style: Theme.of(context).textTheme.headlineMedium,
+        //     ),
+        //   ],
+        // ),
       ],
     );
   }

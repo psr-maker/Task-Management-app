@@ -16,6 +16,7 @@ import 'package:staff_work_track/screen/staff/navigation/dashboard/dashboard.dar
 import 'package:staff_work_track/screen/super%20admin/Navigation/Reports/reports_table.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/drawer/anouncement.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/drawer/auditlog.dart';
+import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/drawer/points.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/notifi.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/settings/settings.dart';
 import 'package:staff_work_track/services/announ_service.dart';
@@ -416,7 +417,7 @@ class _AdminState extends State<AdminDashboard> {
                                 value: (data["delayedGoalPercentage"] ?? 0)
                                     .toDouble(),
                                 icon: Icons.timer,
-                                isPercentage: true,
+                                isPercentage: false,
                               ),
                             ],
                           ),
@@ -544,6 +545,19 @@ class _AdminState extends State<AdminDashboard> {
             child: ListView(
               padding: const EdgeInsets.only(top: 10),
               children: [
+                  _buildDrawerItem(
+                  context,
+                  icon: Icons.task_alt_rounded,
+                  title: "Score Calculation",
+                  onTap: () {
+                    Navigator.pop(context);
+
+                   Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => ProductivityCalculationPage()),
+              );
+                  },
+                ),
                 _buildDrawerItem(
                   context,
                   icon: Icons.task_alt_rounded,

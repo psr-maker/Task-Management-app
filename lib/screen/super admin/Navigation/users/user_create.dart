@@ -62,10 +62,6 @@ class _CreateUsersState extends State<CreateUsers> {
     });
   }
 
-  // =========================
-  // CREATE USER
-  // =========================
-
   Future<void> createUser() async {
     if (usernameController.text.trim().isEmpty) {
       showTopMessage(
@@ -144,10 +140,6 @@ class _CreateUsersState extends State<CreateUsers> {
     }
   }
 
-  // =========================
-  // FETCH DEPARTMENTS
-  // =========================
-
   Future<void> _fetchDepartments() async {
     try {
       final deptList =
@@ -175,10 +167,6 @@ class _CreateUsersState extends State<CreateUsers> {
     }
   }
 
-  // =========================
-  // FETCH ROLES
-  // =========================
-
   Future<void> _loadRoles() async {
     try {
       final rolesList =
@@ -202,10 +190,6 @@ class _CreateUsersState extends State<CreateUsers> {
       );
     }
   }
-
-  // =========================
-  // UI
-  // =========================
 
   @override
   Widget build(BuildContext context) {
@@ -487,7 +471,7 @@ class _CreateUsersState extends State<CreateUsers> {
                             ),
                           ),
 
-                          const SizedBox(height: 40),
+                          const SizedBox(height: 25),
 
                           // =====================
                           // CREATE BUTTON
@@ -517,6 +501,7 @@ class _CreateUsersState extends State<CreateUsers> {
                                   .onPrimary,
                             ),
                           ),
+                          const SizedBox(height: 15),
                         ],
                       ),
                     ),

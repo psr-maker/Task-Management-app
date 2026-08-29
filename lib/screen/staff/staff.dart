@@ -58,15 +58,18 @@ class _StaffState extends State<Staff> {
       StaffDashboard(userid: userId!, role: role),
       const Mywork(),
       const Worklog(),
-      const Anouncestaff()
+      const Anouncestaff(),
     ];
 
     return Scaffold(
       body: pages[_currentIndex],
-      bottomNavigationBar: CurvedBottomNav(
-        currentIndex: _currentIndex,
-        onTap: (i) => setState(() => _currentIndex = i),
-        role: UserRole.staff,
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: CurvedBottomNav(
+          currentIndex: _currentIndex,
+          onTap: (i) => setState(() => _currentIndex = i),
+          role: UserRole.staff,
+        ),
       ),
     );
   }

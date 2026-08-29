@@ -89,7 +89,8 @@ class _CreateTaskPageState extends State<Createtask> {
   void initState() {
     super.initState();
 
-    isTask = widget.initialIsTask ||
+    isTask =
+        widget.initialIsTask ||
         widget.initialTaskName != null ||
         widget.initialGoalCode != null ||
         widget.initialQuantity != null ||
@@ -138,26 +139,36 @@ class _CreateTaskPageState extends State<Createtask> {
     DateTime firstDate = DateTime(2000);
     DateTime lastDate = DateTime(2100);
 
-    // Restrict within Goal dates
+    // Always clamp to the Goal's range first when creating a Task
     if (isTask && goalStartDate != null && goalDueDate != null) {
       firstDate = goalStartDate!;
       lastDate = goalDueDate!;
     }
 
-    // If selecting Task Due Date, it cannot be before Task Start Date
-    if (!isCreated && createdDate != null) {
-      firstDate = createdDate!;
-
-      if (goalDueDate != null) {
-        lastDate = goalDueDate!;
+    if (isCreated) {
+      // Selecting TASK START DATE
+      // must stay within [goalStartDate, goalDueDate]
+      initialDate = firstDate;
+    } else {
+      // Selecting TASK DUE DATE
+      // must stay within [max(createdDate, goalStartDate), goalDueDate]
+      if (createdDate != null && createdDate!.isAfter(firstDate)) {
+        firstDate = createdDate!;
       }
+      initialDate = firstDate;
+    }
 
-      initialDate = createdDate!;
+    // Clamp initialDate to both bounds so the picker never throws
+    // and always opens on a valid, selectable date
+    if (initialDate.isBefore(firstDate)) {
+      initialDate = firstDate;
+    } else if (initialDate.isAfter(lastDate)) {
+      initialDate = lastDate;
     }
 
     DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: initialDate.isBefore(firstDate) ? firstDate : initialDate,
+      initialDate: initialDate,
       firstDate: firstDate,
       lastDate: lastDate,
     );
@@ -170,7 +181,7 @@ class _CreateTaskPageState extends State<Createtask> {
         if (isCreated) {
           createdDate = picked;
 
-          // Clear due date if invalid
+          // If existing due date is now before the new start date, clear it
           if (dueDate != null && dueDate!.isBefore(createdDate!)) {
             dueDate = null;
             dueDateController.clear();
@@ -202,7 +213,6 @@ class _CreateTaskPageState extends State<Createtask> {
         descriController.text.isEmpty ||
         selectedPriority == null ||
         createdDate == null ||
-        selectedGoalCode == null ||
         dueDate == null ||
         (selectedPerformanceType == "Qty" && quantityController.text.isEmpty)) {
       showTopMessage("Please fill the All Fields", isError: true);
@@ -244,7 +254,7 @@ class _CreateTaskPageState extends State<Createtask> {
       priority: selectedPriority!,
       assignedAt: createdDate!,
       dueDate: dueDate!,
-      goalCode: selectedGoalCode!,
+      goalCode: selectedGoalCode,
       performanceType: selectedPerformanceType,
       quantity: quantity,
       startTime: startTime != null ? formatTimeOfDay(startTime!) : null,
@@ -577,47 +587,7 @@ class _CreateTaskPageState extends State<Createtask> {
             },
           ),
         ),
-        // if (selectedGoalCode != null && goalsList.isNotEmpty)
-        //   Builder(
-        //     builder: (context) {
-        //       final selectedGoal = goalsList.firstWhere(
-        //         (g) => g['goalCode'].toString() == selectedGoalCode,
-        //         orElse: () => null,
-        //       );
-        //       if (selectedGoal == null) return const SizedBox.shrink();
 
-        //       return Padding(
-        //         padding: const EdgeInsets.only(top: 10),
-        //         child: Text(
-        //           "Selected Goal: ${selectedGoal['title'] ?? ''} (${selectedGoal['goalCode'] ?? ''})",
-        //           style: Theme.of(context)
-        //               .textTheme
-        //               .headlineSmall
-        //               ?.copyWith(color: Colors.grey[700]),
-        //         ),
-        //       );
-        //     },
-        //   ),
-        // if (selectedGoalCode != null && goalsList.isNotEmpty) ...[
-        //   const SizedBox(height: 10),
-        //   Builder(
-        //     builder: (context) {
-        //       final selectedGoal = goalsList.firstWhere(
-        //         (g) => g['goalCode'].toString() == selectedGoalCode,
-        //         orElse: () => null,
-        //       );
-        //       if (selectedGoal == null) return const SizedBox.shrink();
-
-        //       // return Text(
-        //       //   "Goal: ${selectedGoal['title'] ?? ''} (${selectedGoal['goalCode'] ?? ''})",
-        //       //   style: Theme.of(context)
-        //       //       .textTheme
-        //       //       .headlineSmall
-        //       //       ?.copyWith(color: Colors.grey[700]),
-        //       // );
-        //     },
-        //   ),
-        // ],
         const SizedBox(height: 20),
         CustomFormWidgets.label(context, "Priority"),
         const SizedBox(height: 8),
@@ -653,7 +623,20 @@ class _CreateTaskPageState extends State<Createtask> {
           onTap: () async {
             final picked = await showTimePicker(
               context: context,
-              initialTime: startTime ?? TimeOfDay.now(),
+              initialTime: TimeOfDay.now(),
+              builder: (context, child) {
+                return Theme(
+                  data: Theme.of(context).copyWith(
+                    colorScheme: ColorScheme.light(
+                      primary: Theme.of(context).colorScheme.secondary,
+                      onPrimary: Colors.white,
+                      surface: Colors.white,
+                      onSurface: Colors.black,
+                    ),
+                  ),
+                  child: child!,
+                );
+              },
             );
             if (picked != null) {
               setState(() {
@@ -672,7 +655,20 @@ class _CreateTaskPageState extends State<Createtask> {
           onTap: () async {
             final picked = await showTimePicker(
               context: context,
-              initialTime: endTime ?? TimeOfDay.now(),
+              initialTime: TimeOfDay.now(),
+              builder: (context, child) {
+                return Theme(
+                  data: Theme.of(context).copyWith(
+                    colorScheme: ColorScheme.light(
+                      primary: Theme.of(context).colorScheme.secondary,
+                      onPrimary: Colors.white,
+                      surface: Colors.white,
+                      onSurface: Colors.black,
+                    ),
+                  ),
+                  child: child!,
+                );
+              },
             );
             if (picked != null) {
               setState(() {

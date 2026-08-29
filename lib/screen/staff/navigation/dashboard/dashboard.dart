@@ -396,7 +396,7 @@ class _StaffDashboardState extends State<StaffDashboard> {
                           title: "Delayed %",
                           value: delayedGoalPercent,
                           icon: Icons.verified_outlined,
-                          isPercentage: true,
+                          isPercentage: false,
                         ),
                       ),
                     ],

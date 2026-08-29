@@ -30,10 +30,13 @@ class _SuperadminState extends State<SuperAdmin> {
     return Scaffold(
       body: _pages[_currentIndex],
       bottomNavigationBar: isPortrait
-          ? CurvedBottomNav(
-              currentIndex: _currentIndex,
-              onTap: (i) => setState(() => _currentIndex = i),
-              role: UserRole.superAdmin,
+          ? SafeArea(
+              top: false,
+              child: CurvedBottomNav(
+                currentIndex: _currentIndex,
+                onTap: (i) => setState(() => _currentIndex = i),
+                role: UserRole.superAdmin,
+              ),
             )
           : null,
     );

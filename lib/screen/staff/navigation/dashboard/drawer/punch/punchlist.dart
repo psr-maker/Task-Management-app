@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:staff_work_track/core/widgets/loading.dart';
 import 'package:staff_work_track/screen/staff/navigation/dashboard/drawer/punch/punchcorr_apply.dart';
 import 'package:staff_work_track/services/admin_service.dart';
 import 'package:staff_work_track/utils/app_helper.dart';
@@ -42,13 +43,16 @@ class _PunchCorrectionListState extends State<PunchCorrectionList> {
         title: const Text("Punch Corrections"),
         actions: [
           IconButton(
-            onPressed: () {
-              Navigator.push(
+            onPressed: () async {
+              final result = await Navigator.push(
                 context,
                 MaterialPageRoute(
                   builder: (context) => const PunchCorrection(),
                 ),
               );
+              if (result == true) {
+                loadPunchCorrections();
+              }
             },
             icon: Icon(Icons.add),
           ),
@@ -56,9 +60,7 @@ class _PunchCorrectionListState extends State<PunchCorrectionList> {
       ),
 
       body: isLoading
-          ? const Center(
-              child: CircularProgressIndicator(color: Color(0xff194d26)),
-            )
+          ? const Center(child: RotatingFlower())
           : corrections.isEmpty
           ? const Center(
               child: Text(

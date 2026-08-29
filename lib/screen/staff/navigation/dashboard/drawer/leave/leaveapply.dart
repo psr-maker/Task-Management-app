@@ -313,26 +313,59 @@ class _LeaveapplyState extends State<Leaveapply> {
 
     setState(() => _isLoading = true);
 
-    final success = await AdminService.applyPermission(
+    // final success = await AdminService.applyPermission(
+    //   name: nameController.text,
+    //   designation: designationController.text,
+    //   reason: reasonController.text,
+    //   date: fromDate!, // single date
+    //   fromTime: formatTimeToApi(fromTime!),
+    //   toTime: formatTimeToApi(toTime!),
+    // );
+
+    // setState(() => _isLoading = false);
+
+    // if (success) {
+    //   showTopMessage("Permission Applied Successfully", isError: false);
+
+    //   // ✅ optional reset
+    //   setState(() {
+    //     fromTime = null;
+    //     toTime = null;
+    //     totalMinutes = 0;
+    //   });
+    //   Navigator.pop(context, true);
+    // } else {
+    //   showTopMessage("Failed to apply permission", isError: true);
+    // }
+    final result = await AdminService.applyPermission(
       name: nameController.text,
       designation: designationController.text,
       reason: reasonController.text,
-      date: fromDate!, // single date
+      date: fromDate!,
       fromTime: formatTimeToApi(fromTime!),
       toTime: formatTimeToApi(toTime!),
     );
 
     setState(() => _isLoading = false);
 
-    if (success) {
-      showTopMessage("Permission Applied Successfully", isError: false);
+    if (result != null) {
+      final applicationType = result["applicationType"]?.toString();
 
-      // ✅ optional reset
-      setState(() {
-        fromTime = null;
-        toTime = null;
-        totalMinutes = 0;
-      });
+      if (applicationType == "Leave") {
+        showTopMessage(
+          "60 minute permission limit exceeded. Leave request created.",
+          isError: false,
+        );
+      } else {
+        final remainingMinutes = result["remainingMinutes"] ?? 0;
+
+        showTopMessage(
+          "Permission applied successfully. "
+          "$remainingMinutes minutes remaining.",
+          isError: false,
+        );
+      }
+
       Navigator.pop(context, true);
     } else {
       showTopMessage("Failed to apply permission", isError: true);

@@ -3,7 +3,6 @@ import 'package:staff_work_track/core/widgets/loading.dart';
 import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
 import 'package:staff_work_track/screen/admin/Navigation/dashbord/drawer/task%20points/taskpoint.dart';
 import 'package:staff_work_track/services/admin_service.dart';
-import 'package:staff_work_track/utils/TaskUtils.dart';
 import 'package:staff_work_track/utils/app_helper.dart';
 
 class Taskpoints extends StatefulWidget {
@@ -156,40 +155,60 @@ class _TaskpointsState extends State<Taskpoints> {
   }
 
   Widget _buildTaskCard(Map<String, dynamic> task, int index) {
-    final statusEnum = TaskUtils.parseStatus(task['status']);
+    final int? staffId = task['staffId'];
+
+    if (staffId == null) {
+      return const SizedBox();
+    }
+
+    final bool isReviewed = task['finalPoints'] != null;
+    final bool isExpanded = expandedIndex == index;
 
     return Column(
       children: [
         const SizedBox(height: 15),
 
+        // Expanded review section
         AnimatedSize(
           duration: const Duration(milliseconds: 300),
           curve: Curves.easeInOut,
-          child: expandedIndex == index
+          child: isExpanded
               ? Padding(
-                  padding: const EdgeInsets.only(bottom: 20),
+                  padding: const EdgeInsets.only(bottom: 12),
                   child: TaskPointDetail(
-                    key: ValueKey(task['taskCode']),
-                    taskName: task['task'],
-                    assignedTo: AppHelpers.extractName(
-                      task['assignedTo'] ?? "",
-                    ),
+                    key: ValueKey("${task['taskCode']}_$staffId"),
+
+                    taskName: task['task'] ?? "",
+
+                    assignedTo: task['staffName'] ?? "",
+
                     taskId: task['taskCode'].toString(),
+
+                    staffId: staffId,
+
                     systemPoints: task['systemPoints'] ?? 0,
+
                     finalPoints: task['finalPoints'],
-                    isReviewed: task['finalPoints'] != null,
+
+                    isReviewed: isReviewed,
+
                     delayJustified: task['isDelayJustified'] ?? false,
+
                     delayReason: task['delayReason'],
+
                     comment: task['comment'],
+
                     onShowMessage: (msg, {isError = true}) {
                       showTopMessage(msg, isError: isError);
                     },
+
                     onReviewSubmitted: _refreshTasks,
                   ),
                 )
               : const SizedBox(),
         ),
 
+        // ⭐ THIS IS THE IMPORTANT PART
         GestureDetector(
           onTap: () {
             setState(() {
@@ -197,66 +216,73 @@ class _TaskpointsState extends State<Taskpoints> {
             });
           },
           child: Container(
+            width: double.infinity,
             margin: const EdgeInsets.only(bottom: 8),
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(14),
               border: Border.all(
-                color: Theme.of(context).colorScheme.secondary,
+                //  color: Theme.of(context).colorScheme.secondary,
                 width: 1,
               ),
+              //color: Theme.of(context).colorScheme.primary,
             ),
             child: Row(
               children: [
+                // Status indicator
                 Container(
                   width: 4,
-                  height: 60,
+                  height: 65,
                   decoration: BoxDecoration(
-                    color: TaskUtils.getStatusColor(statusEnum),
+                    color: isReviewed ? Colors.green : Colors.orange,
                     borderRadius: BorderRadius.circular(10),
                   ),
                 ),
+
                 const SizedBox(width: 12),
 
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // Staff name
+                      Text(
+                        task['staffName'] ?? "Unknown Staff",
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.titleSmall,
+                      ),
+
+                      const SizedBox(height: 5),
+
+                      // Task
                       Text(
                         task['task'] ?? "",
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.headlineLarge,
+                        style: Theme.of(context).textTheme.bodyMedium,
                       ),
-                      const SizedBox(height: 6),
-                      Text(
-                        AppHelpers.extractName(task['assignedTo'] ?? ""),
-                        style: Theme.of(context).textTheme.labelMedium,
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        "Completed: ${AppHelpers.formatDate(task['completedDate'])}",
-                        style: Theme.of(context).textTheme.labelSmall,
-                      ),
-                      const SizedBox(height: 6),
+
+                      const SizedBox(height: 5),
+
                       Row(
                         children: [
-                          const Icon(Icons.calendar_today, size: 14),
-                          const SizedBox(width: 6),
+                          const Icon(Icons.people, size: 14),
+                          const SizedBox(width: 5),
+
+                          Text(
+                            '${task['totalMembers'] ?? 0}',
+                            style: Theme.of(context).textTheme.labelSmall,
+                          ),
+
+                          const SizedBox(width: 12),
+
+                          const Icon(Icons.calendar_today, size: 13),
+                          const SizedBox(width: 5),
 
                           Text(
                             "Due: ${AppHelpers.formatDate(task['dueDate'])}",
                             style: Theme.of(context).textTheme.labelSmall,
-                          ),
-                          const SizedBox(width: 12),
-                          const Icon(Icons.group, size: 14),
-                          const SizedBox(width: 4),
-                          Text(
-                            "${task['totalMembers']}",
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                            ),
                           ),
                         ],
                       ),
@@ -264,9 +290,37 @@ class _TaskpointsState extends State<Taskpoints> {
                   ),
                 ),
 
-                task['finalPoints'] != null
-                    ? const Icon(Icons.check_circle, color: Colors.green)
-                    : const Icon(Icons.pending_actions, color: Colors.orange),
+                const SizedBox(width: 8),
+
+                // Review status
+                Column(
+                  children: [
+                    Icon(
+                      isReviewed ? Icons.check_circle : Icons.pending_actions,
+                      color: isReviewed ? Colors.green : Colors.orange,
+                    ),
+
+                    const SizedBox(height: 4),
+
+                    Text(
+                      isReviewed ? "${task['finalPoints']}/100" : "Pending",
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: isReviewed ? Colors.green : Colors.orange,
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(width: 5),
+
+                // Expand icon
+                AnimatedRotation(
+                  turns: isExpanded ? 0.5 : 0,
+                  duration: const Duration(milliseconds: 200),
+                  child: const Icon(Icons.keyboard_arrow_down),
+                ),
               ],
             ),
           ),

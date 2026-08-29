@@ -134,9 +134,13 @@ class AdminService {
     required bool isDelayJustified,
     required String delayReason,
     required String comment,
+    required int staffId,
   }) async {
     final token = await AuthService.getToken();
-    if (token == null) throw Exception("Token not found");
+
+    if (token == null) {
+      throw Exception("Token not found");
+    }
 
     final response = await http.post(
       Uri.parse("$baseUrl/Manager/review-task"),
@@ -146,6 +150,7 @@ class AdminService {
       },
       body: jsonEncode({
         "taskCode": taskCode,
+        "staffId": staffId, // ⭐ MISSING IN YOUR CODE
         "managerPoints": managerPoints,
         "isDelayJustified": isDelayJustified,
         "delayReason": delayReason,
@@ -156,22 +161,32 @@ class AdminService {
     if (response.statusCode == 200) {
       return true;
     } else {
-      throw Exception("Failed to submit review");
+      throw Exception(
+        response.body.isNotEmpty ? response.body : "Failed to submit review",
+      );
     }
   }
 
-  static Future<Map<String, dynamic>?> getReview(String taskCode) async {
+  static Future<List<Map<String, dynamic>>> getReview(String taskCode) async {
     final response = await http.get(
       Uri.parse('$baseUrl/Manager/getreview/$taskCode'),
       headers: {"Content-Type": "application/json"},
     );
 
     if (response.statusCode == 200) {
-      return jsonDecode(response.body);
+      final decoded = jsonDecode(response.body);
+
+      if (decoded is List) {
+        return List<Map<String, dynamic>>.from(
+          decoded.map((item) => Map<String, dynamic>.from(item)),
+        );
+      }
+
+      return [];
     } else if (response.statusCode == 404) {
-      return null;
+      return [];
     } else {
-      throw Exception("Failed to fetch review");
+      throw Exception("Failed to fetch review: ${response.statusCode}");
     }
   }
 
@@ -387,13 +402,13 @@ class AdminService {
     }
   }
 
-  static Future<bool> applyPermission({
+  static Future<Map<String, dynamic>?> applyPermission({
     required String name,
     required String designation,
     required String reason,
     required DateTime date,
-    required String fromTime, // "HH:mm:ss"
-    required String toTime, // "HH:mm:ss"
+    required String fromTime,
+    required String toTime,
   }) async {
     try {
       final token = await AuthService.getToken();
@@ -414,15 +429,25 @@ class AdminService {
         }),
       );
 
+      print("======================================");
+      print("PERMISSION API");
+      print("STATUS CODE: ${response.statusCode}");
+      print("RESPONSE BODY: ${response.body}");
+      print("======================================");
+
       if (response.statusCode == 200) {
-        return true;
-      } else {
-        print("Error: ${response.body}");
-        return false;
+        final data = jsonDecode(response.body);
+
+        print("APPLICATION TYPE: ${data["applicationType"]}");
+
+        return Map<String, dynamic>.from(data);
       }
-    } catch (e) {
-      print("Exception: $e");
-      return false;
+
+      return null;
+    } catch (e, stackTrace) {
+      print("PERMISSION EXCEPTION: $e");
+      print(stackTrace);
+      return null;
     }
   }
 

@@ -7,6 +7,7 @@ class TaskPointDetail extends StatefulWidget {
   final String taskName;
   final String assignedTo;
   final String taskId;
+  final int staffId;
 
   final int systemPoints;
   final int? finalPoints;
@@ -27,8 +28,8 @@ class TaskPointDetail extends StatefulWidget {
     required this.delayJustified,
     this.delayReason,
     this.comment,
-    this.onShowMessage, 
-    this.onReviewSubmitted,
+    this.onShowMessage,
+    this.onReviewSubmitted, required this.staffId,
   });
 
   @override
@@ -75,6 +76,7 @@ class _TaskPointDetailState extends State<TaskPointDetail> {
     try {
       await AdminService.submitReview(
         taskCode: widget.taskId,
+        staffId: widget.staffId,
         managerPoints: points,
         isDelayJustified: delayJustified,
         delayReason: delayReasonController.text,
@@ -84,8 +86,8 @@ class _TaskPointDetailState extends State<TaskPointDetail> {
         "Review submitted successfully",
         isError: false,
       );
-        widget.onReviewSubmitted?.call(); 
-    } catch (e) {
+      widget.onReviewSubmitted?.call();
+    } catch (e) { 
       widget.onShowMessage?.call(e.toString(), isError: true);
     }
   }

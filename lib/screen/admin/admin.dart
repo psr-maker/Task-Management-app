@@ -81,10 +81,13 @@ class _AdminState extends State<Admin> {
 
     return Scaffold(
       body: pages[_currentIndex],
-      bottomNavigationBar: CurvedBottomNav(
-        currentIndex: _currentIndex,
-        onTap: (i) => setState(() => _currentIndex = i),
-        role: UserRole.admin,
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: CurvedBottomNav(
+          currentIndex: _currentIndex,
+          onTap: (i) => setState(() => _currentIndex = i),
+          role: UserRole.admin,
+        ),
       ),
     );
   }

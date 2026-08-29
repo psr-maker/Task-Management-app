@@ -3,7 +3,6 @@ import 'package:staff_work_track/Models/auditlog.dart';
 import 'package:staff_work_track/Models/getusers.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/Task/taskdetail.dart';
-import 'package:staff_work_track/screen/super%20admin/Navigation/users/Admin/admin_detail.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/users/Employee/empdetails.dart';
 import 'package:staff_work_track/services/superadmin_service.dart';
 import 'package:staff_work_track/widgets/auditcard.dart';
@@ -75,22 +74,33 @@ class _AuditLogPageState extends State<AuditLogPage> {
     Map<String, UserModel> users,
   ) {
     final Map<String, List<AuditLogModel>> grouped = {};
+
     for (final log in logs) {
       final key =
           "${log.entityType}_${log.entityId}_${log.changeDateTime.toString().substring(0, 16)}";
+
       grouped.putIfAbsent(key, () => []).add(log);
     }
+
     return grouped.values.map((group) {
       final first = group.first;
+
       final user = users[first.editedById];
 
       return AuditLogGroupModel(
         entityType: first.entityType,
         entityId: first.entityId,
         action: first.action,
+
+        // User name
         editedByName: user?.name ?? first.editedByName,
-        editedRole: user?.role ?? first.editedRole,
+
+        // ⭐ IMPORTANT: use API editedRole
+        editedRole: first.editedRole,
+
+        // User department
         department: user?.department ?? "Unknown",
+
         taskCode: first.taskCode,
         taskName: first.taskName,
         dateTime: first.changeDateTime,
@@ -173,7 +183,7 @@ class _AuditLogPageState extends State<AuditLogPage> {
     if (user.role == "1") {
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => Admindetails(adminId: user.userId)),
+        MaterialPageRoute(builder: (_) => EmployeeDetail(employee: user)),
       );
     } else {
       Navigator.push(

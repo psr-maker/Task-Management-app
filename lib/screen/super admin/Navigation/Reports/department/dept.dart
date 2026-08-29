@@ -318,7 +318,7 @@ class _DepartmentReportsTabState extends State<DepartmentReportsTab> {
                       title: "Delayed %",
                       value: (data["delayedGoalPercentage"] ?? 0).toDouble(),
                       icon: Icons.timer,
-                      isPercentage: true,
+                      isPercentage: false,
                     ),
                   ],
                 ),

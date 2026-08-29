@@ -31,8 +31,11 @@ class _TaskDetailsState extends State<TaskDetails> {
   String? _topMessage;
   bool _isErrorMessage = true;
   bool _showTopMessage = false;
-  Map<String, dynamic>? reviewData;
+  // Map<String, dynamic>? reviewData;
+  List<Map<String, dynamic>> reviewData = [];
+
   bool isReviewLoading = false;
+
   bool permissionLoaded = false;
 
   @override
@@ -95,20 +98,24 @@ class _TaskDetailsState extends State<TaskDetails> {
 
   Future<void> fetchReview() async {
     try {
-      setState(() => isReviewLoading = true);
+      setState(() {
+        isReviewLoading = true;
+      });
 
-      final review = await AdminService.getReview(widget.taskCode);
+      final reviews = await AdminService.getReview(widget.taskCode);
 
-      if (review != null) {
+      if (mounted) {
         setState(() {
-          reviewData = review;
+          reviewData = reviews;
         });
       }
     } catch (e) {
       debugPrint("Review error: $e");
     } finally {
       if (mounted) {
-        setState(() => isReviewLoading = false);
+        setState(() {
+          isReviewLoading = false;
+        });
       }
     }
   }
@@ -183,6 +190,20 @@ class _TaskDetailsState extends State<TaskDetails> {
         _canEditTask = isStaffAssigned;
         permissionLoaded = true;
       });
+    }
+  }
+
+  String _formatDate(String value) {
+    if (value.isEmpty) return "—";
+
+    try {
+      final date = DateTime.parse(value);
+
+      return "${date.day.toString().padLeft(2, '0')}-"
+          "${date.month.toString().padLeft(2, '0')}-"
+          "${date.year}";
+    } catch (_) {
+      return value;
     }
   }
 
@@ -350,18 +371,6 @@ class _TaskDetailsState extends State<TaskDetails> {
                   "Assignment Summary",
                   style: Theme.of(context).textTheme.headlineLarge,
                 ),
-                // const SizedBox(height: 10),
-                // if (memberRoles.isNotEmpty) ...[
-                //   Text("Role", style: Theme.of(context).textTheme.labelMedium),
-                //   const SizedBox(height: 5),
-                //   Wrap(
-                //     spacing: 5,
-                //     runSpacing: 5,
-                //     children: memberRoles
-                //         .map((role) => Chip(label: Text(role)))
-                //         .toList(),
-                //   ),
-                // ],
                 const SizedBox(height: 10),
                 if (departments.isNotEmpty) ...[
                   Text(
@@ -425,28 +434,7 @@ class _TaskDetailsState extends State<TaskDetails> {
                 const SizedBox(height: 15),
 
                 if (task!.status.toLowerCase() == "completed") ...[
-                  Text(
-                    "Review Details",
-                    style: Theme.of(context).textTheme.headlineLarge,
-                  ),
-                  const SizedBox(height: 10),
-
-                  if (isReviewLoading)
-                    const Center(child: RotatingFlower())
-                  else if (reviewData != null)
-                    _buildReviewCard()
-                  else
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade100,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Text(
-                        "No review submitted yet.",
-                        style: TextStyle(color: Colors.grey),
-                      ),
-                    ),
+                  buildReviewDetails(),
                 ],
               ],
             ),
@@ -564,109 +552,145 @@ class _TaskDetailsState extends State<TaskDetails> {
     );
   }
 
-  Widget _buildReviewCard() {
-    if (reviewData == null) return const SizedBox();
+  Widget buildReviewDetails() {
+    if (isReviewLoading) {
+      return const Center(child: RotatingFlower());
+    }
 
-    final systemPoints = reviewData!['systemPoints'] ?? 0;
-    final finalPoints = reviewData!['finalPoints'] ?? 0;
-    final comment = reviewData!['comment'];
-    final delayReason = reviewData!['delayReason'];
-    final isDelayJustified = reviewData!['isDelayJustified'];
+    if (reviewData.isEmpty) {
+      return const Text(
+        "No reviews available",
+        style: TextStyle(color: Colors.grey),
+      );
+    }
 
-    final reviewedByRaw = reviewData!['reviewedBy'] ?? "";
-    final reviewedAtRaw = AppHelpers.formatDate(reviewData!['reviewedAt']);
+    final review = reviewData.first;
+
+    final systemPoints = review['systemPoints'] ?? 0;
+    final delayJustified = review['isDelayJustified'] == true;
+    final reason = review['delayReason'] ?? '';
+    final comment = review['comment'] ?? '';
+    final reviewedBy = review['reviewedBy'] ?? '';
+    final reviewedAt = review['reviewedAt']?.toString() ?? '';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            const Icon(Icons.star, color: Colors.amber),
-            const SizedBox(width: 6),
-            Text(
-              "$finalPoints Points",
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: Colors.amber,
+        Text(
+          "Review Details",
+          style: Theme.of(context).textTheme.headlineLarge,
+        ),
+
+        const SizedBox(height: 15),
+
+        Padding(
+          padding: const EdgeInsets.only(bottom: 14),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                "System Point",
+               style: const TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.amber,
+                ),
               ),
-            ),
-          ],
+
+              Text(
+                "$systemPoints / 100",
+                style: const TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.amber,
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        _reviewRow("Delay Justified", delayJustified ? "Yes" : "No"),
+        if (delayJustified) ...[
+          _reviewRow(
+            "Reason",
+            reason.toString().isEmpty ? "—" : reason.toString(),
+          ),
+
+          _reviewRow(
+            "Comment",
+            comment.toString().isEmpty ? "—" : comment.toString(),
+          ),
+        ],
+        _reviewRow(
+          "Reviewed By",
+          reviewedBy.toString().isEmpty ? "—" : reviewedBy.toString(),
+        ),
+
+        _reviewRow("Date", _formatDate(reviewedAt)),
+
+        const SizedBox(height: 20),
+
+        Text(
+          "Final Points",
+          style: Theme.of(
+            context,
+          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
         ),
 
         const SizedBox(height: 10),
 
-        Row(
-          children: [
-            const Icon(Icons.auto_graph_outlined),
-            const SizedBox(width: 6),
-            Text(
-              "System Points : $systemPoints",
-              style: Theme.of(context).textTheme.labelMedium,
+        ...reviewData.map((review) {
+          final staffName = review['staffName'] ?? 'Unknown Staff';
+
+          final finalPoints = review['finalPoints'] ?? 0;
+
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    staffName.toString(),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
+                    ),
+                  ),
+                ),
+
+                Text(
+                  "$finalPoints ",
+                  style: const TextStyle(
+                    color: Colors.amber,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
-
-        const SizedBox(height: 8),
-
-        Row(
-          children: [
-            const Icon(Icons.rule),
-            const SizedBox(width: 6),
-            Text(
-              "Delay Justified : ${isDelayJustified == true ? "Yes" : "No"}",
-              style: Theme.of(context).textTheme.labelMedium,
-            ),
-          ],
-        ),
-
-        const SizedBox(height: 12),
-
-        if (delayReason != null &&
-            delayReason.toString().trim().isNotEmpty) ...[
-          Text("Delay Reason :"),
-          const SizedBox(height: 6),
-          Text(delayReason, style: Theme.of(context).textTheme.labelMedium),
-          const SizedBox(height: 5),
-        ],
-
-        if (comment != null && comment.toString().trim().isNotEmpty) ...[
-          Text("Comment", style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 6),
-          Text(comment, style: const TextStyle(fontSize: 14, height: 1.5)),
-          const SizedBox(height: 5),
-        ],
-
-        Divider(color: Colors.grey.shade300),
-
-        const SizedBox(height: 5),
-
-        Row(
-          children: [
-            const Icon(Icons.person_outline),
-            const SizedBox(width: 6),
-            Text(
-              "Reviewed by : $reviewedByRaw",
-              style: Theme.of(context).textTheme.labelMedium,
-            ),
-          ],
-        ),
-
-        const SizedBox(height: 5),
-
-        Row(
-          children: [
-            const Icon(Icons.access_time),
-            const SizedBox(width: 6),
-            Text(
-              "Reviewe At :",
-              style: Theme.of(context).textTheme.labelMedium,
-            ),
-            const SizedBox(width: 6),
-            Text(reviewedAtRaw, style: Theme.of(context).textTheme.labelMedium),
-          ],
-        ),
+          );
+        }),
       ],
+    );
+  }
+
+  Widget _reviewRow(String title, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              title,
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+            ),
+          ),
+          Text(
+            value,
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+          ),
+        ],
+      ),
     );
   }
 }

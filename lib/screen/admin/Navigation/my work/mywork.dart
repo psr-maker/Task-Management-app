@@ -17,6 +17,7 @@ class Mywork extends StatefulWidget {
 }
 
 class _MyworkState extends State<Mywork> {
+  int _goalsRefreshKey = 0;
   int? adminId;
   bool isLoading = true;
   bool isSearching = false;
@@ -100,7 +101,7 @@ class _MyworkState extends State<Mywork> {
                   Tab(text: 'Pending/Pause'),
                   Tab(text: 'In Process'),
                   Tab(text: 'Completed'),
-                ], 
+                ],
               ),
 
               Expanded(
@@ -150,7 +151,9 @@ class _MyworkState extends State<Mywork> {
                                     ),
                                   );
                                   if (result == true) {
-                                    setState(() {});
+                                    setState(() {
+                                      _goalsRefreshKey++; // bump the key
+                                    });
                                   }
                                 },
                                 child: Chip(
@@ -169,6 +172,7 @@ class _MyworkState extends State<Mywork> {
                           ),
                           Expanded(
                             child: Allgoals(
+                              key: ValueKey(_goalsRefreshKey),
                               searchQuery: searchController.text,
                               onDelete: (msg, isError) {
                                 showTopMessage(msg, isError: isError);

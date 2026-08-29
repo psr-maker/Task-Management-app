@@ -24,7 +24,7 @@ class EmployeeList extends StatefulWidget {
 
 class _EmployeeListState extends State<EmployeeList> {
   late Future<List<UserModel>> employeesFuture;
-  String selectedRole = "Staff";
+  // String selectedRole = "Staff";
   bool isSelectionMode = false;
   bool isAdmin = false;
   Set<int> selectedEmpIds = {};

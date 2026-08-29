@@ -22,6 +22,7 @@ class _PostAnnouncementPageState extends State<PostAnnouncementPage> {
   final descController = TextEditingController();
 
   String? targetRole;
+  String? selectedTargetName;
   bool _isLoading = false;
 
   String? _topMessage;
@@ -31,7 +32,10 @@ class _PostAnnouncementPageState extends State<PostAnnouncementPage> {
   File? selectedFile;
   Uint8List? selectedBytes;
   String? selectedFileName;
-
+  final List<Map<String, String>> targetRoles = [
+    {"name": "All", "value": "All"},
+    {"name": "Manager", "value": "2"},
+  ];
   void showTopMessage(String message, {bool isError = true}) {
     setState(() {
       _topMessage = message;
@@ -170,12 +174,20 @@ class _PostAnnouncementPageState extends State<PostAnnouncementPage> {
                   const SizedBox(height: 10),
                   CustomFormWidgets.dropdown(
                     context: context,
-                    value: targetRole,
-                    items: const ["All", "2", "Staff"],
-                    onChanged: (v) => setState(() => targetRole = v),
+                    value: selectedTargetName,
+                    items: targetRoles.map((role) => role["name"]!).toList(),
+                    onChanged: (selectedName) {
+                      final selectedRole = targetRoles.firstWhere(
+                        (role) => role["name"] == selectedName,
+                      );
+
+                      setState(() {
+                        selectedTargetName = selectedName;
+                        targetRole = selectedRole["value"];
+                      });
+                    },
                     hint: "Select target",
                   ),
-
                   const SizedBox(height: 15),
 
                   TextButton(onPressed: pickFile, child: Text("Select File")),

@@ -7,6 +7,7 @@ import 'package:staff_work_track/core/widgets/loading.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/admin_approval.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/drawer/anouncement.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/drawer/auditlog.dart';
+import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/drawer/points.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/drawer/users_overtime.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/drawer/usersworklog.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/notifi.dart';
@@ -231,7 +232,7 @@ class _OverallReportsTabState extends State<SuperAdminDashboard> {
                       child: SmallStatCard(
                         title: "Users",
                         value: data["totalManagers"].toString(),
-                        icon: Icons.people,
+                        icon: Icons.people, 
                         color: Theme.of(context).colorScheme.secondary,
                       ),
                     ),
@@ -363,7 +364,7 @@ class _OverallReportsTabState extends State<SuperAdminDashboard> {
                         title: "Delayed %",
                         value: _toDouble(goals["delayedPercentage"]),
                         icon: Icons.access_time_rounded,
-                        isPercentage: true,
+                        isPercentage: false,
                       ),
                     ),
                   ],
@@ -440,6 +441,23 @@ class _OverallReportsTabState extends State<SuperAdminDashboard> {
             ),
           ),
           const SizedBox(height: 10),
+            ListTile(
+            leading: Icon(
+              Icons.reviews_sharp,
+              color: Theme.of(context).colorScheme.secondary,
+            ),
+            title: Text(
+              "Score Calculation",
+              style: Theme.of(context).textTheme.headlineMedium,
+            ), 
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => ProductivityCalculationPage()),
+              );
+            },
+          ),
           ListTile(
             leading: Icon(
               Icons.history,

@@ -5,8 +5,6 @@ import 'package:staff_work_track/services/superadmin_service.dart';
 import 'emp.dart';
 
 class EmployeeReportsList extends StatefulWidget {
-
-
   const EmployeeReportsList({super.key});
 
   @override
@@ -41,10 +39,15 @@ class _EmployeeReportsListState extends State<EmployeeReportsList> {
         }
 
         // ✅ FILTER BY ROLE
+        // final filteredByRole = snapshot.data!
+        //     // .where(
+        //     //   (user) => user.role.toLowerCase() == widget.role.toLowerCase(),
+        //     // )
+        //     .toList();
+
+        // Exclude Role 1 users
         final filteredByRole = snapshot.data!
-            // .where(
-            //   (user) => user.role.toLowerCase() == widget.role.toLowerCase(),
-            // )
+            .where((emp) => emp.role != "1")
             .toList();
 
         final query = searchController.text.toLowerCase();

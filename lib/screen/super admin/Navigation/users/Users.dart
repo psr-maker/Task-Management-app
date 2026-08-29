@@ -91,10 +91,7 @@ class _UsersviewState extends State<Usersview> {
                   setState(() {});
                 },
               )
-            : Text(
-                "Users List",
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
+            : Text("Users List", style: Theme.of(context).textTheme.bodySmall),
         actions: [
           IconButton(
             icon: Icon(isSearching ? Icons.close : Icons.search),
@@ -117,7 +114,6 @@ class _UsersviewState extends State<Usersview> {
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
-             
                 // Add User / Add Task
                 GestureDetector(
                   onTap: () async {
@@ -182,7 +178,13 @@ class _UsersviewState extends State<Usersview> {
                     return const Center(child: Text("No Users Found"));
                   }
 
-                  final employees = snapshot.data!;
+                  // final employees = snapshot.data!;
+
+                  // final filteredEmployees = _filterEmployees(employees);
+                  // Exclude Role 1 users
+                  final employees = snapshot.data!
+                      .where((emp) => emp.role != "1")
+                      .toList();
 
                   final filteredEmployees = _filterEmployees(employees);
 
@@ -251,14 +253,13 @@ class _UsersviewState extends State<Usersview> {
                               //   overflow: TextOverflow.ellipsis,
                               //   style: Theme.of(context).textTheme.labelMedium,
                               // ),
-
                               const SizedBox(height: 3),
 
                               Text(
                                 emp.department,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: Theme.of(context).textTheme.labelLarge   
+                                style: Theme.of(context).textTheme.labelLarge,
                               ),
                             ],
                           ),

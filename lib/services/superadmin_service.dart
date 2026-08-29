@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:staff_work_track/Models/auditlog.dart';
 import 'package:staff_work_track/Models/department.dart';
-
 import 'package:staff_work_track/Models/getusers.dart';
 import 'package:staff_work_track/Models/rolesmodel.dart';
 import 'package:staff_work_track/Models/userstask.dart';
@@ -185,7 +184,7 @@ class SuperAdminService {
   static Future<bool> createTask({
     required String task,
     required String description,
-    required String goalCode,
+    String? goalCode,
     required String priority,
     required DateTime assignedAt,
     required DateTime dueDate,
@@ -208,7 +207,8 @@ class SuperAdminService {
         body: jsonEncode({
           "task": task,
           "description": description,
-          "goalCode": goalCode,
+          if (goalCode != null) "goalCode": goalCode,
+          // "goalCode": goalCode,
           "priority": priority,
           "start_date": assignedAt.toIso8601String(),
           "due_Date": dueDate.toIso8601String(),

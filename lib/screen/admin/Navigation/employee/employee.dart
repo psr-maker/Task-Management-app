@@ -15,7 +15,7 @@ class Employeelist extends StatefulWidget {
 class _EmployeelistState extends State<Employeelist>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  String selectedRole = "Staff";
+
   String department = "";
   bool isLoading = true;
 
