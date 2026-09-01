@@ -61,7 +61,7 @@ class _AdminState extends State<AdminDashboard> {
     _fetchReport();
     loadData();
     _fetchWarnings();
-    _fetchNotifications();
+   // _fetchNotifications();
   }
 
   void _fetchWarnings() async {
@@ -77,17 +77,17 @@ class _AdminState extends State<AdminDashboard> {
     }
   }
 
-  void _fetchNotifications() async {
-    try {
-      final data = await NotificationService.getMyNotifications();
-      if (!mounted) return;
-      setState(() {
-        notificationCount = data.where((n) => n["isRead"] == false).length;
-      });
-    } catch (e) {
-      print("Notification fetch error: $e");
-    }
-  }
+  // void _fetchNotifications() async {
+  //   try {
+  //     final data = await NotificationService.getMyNotifications();
+  //     if (!mounted) return;
+  //     setState(() {
+  //       notificationCount = data.where((n) => n["isRead"] == false).length;
+  //     });
+  //   } catch (e) {
+  //     print("Notification fetch error: $e");
+  //   }
+  // }
 
   void _fetchReport() {
     final fromDate = DateTime(selectedYear.year, 1, 1);
@@ -207,7 +207,7 @@ class _AdminState extends State<AdminDashboard> {
                           context,
                           MaterialPageRoute(builder: (_) => NotificationPage()),
                         );
-                        _fetchNotifications();
+                    //    _fetchNotifications();
                       },
                     ),
                     if (notificationCount > 0)

@@ -48,7 +48,7 @@ class _OverallReportsTabState extends State<SuperAdminDashboard> {
   void initState() {
     super.initState();
     _fetchWarnings();
-    _fetchNotifications();
+   // _fetchNotifications();
     dashboard = loadDashboard();
   }
 
@@ -65,17 +65,17 @@ class _OverallReportsTabState extends State<SuperAdminDashboard> {
     }
   }
 
-  void _fetchNotifications() async {
-    try {
-      final data = await NotificationService.getMyNotifications();
-      if (!mounted) return;
-      setState(() {
-        notificationCount = data.where((n) => n["isRead"] == false).length;
-      });
-    } catch (e) {
-      print("Notification fetch error: $e");
-    }
-  }
+  // void _fetchNotifications() async {
+  //   try {
+  //     final data = await NotificationService.getMyNotifications();
+  //     if (!mounted) return;
+  //     setState(() {
+  //       notificationCount = data.where((n) => n["isRead"] == false).length;
+  //     });
+  //   } catch (e) {
+  //     print("Notification fetch error: $e");
+  //   }
+  // }
 
   double _toDouble(dynamic value) {
     if (value == null) return 0.0;
@@ -154,7 +154,7 @@ class _OverallReportsTabState extends State<SuperAdminDashboard> {
                     MaterialPageRoute(builder: (_) => const NotificationPage()),
                   );
 
-                  _fetchNotifications();
+                 // _fetchNotifications();
                 },
               ),
 

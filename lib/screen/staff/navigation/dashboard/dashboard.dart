@@ -49,23 +49,23 @@ class _StaffDashboardState extends State<StaffDashboard> {
   void initState() {
     super.initState();
     fetchAllData();
-    _fetchNotifications();
+    //_fetchNotifications();
     _fetchWarnings();
   }
 
-  void _fetchNotifications() async {
-    try {
-      final data = await NotificationService.getMyNotifications();
+  // void _fetchNotifications() async {
+  //   try {
+  //     final data = await NotificationService.getMyNotifications();
 
-      if (!mounted) return;
+  //     if (!mounted) return;
 
-      setState(() {
-        notificationCount = data.where((n) => n["isRead"] == false).length;
-      });
-    } catch (e) {
-      print("Notification fetch error: $e");
-    }
-  }
+  //     setState(() {
+  //       notificationCount = data.where((n) => n["isRead"] == false).length;
+  //     });
+  //   } catch (e) {
+  //     print("Notification fetch error: $e");
+  //   }
+  // }
 
   void _fetchWarnings() async {
     try {
@@ -210,7 +210,7 @@ class _StaffDashboardState extends State<StaffDashboard> {
                   );
 
                   // Refresh count when coming back
-                  _fetchNotifications();
+                 // _fetchNotifications();
                 },
               ),
 

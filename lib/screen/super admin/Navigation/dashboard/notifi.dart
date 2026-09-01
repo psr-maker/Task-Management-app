@@ -20,8 +20,8 @@ class _NotificationPageState extends State<NotificationPage> {
   @override
   void initState() {
     super.initState();
-    notifications = NotificationService.getMyNotifications();
-      NotificationService.markAllRead();
+    // notifications = NotificationService.getMyNotifications();
+    //   NotificationService.markAllRead();
   }
 
   void showTopMessage(String message, {bool isError = true}) {
@@ -37,33 +37,33 @@ class _NotificationPageState extends State<NotificationPage> {
     });
   }
 
-  Future<void> clearall() async {
-    try {
-      setState(() {
-        _isLoading = true;
-      });
+  // Future<void> clearall() async {
+  //   try {
+  //     setState(() {
+  //       _isLoading = true;
+  //     });
 
-      bool success = await NotificationService.deleteAllNotifications();
+  //  //   bool success = await NotificationService.deleteAllNotifications();
 
-      if (success) {
-        setState(() {
-          notifications = NotificationService.getMyNotifications();
-        });
+  //     if (success) {
+  //       setState(() {
+  //         notifications = NotificationService.getMyNotifications();
+  //       });
 
-        showTopMessage("All notifications cleared", isError: false);
-      } else {
-        showTopMessage("Failed to clear notifications", isError: true);
-      }
-    } catch (e) {
-      showTopMessage("Failed to clear notifications", isError: true);
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    }
-  }
+  //       showTopMessage("All notifications cleared", isError: false);
+  //     } else {
+  //       showTopMessage("Failed to clear notifications", isError: true);
+  //     }
+  //   } catch (e) {
+  //     showTopMessage("Failed to clear notifications", isError: true);
+  //   } finally {
+  //     if (mounted) {
+  //       setState(() {
+  //         _isLoading = false;
+  //       });
+  //     }
+  //   }
+  // }
 
   @override
   Widget build(BuildContext context) {
@@ -86,10 +86,10 @@ class _NotificationPageState extends State<NotificationPage> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
-                    TextButton(
-                      onPressed: _isLoading ? null : clearall,
-                      child: const Text("CLEAR ALL"),
-                    ),
+                    // TextButton(
+                    //   onPressed: _isLoading ? null : clearall,
+                    //   child: const Text("CLEAR ALL"),
+                    // ),
                   ],
                 ),
                 SizedBox(height: 10),
@@ -142,31 +142,31 @@ class _NotificationPageState extends State<NotificationPage> {
                             ),
 
                             onDismissed: (direction) async {
-                              int id = item["id"];
+                              // int id = item["id"];
 
-                              bool success =
-                                  await NotificationService.deleteNotification(
-                                    id,
-                                  );
+                              // bool success =
+                              //     await NotificationService.deleteNotification(
+                              //       id,
+                              //     );
 
-                              if (success) {
-                                setState(() {
-                                  data.removeAt(index);
-                                });
-                                showTopMessage(
-                                  "Notification deleted successfully",
-                                  isError: false,
-                                );
-                              } else {
-                                showTopMessage(
-                                  "Failed to delete notification",
-                                  isError: true,
-                                );
-                                setState(() {
-                                  notifications =
-                                      NotificationService.getMyNotifications();
-                                });
-                              }
+                              // if (success) {
+                              //   setState(() {
+                              //     data.removeAt(index);
+                              //   });
+                              //   showTopMessage(
+                              //     "Notification deleted successfully",
+                              //     isError: false,
+                              //   );
+                              // } else {
+                              //   showTopMessage(
+                              //     "Failed to delete notification",
+                              //     isError: true,
+                              //   );
+                              //   setState(() {
+                              //     // notifications =
+                              //     //     NotificationService.getMyNotifications();
+                              //   });
+                              // }
                             },
 
                             child: Row(
