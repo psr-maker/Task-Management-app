@@ -175,4 +175,30 @@ class AuthService {
     }
     await _storage.delete(key: _tokenKey);
   }
+
+  Future<void> registerFcmToken(String fcmToken) async {
+    final jwtToken = await AuthService.getToken();
+
+    if (jwtToken == null || jwtToken.isEmpty) {
+      throw Exception("JWT token not found");
+    }
+
+    final response = await http.post(
+      Uri.parse('$baseUrl/auth/register-fcm-token'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $jwtToken',
+      },
+      body: jsonEncode({'fcmToken': fcmToken}),
+    );
+
+    print("FCM REGISTER STATUS: ${response.statusCode}");
+    print("FCM REGISTER RESPONSE: ${response.body}");
+
+    if (response.statusCode != 200) {
+      throw Exception(
+        'FCM registration failed: ${response.statusCode} ${response.body}',
+      );
+    }
+  }
 }

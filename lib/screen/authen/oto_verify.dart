@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:staff_work_track/screen/authen/login_selection.dart';
+import 'package:staff_work_track/services/firebase_noti_service.dart';
 import 'package:staff_work_track/utils/jwt_helper.dart';
 import 'package:staff_work_track/screen/admin/admin.dart';
 import 'package:staff_work_track/screen/staff/staff.dart';
@@ -104,6 +105,18 @@ class _OtpverifyState extends State<Otpverify> {
       }
       final role = JwtHelper.getRole(token);
       await AuthService.saveToken(token);
+      // Get FCM token
+      final fcmToken = await NotificationService.getToken();
+
+      if (fcmToken != null && fcmToken.isNotEmpty) {
+        try {
+          await _authService.registerFcmToken(fcmToken);
+
+          print("✅ FCM token registered successfully");
+        } catch (e) {
+          print("❌ Failed to register FCM token: $e");
+        }
+      }
       showTopMessage("OTP verified successfully", isError: false);
       await Future.delayed(const Duration(seconds: 1));
       if (!mounted) return;

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "700279582470",
+    "project_id": "performance-app-82781",
+    "storage_bucket": "performance-app-82781.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:700279582470:android:eaefbad53608485c71f887",
+        "android_client_info": {
+          "package_name": "com.example.staff_work_track"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCN_6QWDYknbszqNqBGZYgIb11aR2qPb9A"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
