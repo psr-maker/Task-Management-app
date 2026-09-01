@@ -198,48 +198,48 @@ class _StaffDashboardState extends State<StaffDashboard> {
                 ),
               ],
             ),
-          Stack(
-            children: [
-              IconButton(
-                icon: const Icon(Icons.notifications, color: Colors.amber),
-                onPressed: () async {
-                  await Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => NotificationPage()),
-                  );
+          // Stack(
+          //   children: [
+          //     IconButton(
+          //       icon: const Icon(Icons.notifications, color: Colors.amber),
+          //       onPressed: () async {
+          //         await Navigator.push(
+          //           context,
+          //           MaterialPageRoute(builder: (_) => NotificationPage()),
+          //         );
 
-                  // Refresh count when coming back
-                 // _fetchNotifications();
-                },
-              ),
+          //         // Refresh count when coming back
+          //        // _fetchNotifications();
+          //       },
+          //     ),
 
-              if (notificationCount > 0)
-                Positioned(
-                  right: 8,
-                  top: 8,
-                  child: Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: const BoxDecoration(
-                      color: Colors.red,
-                      shape: BoxShape.circle,
-                    ),
-                    constraints: const BoxConstraints(
-                      minWidth: 15,
-                      minHeight: 15,
-                    ),
-                    child: Text(
-                      notificationCount.toString(),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 8,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                ),
-            ],
-          ),
+          //     if (notificationCount > 0)
+          //       Positioned(
+          //         right: 8,
+          //         top: 8,
+          //         child: Container(
+          //           padding: const EdgeInsets.all(4),
+          //           decoration: const BoxDecoration(
+          //             color: Colors.red,
+          //             shape: BoxShape.circle,
+          //           ),
+          //           constraints: const BoxConstraints(
+          //             minWidth: 15,
+          //             minHeight: 15,
+          //           ),
+          //           child: Text(
+          //             notificationCount.toString(),
+          //             style: const TextStyle(
+          //               color: Colors.white,
+          //               fontSize: 8,
+          //               fontWeight: FontWeight.bold,
+          //             ),
+          //             textAlign: TextAlign.center,
+          //           ),
+          //         ),
+          //       ),
+          //   ],
+          // ),
           IconButton(
             onPressed: () {
               Navigator.push(

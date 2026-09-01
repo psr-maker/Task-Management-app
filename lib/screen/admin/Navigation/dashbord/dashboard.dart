@@ -193,41 +193,41 @@ class _AdminState extends State<AdminDashboard> {
                       ),
                     ],
                   ),
-                Stack(
-                  children: [
-                    IconButton(
-                      icon: const Icon(
-                        Icons.notifications,
-                        color: Colors.amber,
-                        size: 20,
-                      ),
-                      onPressed: () async {
-                        await Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => NotificationPage()),
-                        );
-                    //    _fetchNotifications();
-                      },
-                    ),
-                    if (notificationCount > 0)
-                      Positioned(
-                        right: 8,
-                        top: 8,
-                        child: Container(
-                          padding: const EdgeInsets.all(4),
-                          decoration: const BoxDecoration(
-                            color: Colors.red,
-                            shape: BoxShape.circle,
-                          ),
-                          child: Text(
-                            notificationCount.toString(),
-                            style: Theme.of(context).textTheme.titleMedium,
-                            textAlign: TextAlign.center,
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
+                // Stack(
+                //   children: [
+                    // IconButton(
+                    //   icon: const Icon(
+                    //     Icons.notifications,
+                    //     color: Colors.amber,
+                    //     size: 20,
+                    //   ),
+                    //   onPressed: () async {
+                    //     await Navigator.push(
+                    //       context,
+                    //       MaterialPageRoute(builder: (_) => NotificationPage()),
+                    //     );
+                    // //    _fetchNotifications();
+                    //   },
+                    // ),
+                    // if (notificationCount > 0)
+                    //   Positioned(
+                    //     right: 8,
+                    //     top: 8,
+                    //     child: Container(
+                    //       padding: const EdgeInsets.all(4),
+                    //       decoration: const BoxDecoration(
+                    //         color: Colors.red,
+                    //         shape: BoxShape.circle,
+                    //       ),
+                    //       child: Text(
+                    //         notificationCount.toString(),
+                    //         style: Theme.of(context).textTheme.titleMedium,
+                    //         textAlign: TextAlign.center,
+                    //       ),
+                    //     ),
+                    //   ),
+                //   ],
+                // ),
                 IconButton(
                   onPressed: () {
                     Navigator.push(

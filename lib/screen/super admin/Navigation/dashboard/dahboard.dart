@@ -143,47 +143,47 @@ class _OverallReportsTabState extends State<SuperAdminDashboard> {
                 ),
               ],
             ),
-          Stack(
-            children: [
-              IconButton(
-                icon: const Icon(Icons.notifications, color: Colors.amber),
-                onPressed: () async {
-                  await Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const NotificationPage()),
-                  );
+          // Stack(
+          //   children: [
+          //     IconButton(
+          //       icon: const Icon(Icons.notifications, color: Colors.amber),
+          //       onPressed: () async {
+          //         await Navigator.push(
+          //           context,
+          //           MaterialPageRoute(builder: (_) => const NotificationPage()),
+          //         );
 
-                 // _fetchNotifications();
-                },
-              ),
+          //        // _fetchNotifications();
+          //       },
+          //     ),
 
-              if (notificationCount > 0)
-                Positioned(
-                  right: 6,
-                  top: 6,
-                  child: Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: const BoxDecoration(
-                      color: Colors.red,
-                      shape: BoxShape.circle,
-                    ),
-                    constraints: const BoxConstraints(
-                      minWidth: 18,
-                      minHeight: 18,
-                    ),
-                    child: Text(
-                      notificationCount.toString(),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                ),
-            ],
-          ),
+          //     if (notificationCount > 0)
+          //       Positioned(
+          //         right: 6,
+          //         top: 6,
+          //         child: Container(
+          //           padding: const EdgeInsets.all(4),
+          //           decoration: const BoxDecoration(
+          //             color: Colors.red,
+          //             shape: BoxShape.circle,
+          //           ),
+          //           constraints: const BoxConstraints(
+          //             minWidth: 18,
+          //             minHeight: 18,
+          //           ),
+          //           child: Text(
+          //             notificationCount.toString(),
+          //             style: const TextStyle(
+          //               color: Colors.white,
+          //               fontSize: 10,
+          //               fontWeight: FontWeight.bold,
+          //             ),
+          //             textAlign: TextAlign.center,
+          //           ),
+          //         ),
+          //       ),
+          //   ],
+          // ),
           IconButton(
             icon: const Icon(Icons.settings),
             onPressed: () {
