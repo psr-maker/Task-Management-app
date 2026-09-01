@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
 import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
-import 'package:staff_work_track/services/notification_service.dart';
 import 'package:staff_work_track/utils/app_helper.dart';
 
 class NotificationPage extends StatefulWidget {
@@ -16,7 +15,6 @@ class _NotificationPageState extends State<NotificationPage> {
   String? _topMessage;
   bool _isErrorMessage = true;
   bool _showTopMessage = false;
-  bool _isLoading = false;
   @override
   void initState() {
     super.initState();

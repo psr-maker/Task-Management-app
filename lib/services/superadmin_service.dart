@@ -196,42 +196,75 @@ class SuperAdminService {
   }) async {
     try {
       final token = await AuthService.getToken();
-      if (token == null) throw Exception("User not logged in");
-      print("JWT token: $token");
+
+      if (token == null) {
+        throw Exception("User not logged in");
+      }
+
+      // Convert "09:30" -> "09:30:00"
+      String? formatTime(String? time) {
+        if (time == null || time.isEmpty) return null;
+
+        final parts = time.split(':');
+
+        if (parts.length == 2) {
+          return "$time:00";
+        }
+
+        return time;
+      }
+
+      final formattedStartTime = formatTime(startTime);
+      final formattedEndTime = formatTime(endTime);
+
+      final body = {
+        "task": task,
+        "description": description,
+
+        if (goalCode != null) "goalCode": goalCode,
+
+        "priority": priority,
+
+        "start_date": assignedAt.toIso8601String(),
+        "due_Date": dueDate.toIso8601String(),
+
+        "performanceType": performanceType,
+
+        if (quantity != null) "quantity": quantity,
+
+        if (formattedStartTime != null) "startTime": formattedStartTime,
+
+        if (formattedEndTime != null) "endTime": formattedEndTime,
+
+        "assignedToIds": assignedToIds,
+      };
+
+      print("CREATE TASK BODY:");
+      print(jsonEncode(body));
+
       final response = await http.post(
         Uri.parse("$baseUrl/Director/Task-assign"),
         headers: {
           "Content-Type": "application/json",
           "Authorization": "Bearer $token",
         },
-        body: jsonEncode({
-          "task": task,
-          "description": description,
-          if (goalCode != null) "goalCode": goalCode,
-          // "goalCode": goalCode,
-          "priority": priority,
-          "start_date": assignedAt.toIso8601String(),
-          "due_Date": dueDate.toIso8601String(),
-          "performanceType": performanceType,
-          if (quantity != null) "quantity": quantity,
-          if (startTime != null) "startTime": startTime,
-          if (endTime != null) "endTime": endTime,
-          "assignedToIds": assignedToIds,
-        }),
+        body: jsonEncode(body),
       );
+
+      print("STATUS: ${response.statusCode}");
+      print("RESPONSE: ${response.body}");
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         return true;
-      } else {
-        print("Create task failed: ${response.body}");
-        return false;
       }
+
+      print("Create task failed: ${response.body}");
+      return false;
     } catch (e) {
       print("Error creating task: $e");
       return false;
     }
   }
-
   // get all users task
 
   static Future<Map<String, dynamic>> getAllTasks() async {
