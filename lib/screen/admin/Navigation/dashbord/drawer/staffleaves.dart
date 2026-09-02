@@ -486,32 +486,32 @@ class _StaffLeavesState extends State<StaffLeaves>
                         child: Row(
                           children: [
                             Expanded(
-                              child: ElevatedButton.icon(
+                              child: AppButton(
+                                text: "Approve",
+                                isLoading: _isLoading,
                                 onPressed: () => _handleCompensationStatus(
                                   e["id"],
                                   "approved",
                                 ),
-                                icon: const Icon(Icons.check_circle),
-                                label: const Text("Approve"),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.green,
-                                  foregroundColor: Colors.white,
-                                ),
+                                color: Theme.of(context).colorScheme.secondary,
+                                txtcolor: Theme.of(
+                                  context,
+                                ).colorScheme.onPrimary,
                               ),
                             ),
                             const SizedBox(width: 8),
                             Expanded(
-                              child: ElevatedButton.icon(
+                              child: AppButton(
+                                text: "Reject",
+                                isLoading: _isLoading,
                                 onPressed: () => _handleCompensationStatus(
                                   e["id"],
                                   "rejected",
                                 ),
-                                icon: const Icon(Icons.cancel),
-                                label: const Text("Reject"),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.red,
-                                  foregroundColor: Colors.white,
-                                ),
+                                color: Theme.of(context).colorScheme.error,
+                                txtcolor: Theme.of(
+                                  context,
+                                ).colorScheme.onPrimary,
                               ),
                             ),
                           ],

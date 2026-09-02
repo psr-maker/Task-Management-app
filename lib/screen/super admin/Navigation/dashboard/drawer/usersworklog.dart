@@ -5,6 +5,7 @@ import 'package:staff_work_track/core/widgets/buttons.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
 import 'package:staff_work_track/screen/staff/navigation/fullimg.dart';
 import 'package:staff_work_track/services/announ_service.dart';
+import 'package:staff_work_track/utils/time_utils.dart';
 
 class UsersWorklog extends StatefulWidget {
   const UsersWorklog({super.key});
@@ -80,13 +81,16 @@ class _UsersWorklogState extends State<UsersWorklog> {
     if (selectedDate != null) {
       temp = temp
           .where(
-            (w) =>
-                DateTime.parse(w['workDate']).toLocal().day ==
-                    selectedDate!.day &&
-                DateTime.parse(w['workDate']).toLocal().month ==
-                    selectedDate!.month &&
-                DateTime.parse(w['workDate']).toLocal().year ==
-                    selectedDate!.year,
+            (w) {
+              try {
+                final localDate = TimeUtils.fromUtcIso8601(w['workDate']);
+                return localDate.day == selectedDate!.day &&
+                    localDate.month == selectedDate!.month &&
+                    localDate.year == selectedDate!.year;
+              } catch (_) {
+                return false;
+              }
+            },
           )
           .toList();
     }
@@ -250,13 +254,22 @@ class _UsersWorklogState extends State<UsersWorklog> {
     Map<String, List<dynamic>> grouped = {};
 
     for (var log in logs) {
-      String date = log["workDate"]?.split("T")[0] ?? "";
-
-      if (!grouped.containsKey(date)) {
-        grouped[date] = [];
+      try {
+        // Use TimeUtils to properly convert UTC to local for correct date grouping
+        final localDate = TimeUtils.fromUtcIso8601(log["workDate"]);
+        final dateKey = "${localDate.year.toString().padLeft(4, '0')}-${localDate.month.toString().padLeft(2, '0')}-${localDate.day.toString().padLeft(2, '0')}";
+        
+        if (!grouped.containsKey(dateKey)) {
+          grouped[dateKey] = [];
+        }
+        grouped[dateKey]!.add(log);
+      } catch (_) {
+        String date = log["workDate"]?.split("T")[0] ?? "";
+        if (!grouped.containsKey(date)) {
+          grouped[date] = [];
+        }
+        grouped[date]!.add(log);
       }
-
-      grouped[date]!.add(log);
     }
 
     return grouped;
@@ -395,9 +408,8 @@ class _UsersWorklogState extends State<UsersWorklog> {
 
     if (log["time"] != null) {
       try {
-        final DateTime time = DateTime.parse(log["time"].toString());
-
-        displayTime = DateFormat("hh:mm a").format(time);
+        final localDateTime = TimeUtils.fromUtcIso8601(log["time"].toString());
+        displayTime = DateFormat("HH:mm:ss").format(localDateTime);
       } catch (e) {
         displayTime = log["time"].toString();
       }

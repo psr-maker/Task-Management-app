@@ -13,7 +13,7 @@ class WorkLogRepository {
     required bool isSubmit,
     required double latitude,
     required double longitude,
-    required String locationName,
+    String? locationName,
     required XFile image,
   }) async {
     final hasNetwork = await NetworkService.hasInternet();
@@ -33,8 +33,9 @@ class WorkLogRepository {
           isSubmit: isSubmit,
           latitude: latitude,
           longitude: longitude,
-          locationName: locationName,
+          locationName: locationName ?? "Unknown Location",
           image: image,
+          submittedAt: DateTime.now(),
         );
 
         print("✅ WorkLog saved to CLOUD");

@@ -8,6 +8,7 @@ import 'package:staff_work_track/screen/staff/navigation/worklog/addworklog.dart
 import 'package:staff_work_track/core/widgets/buttons.dart';
 import 'package:staff_work_track/screen/staff/navigation/worklog/offline_worklogs.dart';
 import 'package:staff_work_track/services/announ_service.dart';
+import 'package:staff_work_track/utils/time_utils.dart';
 
 class Worklog extends StatefulWidget {
   const Worklog({super.key});
@@ -321,9 +322,9 @@ class _WorklogState extends State<Worklog> {
   bool get canSubmit => logs.any((log) => log["status"] == "Draft");
   String _formatTime(String value) {
     try {
-      final dateTime = DateTime.parse(value);
-
-      return DateFormat('hh:mm a').format(dateTime);
+      // Use TimeUtils to properly convert UTC to local
+      final localDateTime = TimeUtils.fromUtcIso8601(value);
+      return DateFormat('HH:mm:ss').format(localDateTime);
     } catch (_) {
       return value;
     }

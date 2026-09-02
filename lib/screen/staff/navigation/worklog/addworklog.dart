@@ -111,7 +111,7 @@ class _AddWorklogPageState extends State<AddWorklogPage> {
     }
   }
 
-  Future<Map<String, dynamic>> _getLocation() async {
+  Future<Map<String, dynamic>> _getLocationCoordinates() async {
     LocationPermission permission = await Geolocator.checkPermission();
 
     if (permission == LocationPermission.denied) {
@@ -130,16 +130,20 @@ class _AddWorklogPageState extends State<AddWorklogPage> {
     }
 
     if (kIsWeb) {
-      return {"latitude": 0.0, "longitude": 0.0, "locationName": "Web Upload"};
+      return {"latitude": 0.0, "longitude": 0.0};
     }
 
     final position = await Geolocator.getCurrentPosition(
       desiredAccuracy: LocationAccuracy.high,
     );
 
-    double latitude = position.latitude;
-    double longitude = position.longitude;
+    return {
+      "latitude": position.latitude,
+      "longitude": position.longitude,
+    };
+  }
 
+  Future<String> _getLocationName(double latitude, double longitude) async {
     String locationName = "Unknown Location";
 
     try {
@@ -163,13 +167,11 @@ class _AddWorklogPageState extends State<AddWorklogPage> {
             ? fullAddress
             : "Unknown Location";
       }
-    } catch (_) {}
+    } catch (e) {
+      print("Location name fetch error: $e");
+    }
 
-    return {
-      "latitude": latitude,
-      "longitude": longitude,
-      "locationName": locationName,
-    };
+    return locationName;
   }
 
   Future<void> _submit(bool isSubmit) async {
@@ -190,13 +192,22 @@ class _AddWorklogPageState extends State<AddWorklogPage> {
     });
 
     try {
-      final location = await _getLocation();
+      // Get coordinates only (fast, works offline)
+      final coordinates = await _getLocationCoordinates();
 
-      final latitude = location["latitude"] as double;
+      final latitude = coordinates["latitude"] as double;
 
-      final longitude = location["longitude"] as double;
+      final longitude = coordinates["longitude"] as double;
 
-      final locationName = location["locationName"] as String;
+      // Try to get location name (may fail if offline)
+      String? locationName;
+      try {
+        locationName = await _getLocationName(latitude, longitude);
+      } catch (e) {
+        print("⚠️ Failed to get location name: $e");
+        // Continue without location name, will be fetched during sync
+        locationName = null;
+      }
 
       print("WORK TYPE: $workType");
       print("LATITUDE: $latitude");

@@ -4,6 +4,7 @@ import 'package:staff_work_track/core/constant/apiurl.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
 import 'package:staff_work_track/screen/staff/navigation/fullimg.dart';
 import 'package:staff_work_track/services/announ_service.dart';
+import 'package:staff_work_track/utils/time_utils.dart';
 
 class Staffworklog extends StatefulWidget {
   const Staffworklog({super.key});
@@ -69,7 +70,7 @@ class _UsersWorklogState extends State<Staffworklog> {
 
     if (selectedDate != null) {
       temp = temp.where((w) {
-        final date = DateTime.parse(w['workDate']).toLocal();
+        final date = TimeUtils.fromUtcIso8601(w['workDate']);
         return date.year == selectedDate!.year &&
             date.month == selectedDate!.month &&
             date.day == selectedDate!.day;
@@ -94,13 +95,22 @@ class _UsersWorklogState extends State<Staffworklog> {
     Map<String, List<dynamic>> grouped = {};
 
     for (var log in logs) {
-      String date = log["workDate"]?.split("T")[0] ?? "";
-
-      if (!grouped.containsKey(date)) {
-        grouped[date] = [];
+      try {
+        // Use TimeUtils to properly convert UTC to local for correct date grouping
+        final localDate = TimeUtils.fromUtcIso8601(log["workDate"]);
+        final dateKey = "${localDate.year.toString().padLeft(4, '0')}-${localDate.month.toString().padLeft(2, '0')}-${localDate.day.toString().padLeft(2, '0')}";
+        
+        if (!grouped.containsKey(dateKey)) {
+          grouped[dateKey] = [];
+        }
+        grouped[dateKey]!.add(log);
+      } catch (_) {
+        String date = log["workDate"]?.split("T")[0] ?? "";
+        if (!grouped.containsKey(date)) {
+          grouped[date] = [];
+        }
+        grouped[date]!.add(log);
       }
-
-      grouped[date]!.add(log);
     }
 
     return grouped;
@@ -211,9 +221,8 @@ class _UsersWorklogState extends State<Staffworklog> {
 
     if (log["time"] != null) {
       try {
-        final DateTime time = DateTime.parse(log["time"].toString());
-
-        displayTime = DateFormat("hh:mm a").format(time);
+        final localDateTime = TimeUtils.fromUtcIso8601(log["time"].toString());
+        displayTime = DateFormat("HH:mm:ss").format(localDateTime);
       } catch (e) {
         displayTime = log["time"].toString();
       }

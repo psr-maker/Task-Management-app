@@ -5,6 +5,7 @@ import 'package:staff_work_track/core/widgets/loading.dart';
 import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
 import 'package:staff_work_track/services/local_worklog_db.dart';
 import 'package:staff_work_track/services/worklog_sync_service.dart';
+import 'package:staff_work_track/utils/time_utils.dart';
 
 class OfflineWorkLogs extends StatefulWidget {
   const OfflineWorkLogs({super.key});
@@ -221,7 +222,8 @@ class _OfflineWorkLogsState extends State<OfflineWorkLogs> {
     DateTime? workDate;
 
     try {
-      workDate = DateTime.parse(log['workDate']);
+      // Use TimeUtils to properly convert UTC to local
+      workDate = TimeUtils.fromUtcIso8601(log['workDate']);
     } catch (_) {}
 
     return Container(

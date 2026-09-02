@@ -130,6 +130,7 @@ class AnnouncementService {
   required double longitude,
   required String locationName,
   required XFile image,
+  DateTime? submittedAt,
 }) async {
   final token = await AuthService.getToken();
 
@@ -143,11 +144,22 @@ class AnnouncementService {
   request.fields['Title'] = title;
   request.fields['WorkType'] = workType;
   request.fields['Description'] = description;
-  request.fields['WorkDate'] = workDate.toIso8601String();
+  
+  // Send workDate as UTC ISO8601 string
+  final workDateUtc = workDate.toUtc().toIso8601String();
+  request.fields['WorkDate'] = workDateUtc;
+  
   request.fields['IsSubmit'] = isSubmit.toString();
   request.fields['Latitude'] = latitude.toString();
   request.fields['Longitude'] = longitude.toString();
   request.fields['LocationName'] = locationName;
+  
+  // Add submission timestamp for offline worklogs
+  if (submittedAt != null) {
+    // Send as UTC ISO8601 string so backend stores correct time
+    final utcTime = submittedAt.toUtc().toIso8601String();
+    request.fields['SubmittedAt'] = utcTime;
+  }
 
   // ==========================================
   // IMAGE

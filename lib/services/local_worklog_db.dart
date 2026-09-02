@@ -98,4 +98,21 @@ class LocalWorkLogDB {
       whereArgs: [id],
     );
   }
+
+  // =====================================================
+  // UPDATE LOCATION NAME
+  // =====================================================
+
+  static Future<void> updateLocationName(int id, String locationName) async {
+    final db = await database;
+
+    await db.update(
+      'worklogs',
+      {
+        'locationName': locationName,
+      },
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
 }
