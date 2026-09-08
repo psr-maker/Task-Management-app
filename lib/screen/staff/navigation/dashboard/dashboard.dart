@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:staff_work_track/Models/warning_model.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
-import 'package:staff_work_track/screen/staff/navigation/dashboard/drawer/extrawork/workapply.dart';
+import 'package:staff_work_track/screen/staff/navigation/dashboard/drawer/extrawork/Compensation.dart';
 import 'package:staff_work_track/screen/staff/navigation/dashboard/drawer/leave/leavelist.dart';
-import 'package:staff_work_track/screen/staff/navigation/dashboard/drawer/overtime/overtimelist.dart';
+import 'package:staff_work_track/screen/staff/navigation/dashboard/drawer/ovtme/overtime.dart';
 import 'package:staff_work_track/screen/staff/navigation/dashboard/drawer/punch/punchlist.dart';
 import 'package:staff_work_track/screen/staff/navigation/dashboard/settings/usersettings.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/Reports/reports_table.dart';
@@ -509,19 +509,20 @@ class _StaffDashboardState extends State<StaffDashboard> {
               Navigator.pop(context);
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => ExtraWorkApply()),
+                MaterialPageRoute(builder: (_) => MyExtraWorkPage()),
               );
             },
           ),
-          _buildDrawerItem(
+       
+           _buildDrawerItem(
             context,
             icon: Icons.more_time_rounded,
-            title: "Overtime Request",
+            title: "Overtime",
             onTap: () {
               Navigator.pop(context);
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => OvertimeList()),
+                MaterialPageRoute(builder: (_) => OvertimeListttt()),
               );
             },
           ),

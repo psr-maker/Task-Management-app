@@ -108,26 +108,49 @@ class _EditTaskState extends State<EditTask> {
     }
   }
 
+  // Future<void> _selectTime(bool isStart) async {
+  //   final initial = isStart
+  //       ? startTime ?? const TimeOfDay(hour: 9, minute: 0)
+  //       : endTime ?? const TimeOfDay(hour: 10, minute: 0);
+
+  //   final picked = await showTimePicker(
+  //     context: context,
+  //     initialTime: initial,
+  //   );
+
+  //   if (picked != null) {
+  //     setState(() {
+  //       if (isStart) {
+  //         startTime = picked;
+  //         startTimeController.text =
+  //             "${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}";
+  //       } else {
+  //         endTime = picked;
+  //         endTimeController.text =
+  //             "${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}";
+  //       }
+  //     });
+  //   }
+  // }
   Future<void> _selectTime(bool isStart) async {
     final initial = isStart
         ? startTime ?? const TimeOfDay(hour: 9, minute: 0)
         : endTime ?? const TimeOfDay(hour: 10, minute: 0);
 
-    final picked = await showTimePicker(
-      context: context,
-      initialTime: initial,
-    );
+    final picked = await showTimePicker(context: context, initialTime: initial);
 
     if (picked != null) {
+      final formattedTime =
+          "${picked.hour.toString().padLeft(2, '0')}:"
+          "${picked.minute.toString().padLeft(2, '0')}:00";
+
       setState(() {
         if (isStart) {
           startTime = picked;
-          startTimeController.text =
-              "${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}";
+          startTimeController.text = formattedTime;
         } else {
           endTime = picked;
-          endTimeController.text =
-              "${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}";
+          endTimeController.text = formattedTime;
         }
       });
     }
@@ -392,7 +415,8 @@ class _EditTaskState extends State<EditTask> {
 
                         // Check quantity reduction
                         bool createRemainingTask = false;
-                        if (widget.task.performanceType.toLowerCase() == "qty") {
+                        if (widget.task.performanceType.toLowerCase() ==
+                            "qty") {
                           final oldQuantity = widget.task.quantity ?? 0;
 
                           final newQuantity = int.tryParse(
@@ -465,8 +489,10 @@ class _EditTaskState extends State<EditTask> {
 
                             if (remaining > 0) {
                               final initialAssignedAt =
-                                  DateTime.tryParse(widget.task.createdAt.split("T").first) ??
-                                      DateTime.now();
+                                  DateTime.tryParse(
+                                    widget.task.createdAt.split("T").first,
+                                  ) ??
+                                  DateTime.now();
 
                               await Navigator.push(
                                 context,
@@ -476,7 +502,8 @@ class _EditTaskState extends State<EditTask> {
                                         .map((u) => u.userId)
                                         .toList(),
                                     initialTaskName: nameController.text.trim(),
-                                    initialDescription: descriController.text.trim(),
+                                    initialDescription: descriController.text
+                                        .trim(),
                                     initialGoalCode: widget.task.goalCode,
                                     initialPriority: selectedPriority,
                                     initialPerformanceType:
@@ -486,9 +513,10 @@ class _EditTaskState extends State<EditTask> {
                                     initialDueDate: dueDate,
                                     initialStartTime:
                                         startTimeController.text.isNotEmpty
-                                            ? startTimeController.text
-                                            : null,
-                                    initialEndTime: endTimeController.text.isNotEmpty
+                                        ? startTimeController.text
+                                        : null,
+                                    initialEndTime:
+                                        endTimeController.text.isNotEmpty
                                         ? endTimeController.text
                                         : widget.task.endTime,
                                     initialIsTask: true,

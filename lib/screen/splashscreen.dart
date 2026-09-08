@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:staff_work_track/core/widgets/buttons.dart';
+import 'package:staff_work_track/screen/super%20admin/fives/create_fives.dart';
 import 'package:staff_work_track/services/version_service.dart';
 import 'package:staff_work_track/utils/jwt_helper.dart';
 import 'package:staff_work_track/screen/admin/admin.dart';
@@ -32,22 +33,7 @@ class _SplashScreenState extends State<SplashScreen>
     Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => page));
   }
 
-  // Future<void> checkLogin() async {
-  //   final token = await AuthService.getToken();
-  //   await Future.delayed(const Duration(seconds: 2));
-  //   if (token == null || token.isEmpty || JwtHelper.isExpired(token)) {
-  //     _go(const LoginSelection());
-  //     return;
-  //   }
-  //   final role = JwtHelper.getRole(token);
-  //   if (role == "1") {
-  //     _go(const SuperAdmin());
-  //   } else if (role == "2") {
-  //     _go(const Admin());
-  //   } else {
-  //     _go(const Staff());
-  //   }
-  // }
+
   Future<void> checkLogin() async {
     // 1. Check application version
     final versionResult = await VersionService.checkVersion();
@@ -91,7 +77,11 @@ class _SplashScreenState extends State<SplashScreen>
       _go(const SuperAdmin());
     } else if (role == "2") {
       _go(const Admin());
-    } else {
+    } 
+    else if (role == "50") {
+      _go(const FiveSpoints());
+    }
+    else {
       _go(const Staff());
     }
   }

@@ -6,7 +6,8 @@ import 'package:staff_work_track/screen/admin/Navigation/dashbord/drawer/5spoint
 import 'package:staff_work_track/screen/admin/Navigation/dashbord/drawer/attinbhvscore/scoredisplay.dart';
 import 'package:staff_work_track/screen/admin/Navigation/dashbord/drawer/company/leavlist_hr.dart';
 import 'package:staff_work_track/screen/admin/Navigation/dashbord/drawer/company/punchclist_account.dart';
-import 'package:staff_work_track/screen/admin/Navigation/dashbord/drawer/deptovertime.dart';
+import 'package:staff_work_track/screen/admin/Navigation/dashbord/drawer/dept_compensation.dart/compen_list.dart';
+import 'package:staff_work_track/screen/admin/Navigation/dashbord/drawer/overtime/manage_overtime.dart';
 import 'package:staff_work_track/screen/admin/Navigation/dashbord/drawer/punchdeptlist.dart';
 import 'package:staff_work_track/screen/admin/Navigation/dashbord/drawer/staffleaves.dart';
 import 'package:staff_work_track/screen/admin/Navigation/dashbord/drawer/staffworklog.dart';
@@ -59,7 +60,7 @@ class _AdminState extends State<AdminDashboard> {
     _fetchReport();
     loadData();
     _fetchWarnings();
-   // _fetchNotifications();
+    // _fetchNotifications();
   }
 
   void _fetchWarnings() async {
@@ -74,18 +75,6 @@ class _AdminState extends State<AdminDashboard> {
       print("Warning fetch error: $e");
     }
   }
-
-  // void _fetchNotifications() async {
-  //   try {
-  //     final data = await NotificationService.getMyNotifications();
-  //     if (!mounted) return;
-  //     setState(() {
-  //       notificationCount = data.where((n) => n["isRead"] == false).length;
-  //     });
-  //   } catch (e) {
-  //     print("Notification fetch error: $e");
-  //   }
-  // }
 
   void _fetchReport() {
     final fromDate = DateTime(selectedYear.year, 1, 1);
@@ -192,41 +181,7 @@ class _AdminState extends State<AdminDashboard> {
                       ),
                     ],
                   ),
-                // Stack(
-                //   children: [
-                    // IconButton(
-                    //   icon: const Icon(
-                    //     Icons.notifications,
-                    //     color: Colors.amber,
-                    //     size: 20,
-                    //   ),
-                    //   onPressed: () async {
-                    //     await Navigator.push(
-                    //       context,
-                    //       MaterialPageRoute(builder: (_) => NotificationPage()),
-                    //     );
-                    // //    _fetchNotifications();
-                    //   },
-                    // ),
-                    // if (notificationCount > 0)
-                    //   Positioned(
-                    //     right: 8,
-                    //     top: 8,
-                    //     child: Container(
-                    //       padding: const EdgeInsets.all(4),
-                    //       decoration: const BoxDecoration(
-                    //         color: Colors.red,
-                    //         shape: BoxShape.circle,
-                    //       ),
-                    //       child: Text(
-                    //         notificationCount.toString(),
-                    //         style: Theme.of(context).textTheme.titleMedium,
-                    //         textAlign: TextAlign.center,
-                    //       ),
-                    //     ),
-                    //   ),
-                //   ],
-                // ),
+
                 IconButton(
                   onPressed: () {
                     Navigator.push(
@@ -543,17 +498,19 @@ class _AdminState extends State<AdminDashboard> {
             child: ListView(
               padding: const EdgeInsets.only(top: 10),
               children: [
-                  _buildDrawerItem(
+                _buildDrawerItem(
                   context,
                   icon: Icons.task_alt_rounded,
                   title: "Score Calculation",
                   onTap: () {
                     Navigator.pop(context);
 
-                   Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => ProductivityCalculationPage()),
-              );
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ProductivityCalculationPage(),
+                      ),
+                    );
                   },
                 ),
                 _buildDrawerItem(
@@ -618,17 +575,31 @@ class _AdminState extends State<AdminDashboard> {
                 _buildDrawerItem(
                   context,
                   icon: Icons.more_time_rounded,
+                  title: "Compensation",
+                  onTap: () {
+                    Navigator.pop(context);
+
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => ExtraWorkPage(deptt: widget.department)),
+                    );
+                  },
+                ),
+                _buildDrawerItem(
+                  context,
+                  icon: Icons.more_time_rounded,
                   title: "Overtime",
                   onTap: () {
                     Navigator.pop(context);
 
                     Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (_) => DeptOvertimeList()),
+                      MaterialPageRoute(
+                        builder: (_) => ManagerOvertime(dept: widget.department),
+                      ),
                     );
                   },
                 ),
-
                 _buildDrawerItem(
                   context,
                   icon: Icons.work_history_rounded,
@@ -657,19 +628,19 @@ class _AdminState extends State<AdminDashboard> {
                   },
                 ),
 
-                _buildDrawerItem(
-                  context,
-                  icon: Icons.checklist_rounded,
-                  title: "5S Performance",
-                  onTap: () {
-                    Navigator.pop(context);
+                // _buildDrawerItem(
+                //   context,
+                //   icon: Icons.checklist_rounded,
+                //   title: "5S Performance",
+                //   onTap: () {
+                //     Navigator.pop(context);
 
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => FiveSpoints()),
-                    );
-                  },
-                ),
+                //     Navigator.push(
+                //       context,
+                //       MaterialPageRoute(builder: (_) => FiveSpoints()),
+                //     );
+                //   },
+                // ),
 
                 _buildDrawerItem(
                   context,
@@ -730,9 +701,7 @@ class _AdminState extends State<AdminDashboard> {
 
                 Navigator.push(
                   context,
-                  MaterialPageRoute(
-                    builder: (_) => HrLeaves(),
-                  ),
+                  MaterialPageRoute(builder: (_) => HrLeaves()),
                 );
               },
             ),
@@ -749,9 +718,7 @@ class _AdminState extends State<AdminDashboard> {
 
                 Navigator.push(
                   context,
-                  MaterialPageRoute(
-                    builder: (_) => HrLeaves(),
-                  ),
+                  MaterialPageRoute(builder: (_) => HrLeaves()),
                 );
               },
             ),
