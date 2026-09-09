@@ -25,6 +25,30 @@ class AdminService {
     }
   }
 
+  static Future<List<UserModel>> getEmployeesByDepartments(
+    List<String> departments,
+  ) async {
+    if (departments.isEmpty) return [];
+
+    final results = await Future.wait(
+      departments.map((department) async {
+        try {
+          return await getEmployeesByDepartment(department);
+        } catch (_) {
+          return <UserModel>[];
+        }
+      }),
+    );
+
+    final uniqueUsers = <int, UserModel>{};
+    for (final list in results) {
+      for (final user in list) {
+        uniqueUsers[user.userId] = user;
+      }
+    }
+    return uniqueUsers.values.toList();
+  }
+
   static Future<List<dynamic>> getGoalsByDepartment(String department) async {
     try {
       final url = Uri.parse("$baseUrl/Manager/allStaffGoals/$department");

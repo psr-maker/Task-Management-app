@@ -108,36 +108,24 @@ class _EditTaskState extends State<EditTask> {
     }
   }
 
-  // Future<void> _selectTime(bool isStart) async {
-  //   final initial = isStart
-  //       ? startTime ?? const TimeOfDay(hour: 9, minute: 0)
-  //       : endTime ?? const TimeOfDay(hour: 10, minute: 0);
-
-  //   final picked = await showTimePicker(
-  //     context: context,
-  //     initialTime: initial,
-  //   );
-
-  //   if (picked != null) {
-  //     setState(() {
-  //       if (isStart) {
-  //         startTime = picked;
-  //         startTimeController.text =
-  //             "${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}";
-  //       } else {
-  //         endTime = picked;
-  //         endTimeController.text =
-  //             "${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}";
-  //       }
-  //     });
-  //   }
-  // }
   Future<void> _selectTime(bool isStart) async {
-    final initial = isStart
-        ? startTime ?? const TimeOfDay(hour: 9, minute: 0)
-        : endTime ?? const TimeOfDay(hour: 10, minute: 0);
-
-    final picked = await showTimePicker(context: context, initialTime: initial);
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.now(),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.light(
+              primary: Theme.of(context).colorScheme.secondary,
+              onPrimary: Colors.white,
+              surface: Colors.white,
+              onSurface: Colors.black,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
 
     if (picked != null) {
       final formattedTime =

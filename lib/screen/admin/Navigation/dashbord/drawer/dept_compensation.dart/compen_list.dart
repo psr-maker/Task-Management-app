@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import 'package:staff_work_track/core/widgets/loading.dart';
+import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
 import 'package:staff_work_track/screen/admin/Navigation/dashbord/drawer/dept_compensation.dart/add_compen.dart';
 import 'package:staff_work_track/services/overtime_service.dart';
 
@@ -17,7 +18,9 @@ class ExtraWorkPage extends StatefulWidget {
 class _ExtraWorkPageState extends State<ExtraWorkPage>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-
+  String? _topMessage;
+  bool _isErrorMessage = true;
+  bool _showTopMessage = false;
   bool isLoading = true;
   bool isRefreshing = false;
 
@@ -72,7 +75,7 @@ class _ExtraWorkPageState extends State<ExtraWorkPage>
 
       if (!mounted) return;
 
-      _showMessage(
+      showTopMessage(
         'Failed to load extra work: '
         '${e.toString().replaceFirst('Exception: ', '')}',
         isError: true,
@@ -125,7 +128,7 @@ class _ExtraWorkPageState extends State<ExtraWorkPage>
     final extraWorkId = _getExtraWorkId(item);
 
     if (extraWorkId == null) {
-      _showMessage('Invalid extra work ID.', isError: true);
+      showTopMessage('Invalid extra work ID.', isError: true);
       return;
     }
 
@@ -147,14 +150,14 @@ class _ExtraWorkPageState extends State<ExtraWorkPage>
 
       if (!mounted) return;
 
-      _showMessage('Extra work approved successfully.');
+      showTopMessage('Extra work approved successfully.', isError: false);
 
       // Reload the list
       await _loadExtraWorks(refresh: true);
     } catch (e) {
       if (!mounted) return;
 
-      _showMessage(
+      showTopMessage(
         'Failed to approve: '
         '${e.toString().replaceFirst('Exception: ', '')}',
         isError: true,
@@ -172,7 +175,7 @@ class _ExtraWorkPageState extends State<ExtraWorkPage>
     final extraWorkId = _getExtraWorkId(item);
 
     if (extraWorkId == null) {
-      _showMessage('Invalid extra work ID.', isError: true);
+      showTopMessage('Invalid extra work ID.', isError: true);
       return;
     }
 
@@ -282,13 +285,12 @@ class _ExtraWorkPageState extends State<ExtraWorkPage>
 
       if (!mounted) return;
 
-      _showMessage('Extra work rejected successfully.');
-
+      showTopMessage('Extra work rejected successfully.', isError: false);
       await _loadExtraWorks(refresh: true);
     } catch (e) {
       if (!mounted) return;
 
-      _showMessage(
+      showTopMessage(
         'Failed to reject: '
         '${e.toString().replaceFirst('Exception: ', '')}',
         isError: true,
@@ -314,6 +316,21 @@ class _ExtraWorkPageState extends State<ExtraWorkPage>
     }
 
     return int.tryParse(value.toString());
+  }
+
+  void showTopMessage(String message, {bool isError = true}) {
+    setState(() {
+      _topMessage = message;
+      _isErrorMessage = isError;
+      _showTopMessage = true;
+    });
+
+    Future.delayed(const Duration(seconds: 3), () {
+      if (!mounted) return;
+      setState(() {
+        _showTopMessage = false;
+      });
+    });
   }
 
   @override
@@ -380,35 +397,57 @@ class _ExtraWorkPageState extends State<ExtraWorkPage>
         ),
       ),
 
-      body: isLoading
-          ? const Center(child: RotatingFlower())
-          : TabBarView(
-              controller: _tabController,
+      body: Stack(
+        children: [
+          isLoading
+              ? const Center(child: RotatingFlower())
+              : TabBarView(
+                  controller: _tabController,
 
-              children: List.generate(4, (index) {
-                final works = getFilteredWorks(index);
+                  children: List.generate(4, (index) {
+                    final works = getFilteredWorks(index);
 
-                if (works.isEmpty) {
-                  return _emptyState();
-                }
+                    if (works.isEmpty) {
+                      return _emptyState();
+                    }
 
-                return RefreshIndicator(
-                  onRefresh: () => _loadExtraWorks(refresh: true),
+                    return RefreshIndicator(
+                      onRefresh: () => _loadExtraWorks(refresh: true),
 
-                  child: ListView.builder(
-                    physics: const AlwaysScrollableScrollPhysics(),
+                      child: ListView.builder(
+                        physics: const AlwaysScrollableScrollPhysics(),
 
-                    padding: const EdgeInsets.all(15),
+                        padding: const EdgeInsets.all(15),
 
-                    itemCount: works.length,
+                        itemCount: works.length,
 
-                    itemBuilder: (context, i) {
-                      return _extraWorkCard(works[i]);
-                    },
-                  ),
-                );
-              }),
+                        itemBuilder: (context, i) {
+                          return _extraWorkCard(works[i]);
+                        },
+                      ),
+                    );
+                  }),
+                ),
+          if (_topMessage != null)
+            AnimatedPositioned(
+              top: _showTopMessage ? 20 : -120,
+              left: 16,
+              right: 16,
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeOut,
+              child: Msgsnackbar(
+                context,
+                message: _topMessage!,
+                isError: _isErrorMessage,
+                backgroundColor: _isErrorMessage
+                    ? Colors.red
+                    : Theme.of(context).colorScheme.onPrimary,
+                textColor: Theme.of(context).colorScheme.secondary,
+                iconColor: Theme.of(context).colorScheme.secondary,
+              ),
             ),
+        ],
+      ),
     );
   }
 
@@ -642,7 +681,7 @@ class _ExtraWorkPageState extends State<ExtraWorkPage>
             label: Text(isProcessing ? 'Processing...' : 'Approve'),
 
             style: ElevatedButton.styleFrom(
-            backgroundColor: const Color.fromARGB(255, 25, 77, 38),
+              backgroundColor: const Color.fromARGB(255, 25, 77, 38),
 
               foregroundColor: Colors.white,
 
@@ -806,7 +845,7 @@ class _ExtraWorkPageState extends State<ExtraWorkPage>
         color: Colors.red.withOpacity(0.05),
         borderRadius: BorderRadius.circular(12),
 
-        border: Border.all( color: Colors.red),
+        border: Border.all(color: Colors.red),
       ),
 
       child: Column(
@@ -873,21 +912,5 @@ class _ExtraWorkPageState extends State<ExtraWorkPage>
         ),
       ],
     );
-  }
-
-  void _showMessage(String message, {bool isError = false}) {
-    if (!mounted) return;
-
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(message),
-
-          backgroundColor: isError ? Colors.redAccent : Colors.green,
-
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
   }
 }

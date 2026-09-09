@@ -37,7 +37,7 @@ class _LeaveapplyState extends State<Leaveapply> {
 
   List<Map<String, dynamic>> availableCompensation = [];
 
-  static const List<String> leaveCategories = ["CL", "LOP", "Compensation"];
+  static const List<String> leaveCategories = ["CL", "LOP"];
 
   @override
   void initState() {
@@ -313,30 +313,6 @@ class _LeaveapplyState extends State<Leaveapply> {
 
     setState(() => _isLoading = true);
 
-    // final success = await AdminService.applyPermission(
-    //   name: nameController.text,
-    //   designation: designationController.text,
-    //   reason: reasonController.text,
-    //   date: fromDate!, // single date
-    //   fromTime: formatTimeToApi(fromTime!),
-    //   toTime: formatTimeToApi(toTime!),
-    // );
-
-    // setState(() => _isLoading = false);
-
-    // if (success) {
-    //   showTopMessage("Permission Applied Successfully", isError: false);
-
-    //   // ✅ optional reset
-    //   setState(() {
-    //     fromTime = null;
-    //     toTime = null;
-    //     totalMinutes = 0;
-    //   });
-    //   Navigator.pop(context, true);
-    // } else {
-    //   showTopMessage("Failed to apply permission", isError: true);
-    // }
     final result = await AdminService.applyPermission(
       name: nameController.text,
       designation: designationController.text,

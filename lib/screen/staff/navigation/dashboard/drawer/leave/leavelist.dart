@@ -17,47 +17,46 @@ class _LeavelistState extends State<Leavelist>
   List allItems = [];
   List filteredItems = [];
   bool isLoading = true;
-  String activeTab = "Leave"; // "Leave", "Permission", "Compensation"
+  String activeTab = "Leave"; // "Leave", "Permission"
   late TabController _tabController;
   final tabs = ["All", "Pending", "Approved", "Rejected"];
   final permissionTabs = ["All", "Pending", "Approved", "Rejected"];
-  final compensationTabs = ["All", "Pending", "Approved", "Rejected"];
   Set<int> expandedItems = {};
   String? _topMessage;
   bool _isErrorMessage = true;
   bool _showTopMessage = false;
-  static const num clMonthlyQuota = 1;
+  // static const num clMonthlyQuota = 1;
 
   num clUsed = 0;
   num lopUsed = 0;
   num compUsed = 0;
   num compApprovedTotal = 0;
 
-  bool _summaryLoading = true;
+  // bool _summaryLoading = true;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
     loadItems();
-    loadSummaryData();
+   // loadSummaryData();
     _tabController.addListener(() {
       filterItems();
     });
   }
 
-  Future<void> loadSummaryData() async {
-    setState(() => _summaryLoading = true);
-    try {
-      final leaves = await AdminService.getLeaves();
-      final service = AdminService();
-      final compensation = await service.getMyExtraWork();
-      computeLeaveSummary(leaves, compensation);
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _summaryLoading = false);
-    }
-  }
+  // Future<void> loadSummaryData() async {
+  //   setState(() => _summaryLoading = true);
+  //   try {
+  //     final leaves = await AdminService.getLeaves();
+  //     final service = AdminService();
+  //     final compensation = await service.getMyExtraWork();
+  //     computeLeaveSummary(leaves, compensation);
+  //   } catch (e) {
+  //     if (!mounted) return;
+  //     setState(() => _summaryLoading = false);
+  //   }
+  // }
 
   void computeLeaveSummary(List leaves, List compensation) {
     final now = DateTime.now();
@@ -120,7 +119,7 @@ class _LeavelistState extends State<Leavelist>
       lopUsed = lop;
       compUsed = usedCount;
       compApprovedTotal = approvedTotal;
-      _summaryLoading = false;
+     // _summaryLoading = false;
     });
   }
 
@@ -149,9 +148,6 @@ class _LeavelistState extends State<Leavelist>
         data = await AdminService.getLeaves();
       } else if (activeTab == "Permission") {
         data = await AdminService.getPermissions();
-      } else if (activeTab == "Compensation") {
-        final service = AdminService();
-        data = await service.getMyExtraWork();
       }
 
       setState(() {
@@ -171,26 +167,24 @@ class _LeavelistState extends State<Leavelist>
   }
 
   void filterItems() {
-    String selected;
+    final currentTabs = activeTab == "Leave" ? tabs : permissionTabs;
 
-    if (activeTab == "Leave") {
-      selected = tabs[_tabController.index];
-    } else if (activeTab == "Permission") {
-      selected = permissionTabs[_tabController.index];
-    } else {
-      selected = compensationTabs[_tabController.index];
+    if (_tabController.index < 0 ||
+        _tabController.index >= currentTabs.length) {
+      return;
     }
 
+    final selected = currentTabs[_tabController.index];
+
     setState(() {
-      if (selected == "All") {
-        filteredItems = allItems;
+      if (selected.toLowerCase() == "all") {
+        filteredItems = List.from(allItems);
       } else {
-        filteredItems = allItems
-            .where(
-              (e) =>
-                  (e["status"] ?? "").toLowerCase() == selected.toLowerCase(),
-            )
-            .toList();
+        filteredItems = allItems.where((e) {
+          final status = (e["status"] ?? "").toString().trim();
+
+          return status.toLowerCase() == selected.toLowerCase();
+        }).toList();
       }
     });
   }
@@ -274,7 +268,7 @@ class _LeavelistState extends State<Leavelist>
 
                 if (result == true) {
                   loadItems(); // refresh immediately
-                  loadSummaryData();
+                 // loadSummaryData();
                 }
               },
             ),
@@ -347,35 +341,6 @@ class _LeavelistState extends State<Leavelist>
                         ),
                       ),
                     ),
-                    const SizedBox(width: 5),
-                    Expanded(
-                      child: GestureDetector(
-                        onTap: () {
-                          setState(() {
-                            activeTab = "Compensation";
-                          });
-                          loadItems();
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            vertical: 5,
-                            horizontal: 10,
-                          ),
-                          decoration: BoxDecoration(
-                            color: activeTab == "Compensation"
-                                ? Colors.white24
-                                : Colors.transparent,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Center(
-                            child: Text(
-                              'Compen',
-                              style: Theme.of(context).textTheme.labelLarge,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
                   ],
                 ),
               ),
@@ -396,14 +361,9 @@ class _LeavelistState extends State<Leavelist>
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
                 ),
-                tabs:
-                    (activeTab == "Leave"
-                            ? tabs
-                            : activeTab == "Permission"
-                            ? permissionTabs
-                            : compensationTabs)
-                        .map((e) => Tab(text: e))
-                        .toList(),
+                tabs: (activeTab == "Leave" ? tabs : permissionTabs)
+                    .map((e) => Tab(text: e))
+                    .toList(),
               ),
             ],
           ),
@@ -414,11 +374,7 @@ class _LeavelistState extends State<Leavelist>
           : filteredItems.isEmpty
           ? Center(
               child: Text(
-                activeTab == "Leave"
-                    ? "No Leave Found"
-                    : activeTab == "Permission"
-                    ? "No Permission Found"
-                    : "No Compensation Found",
+                activeTab == "Leave" ? "No Leave Found" : "No Permission Found",
               ),
             )
           : Stack(
@@ -426,10 +382,10 @@ class _LeavelistState extends State<Leavelist>
                 ListView(
                   padding: const EdgeInsets.all(12),
                   children: [
-                    if (activeTab == "Leave") ...[
-                      leaveSummaryCard(),
-                      const SizedBox(height: 12),
-                    ],
+                    // if (activeTab == "Leave") ...[
+                    //   leaveSummaryCard(),
+                    //   const SizedBox(height: 12),
+                    // ],
                     ...groupedData.entries.map((entry) {
                       String month = entry.key;
                       List items = entry.value;
@@ -474,7 +430,7 @@ class _LeavelistState extends State<Leavelist>
 
   Widget buildItem(dynamic e, int index) {
     final isPermission = activeTab == "Permission";
-    final isCompensation = activeTab == "Compensation";
+
     final status = (e["status"] ?? "").toString().toLowerCase();
     final isExpanded = expandedItems.contains(index);
 
@@ -532,7 +488,7 @@ class _LeavelistState extends State<Leavelist>
 
                 return;
               }
-              if (!isPermission && !isCompensation && status != "pending") {
+              if (!isPermission && status != "pending") {
                 showTopMessage(
                   "Only pending leave can be deleted",
                   isError: true,
@@ -543,28 +499,18 @@ class _LeavelistState extends State<Leavelist>
               final confirmed = await showConfirmDialog(
                 context,
                 "Delete",
-                isCompensation ? "compensation" : "leave",
+                "leave",
               );
 
               if (confirmed == true) {
                 final success = await AdminService.deleteLeave(e["id"]);
 
                 if (success) {
-                  showTopMessage(
-                    isCompensation
-                        ? "Compensation deleted successfully"
-                        : "Leave deleted successfully",
-                    isError: false,
-                  );
+                  showTopMessage("Leave deleted successfully", isError: false);
                   loadItems();
-                  loadSummaryData();
+                 // loadSummaryData();
                 } else {
-                  showTopMessage(
-                    isCompensation
-                        ? "Failed to delete compensation"
-                        : "Failed to delete leave",
-                    isError: true,
-                  );
+                  showTopMessage("Failed to delete leave", isError: true);
                 }
               }
             },
@@ -585,18 +531,14 @@ class _LeavelistState extends State<Leavelist>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          isCompensation
-                              ? e["workType"] ?? "Work"
-                              : isPermission
+                          isPermission
                               ? e["name"] ?? ""
                               : "${e["leaveType"]} - ${e["leaveTyp"]}",
                           style: Theme.of(context).textTheme.labelMedium,
                         ),
                         const SizedBox(height: 5),
                         Text(
-                          isCompensation
-                              ? formatDate(e["workedDate"])
-                              : isPermission
+                          isPermission
                               ? formatDate(e["date"] ?? e["fromDate"])
                               : formatDate(e["fromDate"]),
                           style: Theme.of(context).textTheme.headlineLarge,
@@ -605,12 +547,6 @@ class _LeavelistState extends State<Leavelist>
                           const SizedBox(height: 4),
                           Text(
                             e["totalHours"].toString() + " hours",
-                            style: Theme.of(context).textTheme.headlineMedium,
-                          ),
-                        ] else if (isCompensation) ...[
-                          const SizedBox(height: 4),
-                          Text(
-                            "${formatTime(e["startTime"])} - ${formatTime(e["endTime"])}",
                             style: Theme.of(context).textTheme.headlineMedium,
                           ),
                         ] else ...[
@@ -655,13 +591,7 @@ class _LeavelistState extends State<Leavelist>
                 children: [
                   Divider(color: Colors.grey.shade200),
 
-                  if (isCompensation) ...[
-                    infoRow("Work Type", e["workType"]),
-                    infoRow("Date", formatDate(e["workedDate"])),
-                    infoRow("From Time", formatTime(e["startTime"])),
-                    infoRow("To Time", formatTime(e["endTime"])),
-                    infoRow("Reason", e["reason"]),
-                  ] else if (isPermission) ...[
+                  if (isPermission) ...[
                     infoRow("Name", e["name"]),
                     infoRow("Date", formatDate(e["date"] ?? e["fromDate"])),
                     infoRow("From Time", formatTime(e["fromTime"])),
@@ -711,65 +641,65 @@ class _LeavelistState extends State<Leavelist>
     );
   }
 
-  Widget leaveSummaryCard() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.secondary.withOpacity(0.08),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: Theme.of(context).colorScheme.secondary.withOpacity(0.3),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            DateFormat("MMMM yyyy").format(DateTime.now()),
-            style: Theme.of(context).textTheme.labelMedium,
-          ),
-          const SizedBox(height: 12),
-          _summaryLoading
-              ? const Center(
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(vertical: 8),
-                    child: SizedBox(
-                      height: 18,
-                      width: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    ),
-                  ),
-                )
-              : Row(
-                  children: [
-                    Expanded(
-                      child: summaryStat("CL Leave", clUsed, clMonthlyQuota),
-                    ),
-                    Container(
-                      width: 1,
-                      height: 40,
-                      color: Colors.grey.shade300,
-                    ),
-                    Expanded(child: summaryStat("LOP Leave", lopUsed, null)),
-                    Container(
-                      width: 1,
-                      height: 40,
-                      color: Colors.grey.shade300,
-                    ),
-                    Expanded(
-                      child: summaryStat(
-                        "Compensation",
-                        compUsed,
-                        compApprovedTotal,
-                      ),
-                    ),
-                  ],
-                ),
-        ],
-      ),
-    );
-  }
+  // Widget leaveSummaryCard() {
+  //   return Container(
+  //     width: double.infinity,
+  //     padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+  //     decoration: BoxDecoration(
+  //       color: Theme.of(context).colorScheme.secondary.withOpacity(0.08),
+  //       borderRadius: BorderRadius.circular(12),
+  //       border: Border.all(
+  //         color: Theme.of(context).colorScheme.secondary.withOpacity(0.3),
+  //       ),
+  //     ),
+  //     child: Column(
+  //       crossAxisAlignment: CrossAxisAlignment.start,
+  //       children: [
+  //         Text(
+  //           DateFormat("MMMM yyyy").format(DateTime.now()),
+  //           style: Theme.of(context).textTheme.labelMedium,
+  //         ),
+  //         const SizedBox(height: 12),
+  //         _summaryLoading
+  //             ? const Center(
+  //                 child: Padding(
+  //                   padding: EdgeInsets.symmetric(vertical: 8),
+  //                   child: SizedBox(
+  //                     height: 18,
+  //                     width: 18,
+  //                     child: CircularProgressIndicator(strokeWidth: 2),
+  //                   ),
+  //                 ),
+  //               )
+  //             : Row(
+  //                 children: [
+  //                   Expanded(
+  //                     child: summaryStat("CL Leave", clUsed, clMonthlyQuota),
+  //                   ),
+  //                   Container(
+  //                     width: 1,
+  //                     height: 40,
+  //                     color: Colors.grey.shade300,
+  //                   ),
+  //                   Expanded(child: summaryStat("LOP Leave", lopUsed, null)),
+  //                   Container(
+  //                     width: 1,
+  //                     height: 40,
+  //                     color: Colors.grey.shade300,
+  //                   ),
+  //                   Expanded(
+  //                     child: summaryStat(
+  //                       "Compensation",
+  //                       compUsed,
+  //                       compApprovedTotal,
+  //                     ),
+  //                   ),
+  //                 ],
+  //               ),
+  //       ],
+  //     ),
+  //   );
+  // }
 
   Widget summaryStat(String label, num used, num? total) {
     return Column(

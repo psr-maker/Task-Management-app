@@ -8,7 +8,8 @@ import 'package:staff_work_track/services/announ_service.dart';
 import 'package:staff_work_track/utils/time_utils.dart';
 
 class UsersWorklog extends StatefulWidget {
-  const UsersWorklog({super.key});
+  final List<String>? allowedDepartments;
+  const UsersWorklog({super.key, this.allowedDepartments});
 
   @override
   State<UsersWorklog> createState() => _UsersWorklogState();
@@ -50,16 +51,26 @@ class _UsersWorklogState extends State<UsersWorklog> {
     setState(() => isLoading = true);
     try {
       final data = await AnnouncementService.getWorklogs();
+      final allowed = widget.allowedDepartments;
+      final filtered = allowed == null || allowed.isEmpty
+          ? data
+          : data.where((log) {
+              final name = (log['departmentName'] ?? '').toString();
+              return allowed.any(
+                (item) =>
+                    item.trim().toLowerCase() == name.trim().toLowerCase(),
+              );
+            }).toList();
       final deptSet = <String>{};
-      for (var log in data) {
+      for (var log in filtered) {
         if (log['departmentName'] != null) {
           deptSet.add(log['departmentName']);
         }
       }
 
       setState(() {
-        worklogs = data;
-        filteredLogs = data;
+        worklogs = filtered;
+        filteredLogs = filtered;
         departments = deptSet.toList();
         isLoading = false;
       });

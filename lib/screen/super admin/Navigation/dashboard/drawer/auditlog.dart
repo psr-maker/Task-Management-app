@@ -1,15 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:staff_work_track/Models/auditlog.dart';
 import 'package:staff_work_track/Models/getusers.dart';
+import 'package:staff_work_track/core/constant/division_config.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/Task/taskdetail.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/users/Employee/empdetails.dart';
+import 'package:staff_work_track/services/admin_service.dart';
 import 'package:staff_work_track/services/superadmin_service.dart';
 import 'package:staff_work_track/widgets/auditcard.dart';
 
 class AuditLogPage extends StatefulWidget {
   final String? highlightid;
-  const AuditLogPage({super.key, this.highlightid});
+  final List<String>? allowedDepartments;
+  const AuditLogPage({
+    super.key,
+    this.highlightid,
+    this.allowedDepartments,
+  });
 
   @override
   State<AuditLogPage> createState() => _AuditLogPageState();
@@ -177,6 +184,48 @@ class _AuditLogPageState extends State<AuditLogPage> {
   ) {
     if (log.entityType != "User") return null;
     return users[log.entityId];
+  }
+
+  List<AuditLogGroupModel> _filterByDepartments(
+    List<AuditLogGroupModel> grouped,
+    Map<String, UserModel> users,
+  ) {
+    final allowed = widget.allowedDepartments;
+    if (allowed == null || allowed.isEmpty) return grouped;
+
+    return grouped.where((log) {
+      if (DivisionConfig.isAllowedDepartment(log.department, allowed)) {
+        return true;
+      }
+
+      final affected = _getAffectedUser(log, users);
+      if (affected != null &&
+          DivisionConfig.isAllowedDepartment(affected.department, allowed)) {
+        return true;
+      }
+
+      final actor = users[log.changes.isNotEmpty
+          ? log.changes.first.editedById
+          : ''];
+      if (actor != null &&
+          DivisionConfig.isAllowedDepartment(actor.department, allowed)) {
+        return true;
+      }
+
+      return false;
+    }).toList();
+  }
+
+  Future<List<UserModel>> _loadUsers() async {
+    try {
+      return await SuperAdminService.getAllUsers();
+    } catch (_) {
+      final departments = widget.allowedDepartments;
+      if (departments != null && departments.isNotEmpty) {
+        return AdminService.getEmployeesByDepartments(departments);
+      }
+      rethrow;
+    }
   }
 
   void _navigateToUserDetails(BuildContext context, UserModel user) {
@@ -378,7 +427,7 @@ class _AuditLogPageState extends State<AuditLogPage> {
       body: FutureBuilder<List<Object>>(
         future: Future.wait([
           SuperAdminService.getAuditLogs(),
-          SuperAdminService.getAllUsers(),
+          _loadUsers(),
         ]),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
@@ -393,7 +442,10 @@ class _AuditLogPageState extends State<AuditLogPage> {
             for (var user in userList) user.userId.toString(): user,
           };
           final filteredLogs = _applyDateFilter(logs);
-          final groupedLogs = _groupLogs(filteredLogs, users);
+          final groupedLogs = _filterByDepartments(
+            _groupLogs(filteredLogs, users),
+            users,
+          );
           if (groupedLogs.isEmpty) {
             return const Center(
               child: Text(

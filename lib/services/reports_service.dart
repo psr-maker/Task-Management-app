@@ -117,6 +117,159 @@ class ReportsService {
     }
   }
 
+  static int _asInt(dynamic value) {
+    if (value == null) return 0;
+    if (value is int) return value;
+    if (value is double) return value.round();
+    return int.tryParse(value.toString()) ?? 0;
+  }
+
+  static double _asDouble(dynamic value) {
+    if (value == null) return 0;
+    if (value is double) return value;
+    if (value is int) return value.toDouble();
+    return double.tryParse(value.toString()) ?? 0;
+  }
+
+  static Future<Map<String, dynamic>> fetchDivisionReport(
+    List<String> departments, {
+    DateTime? fromDate,
+    DateTime? toDate,
+  }) async {
+    if (departments.isEmpty) {
+      return {
+        "totalUsers": 0,
+        "totalDepartments": 0,
+        "totalGoals": 0,
+        "completedGoals": 0,
+        "pendingGoals": 0,
+        "overdueGoals": 0,
+        "totalTasks": 0,
+        "completedTasks": 0,
+        "pendingTasks": 0,
+        "overdueTasks": 0,
+        "goalCompletionPercentage": 0,
+        "onTimeGoalCompletionPercentage": 0,
+        "delayedGoalPercentage": 0,
+        "departmentData": <Map<String, dynamic>>[],
+        "overdueTasksList": <Map<String, dynamic>>[],
+        "overdueGoalsList": <Map<String, dynamic>>[],
+      };
+    }
+
+    final results = await Future.wait(
+      departments.map((department) async {
+        try {
+          return await fetchDepartmentReport(
+            department,
+            fromDate: fromDate,
+            toDate: toDate,
+          );
+        } catch (_) {
+          return <String, dynamic>{};
+        }
+      }),
+    );
+
+    int totalUsers = 0;
+    int totalGoals = 0;
+    int completedGoals = 0;
+    int pendingGoals = 0;
+    int overdueGoals = 0;
+    int totalTasks = 0;
+    int completedTasks = 0;
+    int pendingTasks = 0;
+    int overdueTasks = 0;
+    double onTimeWeighted = 0;
+    double delayedWeighted = 0;
+    int onTimeWeight = 0;
+    int delayedWeight = 0;
+
+    final departmentData = <Map<String, dynamic>>[];
+    final overdueTasksList = <Map<String, dynamic>>[];
+    final overdueGoalsList = <Map<String, dynamic>>[];
+
+    for (var i = 0; i < departments.length; i++) {
+      final data = results[i];
+      final users = _asInt(data["totalUsers"]);
+      final goalsTotal = _asInt(data["totalGoals"]);
+      final goalsCompleted = _asInt(data["completedGoals"]);
+      final goalsPending = _asInt(data["pendingGoals"]);
+      final goalsOverdue = _asInt(data["overdueGoals"]);
+      final tasksTotal = _asInt(data["totalTasks"]);
+      final tasksCompleted = _asInt(data["completedTasks"]);
+      final tasksPending = _asInt(data["pendingTasks"]);
+      final tasksOverdue = _asInt(data["overdueTasks"]);
+
+      totalUsers += users;
+      totalGoals += goalsTotal;
+      completedGoals += goalsCompleted;
+      pendingGoals += goalsPending;
+      overdueGoals += goalsOverdue;
+      totalTasks += tasksTotal;
+      completedTasks += tasksCompleted;
+      pendingTasks += tasksPending;
+      overdueTasks += tasksOverdue;
+
+      if (goalsTotal > 0) {
+        onTimeWeighted +=
+            _asDouble(data["onTimeGoalCompletionPercentage"]) * goalsTotal;
+        delayedWeighted += _asDouble(data["delayedGoalPercentage"]) * goalsTotal;
+        onTimeWeight += goalsTotal;
+        delayedWeight += goalsTotal;
+      }
+
+      departmentData.add({
+        "department": departments[i],
+        "totalUsers": users,
+        "tasks": {
+          "total": tasksTotal,
+          "completed": tasksCompleted,
+          "pending": tasksPending,
+          "overdue": tasksOverdue,
+        },
+        "goals": {
+          "total": goalsTotal,
+          "completed": goalsCompleted,
+          "pending": goalsPending,
+          "overdue": goalsOverdue,
+        },
+      });
+
+      overdueTasksList.addAll(
+        List<Map<String, dynamic>>.from(data["overdueTasksList"] ?? []),
+      );
+      overdueGoalsList.addAll(
+        List<Map<String, dynamic>>.from(data["overdueGoalsList"] ?? []),
+      );
+    }
+
+    return {
+      "totalUsers": totalUsers,
+      "totalDepartments": departments.length,
+      "totalGoals": totalGoals,
+      "completedGoals": completedGoals,
+      "pendingGoals": pendingGoals,
+      "overdueGoals": overdueGoals,
+      "totalTasks": totalTasks,
+      "completedTasks": completedTasks,
+      "pendingTasks": pendingTasks,
+      "overdueTasks": overdueTasks,
+      "goalCompletionPercentage": totalGoals == 0
+          ? 0
+          : (completedGoals / totalGoals) * 100,
+      "onTimeGoalCompletionPercentage": onTimeWeight == 0
+          ? 0
+          : onTimeWeighted / onTimeWeight,
+      "delayedGoalPercentage": delayedWeight == 0
+          ? 0
+          : delayedWeighted / delayedWeight,
+      "departmentData": departmentData,
+      "overdueTasksList": overdueTasksList,
+      "overdueGoalsList": overdueGoalsList,
+    };
+  }
+
   static Future<Map<String, dynamic>> getFullReport({
     int? userId,
     String? department,

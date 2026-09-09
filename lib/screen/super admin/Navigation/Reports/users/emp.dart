@@ -53,6 +53,7 @@ class _EmployeeReportPageState extends State<EmployeeReportPage> {
         selectedYear.year,
       );
 
+      if (!mounted) return;
       setState(() {
         data = report;
         monthlyData = monthly;
@@ -62,6 +63,7 @@ class _EmployeeReportPageState extends State<EmployeeReportPage> {
         isLoading = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         isLoading = false;
       });
@@ -100,6 +102,7 @@ class _EmployeeReportPageState extends State<EmployeeReportPage> {
   }
 
   Future<void> generateAndDownloadPDF() async {
+    if (!mounted) return;
     setState(() {
       _isDownloadingPdf = true;
     });
@@ -207,6 +210,7 @@ class _EmployeeReportPageState extends State<EmployeeReportPage> {
               );
 
               if (picked != null) {
+                if (!mounted) return;
                 setState(() {
                   selectedYear = picked;
                   isLoading = true;

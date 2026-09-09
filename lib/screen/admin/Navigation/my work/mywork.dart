@@ -43,7 +43,8 @@ class _MyworkState extends State<Mywork> {
       });
     } catch (e) {
       debugPrint(e.toString());
-      isLoading = false;
+      if (!mounted) return;
+      setState(() => isLoading = false);
     }
   }
 
@@ -60,6 +61,7 @@ class _MyworkState extends State<Mywork> {
   }
 
   void showTopMessage(String message, {bool isError = true}) {
+    if (!mounted) return;
     setState(() {
       _topMessage = message;
       _isErrorMessage = isError;
@@ -151,8 +153,9 @@ class _MyworkState extends State<Mywork> {
                                     ),
                                   );
                                   if (result == true) {
+                                    if (!mounted) return;
                                     setState(() {
-                                      _goalsRefreshKey++; // bump the key
+                                      _goalsRefreshKey++;
                                     });
                                   }
                                 },

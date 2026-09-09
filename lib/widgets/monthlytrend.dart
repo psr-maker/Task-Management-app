@@ -840,7 +840,8 @@ class YearlyProductivityPage extends StatelessWidget {
 }
 
 class Alldeptproducticity extends StatefulWidget {
-  const Alldeptproducticity({super.key});
+  final List<String>? departments;
+  const Alldeptproducticity({super.key, this.departments});
   @override
   State<Alldeptproducticity> createState() => _AlldeptproducticityState();
 }
@@ -876,7 +877,17 @@ class _AlldeptproducticityState extends State<Alldeptproducticity> {
         } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
           return const SizedBox();
         }
-        final departments = snapshot.data!;
+        final allowed = widget.departments;
+        final departments = snapshot.data!.where((dept) {
+          if (allowed == null || allowed.isEmpty) return true;
+          final name = (dept['department'] ?? '').toString();
+          return allowed.any(
+            (item) => item.trim().toLowerCase() == name.trim().toLowerCase(),
+          );
+        }).toList();
+        if (departments.isEmpty) {
+          return const SizedBox();
+        }
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

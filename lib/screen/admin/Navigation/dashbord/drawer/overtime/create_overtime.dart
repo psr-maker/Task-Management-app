@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:staff_work_track/Models/getusers.dart';
 import 'package:staff_work_track/core/widgets/buttons.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
+import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
 import 'package:staff_work_track/services/overtime_service.dart';
 import 'package:staff_work_track/services/superadmin_service.dart';
 import 'package:staff_work_track/widgets/customfieldwidget.dart';
@@ -38,7 +39,9 @@ class _ManagerOvertimeCreateState extends State<ManagerOvertimeCreate> {
   bool showEmployeeList = false;
   bool loadingUsers = true;
   bool loading = false;
-
+  String? _topMessage;
+  bool _isErrorMessage = true;
+  bool _showTopMessage = false;
   @override
   void initState() {
     super.initState();
@@ -78,12 +81,12 @@ class _ManagerOvertimeCreateState extends State<ManagerOvertimeCreate> {
     }
 
     if (selectedUid == null) {
-      showMessage("Please select an employee", true);
+      showTopMessage("Please select an employee", isError: true);
       return;
     }
 
     if (!_isValidTimeRange()) {
-      showMessage("To time must be after From time", true);
+      showTopMessage("To time must be after From time", isError: true);
       return;
     }
 
@@ -112,8 +115,7 @@ class _ManagerOvertimeCreateState extends State<ManagerOvertimeCreate> {
 
       if (!mounted) return;
 
-      showMessage("Overtime request sent successfully", false);
-
+      showTopMessage("Overtime request sent successfully", isError: false);
       await Future.delayed(const Duration(milliseconds: 700));
 
       if (!mounted) return;
@@ -123,8 +125,10 @@ class _ManagerOvertimeCreateState extends State<ManagerOvertimeCreate> {
       debugPrint("Create overtime error: $e");
 
       if (!mounted) return;
-
-      showMessage(e.toString().replaceFirst("Exception: ", ""), true);
+      showTopMessage(
+        e.toString().replaceFirst("Exception: ", ""),
+        isError: true,
+      );
     } finally {
       if (mounted) {
         setState(() {
@@ -132,6 +136,21 @@ class _ManagerOvertimeCreateState extends State<ManagerOvertimeCreate> {
         });
       }
     }
+  }
+
+  void showTopMessage(String message, {bool isError = true}) {
+    setState(() {
+      _topMessage = message;
+      _isErrorMessage = isError;
+      _showTopMessage = true;
+    });
+
+    Future.delayed(const Duration(seconds: 3), () {
+      if (!mounted) return;
+      setState(() {
+        _showTopMessage = false;
+      });
+    });
   }
 
   bool _isValidTimeRange() {
@@ -148,15 +167,6 @@ class _ManagerOvertimeCreateState extends State<ManagerOvertimeCreate> {
     } catch (_) {
       return true;
     }
-  }
-
-  void showMessage(String message, bool error) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: error ? Colors.red : Colors.green,
-      ),
-    );
   }
 
   Future<void> pickDate() async {
@@ -227,191 +237,214 @@ class _ManagerOvertimeCreateState extends State<ManagerOvertimeCreate> {
         ),
         title: const Text("Create Overtime Request"),
       ),
-      body: loadingUsers
-          ? const Center(child: RotatingFlower())
-          : Form(
-              key: _formKey,
-              child: ListView(
-                padding: const EdgeInsets.all(16),
-                children: [
-                  CustomFormWidgets.label(context, 'Staff'),
-                  const SizedBox(height: 5),
-                  TextFormField(
-                    controller: _nameController,
-                    style: Theme.of(context).textTheme.headlineLarge,
-                    decoration: _inputDecoration(
-                      "Select employee",
-                      Icons.person,
-                      suffix: Icons.keyboard_arrow_down,
-                    ),
-                    onChanged: (value) {
-                      setState(() {
-                        selectedUid = null;
-                        selectedDept = null;
-                        _deptController.clear();
-
-                        showEmployeeList = true;
-
-                        filteredUsers = users.where((user) {
-                          return user.name.toLowerCase().contains(
-                            value.toLowerCase(),
-                          );
-                        }).toList();
-                      });
-                    },
-                    validator: (value) {
-                      if (selectedUid == null) {
-                        return "Select employee";
-                      }
-                      return null;
-                    },
-                  ),
-
-                  if (showEmployeeList)
-                    Container(
-                      constraints: const BoxConstraints(maxHeight: 220),
-                      margin: const EdgeInsets.only(top: 5),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.grey.shade300),
+      body: Stack(
+        children: [
+          loadingUsers
+              ? const Center(child: RotatingFlower())
+              : Form(
+                key: _formKey,
+                child: ListView(
+                  padding: const EdgeInsets.all(16),
+                  children: [
+                    CustomFormWidgets.label(context, 'Staff'),
+                    const SizedBox(height: 5),
+                    TextFormField(
+                      controller: _nameController,
+                      style: Theme.of(context).textTheme.headlineLarge,
+                      decoration: _inputDecoration(
+                        "Select employee",
+                        Icons.person,
+                        suffix: Icons.keyboard_arrow_down,
                       ),
-                      child: ListView.builder(
-                        shrinkWrap: true,
-                        itemCount: filteredUsers.length,
-                        itemBuilder: (context, index) {
-                          final user = filteredUsers[index];
-
-                          return ListTile(
-                            leading: const CircleAvatar(
-                              radius: 20,
-                              child: Icon(Icons.person, size: 15),
-                            ),
-                            title: Text(
-                              user.name,
-                              style: Theme.of(context).textTheme.titleSmall,
-                            ),
-                            subtitle: Text(
-                              user.department,
-                              style: Theme.of(context).textTheme.labelSmall,
-                            ),
-                            onTap: () {
-                              setState(() {
-                                selectedUid = user.userId;
-
-                                selectedDept = user.department;
-
-                                _nameController.text = user.name;
-
-                                _deptController.text = user.department;
-
-                                showEmployeeList = false;
-                              });
-                            },
-                          );
-                        },
+                      onChanged: (value) {
+                        setState(() {
+                          selectedUid = null;
+                          selectedDept = null;
+                          _deptController.clear();
+              
+                          showEmployeeList = true;
+              
+                          filteredUsers = users.where((user) {
+                            return user.name.toLowerCase().contains(
+                              value.toLowerCase(),
+                            );
+                          }).toList();
+                        });
+                      },
+                      validator: (value) {
+                        if (selectedUid == null) {
+                          return "Select employee";
+                        }
+                        return null;
+                      },
+                    ),
+              
+                    if (showEmployeeList)
+                      Container(
+                        constraints: const BoxConstraints(maxHeight: 220),
+                        margin: const EdgeInsets.only(top: 5),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.grey.shade300),
+                        ),
+                        child: ListView.builder(
+                          shrinkWrap: true,
+                          itemCount: filteredUsers.length,
+                          itemBuilder: (context, index) {
+                            final user = filteredUsers[index];
+              
+                            return ListTile(
+                              leading: const CircleAvatar(
+                                radius: 20,
+                                child: Icon(Icons.person, size: 15),
+                              ),
+                              title: Text(
+                                user.name,
+                                style: Theme.of(context).textTheme.titleSmall,
+                              ),
+                              subtitle: Text(
+                                user.department,
+                                style: Theme.of(context).textTheme.labelSmall,
+                              ),
+                              onTap: () {
+                                setState(() {
+                                  selectedUid = user.userId;
+              
+                                  selectedDept = user.department;
+              
+                                  _nameController.text = user.name;
+              
+                                  _deptController.text = user.department;
+              
+                                  showEmployeeList = false;
+                                });
+                              },
+                            );
+                          },
+                        ),
+                      ),
+              
+                    const SizedBox(height: 18),
+                    CustomFormWidgets.label(context, 'Department'),
+                    const SizedBox(height: 5),
+                    TextFormField(
+                      controller: _deptController,
+                      readOnly: true,
+                      style: Theme.of(context).textTheme.headlineLarge,
+                      decoration: _inputDecoration(
+                        "Department",
+                        Icons.business_outlined,
                       ),
                     ),
-
-                  const SizedBox(height: 18),
-                  CustomFormWidgets.label(context, 'Department'),
-                  const SizedBox(height: 5),
-                  TextFormField(
-                    controller: _deptController,
-                    readOnly: true,
-                    style: Theme.of(context).textTheme.headlineLarge,
-                    decoration: _inputDecoration(
-                      "Department",
-                      Icons.business_outlined,
+              
+                    const SizedBox(height: 18),
+              
+                    CustomFormWidgets.label(context, 'Overtime Date'),
+                    const SizedBox(height: 5),
+                    TextFormField(
+                      controller: _dateController,
+                      readOnly: true,
+                      onTap: pickDate,
+                      style: Theme.of(context).textTheme.headlineLarge,
+                      decoration: _inputDecoration(
+                        "Select date",
+                        Icons.calendar_today_outlined,
+                      ),
+                      validator: (value) => value == null || value.isEmpty
+                          ? "Select date"
+                          : null,
                     ),
-                  ),
-
-                  const SizedBox(height: 18),
-
-                  CustomFormWidgets.label(context, 'Overtime Date'),
-                  const SizedBox(height: 5),
-                  TextFormField(
-                    controller: _dateController,
-                    readOnly: true,
-                    onTap: pickDate,
-                    style: Theme.of(context).textTheme.headlineLarge,
-                    decoration: _inputDecoration(
-                      "Select date",
-                      Icons.calendar_today_outlined,
+              
+                    const SizedBox(height: 18),
+              
+                    CustomFormWidgets.label(context, 'From Time'),
+                    const SizedBox(height: 5),
+                    TextFormField(
+                      controller: _startController,
+                      readOnly: true,
+                      style: Theme.of(context).textTheme.headlineLarge,
+                      onTap: () => pickTime(_startController),
+                      decoration: _inputDecoration(
+                        "Select start time",
+                        Icons.schedule_outlined,
+                      ),
+                      validator: (value) => value == null || value.isEmpty
+                          ? "Select start time"
+                          : null,
                     ),
-                    validator: (value) =>
-                        value == null || value.isEmpty ? "Select date" : null,
-                  ),
-
-                  const SizedBox(height: 18),
-
-                  CustomFormWidgets.label(context, 'From Time'),
-                  const SizedBox(height: 5),
-                  TextFormField(
-                    controller: _startController,
-                    readOnly: true,
-                    style: Theme.of(context).textTheme.headlineLarge,
-                    onTap: () => pickTime(_startController),
-                    decoration: _inputDecoration(
-                      "Select start time",
-                      Icons.schedule_outlined,
+              
+                    const SizedBox(height: 18),
+              
+                    CustomFormWidgets.label(context, 'To Time'),
+              
+                    TextFormField(
+                      controller: _endController,
+                      readOnly: true,
+                      style: Theme.of(context).textTheme.headlineLarge,
+                      onTap: () => pickTime(_endController),
+                      decoration: _inputDecoration(
+                        "Select end time",
+                        Icons.schedule_outlined,
+                      ),
+                      validator: (value) => value == null || value.isEmpty
+                          ? "Select end time"
+                          : null,
                     ),
-                    validator: (value) => value == null || value.isEmpty
-                        ? "Select start time"
-                        : null,
-                  ),
-
-                  const SizedBox(height: 18),
-
-                  CustomFormWidgets.label(context, 'To Time'),
-
-                  TextFormField(
-                    controller: _endController,
-                    readOnly: true,
-                    style: Theme.of(context).textTheme.headlineLarge,
-                    onTap: () => pickTime(_endController),
-                    decoration: _inputDecoration(
-                      "Select end time",
-                      Icons.schedule_outlined,
+              
+                    const SizedBox(height: 18),
+              
+                    CustomFormWidgets.label(context, 'Reason'),
+                    const SizedBox(height: 5),
+                    TextFormField(
+                      controller: _reasonController,
+                      maxLines: 4,
+                      style: Theme.of(context).textTheme.headlineLarge,
+                      decoration: _inputDecoration(
+                        "Enter overtime reason",
+                        Icons.note_alt_outlined,
+                      ),
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) {
+                          return "Enter reason";
+                        }
+              
+                        return null;
+                      },
                     ),
-                    validator: (value) => value == null || value.isEmpty
-                        ? "Select end time"
-                        : null,
-                  ),
-
-                  const SizedBox(height: 18),
-
-                  CustomFormWidgets.label(context, 'Reason'),
-                  const SizedBox(height: 5),
-                  TextFormField(
-                    controller: _reasonController,
-                    maxLines: 4,
-                    style: Theme.of(context).textTheme.headlineLarge,
-                    decoration: _inputDecoration(
-                      "Enter overtime reason",
-                      Icons.note_alt_outlined,
+              
+                    const SizedBox(height: 28),
+              
+                    AppButton(
+                      text: "Send Request",
+                      isLoading: loading,
+                      onPressed: loading ? null : submit,
+                      color: Theme.of(context).colorScheme.secondary,
+                      txtcolor: Theme.of(context).colorScheme.onPrimary,
                     ),
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty) {
-                        return "Enter reason";
-                      }
-
-                      return null;
-                    },
-                  ),
-
-                  const SizedBox(height: 28),
-
-                  AppButton(
-                    text: "Send Request",
-                    isLoading: loading,
-                    onPressed: loading ? null : submit,
-                    color: Theme.of(context).colorScheme.secondary,
-                    txtcolor: Theme.of(context).colorScheme.onPrimary,
-                  ),
-                ],
+                  ],
+                ),
+              ),
+            if (_topMessage != null)
+            AnimatedPositioned(
+              top: _showTopMessage ? 20 : -120,
+              left: 16,
+              right: 16,
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeOut,
+              child: Msgsnackbar(
+               context,
+                message: _topMessage!,
+                isError: _isErrorMessage,
+                backgroundColor: _isErrorMessage
+                    ? Colors.red
+                    : Theme.of(context).colorScheme.onPrimary,
+                textColor: Theme.of(context).colorScheme.secondary,
+                iconColor: Theme.of(context).colorScheme.secondary,
               ),
             ),
+        ],
+      ),
     );
   }
 

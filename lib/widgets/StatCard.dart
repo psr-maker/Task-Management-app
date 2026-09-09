@@ -263,7 +263,7 @@ class _TaskCardState extends State<Taskstatus> {
       }
 
       // Staff can only edit if task is assigned to them
-      if (userRole != "2") {
+      if (userRole != "3") {
         setState(() {
           _canEditStatus = isAssignedToUser;
           _permissionChecked = true;

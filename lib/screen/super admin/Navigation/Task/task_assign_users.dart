@@ -112,7 +112,7 @@ class _AssignUsersPageState extends State<AssignUsersPage> {
         // fallback to old logic when position metadata is unavailable
         if (loginRole == "1") {
           if (user.role != "1") users.add(user);
-        } else if (loginRole == "2") {
+        } else if (loginRole == "3") {
           if (loginDepartment != null && loginDepartment!.isNotEmpty) {
             if (user.department.toLowerCase().trim() ==
                     loginDepartment!.toLowerCase().trim() &&

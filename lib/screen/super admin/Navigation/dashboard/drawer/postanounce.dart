@@ -34,7 +34,7 @@ class _PostAnnouncementPageState extends State<PostAnnouncementPage> {
   String? selectedFileName;
   final List<Map<String, String>> targetRoles = [
     {"name": "All", "value": "All"},
-    {"name": "Manager", "value": "2"},
+    {"name": "Manager", "value": "3"},
   ];
   void showTopMessage(String message, {bool isError = true}) {
     setState(() {

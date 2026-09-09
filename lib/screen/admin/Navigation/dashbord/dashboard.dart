@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:staff_work_track/Models/warning_model.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
 import 'package:staff_work_track/screen/admin/Navigation/dashbord/deptwarnings.dart';
-import 'package:staff_work_track/screen/admin/Navigation/dashbord/drawer/5spoints.dart';
 import 'package:staff_work_track/screen/admin/Navigation/dashbord/drawer/attinbhvscore/scoredisplay.dart';
 import 'package:staff_work_track/screen/admin/Navigation/dashbord/drawer/company/leavlist_hr.dart';
 import 'package:staff_work_track/screen/admin/Navigation/dashbord/drawer/company/punchclist_account.dart';
@@ -458,10 +457,10 @@ class _AdminState extends State<AdminDashboard> {
 
     final bool isAccountsManager =
         widget.department.trim() == "Accounts Department" &&
-        widget.role.toString() == "2";
+        widget.role.toString() == "3";
     final bool isHRManager =
         widget.department.trim() == "HR Department" &&
-        widget.role.toString() == "2";
+        widget.role.toString() == "3";
 
     return Drawer(
       backgroundColor: isDark

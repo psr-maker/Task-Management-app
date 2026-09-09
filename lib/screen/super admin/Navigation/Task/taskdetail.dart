@@ -139,7 +139,7 @@ class _TaskDetailsState extends State<TaskDetails> {
     }
 
     final isDirector = loginUserRole.contains("1");
-    final isManager = loginUserRole.contains("2");
+    final isManager = loginUserRole.contains("3");
 
     // ✅ Directors can always edit
     if (isDirector) {

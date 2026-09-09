@@ -223,7 +223,7 @@ class _EmployeeDetailState extends State<EmployeeDetail> {
     }
 
     final isDirector = loginUserRole.contains("1");
-    final isManager = loginUserRole.contains("2");
+    final isManager = loginUserRole.contains("3");
 
     // ✅ RULES
     final allowEditDelete = isDirector || (loginUserId == createdById);

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
+import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
 import 'package:staff_work_track/services/overtime_service.dart';
 
 class Myovertime extends StatefulWidget {
@@ -17,7 +18,9 @@ class _MyovertimeState extends State<Myovertime> {
   bool processing = false;
 
   bool hasChanged = false;
-
+  String? _topMessage;
+  bool _isErrorMessage = true;
+  bool _showTopMessage = false;
   @override
   void initState() {
     super.initState();
@@ -43,7 +46,8 @@ class _MyovertimeState extends State<Myovertime> {
       debugPrint("Load staff overtime error: $e");
 
       if (!mounted) return;
-      _showMessage("Unable to load overtime history", true);
+
+      showTopMessage("Unable to load overtime history", isError: true);
     }
   }
 
@@ -135,15 +139,19 @@ class _MyovertimeState extends State<Myovertime> {
     return "${m}m";
   }
 
-  void _showMessage(String message, bool error) {
-    if (!mounted) return;
+  void showTopMessage(String message, {bool isError = true}) {
+    setState(() {
+      _topMessage = message;
+      _isErrorMessage = isError;
+      _showTopMessage = true;
+    });
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: error ? Colors.red : Colors.green,
-      ),
-    );
+    Future.delayed(const Duration(seconds: 3), () {
+      if (!mounted) return;
+      setState(() {
+        _showTopMessage = false;
+      });
+    });
   }
 
   @override
@@ -192,6 +200,24 @@ class _MyovertimeState extends State<Myovertime> {
                     Container(
                       color: Colors.black.withOpacity(.15),
                       child: const Center(child: CircularProgressIndicator()),
+                    ),
+                  if (_topMessage != null)
+                    AnimatedPositioned(
+                      top: _showTopMessage ? 20 : -120,
+                      left: 16,
+                      right: 16,
+                      duration: const Duration(milliseconds: 300),
+                      curve: Curves.easeOut,
+                      child: Msgsnackbar(
+                        context,
+                        message: _topMessage!,
+                        isError: _isErrorMessage,
+                        backgroundColor: _isErrorMessage
+                            ? Colors.red
+                            : Theme.of(context).colorScheme.onPrimary,
+                        textColor: Theme.of(context).colorScheme.secondary,
+                        iconColor: Theme.of(context).colorScheme.secondary,
+                      ),
                     ),
                 ],
               ),
@@ -257,16 +283,15 @@ class _MyovertimeState extends State<Myovertime> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-       
             children: [
-               Text(
-                  "Overtime Request",
-                 style: Theme.of(context).textTheme.headlineLarge,
-                ),
+              Text(
+                "Overtime Request",
+                style: Theme.of(context).textTheme.headlineLarge,
+              ),
               // CIRCLE ICON
               Expanded(
                 child: Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
+                  mainAxisAlignment: MainAxisAlignment.end,
                   children: [
                     Container(
                       width: 20,
@@ -292,16 +317,13 @@ class _MyovertimeState extends State<Myovertime> {
                   fontSize: 14,
                 ),
               ),
-
-           
             ],
           ),
-              const SizedBox(height: 10),
-              Text(
-                date,
-                style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
-              ),
-         
+          const SizedBox(height: 10),
+          Text(
+            date,
+            style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+          ),
 
           const SizedBox(height: 10),
           Row(
@@ -336,10 +358,7 @@ class _MyovertimeState extends State<Myovertime> {
 
           const SizedBox(height: 10),
 
-           Text(
-            "Reason",
-           style: Theme.of(context).textTheme.headlineMedium,
-          ),
+          Text("Reason", style: Theme.of(context).textTheme.headlineMedium),
 
           const SizedBox(height: 8),
 
@@ -353,7 +372,7 @@ class _MyovertimeState extends State<Myovertime> {
 
             _buildWaitingSection(
               message: "Waiting for Your Response",
-              color: Colors.orange
+              color: Colors.orange,
             ),
           ],
           if (staffAccepted(item)) ...[
@@ -384,10 +403,7 @@ class _MyovertimeState extends State<Myovertime> {
     );
   }
 
-  Widget _buildWaitingSection({
-    required String message,
-    required Color color,
-  }) {
+  Widget _buildWaitingSection({required String message, required Color color}) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(11),
@@ -439,9 +455,7 @@ class _MyovertimeState extends State<Myovertime> {
         const SizedBox(height: 7),
 
         Text(
-          managerStatus == "Pending"
-              ? "Waiting for manager approval."
-              : "",
+          managerStatus == "Pending" ? "Waiting for manager approval." : "",
           style: TextStyle(color: Colors.grey.shade600, fontSize: 11),
         ),
       ],

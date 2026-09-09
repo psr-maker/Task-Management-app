@@ -22,12 +22,11 @@ class _StaffLeavesState extends State<StaffLeaves>
   bool _isErrorMessage = true;
   bool _showTopMessage = false;
   String activeTab =
-      "Leave"; // "Leave", "Permission", "Department Compensation"
+      "Leave"; // "Leave", "Permission"
 
   late TabController _tabController;
   final tabs = ["All", "Pending", "Approved", "Rejected"];
   final permissionTabs = ["All", "Pending", "Approved", "Rejected"];
-  final compensationTabs = ["All", "Pending", "Approved", "Rejected"];
   Set<int> expandedItems = {};
 
   @override
@@ -55,9 +54,6 @@ class _StaffLeavesState extends State<StaffLeaves>
         data = await AdminService.getDepartmentLeaves();
       } else if (activeTab == "Permission") {
         data = await AdminService.getDepartmentPermissions();
-      } else if (activeTab == "Department Compensation") {
-        final service = AdminService();
-        data = await service.getDepartmentExtraWork();
       }
 
       setState(() {
@@ -98,8 +94,6 @@ class _StaffLeavesState extends State<StaffLeaves>
       selected = tabs[_tabController.index];
     } else if (activeTab == "Permission") {
       selected = permissionTabs[_tabController.index];
-    } else if (activeTab == "Department Compensation") {
-      selected = compensationTabs[_tabController.index];
     } else {
       selected = tabs[_tabController.index];
     }
@@ -240,36 +234,6 @@ class _StaffLeavesState extends State<StaffLeaves>
                         ),
                       ),
                     ),
-                    const SizedBox(width: 5),
-                    Expanded(
-                      child: GestureDetector(
-                        onTap: () {
-                          setState(() {
-                            activeTab = "Department Compensation";
-                            _tabController.index = 0;
-                          });
-                          loadItems();
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            vertical: 5,
-                            horizontal: 10,
-                          ),
-                          decoration: BoxDecoration(
-                            color: activeTab == "Department Compensation"
-                                ? Colors.white24
-                                : Colors.transparent,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Center(
-                            child: Text(
-                              'Dept Comp.',
-                              style: Theme.of(context).textTheme.labelLarge,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
                   ],
                 ),
               ),
@@ -286,14 +250,9 @@ class _StaffLeavesState extends State<StaffLeaves>
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
                 ),
-                tabs:
-                    (activeTab == "Leave"
-                            ? tabs
-                            : activeTab == "Permission"
-                            ? permissionTabs
-                            : compensationTabs)
-                        .map((e) => Tab(text: e))
-                        .toList(),
+                tabs: (activeTab == "Leave" ? tabs : permissionTabs)
+                    .map((e) => Tab(text: e))
+                    .toList(),
               ),
             ],
           ),
@@ -306,9 +265,7 @@ class _StaffLeavesState extends State<StaffLeaves>
               child: Text(
                 activeTab == "Leave"
                     ? "No Leave Found"
-                    : activeTab == "Permission"
-                    ? "No Permission Found"
-                    : "No Compensation Found",
+                    : "No Permission Found"
               ),
             )
           : Stack(
@@ -357,7 +314,6 @@ class _StaffLeavesState extends State<StaffLeaves>
 
   Widget buildItem(dynamic e, int index) {
     final isPermission = activeTab == "Permission";
-    final isCompensation = activeTab == "Department Compensation";
     final status = (e["status"] ?? "").toString().toLowerCase();
     final isExpanded = expandedItems.contains(index);
 
@@ -396,23 +352,12 @@ class _StaffLeavesState extends State<StaffLeaves>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          isCompensation
-                              ? e["workType"] ?? "Work"
-                              : (e["name"] ?? ""),
+           
+               (e["name"] ?? ""),
                           style: Theme.of(context).textTheme.headlineLarge,
                         ),
                         const SizedBox(height: 4),
-                        if (isCompensation) ...[
-                          Text(
-                            formatDate(e["workedDate"]),
-                            style: Theme.of(context).textTheme.labelMedium,
-                          ),
-                          const SizedBox(height: 5),
-                          Text(
-                            "${formatTime(e["startTime"])} - ${formatTime(e["endTime"])}",
-                            style: Theme.of(context).textTheme.headlineMedium,
-                          ),
-                        ] else if (isPermission) ...[
+                        if (isPermission) ...[
                           Text(
                             formatDate(e["date"] ?? e["fromDate"]),
                             style: Theme.of(context).textTheme.labelMedium,
@@ -470,54 +415,7 @@ class _StaffLeavesState extends State<StaffLeaves>
               child: Column(
                 children: [
                   Divider(color: Colors.grey.shade200),
-                  if (isCompensation) ...[
-                    infoRow("Staff Name", e["staffName"] ?? "-"),
-                    infoRow("Work Type", e["workType"]),
-                    infoRow("Date", formatDate(e["workedDate"])),
-                    infoRow("From Time", formatTime(e["startTime"])),
-                    infoRow("To Time", formatTime(e["endTime"])),
-                    infoRow("Reason", e["reason"]),
-                    if (e["remarks"] != null &&
-                        e["remarks"].toString().isNotEmpty)
-                      infoRow("Remarks", e["remarks"]),
-                    if (status == "pending")
-                      Padding(
-                        padding: const EdgeInsets.only(top: 12),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: AppButton(
-                                text: "Approve",
-                                isLoading: _isLoading,
-                                onPressed: () => _handleCompensationStatus(
-                                  e["id"],
-                                  "approved",
-                                ),
-                                color: Theme.of(context).colorScheme.secondary,
-                                txtcolor: Theme.of(
-                                  context,
-                                ).colorScheme.onPrimary,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: AppButton(
-                                text: "Reject",
-                                isLoading: _isLoading,
-                                onPressed: () => _handleCompensationStatus(
-                                  e["id"],
-                                  "rejected",
-                                ),
-                                color: Theme.of(context).colorScheme.error,
-                                txtcolor: Theme.of(
-                                  context,
-                                ).colorScheme.onPrimary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                  ] else if (isPermission) ...[
+                if (isPermission) ...[
                     infoRow("Name", e["name"]),
                     infoRow("Date", formatDate(e["date"] ?? e["fromDate"])),
                     infoRow("From Time", formatTime(e["fromTime"])),
@@ -763,27 +661,4 @@ class _StaffLeavesState extends State<StaffLeaves>
     );
   }
 
-  Future<void> _handleCompensationStatus(int id, String status) async {
-    try {
-      setState(() => _isLoading = true);
-
-      final service = AdminService();
-      await service.updateExtraWorkStatus(
-        id: id,
-        status: status,
-        remarks: null,
-      );
-
-      showTopMessage(
-        "Compensation ${status == 'approved' ? 'approved' : 'rejected'} successfully",
-        isError: false,
-      );
-
-      await loadItems();
-    } catch (e) {
-      showTopMessage("Error: ${e.toString()}", isError: true);
-    } finally {
-      setState(() => _isLoading = false);
-    }
-  }
 }

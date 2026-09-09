@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:staff_work_track/core/widgets/buttons.dart';
+import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
 import 'package:staff_work_track/services/admin_service.dart';
 import 'package:staff_work_track/services/overtime_service.dart';
 import 'package:staff_work_track/widgets/customfieldwidget.dart';
@@ -28,7 +29,9 @@ class _CreateExtraWorkPageState extends State<CreateExtraWorkPage> {
 
   TimeOfDay? startTime;
   TimeOfDay? endTime;
-
+  String? _topMessage;
+  bool _isErrorMessage = true;
+  bool _showTopMessage = false;
   String? selectedWorkType;
 
   List<dynamic> staffList = [];
@@ -76,7 +79,7 @@ class _CreateExtraWorkPageState extends State<CreateExtraWorkPage> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
 
-        _showMessage('Failed to load staff: ${e.toString()}');
+        showTopMessage("Failed to load staff: ${e.toString()}", isError: true);
       });
     } finally {
       if (!mounted) return;
@@ -105,7 +108,7 @@ class _CreateExtraWorkPageState extends State<CreateExtraWorkPage> {
     } catch (e) {
       if (!mounted) return;
 
-      _showMessage('Failed to load tasks: ${e.toString()}');
+      showTopMessage("Failed to load tasks: ${e.toString()}", isError: true);
     } finally {
       if (mounted) {
         setState(() {
@@ -228,31 +231,31 @@ class _CreateExtraWorkPageState extends State<CreateExtraWorkPage> {
     }
 
     if (selectedStaffId == null) {
-      _showMessage('Please select staff');
+      showTopMessage("Please select task", isError: true);
       return;
     }
     if (selectedTaskCode == null) {
-      _showMessage('Please select task');
+      showTopMessage("Please select task", isError: true);
       return;
     }
 
     if (selectedDate == null) {
-      _showMessage('Please select work date');
+      showTopMessage("'Please select work date", isError: true);
       return;
     }
 
     if (selectedWorkType == null) {
-      _showMessage('Please select work type');
+      showTopMessage("Please select work type", isError: true);
       return;
     }
 
     if (startTime == null) {
-      _showMessage('Please select start time');
+      showTopMessage("Please select start time", isError: true);
       return;
     }
 
     if (endTime == null) {
-      _showMessage('Please select end time');
+      showTopMessage("Please select end time", isError: true);
       return;
     }
 
@@ -261,14 +264,14 @@ class _CreateExtraWorkPageState extends State<CreateExtraWorkPage> {
     final endMinutes = endTime!.hour * 60 + endTime!.minute;
 
     if (endMinutes <= startMinutes) {
-      _showMessage('End time must be after start time');
+      showTopMessage("End time must be after start time", isError: true);
       return;
     }
 
     final expectedHours = double.tryParse(expectedHoursController.text);
 
     if (expectedHours == null || expectedHours <= 0) {
-      _showMessage('Expected hours could not be calculated');
+      showTopMessage('Expected hours could not be calculated', isError: true);
       return;
     }
 
@@ -299,18 +302,15 @@ class _CreateExtraWorkPageState extends State<CreateExtraWorkPage> {
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Extra work request sent successfully'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-
+      showTopMessage("Compensation request sent successfully", isError: false);
       Navigator.pop(context, true);
     } catch (e) {
       if (!mounted) return;
 
-      _showMessage(e.toString().replaceFirst('Exception: ', ''));
+      showTopMessage(
+        e.toString().replaceFirst('Exception: ', ''),
+        isError: true,
+      );
     } finally {
       if (mounted) {
         setState(() {
@@ -320,10 +320,19 @@ class _CreateExtraWorkPageState extends State<CreateExtraWorkPage> {
     }
   }
 
-  void _showMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
-    );
+  void showTopMessage(String message, {bool isError = true}) {
+    setState(() {
+      _topMessage = message;
+      _isErrorMessage = isError;
+      _showTopMessage = true;
+    });
+
+    Future.delayed(const Duration(seconds: 3), () {
+      if (!mounted) return;
+      setState(() {
+        _showTopMessage = false;
+      });
+    });
   }
 
   @override
@@ -336,262 +345,289 @@ class _CreateExtraWorkPageState extends State<CreateExtraWorkPage> {
           icon: const Icon(Icons.arrow_back_ios),
         ),
       ),
-      body: Form(
-        key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.all(20),
-          children: [
-            CustomFormWidgets.label(context, 'Staff'),
+      body: Stack(
+        children: [
+          Form(
+            key: _formKey,
+            child: ListView(
+              padding: const EdgeInsets.all(20),
+              children: [
+                CustomFormWidgets.label(context, 'Staff'),
 
-            const SizedBox(height: 8),
+                const SizedBox(height: 8),
 
-            _dropdownContainer(
-              child: DropdownButtonFormField<int>(
-                value: selectedStaffId,
-                isExpanded: true,
-                decoration: _inputDecoration(
-                  'Select Staff',
-                  Icons.person_outline_rounded,
-                ),
-                style: Theme.of(context).textTheme.headlineSmall,
-                hint: Text(
-                  isLoadingStaff ? 'Loading staff...' : 'Select staff',
-                ),
-                items: staffList.map((staff) {
-                  return DropdownMenuItem<int>(
-                    value: staff.userId,
-                    child: Text(staff.name, overflow: TextOverflow.ellipsis),
-                  );
-                }).toList(),
-                onChanged: isLoadingStaff
-                    ? null
-                    : (value) {
-                        if (value == null) return;
+                _dropdownContainer(
+                  child: DropdownButtonFormField<int>(
+                    value: selectedStaffId,
+                    isExpanded: true,
+                    decoration: _inputDecoration(
+                      'Select Staff',
+                      Icons.person_outline_rounded,
+                    ),
+                    style: Theme.of(context).textTheme.headlineSmall,
+                    hint: Text(
+                      isLoadingStaff ? 'Loading staff...' : 'Select staff',
+                    ),
+                    items: staffList.map((staff) {
+                      return DropdownMenuItem<int>(
+                        value: staff.userId,
+                        child: Text(
+                          staff.name,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      );
+                    }).toList(),
+                    onChanged: isLoadingStaff
+                        ? null
+                        : (value) {
+                            if (value == null) return;
 
-                        setState(() {
-                          selectedStaffId = value;
-                          selectedTaskCode = null;
-                          taskList = [];
-                        });
+                            setState(() {
+                              selectedStaffId = value;
+                              selectedTaskCode = null;
+                              taskList = [];
+                            });
 
-                        _loadTasksForStaff(value);
-                      },
-                validator: (value) {
-                  if (value == null) {
-                    return 'Select staff';
-                  }
+                            _loadTasksForStaff(value);
+                          },
+                    validator: (value) {
+                      if (value == null) {
+                        return 'Select staff';
+                      }
 
-                  return null;
-                },
-              ),
-            ),
-
-            const SizedBox(height: 18),
-
-            CustomFormWidgets.label(context, 'Task'),
-            const SizedBox(height: 8),
-            DropdownButtonFormField<String>(
-              value: selectedTaskCode,
-              isExpanded: true,
-              decoration: _inputDecoration('Task', Icons.task_alt_outlined),
-              style: Theme.of(context).textTheme.headlineSmall,
-              hint: Text(
-                selectedStaffId == null
-                    ? 'Select staff first'
-                    : isLoadingTasks
-                    ? 'Loading tasks...'
-                    : taskList.isEmpty
-                    ? 'No tasks found'
-                    : 'Select task',
-              ),
-              items: taskList
-                  .map((task) {
-                    final taskCode = task['taskCode']?.toString();
-
-                    if (taskCode == null || taskCode.isEmpty) {
                       return null;
-                    }
+                    },
+                  ),
+                ),
 
-                    return DropdownMenuItem<String>(
-                      value: taskCode,
-                      child: Text(
-                        task['task']?.toString() ?? 'Untitled Task',
-                        style: Theme.of(context).textTheme.headlineSmall,
-                        overflow: TextOverflow.ellipsis,
+                const SizedBox(height: 18),
+
+                CustomFormWidgets.label(context, 'Task'),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<String>(
+                  value: selectedTaskCode,
+                  isExpanded: true,
+                  decoration: _inputDecoration('Task', Icons.task_alt_outlined),
+                  style: Theme.of(context).textTheme.headlineSmall,
+                  hint: Text(
+                    selectedStaffId == null
+                        ? 'Select staff first'
+                        : isLoadingTasks
+                        ? 'Loading tasks...'
+                        : taskList.isEmpty
+                        ? 'No tasks found'
+                        : 'Select task',
+                  ),
+                  items: taskList
+                      .map((task) {
+                        final taskCode = task['taskCode']?.toString();
+
+                        if (taskCode == null || taskCode.isEmpty) {
+                          return null;
+                        }
+
+                        return DropdownMenuItem<String>(
+                          value: taskCode,
+                          child: Text(
+                            task['task']?.toString() ?? 'Untitled Task',
+                            style: Theme.of(context).textTheme.headlineSmall,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        );
+                      })
+                      .whereType<DropdownMenuItem<String>>()
+                      .toList(),
+                  onChanged:
+                      selectedStaffId == null ||
+                          isLoadingTasks ||
+                          taskList.isEmpty
+                      ? null
+                      : (value) {
+                          setState(() {
+                            selectedTaskCode = value;
+                          });
+                        },
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Select task';
+                    }
+                    return null;
+                  },
+                ),
+
+                const SizedBox(height: 18),
+
+                CustomFormWidgets.label(context, 'Work Date'),
+
+                const SizedBox(height: 8),
+
+                _dateField(),
+
+                const SizedBox(height: 18),
+
+                CustomFormWidgets.label(context, 'Work Type'),
+
+                const SizedBox(height: 8),
+
+                _dropdownContainer(
+                  child: DropdownButtonFormField<String>(
+                    value: selectedWorkType,
+                    isExpanded: true,
+                    decoration: _inputDecoration(
+                      'Select Work Type',
+                      Icons.work_history_outlined,
+                    ),
+                    style: Theme.of(context).textTheme.headlineSmall,
+                    hint: const Text('Select work type'),
+                    items: [
+                      DropdownMenuItem(
+                        value: 'WeeklyOff',
+                        child: Text(
+                          'Weekly Off',
+                          style: Theme.of(context).textTheme.headlineSmall,
+                        ),
                       ),
-                    );
-                  })
-                  .whereType<DropdownMenuItem<String>>()
-                  .toList(),
-              onChanged:
-                  selectedStaffId == null || isLoadingTasks || taskList.isEmpty
-                  ? null
-                  : (value) {
+                      DropdownMenuItem(
+                        value: 'PublicHoliday',
+                        child: Text(
+                          'Public Holiday',
+                          style: Theme.of(context).textTheme.headlineSmall,
+                        ),
+                      ),
+                      DropdownMenuItem(
+                        value: 'CompanyHoliday',
+                        child: Text(
+                          'Company Holiday',
+                          style: Theme.of(context).textTheme.headlineSmall,
+                        ),
+                      ),
+                      DropdownMenuItem(
+                        value: 'Other',
+                        child: Text(
+                          'Other',
+                          style: Theme.of(context).textTheme.headlineSmall,
+                        ),
+                      ),
+                    ],
+                    onChanged: (value) {
                       setState(() {
-                        selectedTaskCode = value;
+                        selectedWorkType = value;
                       });
                     },
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Select task';
-                }
-                return null;
-              },
-            ),
+                    validator: (value) {
+                      if (value == null) {
+                        return 'Select work type';
+                      }
 
-            const SizedBox(height: 18),
-
-            CustomFormWidgets.label(context, 'Work Date'),
-
-            const SizedBox(height: 8),
-
-            _dateField(),
-
-            const SizedBox(height: 18),
-
-            CustomFormWidgets.label(context, 'Work Type'),
-
-            const SizedBox(height: 8),
-
-            _dropdownContainer(
-              child: DropdownButtonFormField<String>(
-                value: selectedWorkType,
-                isExpanded: true,
-                decoration: _inputDecoration(
-                  'Select Work Type',
-                  Icons.work_history_outlined,
-                ),
-                style: Theme.of(context).textTheme.headlineSmall,
-                hint: const Text('Select work type'),
-                items: [
-                  DropdownMenuItem(
-                    value: 'WeeklyOff',
-                    child: Text(
-                      'Weekly Off',
-                      style: Theme.of(context).textTheme.headlineSmall,
-                    ),
-                  ),
-                  DropdownMenuItem(
-                    value: 'PublicHoliday',
-                    child: Text(
-                      'Public Holiday',
-                      style: Theme.of(context).textTheme.headlineSmall,
-                    ),
-                  ),
-                  DropdownMenuItem(
-                    value: 'CompanyHoliday',
-                    child: Text(
-                      'Company Holiday',
-                      style: Theme.of(context).textTheme.headlineSmall,
-                    ),
-                  ),
-                  DropdownMenuItem(
-                    value: 'Other',
-                    child: Text(
-                      'Other',
-                      style: Theme.of(context).textTheme.headlineSmall,
-                    ),
-                  ),
-                ],
-                onChanged: (value) {
-                  setState(() {
-                    selectedWorkType = value;
-                  });
-                },
-                validator: (value) {
-                  if (value == null) {
-                    return 'Select work type';
-                  }
-
-                  return null;
-                },
-              ),
-            ),
-
-            const SizedBox(height: 18),
-
-            CustomFormWidgets.label(context, 'Work Time'),
-
-            const SizedBox(height: 8),
-
-            Row(
-              children: [
-                Expanded(
-                  child: _timeField(
-                    label: 'Start Time',
-                    icon: Icons.login_rounded,
-                    time: startTime,
-                    onTap: _selectStartTime,
+                      return null;
+                    },
                   ),
                 ),
 
-                const SizedBox(width: 12),
+                const SizedBox(height: 18),
 
-                Expanded(
-                  child: _timeField(
-                    label: 'End Time',
-                    icon: Icons.logout_rounded,
-                    time: endTime,
-                    onTap: _selectEndTime,
+                CustomFormWidgets.label(context, 'Work Time'),
+
+                const SizedBox(height: 8),
+
+                Row(
+                  children: [
+                    Expanded(
+                      child: _timeField(
+                        label: 'Start Time',
+                        icon: Icons.login_rounded,
+                        time: startTime,
+                        onTap: _selectStartTime,
+                      ),
+                    ),
+
+                    const SizedBox(width: 12),
+
+                    Expanded(
+                      child: _timeField(
+                        label: 'End Time',
+                        icon: Icons.logout_rounded,
+                        time: endTime,
+                        onTap: _selectEndTime,
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 18),
+
+                CustomFormWidgets.label(context, 'Expected Hours'),
+
+                const SizedBox(height: 8),
+                TextFormField(
+                  controller: expectedHoursController,
+                  readOnly: true,
+                  decoration: _inputDecoration(
+                    'Expected Hours',
+                    Icons.timer_outlined,
                   ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Select start and end time';
+                    }
+
+                    return null;
+                  },
+                ),
+
+                const SizedBox(height: 18),
+
+                CustomFormWidgets.label(context, 'Reason'),
+
+                const SizedBox(height: 8),
+
+                TextFormField(
+                  controller: reasonController,
+                  maxLines: 4,
+                  decoration: _inputDecoration(
+                    'Enter reason',
+                    Icons.notes_rounded,
+                  ).copyWith(alignLabelWithHint: true),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Enter reason';
+                    }
+
+                    return null;
+                  },
+                ),
+
+                const SizedBox(height: 28),
+
+                AppButton(
+                  text: 'Send Request',
+                  isLoading: isSubmitting,
+                  onPressed: isSubmitting ? null : _submit,
+                  color: Theme.of(context).colorScheme.secondary,
+                  txtcolor: Theme.of(context).colorScheme.onPrimary,
                 ),
               ],
             ),
-
-            const SizedBox(height: 18),
-
-            CustomFormWidgets.label(context, 'Expected Hours'),
-
-            const SizedBox(height: 8),
-            TextFormField(
-              controller: expectedHoursController,
-              readOnly: true,
-              decoration: _inputDecoration(
-                'Expected Hours',
-                Icons.timer_outlined,
+          ),
+          if (_topMessage != null)
+            AnimatedPositioned(
+              top: _showTopMessage ? 20 : -120,
+              left: 16,
+              right: 16,
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeOut,
+              child: Msgsnackbar(
+                context,
+                message: _topMessage!,
+                isError: _isErrorMessage,
+                backgroundColor: _isErrorMessage
+                    ? Colors.red
+                    : Theme.of(context).colorScheme.onPrimary,
+                textColor: Theme.of(context).colorScheme.secondary,
+                iconColor: Theme.of(context).colorScheme.secondary,
               ),
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Select start and end time';
-                }
-
-                return null;
-              },
             ),
-
-            const SizedBox(height: 18),
-
-            CustomFormWidgets.label(context, 'Reason'),
-
-            const SizedBox(height: 8),
-
-            TextFormField(
-              controller: reasonController,
-              maxLines: 4,
-              decoration: _inputDecoration(
-                'Enter reason',
-                Icons.notes_rounded,
-              ).copyWith(alignLabelWithHint: true),
-              validator: (value) {
-                if (value == null || value.trim().isEmpty) {
-                  return 'Enter reason';
-                }
-
-                return null;
-              },
-            ),
-
-            const SizedBox(height: 28),
-
-            AppButton(
-              text: 'Send Request',
-              isLoading: isSubmitting,
-              onPressed: isSubmitting ? null : _submit,
-              color: Theme.of(context).colorScheme.secondary,
-              txtcolor: Theme.of(context).colorScheme.onPrimary,
-            ),
-          ],
-        ),
+        ],
       ),
     );
   }

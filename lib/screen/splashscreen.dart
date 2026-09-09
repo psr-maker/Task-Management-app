@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:staff_work_track/core/widgets/buttons.dart';
 import 'package:staff_work_track/screen/super%20admin/fives/create_fives.dart';
 import 'package:staff_work_track/services/version_service.dart';
+import 'package:staff_work_track/core/constant/division_config.dart';
 import 'package:staff_work_track/utils/jwt_helper.dart';
 import 'package:staff_work_track/screen/admin/admin.dart';
 import 'package:staff_work_track/screen/authen/login_selection.dart';
+import 'package:staff_work_track/screen/division_head/division_head.dart';
 import 'package:staff_work_track/screen/staff/staff.dart';
 import 'package:staff_work_track/screen/super%20admin/superadmin.dart';
 import 'package:staff_work_track/services/auth_service.dart';
@@ -75,13 +77,13 @@ class _SplashScreenState extends State<SplashScreen>
 
     if (role == "1") {
       _go(const SuperAdmin());
-    } else if (role == "2") {
+    } else if (role == "3") {
       _go(const Admin());
-    } 
-    else if (role == "50") {
+    } else if (AppRoles.isDivisionHead(role)) {
+      _go(const DivisionHead());
+    } else if (role == "50") {
       _go(const FiveSpoints());
-    }
-    else {
+    } else {
       _go(const Staff());
     }
   }

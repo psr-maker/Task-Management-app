@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:staff_work_track/core/widgets/buttons.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
+import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
 import 'package:staff_work_track/screen/staff/navigation/dashboard/drawer/ovtme/overtimes_details.dart';
 import 'package:staff_work_track/services/overtime_service.dart';
 
@@ -20,7 +21,9 @@ class _OvertimeListtttState extends State<OvertimeListttt> {
 
   DateTime? fromDate;
   DateTime? toDate;
-
+  String? _topMessage;
+  bool _isErrorMessage = true;
+  bool _showTopMessage = false;
   @override
   void initState() {
     super.initState();
@@ -87,7 +90,10 @@ class _OvertimeListtttState extends State<OvertimeListttt> {
         loading = false;
       });
 
-      showError(e.toString().replaceFirst("Exception: ", ""));
+      showTopMessage(
+        e.toString().replaceFirst("Exception: ", ""),
+        isError: true,
+      );
     }
   }
 
@@ -189,7 +195,7 @@ class _OvertimeListtttState extends State<OvertimeListttt> {
     final overtimeId = int.tryParse(item["id"].toString());
 
     if (overtimeId == null) {
-      showError("Invalid overtime ID");
+      showTopMessage("Invalid overtime ID", isError: true);
       return;
     }
 
@@ -232,7 +238,7 @@ class _OvertimeListtttState extends State<OvertimeListttt> {
     final overtimeId = int.tryParse(item["id"].toString());
 
     if (overtimeId == null) {
-      showError("Invalid overtime ID");
+      showTopMessage("Invalid overtime ID", isError: true);
       return;
     }
 
@@ -281,10 +287,7 @@ class _OvertimeListtttState extends State<OvertimeListttt> {
                 final reason = reasonController.text.trim();
 
                 if (reason.isEmpty) {
-                  ScaffoldMessenger.of(dialogContext).showSnackBar(
-                    const SnackBar(content: Text("Please enter a reason")),
-                  );
-
+                  showTopMessage("Please enter a reason", isError: true);
                   return;
                 }
 
@@ -333,29 +336,33 @@ class _OvertimeListtttState extends State<OvertimeListttt> {
           response["success"] == true || response["success"] == "true";
 
       if (success) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              status == "Accepted"
-                  ? "Overtime accepted successfully"
-                  : "Overtime rejected successfully",
-            ),
-          ),
-        );
+        // Remove accepted/rejected request from current list
+        setState(() {
+          allData.removeWhere(
+            (item) => int.tryParse(item["id"].toString()) == overtimeId,
+          );
 
-        // Reload the list.
-        //
-        // After accepting/rejecting:
-        // staffStatus will no longer be Pending,
-        // so the overtime automatically disappears.
-        await loadData();
+          filteredData.removeWhere(
+            (item) => int.tryParse(item["id"].toString()) == overtimeId,
+          );
+
+          loading = false;
+        });
+
+        showTopMessage(
+          status == "Accepted"
+              ? "Overtime accepted successfully"
+              : "Overtime rejected successfully",
+          isError: false,
+        );
       } else {
         setState(() {
           loading = false;
         });
 
-        showError(
+        showTopMessage(
           response["message"]?.toString() ?? "Unable to update overtime",
+          isError: false,
         );
       }
     } catch (e) {
@@ -367,16 +374,26 @@ class _OvertimeListtttState extends State<OvertimeListttt> {
         loading = false;
       });
 
-      showError(e.toString().replaceFirst("Exception: ", ""));
+      showTopMessage(
+        e.toString().replaceFirst("Exception: ", ""),
+        isError: true,
+      );
     }
   }
 
-  void showError(String message) {
-    if (!mounted) return;
+  void showTopMessage(String message, {bool isError = true}) {
+    setState(() {
+      _topMessage = message;
+      _isErrorMessage = isError;
+      _showTopMessage = true;
+    });
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(backgroundColor: Colors.red, content: Text(message)),
-    );
+    Future.delayed(const Duration(seconds: 3), () {
+      if (!mounted) return;
+      setState(() {
+        _showTopMessage = false;
+      });
+    });
   }
 
   @override
@@ -419,18 +436,40 @@ class _OvertimeListtttState extends State<OvertimeListttt> {
         ],
       ),
 
-      body: loading
-          ? const Center(child: RotatingFlower())
-          : RefreshIndicator(
-              onRefresh: loadData,
-              child: filteredData.isEmpty
-                  ? _buildEmptyState()
-                  : ListView(
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      padding: const EdgeInsets.only(top: 8, bottom: 30),
-                      children: _buildGroupedData(),
-                    ),
+      body: Stack(
+        children: [
+          loading
+              ? const Center(child: RotatingFlower())
+              : RefreshIndicator(
+                  onRefresh: loadData,
+                  child: filteredData.isEmpty
+                      ? _buildEmptyState()
+                      : ListView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          padding: const EdgeInsets.only(top: 8, bottom: 30),
+                          children: _buildGroupedData(),
+                        ),
+                ),
+          if (_topMessage != null)
+            AnimatedPositioned(
+              top: _showTopMessage ? 20 : -120,
+              left: 16,
+              right: 16,
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeOut,
+              child: Msgsnackbar(
+                context,
+                message: _topMessage!,
+                isError: _isErrorMessage,
+                backgroundColor: _isErrorMessage
+                    ? Colors.red
+                    : Theme.of(context).colorScheme.onPrimary,
+                textColor: Theme.of(context).colorScheme.secondary,
+                iconColor: Theme.of(context).colorScheme.secondary,
+              ),
             ),
+        ],
+      ),
     );
   }
 

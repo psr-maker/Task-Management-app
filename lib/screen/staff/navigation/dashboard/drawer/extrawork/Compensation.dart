@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import 'package:staff_work_track/core/widgets/loading.dart';
+import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
 import 'package:staff_work_track/services/overtime_service.dart';
 
 class MyExtraWorkPage extends StatefulWidget {
@@ -22,7 +23,9 @@ class _MyExtraWorkPageState extends State<MyExtraWorkPage>
   late TabController _tabController;
 
   final List<String> tabs = ['All', 'Pending', 'Approved', 'Rejected'];
-
+  String? _topMessage;
+  bool _isErrorMessage = true;
+  bool _showTopMessage = false;
   @override
   void initState() {
     super.initState();
@@ -50,12 +53,6 @@ class _MyExtraWorkPageState extends State<MyExtraWorkPage>
     try {
       final result = await OvertimeService.getMyExtraWork();
 
-      debugPrint('==========================================');
-      debugPrint('MY EXTRA WORK RESULT');
-      debugPrint('Count: ${result.length}');
-      debugPrint('Data: $result');
-      debugPrint('==========================================');
-
       if (!mounted) return;
 
       setState(() {
@@ -68,7 +65,10 @@ class _MyExtraWorkPageState extends State<MyExtraWorkPage>
 
       if (!mounted) return;
 
-      _showMessage(e.toString().replaceFirst('Exception: ', ''), isError: true);
+      showTopMessage(
+        e.toString().replaceFirst('Exception: ', ''),
+        isError: true,
+      );
     } finally {
       if (!mounted) return;
 
@@ -127,7 +127,7 @@ class _MyExtraWorkPageState extends State<MyExtraWorkPage>
     final id = _getId(work);
 
     if (id == null) {
-      _showMessage('Invalid extra work ID.', isError: true);
+      showTopMessage("Invalid extra work ID.", isError: true);
       return;
     }
 
@@ -144,13 +144,16 @@ class _MyExtraWorkPageState extends State<MyExtraWorkPage>
 
       if (!mounted) return;
 
-      _showMessage('Extra work accepted successfully.');
+      showTopMessage('Compensation accepted successfully.', isError: false);
 
       await _loadExtraWork();
     } catch (e) {
       if (!mounted) return;
 
-      _showMessage(e.toString().replaceFirst('Exception: ', ''), isError: true);
+      showTopMessage(
+        e.toString().replaceFirst('Exception: ', ''),
+        isError: true,
+      );
     } finally {
       if (!mounted) return;
 
@@ -164,7 +167,7 @@ class _MyExtraWorkPageState extends State<MyExtraWorkPage>
     final id = _getId(work);
 
     if (id == null) {
-      _showMessage('Invalid extra work ID.', isError: true);
+      showTopMessage("Invalid extra work ID.',", isError: true);
       return;
     }
 
@@ -196,13 +199,15 @@ class _MyExtraWorkPageState extends State<MyExtraWorkPage>
 
       if (!mounted) return;
 
-      _showMessage('Extra work rejected successfully.');
-
+      showTopMessage("Extra work rejected successfully", isError: true);
       await _loadExtraWork();
     } catch (e) {
       if (!mounted) return;
 
-      _showMessage(e.toString().replaceFirst('Exception: ', ''), isError: true);
+      showTopMessage(
+        e.toString().replaceFirst('Exception: ', ''),
+        isError: true,
+      );
     } finally {
       if (!mounted) return;
 
@@ -316,18 +321,19 @@ class _MyExtraWorkPageState extends State<MyExtraWorkPage>
     }
   }
 
-  void _showMessage(String message, {bool isError = false}) {
-    if (!mounted) return;
+  void showTopMessage(String message, {bool isError = true}) {
+    setState(() {
+      _topMessage = message;
+      _isErrorMessage = isError;
+      _showTopMessage = true;
+    });
 
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(message),
-          backgroundColor: isError ? Colors.redAccent : Colors.green,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+    Future.delayed(const Duration(seconds: 3), () {
+      if (!mounted) return;
+      setState(() {
+        _showTopMessage = false;
+      });
+    });
   }
 
   @override
@@ -337,34 +343,56 @@ class _MyExtraWorkPageState extends State<MyExtraWorkPage>
     return Scaffold(
       appBar: AppBar(
         title: const Text('Compensation Work'),
-   leading: IconButton(
+        leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios),
           onPressed: () {
             Navigator.pop(context);
           },
         ),
-      
+
         bottom: TabBar(
           controller: _tabController,
-          isScrollable: true,
+
           indicatorColor: secondaryColor,
-         labelColor: Theme.of(context).colorScheme.onPrimary,
-              unselectedLabelColor: Colors.white54,
+          labelColor: Theme.of(context).colorScheme.onPrimary,
+          unselectedLabelColor: Colors.white54,
           tabs: tabs.map((tab) {
             return Tab(text: tab);
           }).toList(),
         ),
       ),
 
-      body: isLoading
-          ? const Center(child: RotatingFlower())
-          : TabBarView(
-              controller: _tabController,
+      body: Stack(
+        children: [
+          isLoading
+              ? const Center(child: RotatingFlower())
+              : TabBarView(
+                  controller: _tabController,
 
-              children: tabs.map((filter) {
-                return _buildTabContent(filter);
-              }).toList(),
+                  children: tabs.map((filter) {
+                    return _buildTabContent(filter);
+                  }).toList(),
+                ),
+          if (_topMessage != null)
+            AnimatedPositioned(
+              top: _showTopMessage ? 20 : -120,
+              left: 16,
+              right: 16,
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeOut,
+              child: Msgsnackbar(
+                context,
+                message: _topMessage!,
+                isError: _isErrorMessage,
+                backgroundColor: _isErrorMessage
+                    ? Colors.red
+                    : Theme.of(context).colorScheme.onPrimary,
+                textColor: Theme.of(context).colorScheme.secondary,
+                iconColor: Theme.of(context).colorScheme.secondary,
+              ),
             ),
+        ],
+      ),
     );
   }
 
@@ -469,7 +497,7 @@ class _MyExtraWorkPageState extends State<MyExtraWorkPage>
                             ? 'Extra Work'
                             : workType,
 
-                       style: Theme.of(context).textTheme.headlineLarge,
+                        style: Theme.of(context).textTheme.headlineLarge,
                       ),
 
                       const SizedBox(height: 5),
@@ -527,7 +555,7 @@ class _MyExtraWorkPageState extends State<MyExtraWorkPage>
 
             const SizedBox(height: 14),
 
-             Text('Reason', style: Theme.of(context).textTheme.headlineLarge),
+            Text('Reason', style: Theme.of(context).textTheme.headlineLarge),
 
             const SizedBox(height: 5),
 
@@ -703,8 +731,7 @@ class _MyExtraWorkPageState extends State<MyExtraWorkPage>
       crossAxisAlignment: CrossAxisAlignment.center,
 
       children: [
-          Icon(icon, size: 15, color: Colors.black54),
-
+        Icon(icon, size: 15, color: Colors.black54),
 
         const SizedBox(width: 10),
 
@@ -743,7 +770,7 @@ class _MyExtraWorkPageState extends State<MyExtraWorkPage>
         color: Colors.red.withOpacity(0.05),
         borderRadius: BorderRadius.circular(12),
 
-        border: Border.all( color: Colors.red),
+        border: Border.all(color: Colors.red),
       ),
 
       child: Column(

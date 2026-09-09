@@ -46,7 +46,7 @@ class _EmployeeListState extends State<EmployeeList> {
     final role = JwtHelper.getRole(token);
 
     setState(() {
-      isAdmin = role == "2";
+      isAdmin = role == "3";
     });
   }
 

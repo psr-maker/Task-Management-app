@@ -33,12 +33,13 @@ class _AllgoalsState extends State<Allgoals> {
   Future<void> loadGoals() async {
     try {
       final data = await SuperAdminService.getGoals();
-
+      if (!mounted) return;
       setState(() {
         goals = data;
         isLoading = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() => isLoading = false);
     }
   }

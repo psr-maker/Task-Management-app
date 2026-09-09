@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
+import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
 import 'package:staff_work_track/screen/admin/Navigation/dashbord/drawer/overtime/create_overtime.dart';
 import 'package:staff_work_track/screen/admin/Navigation/dashbord/drawer/overtime/overtime_details.dart';
 import 'package:staff_work_track/screen/admin/Navigation/dashbord/drawer/overtime/select_staff.dart';
@@ -27,6 +28,9 @@ class _ManagerOvertimeState extends State<ManagerOvertime> {
   DateTime? endDate;
 
   int? processingId;
+  String? _topMessage;
+  bool _isErrorMessage = true;
+  bool _showTopMessage = false;
 
   @override
   void initState() {
@@ -222,24 +226,15 @@ class _ManagerOvertimeState extends State<ManagerOvertime> {
     final id = int.tryParse(item["id"]?.toString() ?? "");
 
     if (id == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Invalid overtime ID"),
-          backgroundColor: Colors.red,
-        ),
-      );
-
+      showTopMessage("Invalid overtime ID", isError: true);
       return;
     }
 
     if (!_isWaitingForManager(item)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("This overtime is not ready for manager approval."),
-          backgroundColor: Colors.orange,
-        ),
+      showTopMessage(
+        "This overtime is not ready for manager approval.",
+        isError: true,
       );
-
       return;
     }
 
@@ -268,27 +263,17 @@ class _ManagerOvertimeState extends State<ManagerOvertime> {
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            approve
-                ? "Overtime approved successfully"
-                : "Overtime rejected successfully",
-          ),
-          backgroundColor: approve ? Colors.green : Colors.red,
-        ),
+      showTopMessage(
+        approve
+            ? "Overtime approved successfully"
+            : "Overtime rejected successfully",
+        isError: approve ? false : true,
       );
-
       await loadData();
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("Failed to update overtime: $e"),
-          backgroundColor: Colors.red,
-        ),
-      );
+      showTopMessage("Failed to update overtime: $e", isError: true);
     } finally {
       if (!mounted) return;
 
@@ -346,12 +331,10 @@ class _ManagerOvertimeState extends State<ManagerOvertime> {
                     final trimmedReason = reason.trim();
 
                     if (trimmedReason.isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text("Please enter rejection reason"),
-                        ),
+                      showTopMessage(
+                        "Please enter rejection reason",
+                        isError: true,
                       );
-
                       return;
                     }
 
@@ -414,6 +397,21 @@ class _ManagerOvertimeState extends State<ManagerOvertime> {
     await loadData();
   }
 
+  void showTopMessage(String message, {bool isError = true}) {
+    setState(() {
+      _topMessage = message;
+      _isErrorMessage = isError;
+      _showTopMessage = true;
+    });
+
+    Future.delayed(const Duration(seconds: 3), () {
+      if (!mounted) return;
+      setState(() {
+        _showTopMessage = false;
+      });
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -446,26 +444,48 @@ class _ManagerOvertimeState extends State<ManagerOvertime> {
         ],
       ),
 
-      body: loading
-          ? const Center(child: RotatingFlower())
-          : RefreshIndicator(
-              onRefresh: loadData,
-              child: ListView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.all(15),
-                children: [
-                  if (filteredData.isEmpty)
-                    _buildEmptyState()
-                  else
-                    ...filteredData.map(
-                      (item) => Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: _buildOvertimeCard(item),
-                      ),
-                    ),
-                ],
+      body: Stack(
+        children: [
+          loading
+              ? const Center(child: RotatingFlower())
+              : RefreshIndicator(
+                  onRefresh: loadData,
+                  child: ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.all(15),
+                    children: [
+                      if (filteredData.isEmpty)
+                        _buildEmptyState()
+                      else
+                        ...filteredData.map(
+                          (item) => Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: _buildOvertimeCard(item),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+          if (_topMessage != null)
+            AnimatedPositioned(
+              top: _showTopMessage ? 20 : -120,
+              left: 16,
+              right: 16,
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeOut,
+              child: Msgsnackbar(
+               context,
+                message: _topMessage!,
+                isError: _isErrorMessage,
+                backgroundColor: _isErrorMessage
+                    ? Colors.red
+                    : Theme.of(context).colorScheme.onPrimary,
+                textColor: Theme.of(context).colorScheme.secondary,
+                iconColor: Theme.of(context).colorScheme.secondary,
               ),
             ),
+        ],
+      ),
     );
   }
 

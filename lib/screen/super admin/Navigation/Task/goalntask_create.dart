@@ -134,39 +134,67 @@ class _CreateTaskPageState extends State<Createtask> {
     TextEditingController controller,
     bool isCreated,
   ) async {
-    DateTime initialDate = DateTime.now();
+    final today = DateTime.now();
 
     DateTime firstDate = DateTime(2000);
     DateTime lastDate = DateTime(2100);
 
-    // Always clamp to the Goal's range first when creating a Task
+    DateTime initialDate = today;
     if (isTask && goalStartDate != null && goalDueDate != null) {
-      firstDate = goalStartDate!;
-      lastDate = goalDueDate!;
-    }
+      firstDate = DateTime(
+        goalStartDate!.year,
+        goalStartDate!.month,
+        goalStartDate!.day,
+      );
 
-    if (isCreated) {
-      // Selecting TASK START DATE
-      // must stay within [goalStartDate, goalDueDate]
-      initialDate = firstDate;
-    } else {
-      // Selecting TASK DUE DATE
-      // must stay within [max(createdDate, goalStartDate), goalDueDate]
-      if (createdDate != null && createdDate!.isAfter(firstDate)) {
-        firstDate = createdDate!;
+      lastDate = DateTime(
+        goalDueDate!.year,
+        goalDueDate!.month,
+        goalDueDate!.day,
+      );
+
+      if (isCreated) {
+        // Task Start Date
+        initialDate = firstDate;
+      } else {
+        // Task Due Date
+        if (createdDate != null && createdDate!.isAfter(firstDate)) {
+          firstDate = DateTime(
+            createdDate!.year,
+            createdDate!.month,
+            createdDate!.day,
+          );
+        }
+
+        initialDate = firstDate;
       }
-      initialDate = firstDate;
     }
+    else if (isTask) {
+      // No goal selected → use today's date
+      initialDate = today;
 
-    // Clamp initialDate to both bounds so the picker never throws
-    // and always opens on a valid, selectable date
+      if (!isCreated && createdDate != null) {
+        // Due date cannot be before task start date
+        firstDate = DateTime(
+          createdDate!.year,
+          createdDate!.month,
+          createdDate!.day,
+        );
+
+        if (initialDate.isBefore(firstDate)) {
+          initialDate = firstDate;
+        }
+      }
+    }
     if (initialDate.isBefore(firstDate)) {
       initialDate = firstDate;
-    } else if (initialDate.isAfter(lastDate)) {
+    }
+
+    if (initialDate.isAfter(lastDate)) {
       initialDate = lastDate;
     }
 
-    DateTime? picked = await showDatePicker(
+    final DateTime? picked = await showDatePicker(
       context: context,
       initialDate: initialDate,
       firstDate: firstDate,
@@ -181,7 +209,7 @@ class _CreateTaskPageState extends State<Createtask> {
         if (isCreated) {
           createdDate = picked;
 
-          // If existing due date is now before the new start date, clear it
+          // If due date is before new start date, clear it
           if (dueDate != null && dueDate!.isBefore(createdDate!)) {
             dueDate = null;
             dueDateController.clear();

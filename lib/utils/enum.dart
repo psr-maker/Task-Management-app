@@ -2,6 +2,7 @@ enum UserRole {
   staff,
   admin,
   superAdmin,
+  divisionHead,
 }
 
 
