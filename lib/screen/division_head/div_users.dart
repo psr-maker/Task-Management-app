@@ -118,10 +118,23 @@ class _DivUsersState extends State<DivUsers> {
   Future<void> _onAddGoalOrTask() async {
     if (selectedEmpIds.isEmpty) return;
 
+    final employees = await employeesFuture;
+    final selectedUsers = employees
+        .where((emp) => selectedEmpIds.contains(emp.userId))
+        .toList();
+    final departments = selectedUsers
+        .map((emp) => emp.department)
+        .where((dept) => dept.trim().isNotEmpty)
+        .toSet()
+        .toList();
+
     await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => Createtask(assignedToIds: selectedEmpIds.toList()),
+        builder: (_) => Createtask(
+          assignedToIds: selectedEmpIds.toList(),
+          assignedDepartments: departments,
+        ),
       ),
     );
 

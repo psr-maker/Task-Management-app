@@ -1,7 +1,7 @@
 class AppRoles {
   static const String director = "1";
   static const String manager = "3";
-  static const String divisionHead = "8";
+  static const String divisionHead = "2";
   static const String fiveS = "50";
 
   static bool isDivisionHead(String? role) {

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:staff_work_track/services/admin_service.dart';
 import 'package:staff_work_track/services/superadmin_service.dart';
 import 'package:staff_work_track/core/widgets/buttons.dart';
 import 'package:staff_work_track/core/providers/data_refresh_provider.dart';
@@ -8,6 +9,7 @@ import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
 
 class Createtask extends StatefulWidget {
   final List<int> assignedToIds;
+  final List<String>? assignedDepartments;
   final String? initialTaskName;
   final String? initialDescription;
   final String? initialGoalCode;
@@ -23,6 +25,7 @@ class Createtask extends StatefulWidget {
   const Createtask({
     super.key,
     required this.assignedToIds,
+    this.assignedDepartments,
     this.initialTaskName,
     this.initialDescription,
     this.initialGoalCode,
@@ -384,32 +387,100 @@ class _CreateTaskPageState extends State<Createtask> {
     }
   }
 
+  Future<List<String>> _assigneeDepartments() async {
+    final provided = widget.assignedDepartments
+            ?.where((d) => d.trim().isNotEmpty)
+            .toSet()
+            .toList() ??
+        [];
+    if (provided.isNotEmpty) return provided;
+
+    final departments = <String>{};
+    for (final id in widget.assignedToIds) {
+      try {
+        final details = await SuperAdminService.getAdminDetails(id);
+        if (details.department.trim().isNotEmpty) {
+          departments.add(details.department);
+        }
+      } catch (_) {}
+    }
+    return departments.toList();
+  }
+
+  List<dynamic> _uniqueGoals(List<dynamic> goals) {
+    final seen = <String>{};
+    final unique = <dynamic>[];
+    for (final goal in goals) {
+      if (goal is! Map) continue;
+      final code = (goal['goalCode'] ?? goal['code'] ?? '').toString();
+      if (code.isEmpty || !seen.add(code)) continue;
+      unique.add(goal);
+    }
+    return unique;
+  }
+
+  Future<List<dynamic>> _loadAssigneeGoals() async {
+    final loaded = <dynamic>[];
+    final departments = await _assigneeDepartments();
+
+    if (departments.isNotEmpty) {
+      final deptGoals = await Future.wait(
+        departments.map((department) async {
+          try {
+            return await AdminService.getGoalsByDepartment(department);
+          } catch (_) {
+            return <dynamic>[];
+          }
+        }),
+      );
+      for (final list in deptGoals) {
+        loaded.addAll(list);
+      }
+    }
+
+    for (final userId in widget.assignedToIds) {
+      try {
+        loaded.addAll(await AdminService.getusergoalbyid(userId));
+      } catch (_) {}
+    }
+
+    return loaded;
+  }
+
   Future<void> loadGoals() async {
-    setState(() => isGoalLoading = true);
+    if (mounted) setState(() => isGoalLoading = true);
 
     try {
-      final response = await SuperAdminService.getGoalsname();
+      var loaded = await _loadAssigneeGoals();
 
+      if (loaded.isEmpty) {
+        try {
+          loaded = await SuperAdminService.getGoalsname();
+        } catch (_) {}
+      }
+
+      if (!mounted) return;
       setState(() {
-        goalsList = response;
+        goalsList = _uniqueGoals(loaded);
 
         if (selectedGoalCode != null && goalsList.isNotEmpty) {
-          final selectedGoal = goalsList.firstWhere(
+          final matches = goalsList.where(
             (g) => g['goalCode'].toString() == selectedGoalCode,
-            orElse: () => null,
           );
-
-          if (selectedGoal != null) {
-            goalStartDate = DateTime.parse(selectedGoal['startDate']);
-            goalDueDate = DateTime.parse(selectedGoal['dueDate']);
+          if (matches.isNotEmpty) {
+            final selectedGoal = matches.first;
+            final start = selectedGoal['startDate'];
+            final due = selectedGoal['dueDate'];
+            if (start != null) goalStartDate = DateTime.tryParse(start.toString());
+            if (due != null) goalDueDate = DateTime.tryParse(due.toString());
           }
         }
       });
     } catch (e) {
-      showTopMessage("Failed to load goals");
+      if (mounted) showTopMessage("Failed to load goals");
     }
 
-    setState(() => isGoalLoading = false);
+    if (mounted) setState(() => isGoalLoading = false);
   }
 
   @override
@@ -580,7 +651,18 @@ class _CreateTaskPageState extends State<Createtask> {
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: const Color.fromARGB(255, 25, 77, 38)),
           ),
-          child: DropdownButtonFormField<String>(
+          child: isGoalLoading
+              ? const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 12),
+                  child: Center(
+                    child: SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  ),
+                )
+              : DropdownButtonFormField<String>(
             value: selectedGoalCode,
 
             decoration: const InputDecoration(
@@ -588,7 +670,9 @@ class _CreateTaskPageState extends State<Createtask> {
               contentPadding: EdgeInsets.zero,
             ),
             hint: Text(
-              "Select Goal",
+              goalsList.isEmpty
+                  ? "No goals found for this department"
+                  : "Select Goal",
               style: Theme.of(context).textTheme.titleLarge,
             ),
             style: Theme.of(context).textTheme.titleLarge,
@@ -602,17 +686,25 @@ class _CreateTaskPageState extends State<Createtask> {
                 ),
               );
             }).toList(),
-            onChanged: (value) {
-              setState(() {
-                selectedGoalCode = value;
+            onChanged: goalsList.isEmpty
+                ? null
+                : (value) {
+                    setState(() {
+                      selectedGoalCode = value;
 
-                final selectedGoal = goalsList.firstWhere(
-                  (g) => g['goalCode'].toString() == value,
-                );
-                goalStartDate = DateTime.parse(selectedGoal['startDate']);
-                goalDueDate = DateTime.parse(selectedGoal['dueDate']);
-              });
-            },
+                      final selectedGoal = goalsList.firstWhere(
+                        (g) => g['goalCode'].toString() == value,
+                      );
+                      final start = selectedGoal['startDate'];
+                      final due = selectedGoal['dueDate'];
+                      if (start != null) {
+                        goalStartDate = DateTime.tryParse(start.toString());
+                      }
+                      if (due != null) {
+                        goalDueDate = DateTime.tryParse(due.toString());
+                      }
+                    });
+                  },
           ),
         ),
 

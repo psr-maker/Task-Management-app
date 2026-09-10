@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:staff_work_track/Models/warning_model.dart';
+import 'package:staff_work_track/core/constant/division_config.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
 import 'package:staff_work_track/screen/staff/navigation/dashboard/drawer/extrawork/Compensation.dart';
 import 'package:staff_work_track/screen/staff/navigation/dashboard/drawer/leave/leavelist.dart';
@@ -18,11 +19,13 @@ class StaffDashboard extends StatefulWidget {
   final int userid;
   final String role;
   final VoidCallback? onBackToManager;
+  final String backToLabel;
   const StaffDashboard({
     super.key,
     required this.userid,
     required this.role,
     this.onBackToManager,
+    this.backToLabel = "Back to Dashboard",
   });
 
   @override
@@ -489,6 +492,17 @@ class _StaffDashboardState extends State<StaffDashboard> {
 
           const SizedBox(height: 10),
 
+          if (widget.onBackToManager != null)
+            _buildDrawerItem(
+              context,
+              icon: Icons.dashboard_customize_rounded,
+              title: widget.backToLabel,
+              onTap: () {
+                Navigator.pop(context);
+                widget.onBackToManager!();
+              },
+            ),
+
           _buildDrawerItem(
             context,
             icon: Icons.event_available_rounded,
@@ -501,43 +515,44 @@ class _StaffDashboardState extends State<StaffDashboard> {
               );
             },
           ),
-          _buildDrawerItem(
-            context,
-            icon: Icons.event_repeat_rounded,
-            title: "Compensation Leave",
-            onTap: () {
-              Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => MyExtraWorkPage()),
-              );
-            },
-          ),
-       
-           _buildDrawerItem(
-            context,
-            icon: Icons.more_time_rounded,
-            title: "Overtime",
-            onTap: () {
-              Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => OvertimeListttt()),
-              );
-            },
-          ),
-          _buildDrawerItem(
-            context,
-            icon: Icons.edit_calendar_rounded,
-            title: "Punch Correction",
-            onTap: () {
-              Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => PunchCorrectionList()),
-              );
-            },
-          ),
+          if (!AppRoles.isDivisionHead(widget.role)) ...[
+            _buildDrawerItem(
+              context,
+              icon: Icons.event_repeat_rounded,
+              title: "Compensation Leave",
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => MyExtraWorkPage()),
+                );
+              },
+            ),
+            _buildDrawerItem(
+              context,
+              icon: Icons.more_time_rounded,
+              title: "Overtime",
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => OvertimeListttt()),
+                );
+              },
+            ),
+            _buildDrawerItem(
+              context,
+              icon: Icons.edit_calendar_rounded,
+              title: "Punch Correction",
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => PunchCorrectionList()),
+                );
+              },
+            ),
+          ],
         ],
       ),
     );

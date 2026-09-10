@@ -21,6 +21,8 @@ class DivisionHead extends StatefulWidget {
 class _DivisionHeadState extends State<DivisionHead> {
   int _currentIndex = 0;
   String department = "";
+  int userId = 0;
+  String role = "";
   bool isLoading = true;
 
   @override
@@ -38,6 +40,8 @@ class _DivisionHeadState extends State<DivisionHead> {
 
       final decodedToken = JwtDecoder.decode(token);
       final id = int.parse(decodedToken['UserId'].toString());
+      final userRole =
+          decodedToken['role'] ?? decodedToken['Role'] ?? "";
 
       String dept = JwtHelper.getDepartment(token) ?? "";
       try {
@@ -47,6 +51,8 @@ class _DivisionHeadState extends State<DivisionHead> {
 
       if (!mounted) return;
       setState(() {
+        userId = id;
+        role = userRole.toString();
         department = dept;
         isLoading = false;
       });
@@ -64,7 +70,11 @@ class _DivisionHeadState extends State<DivisionHead> {
     }
 
     final pages = [
-      DivDashboard(department: department),
+      DivDashboard(
+        department: department,
+        userId: userId,
+        role: role,
+      ),
       DivUsers(department: department),
       const Mywork(),
       const Worklog(),

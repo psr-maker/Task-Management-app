@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:staff_work_track/core/constant/apiurl.dart';
+import 'package:staff_work_track/core/constant/division_config.dart';
 import 'package:staff_work_track/core/widgets/buttons.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
 import 'package:staff_work_track/screen/staff/navigation/fullimg.dart';
@@ -23,8 +24,13 @@ class _UsersWorklogState extends State<UsersWorklog> {
   bool isSearching = false;
 
   String searchQuery = "";
-  String? selectedDepartment;
+  String selectedDepartment = "All";
   DateTime? selectedDate;
+
+  List<String> get filterDepartments =>
+      widget.allowedDepartments != null && widget.allowedDepartments!.isNotEmpty
+      ? ["All", ...widget.allowedDepartments!]
+      : ["All", ...departments];
 
   List<String> departments = [];
 
@@ -48,33 +54,65 @@ class _UsersWorklogState extends State<UsersWorklog> {
   }
 
   Future<void> fetchData() async {
-    setState(() => isLoading = true);
+    if (mounted) setState(() => isLoading = true);
     try {
-      final data = await AnnouncementService.getWorklogs();
+      List data = [];
+      try {
+        data = await AnnouncementService.getWorklogs();
+      } catch (_) {}
+
       final allowed = widget.allowedDepartments;
-      final filtered = allowed == null || allowed.isEmpty
-          ? data
-          : data.where((log) {
-              final name = (log['departmentName'] ?? '').toString();
-              return allowed.any(
-                (item) =>
-                    item.trim().toLowerCase() == name.trim().toLowerCase(),
-              );
-            }).toList();
-      final deptSet = <String>{};
-      for (var log in filtered) {
-        if (log['departmentName'] != null) {
-          deptSet.add(log['departmentName']);
+      if (allowed != null && allowed.isNotEmpty) {
+        final perDept = await Future.wait(
+          allowed.map((dept) async {
+            try {
+              return await AnnouncementService.getWorklogs(department: dept);
+            } catch (_) {
+              return <dynamic>[];
+            }
+          }),
+        );
+        for (final list in perDept) {
+          data.addAll(list);
         }
       }
 
+      final unique = <String, dynamic>{};
+      for (final log in data) {
+        final key =
+            (log['id'] ??
+                    "${log['userId']}_${log['workDate']}_${log['startTime']}")
+                .toString();
+        unique[key] = log;
+      }
+      data = unique.values.toList();
+
+      if (allowed != null && allowed.isNotEmpty) {
+        data = data.where((log) {
+          return DivisionConfig.isAllowedDepartment(
+            (log['departmentName'] ?? log['department'] ?? '').toString(),
+            allowed,
+          );
+        }).toList();
+      }
+
+      final deptSet = <String>{};
+      for (var log in data) {
+        final name = (log['departmentName'] ?? log['department'] ?? '')
+            .toString();
+        if (name.isNotEmpty) deptSet.add(name);
+      }
+
+      if (!mounted) return;
       setState(() {
-        worklogs = filtered;
-        filteredLogs = filtered;
+        worklogs = data;
+        filteredLogs = data;
         departments = deptSet.toList();
         isLoading = false;
       });
+      applyFilter();
     } catch (e) {
+      if (!mounted) return;
       setState(() => isLoading = false);
       print(e);
     }
@@ -83,9 +121,14 @@ class _UsersWorklogState extends State<UsersWorklog> {
   void applyFilter() {
     List<dynamic> temp = worklogs;
 
-    if (selectedDepartment != null && selectedDepartment!.isNotEmpty) {
+    if (selectedDepartment != "All") {
       temp = temp
-          .where((w) => w['departmentName'] == selectedDepartment)
+          .where(
+            (w) => DivisionConfig.isAllowedDepartment(
+              (w['departmentName'] ?? w['department'] ?? '').toString(),
+              [selectedDepartment],
+            ),
+          )
           .toList();
     }
 
@@ -328,86 +371,140 @@ class _UsersWorklogState extends State<UsersWorklog> {
             },
           ),
 
-          PopupMenuButton<String?>(
-            icon: const Icon(Icons.filter_alt),
-            onSelected: (value) {
-              setState(() {
-                selectedDepartment = value;
-                applyFilter();
-              });
-            },
-            itemBuilder: (context) => [
-              PopupMenuItem<String?>(
-                value: null,
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        "All Departments",
-                        style: Theme.of(context).textTheme.headlineMedium,
+          if (widget.allowedDepartments == null)
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.filter_alt),
+              onSelected: (value) {
+                setState(() {
+                  selectedDepartment = value;
+                  applyFilter();
+                });
+              },
+              itemBuilder: (context) => filterDepartments
+                  .map(
+                    (d) => PopupMenuItem<String>(
+                      value: d,
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              d == "All" ? "All Departments" : d,
+                              style: Theme.of(context).textTheme.headlineMedium,
+                            ),
+                          ),
+                          if (selectedDepartment == d)
+                            const Icon(Icons.check, color: Colors.green),
+                        ],
                       ),
                     ),
-                    if (selectedDepartment == null)
-                      const Icon(Icons.check, color: Colors.green),
-                  ],
-                ),
-              ),
-
-              ...departments.map(
-                (d) => PopupMenuItem<String?>(
-                  value: d,
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          d,
-                          style: Theme.of(context).textTheme.headlineMedium,
-                        ),
-                      ),
-                      if (selectedDepartment == d)
-                        const Icon(Icons.check, color: Colors.green),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
+                  )
+                  .toList(),
+            ),
           IconButton(
             onPressed: _showDateMonthPicker,
             icon: const Icon(Icons.calendar_today),
           ),
         ],
       ),
-      body: isLoading
-          ? const Center(child: RotatingFlower())
-          : filteredLogs.isEmpty
-          ? const Center(child: Text("No Worklogs Found"))
-          : ListView(
-              padding: const EdgeInsets.all(12),
-              children: groupedLogs.entries.map((entry) {
-                String date = entry.key;
-                List logs = entry.value;
-
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // 📅 DATE HEADER
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 10),
-                      child: Text(
-                        DateFormat("yyyy-MMMM-dd").format(DateTime.parse(date)),
-                        style: Theme.of(context).textTheme.labelMedium,
+      body: Column(
+        children: [
+          if (widget.allowedDepartments != null &&
+              widget.allowedDepartments!.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(10, 12, 10, 0),
+              child: SizedBox(
+                height: 34,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  children: filterDepartments.map((dept) {
+                    final selected = selectedDepartment == dept;
+                    final label = dept == "All"
+                        ? "All"
+                        : dept.replaceAll(" Department", "");
+                    final secondary = Theme.of(context).colorScheme.secondary;
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            selectedDepartment = dept;
+                            applyFilter();
+                          });
+                        },
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          height: 34,
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          decoration: BoxDecoration(
+                            color: selected ? secondary : Colors.white,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: selected
+                                  ? secondary
+                                  : const Color(0xFFD0D5D2),
+                            ),
+                          ),
+                          alignment: Alignment.center,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (selected) ...[
+                                const Icon(
+                                  Icons.check,
+                                  size: 16,
+                                  color: Colors.white,
+                                ),
+                                const SizedBox(width: 4),
+                              ],
+                              Text(
+                                label,
+                                style: TextStyle(
+                                  color: selected ? Colors.white : secondary,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
-                    ),
-
-                    // 📍 TIMELINE ITEMS
-                    ...logs
-                        .map((log) => buildTimelineItem(context, log))
-                        .toList(),
-                  ],
-                );
-              }).toList(),
+                    );
+                  }).toList(),
+                ),
+              ),
             ),
+          Expanded(
+            child: isLoading
+                ? const Center(child: RotatingFlower())
+                : filteredLogs.isEmpty
+                ? const Center(child: Text("No Worklogs Found"))
+                : ListView(
+                    padding: const EdgeInsets.all(12),
+                    children: groupedLogs.entries.map((entry) {
+                      String date = entry.key;
+                      List logs = entry.value;
+
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            child: Text(
+                              DateFormat(
+                                "yyyy-MMMM-dd",
+                              ).format(DateTime.parse(date)),
+                              style: Theme.of(context).textTheme.labelMedium,
+                            ),
+                          ),
+                          ...logs
+                              .map((log) => buildTimelineItem(context, log)),
+                        ],
+                      );
+                    }).toList(),
+                  ),
+          ),
+        ],
+      ),
     );
   }
 

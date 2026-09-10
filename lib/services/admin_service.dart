@@ -324,9 +324,13 @@ class AdminService {
     int? compensationExtraWorkId,
   }) async {
     try {
+      final token = await AuthService.getToken();
       final response = await http.post(
         Uri.parse("$baseUrl/Manager/apply-leave"),
-        headers: {"Content-Type": "application/json"},
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer $token",
+        },
         body: jsonEncode({
           "senderId": senderId,
           "name": name,

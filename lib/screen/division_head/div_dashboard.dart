@@ -4,12 +4,15 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:staff_work_track/core/constant/division_config.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
-import 'package:staff_work_track/screen/admin/Navigation/dashbord/drawer/dept_compensation.dart/compen_list.dart';
-import 'package:staff_work_track/screen/admin/Navigation/dashbord/drawer/staffleaves.dart';
+import 'package:staff_work_track/screen/division_head/div_compensation.dart';
+import 'package:staff_work_track/screen/division_head/div_leave_management.dart';
+import 'package:staff_work_track/screen/division_head/div_overtime.dart';
+import 'package:staff_work_track/screen/staff/navigation/dashboard/dashboard.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/drawer/anouncement.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/drawer/auditlog.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/drawer/points.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/drawer/usersworklog.dart';
+import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/settings/settings.dart';
 import 'package:staff_work_track/services/reports_service.dart';
 import 'package:staff_work_track/utils/TaskUtils.dart';
 import 'package:staff_work_track/utils/enum.dart';
@@ -18,10 +21,14 @@ import 'package:staff_work_track/widgets/kpicard.dart';
 
 class DivDashboard extends StatefulWidget {
   final String department;
+  final int userId;
+  final String role;
 
   const DivDashboard({
     super.key,
     required this.department,
+    required this.userId,
+    required this.role,
   });
 
   @override
@@ -31,6 +38,7 @@ class DivDashboard extends StatefulWidget {
 class _DivDashboardState extends State<DivDashboard> {
   late Future<Map<String, dynamic>> reportFuture;
   int selectedType = 0;
+  bool isDivisionView = true;
 
   List<String> get childDepartments =>
       DivisionConfig.childDepartments(widget.department);
@@ -59,10 +67,34 @@ class _DivDashboardState extends State<DivDashboard> {
 
   @override
   Widget build(BuildContext context) {
+    if (!isDivisionView) {
+      return StaffDashboard(
+        userid: widget.userId,
+        role: widget.role,
+        backToLabel: "Division Dashboard",
+        onBackToManager: () {
+          setState(() => isDivisionView = true);
+        },
+      );
+    }
+
     return Scaffold(
       drawer: _buildDrawer(context),
       appBar: AppBar(
         title: const Text("Division Head"),
+        actions: [
+               
+               
+                IconButton(
+                  icon: const Icon(Icons.settings),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => Settings()),
+                    );
+                  },
+                ),
+              ],
       ),
       body: childDepartments.isEmpty
           ? const Center(
@@ -338,7 +370,11 @@ class _DivDashboardState extends State<DivDashboard> {
                     Navigator.pop(context);
                     Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (_) => const StaffLeaves()),
+                      MaterialPageRoute(
+                        builder: (_) => DivLeaveManagement(
+                          department: widget.department,
+                        ), 
+                      ),
                     );
                   },
                 ),
@@ -350,7 +386,24 @@ class _DivDashboardState extends State<DivDashboard> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => ExtraWorkPage(deptt: widget.department),
+                        builder: (_) => DivCompensation(
+                          department: widget.department,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                _buildDrawerItem(
+                  icon: Icons.schedule_rounded,
+                  title: "Overtime",
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => DivOvertime(
+                          department: widget.department,
+                        ),
                       ),
                     );
                   },
@@ -364,7 +417,11 @@ class _DivDashboardState extends State<DivDashboard> {
                       context,
                       MaterialPageRoute(
                         builder: (_) => UsersWorklog(
-                          allowedDepartments: childDepartments,
+                          allowedDepartments: [
+                            if (widget.department.isNotEmpty)
+                              widget.department,
+                            ...childDepartments,
+                          ],
                         ),
                       ),
                     );
@@ -398,6 +455,15 @@ class _DivDashboardState extends State<DivDashboard> {
                         ),
                       ),
                     );
+                  },
+                ),
+                const Divider(height: 1),
+                _buildDrawerItem(
+                  icon: Icons.dashboard_customize_rounded,
+                  title: "My Dashboard",
+                  onTap: () {
+                    Navigator.pop(context);
+                    setState(() => isDivisionView = false);
                   },
                 ),
               ],

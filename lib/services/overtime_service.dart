@@ -225,14 +225,56 @@ class OvertimeService {
     );
   }
 
-  static Future<List<Map<String, dynamic>>> getDepartmentExtraWork() async {
+  static List<Map<String, dynamic>> _parseExtraWorkList(dynamic decoded) {
+    List? data;
+    if (decoded is List) {
+      data = decoded;
+    } else if (decoded is Map) {
+      for (final key in [
+        'extraWorks',
+        'ExtraWorks',
+        'data',
+        'Data',
+        'result',
+        'Result',
+        'items',
+        'Items',
+        'extraWork',
+        'ExtraWork',
+        'compensations',
+        'availableCompensation',
+      ]) {
+        final value = decoded[key];
+        if (value is List) {
+          data = value;
+          break;
+        }
+      }
+
+      if (data == null &&
+          (decoded.containsKey('status') ||
+              decoded.containsKey('Status') ||
+              decoded.containsKey('workType') ||
+              decoded.containsKey('WorkType'))) {
+        data = [decoded];
+      }
+    }
+
+    if (data == null) return [];
+
+    return data.whereType<Map>().map<Map<String, dynamic>>((item) {
+      return Map<String, dynamic>.from(item);
+    }).toList();
+  }
+
+  static Future<List<Map<String, dynamic>>> _getExtraWorkFrom(String path) async {
     final token = await AuthService.getToken();
 
     if (token == null || token.isEmpty) {
       throw Exception('Authentication token not found.');
     }
 
-    final uri = Uri.parse('$baseUrl/Manager/department-extra-work');
+    final uri = Uri.parse('$baseUrl$path');
 
     final response = await http.get(
       uri,
@@ -242,34 +284,108 @@ class OvertimeService {
       },
     );
 
-    print('Department ExtraWork Status: ${response.statusCode}');
-    print('Department ExtraWork Response: ${response.body}');
+    print('Department ExtraWork $path Status: ${response.statusCode}');
+    print('Department ExtraWork $path Response: ${response.body}');
 
-    Map<String, dynamic> responseData = {};
-
+    dynamic decoded;
     try {
-      responseData = jsonDecode(response.body);
+      decoded = jsonDecode(response.body);
     } catch (_) {}
 
     if (response.statusCode >= 200 && response.statusCode < 300) {
-      final data = responseData['extraWorks'];
-
-      if (data is List) {
-        return data
-            .map<Map<String, dynamic>>(
-              (item) => Map<String, dynamic>.from(item),
-            )
-            .toList();
-      }
-
-      return [];
+      return _parseExtraWorkList(decoded);
     }
 
+    final message = decoded is Map
+        ? (decoded['message'] ?? decoded['Message'])
+        : null;
     throw Exception(
-      responseData['message'] ??
+      message ??
           'Failed to load department extra work. '
               'Status: ${response.statusCode}',
     );
+  }
+
+  static Future<List<Map<String, dynamic>>> _getStaffByDepartment(
+    String department,
+  ) async {
+    final token = await AuthService.getToken();
+    final uri = Uri.parse('$baseUrl/Manager/staffbydept/$department');
+
+    final headers = <String, String>{
+      'Content-Type': 'application/json',
+    };
+    if (token != null && token.isNotEmpty) {
+      headers['Authorization'] = 'Bearer $token';
+    }
+
+    final response = await http.get(uri, headers: headers);
+
+    print('Staffbydept $department Status: ${response.statusCode}');
+    print('Staffbydept $department Response: ${response.body}');
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception('Failed to load staff for $department');
+    }
+
+    final decoded = jsonDecode(response.body);
+    final employees = decoded is Map
+        ? (decoded['employees'] ?? decoded['data'] ?? [])
+        : decoded;
+
+    if (employees is! List) return [];
+
+    return employees.whereType<Map>().map<Map<String, dynamic>>((item) {
+      return Map<String, dynamic>.from(item);
+    }).toList();
+  }
+
+  static Future<List<Map<String, dynamic>>> _getAvailableCompensation(
+    int userId,
+  ) async {
+    return _getExtraWorkFrom('/Manager/available-compensation/$userId');
+  }
+
+  static Future<List<Map<String, dynamic>>> getDepartmentExtraWork({
+    String? department,
+  }) async {
+    if (department == null || department.trim().isEmpty) {
+      return _getExtraWorkFrom('/Manager/department-extra-work');
+    }
+
+    final selected = department.trim();
+    print('Selected extra-work department: $selected');
+
+    final staff = await _getStaffByDepartment(selected);
+    if (staff.isEmpty) return [];
+
+    final lists = await Future.wait(
+      staff.map((user) async {
+        final userId = int.tryParse(
+          (user['userId'] ?? user['id'] ?? '').toString(),
+        );
+        if (userId == null) return <Map<String, dynamic>>[];
+
+        try {
+          final works = await _getAvailableCompensation(userId);
+          final name = (user['name'] ?? user['staffName'] ?? '').toString();
+          return works.map((item) {
+            return {
+              ...item,
+              'staffName': (item['staffName'] ?? item['name'] ?? name)
+                  .toString(),
+              'userId': item['userId'] ?? userId,
+              'department': item['department'] ?? selected,
+            };
+          }).toList();
+        } catch (e) {
+          print('available-compensation $userId error: $e');
+          return <Map<String, dynamic>>[];
+        }
+      }),
+    );
+
+    return lists.expand((item) => item).toList();
   }
 
   static Future<List<Map<String, dynamic>>> getMyExtraWork() async {
@@ -423,4 +539,173 @@ class OvertimeService {
 
     return '$year-$month-$day';
   }
+
+  static Future<List<Map<String, dynamic>>> getExtraWorkByDepartments(
+    List<String> departments,
+  ) async {
+    final token = await AuthService.getToken();
+
+    if (token == null || token.isEmpty) {
+      throw Exception('Authentication token not found.');
+    }
+
+    if (departments.isEmpty) {
+      throw Exception('At least one department is required.');
+    }
+
+    final departmentList = departments
+        .map((dept) => dept.trim())
+        .where((dept) => dept.isNotEmpty)
+        .toSet()
+        .toList();
+
+    if (departmentList.isEmpty) {
+      throw Exception('At least one valid department is required.');
+    }
+
+    final uri = Uri.parse('$baseUrl/Manager/departments-extra-work').replace(
+      queryParameters: {
+        'departments': departmentList.join(','),
+      },
+    );
+
+    final response = await http.get(
+      uri,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+    );
+
+    print('getExtraWorkByDepartments Status: ${response.statusCode}');
+    print('getExtraWorkByDepartments URL: $uri');
+    print('getExtraWorkByDepartments Response: ${response.body}');
+
+    dynamic decoded;
+    try {
+      decoded = jsonDecode(response.body);
+    } catch (_) {}
+
+    if (response.statusCode != 200) {
+      final message = decoded is Map ? decoded['message'] : null;
+      throw Exception(
+        message ?? 'Failed to get department extra work.',
+      );
+    }
+
+    final parsed = _parseExtraWorkList(decoded);
+    if (parsed.isNotEmpty) return parsed;
+
+    if (decoded is Map) {
+      final grouped = decoded['departments'] ?? decoded['Departments'];
+      if (grouped is List) {
+        return grouped
+            .whereType<Map>()
+            .expand((item) => _parseExtraWorkList(item))
+            .toList();
+      }
+    }
+
+    return [];
+  }
+
+  static List<Map<String, dynamic>> _parseOvertimeList(dynamic decoded) {
+    List? data;
+    if (decoded is List) {
+      data = decoded;
+    } else if (decoded is Map) {
+      for (final key in [
+        'overtimes',
+        'OverTimes',
+        'overtime',
+        'Overtime',
+        'data',
+        'Data',
+        'result',
+        'Result',
+        'items',
+        'Items',
+      ]) {
+        final value = decoded[key];
+        if (value is List) {
+          data = value;
+          break;
+        }
+      }
+    }
+
+    if (data == null) return [];
+
+    return data.whereType<Map>().map<Map<String, dynamic>>((item) {
+      return Map<String, dynamic>.from(item);
+    }).toList();
+  }
+
+  static Future<List<Map<String, dynamic>>> getOvertimeByDepartments(
+    List<String> departments,
+  ) async {
+    final token = await AuthService.getToken();
+
+    if (token == null || token.isEmpty) {
+      throw Exception('Authentication token not found.');
+    }
+
+    if (departments.isEmpty) {
+      throw Exception('At least one department is required.');
+    }
+
+    final departmentList = departments
+        .map((department) => department.trim())
+        .where((department) => department.isNotEmpty)
+        .toSet()
+        .toList();
+
+    if (departmentList.isEmpty) {
+      throw Exception('At least one valid department is required.');
+    }
+
+    final uri = Uri.parse('$baseUrl/Manager/departments_overtime').replace(
+      queryParameters: {
+        'departments': departmentList.join(','),
+      },
+    );
+
+    final response = await http.get(
+      uri,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+    );
+
+    print('getOvertimeByDepartments Status: ${response.statusCode}');
+    print('getOvertimeByDepartments URL: $uri');
+    print('getOvertimeByDepartments Response: ${response.body}');
+
+    dynamic decoded;
+    try {
+      decoded = jsonDecode(response.body);
+    } catch (_) {}
+
+    if (response.statusCode != 200) {
+      final message = decoded is Map ? decoded['message'] : null;
+      throw Exception(message ?? 'Failed to get overtime details.');
+    }
+
+    final parsed = _parseOvertimeList(decoded);
+    if (parsed.isNotEmpty) return parsed;
+
+    if (decoded is Map) {
+      final grouped = decoded['departments'] ?? decoded['Departments'];
+      if (grouped is List) {
+        return grouped
+            .whereType<Map>()
+            .expand((item) => _parseOvertimeList(item))
+            .toList();
+      }
+    }
+
+    return [];
+  }
+
 }
