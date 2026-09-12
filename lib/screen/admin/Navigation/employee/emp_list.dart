@@ -39,6 +39,12 @@ class _EmployeeListState extends State<EmployeeList> {
     _loadRole();
   }
 
+  @override
+  void dispose() {
+    searchController.dispose();
+    super.dispose();
+  }
+
   Future<void> _loadRole() async {
     final token = await AuthService.getToken();
     if (token == null) return;
@@ -57,7 +63,7 @@ class _EmployeeListState extends State<EmployeeList> {
         if (selectedEmpIds.isEmpty) {
           isSelectionMode = false;
         }
-      } else {
+      } else { 
         selectedEmpIds.add(userId);
         isSelectionMode = true;
       }
@@ -68,86 +74,82 @@ class _EmployeeListState extends State<EmployeeList> {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.all(10),
-      child: SingleChildScrollView(
-        child: Column(
-          children: [
-            if (isAdmin)
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  Expanded(
-                    child: isSearching
-                        ? TextField(
-                            controller: searchController,
-                            decoration: InputDecoration(
-                              hintText: "Search employee",
-                              hintStyle: Theme.of(
-                                context,
-                              ).textTheme.headlineSmall,
-        
-                              border: InputBorder.none,
-                              enabledBorder: InputBorder.none,
-                              focusedBorder: InputBorder.none,
-                            ),
-                            onChanged: (_) => setState(() {}),
-                          )
-                        : Text(
-                            "Users List",
-                            style: Theme.of(context).textTheme.displaySmall,
+      child: Column(
+        children: [
+          if (isAdmin)
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                Expanded(
+                  child: isSearching
+                      ? TextField(
+                          controller: searchController,
+                          decoration: InputDecoration(
+                            hintText: "Search employee",
+                            hintStyle: Theme.of(
+                              context,
+                            ).textTheme.headlineSmall,
+                            border: InputBorder.none,
+                            enabledBorder: InputBorder.none,
+                            focusedBorder: InputBorder.none,
                           ),
-                  ),
-        
-                  IconButton(
-                    icon: Icon(isSearching ? Icons.close : Icons.search),
-                    onPressed: () {
-                      setState(() {
-                        isSearching = !isSearching;
-                        searchController.clear();
-                      });
-                    },
-                  ),
-        
-                  GestureDetector(
-                    onTap: () async {
-                      if (selectedEmpIds.isNotEmpty) {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => Createtask(
-                              assignedToIds: selectedEmpIds.toList(),
-                            ),
+                          onChanged: (_) => setState(() {}),
+                        )
+                      : Text(
+                          "Users List",
+                          style: Theme.of(context).textTheme.displaySmall,
+                        ),
+                ),
+                IconButton(
+                  icon: Icon(isSearching ? Icons.close : Icons.search),
+                  onPressed: () {
+                    setState(() {
+                      isSearching = !isSearching;
+                      searchController.clear();
+                    });
+                  },
+                ),
+                GestureDetector(
+                  onTap: () async {
+                    if (selectedEmpIds.isNotEmpty) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => Createtask(
+                            assignedToIds: selectedEmpIds.toList(),
                           ),
-                        );
-                      } else {
-                        final result = await Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => CreateUsers(),
-                          ),
-                        );
-                        if (result == true) {
-                          setState(() {
-                            employeesFuture =
-                                AdminService.getEmployeesByDepartment(
-                                  widget.department,
-                                );
-                          });
-                        }
+                        ),
+                      );
+                    } else {
+                      final result = await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => CreateUsers(),
+                        ),
+                      );
+                      if (result == true) {
+                        setState(() {
+                          employeesFuture =
+                              AdminService.getEmployeesByDepartment(
+                                widget.department,
+                              );
+                        });
                       }
-                    },
-        
-                    child: Chip(
-                      backgroundColor: Theme.of(context).colorScheme.secondary,
-                      label: Text(
-                        selectedEmpIds.isNotEmpty ? "Add Task" : "Users +",
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
+                    }
+                  },
+                  child: Chip(
+                    backgroundColor: Theme.of(context).colorScheme.secondary,
+                    label: Text(
+                      selectedEmpIds.isNotEmpty ? "Add Task" : "Users +",
+                      style: Theme.of(context).textTheme.titleMedium,
                     ),
                   ),
-                ],
-              ),
-            SizedBox(height: 10),
-            FutureBuilder<List<UserModel>>(
+                ),
+              ],
+            ),
+          const SizedBox(height: 10),
+          Expanded(
+            child: FutureBuilder<List<UserModel>>(
               future: employeesFuture,
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
@@ -166,7 +168,6 @@ class _EmployeeListState extends State<EmployeeList> {
                 }
                 final employees = snapshot.data!;
                 final filteredEmployees = employees.where((emp) {
-                  // final query = widget.searchQuery.trim().toLowerCase();
                   final query =
                       searchController.text.trim().toLowerCase().isNotEmpty
                       ? searchController.text.toLowerCase()
@@ -177,8 +178,7 @@ class _EmployeeListState extends State<EmployeeList> {
                       emp.department.toLowerCase().contains(query);
                 }).toList();
                 return ListView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
+                  physics: const AlwaysScrollableScrollPhysics(),
                   itemCount: filteredEmployees.length,
                   itemBuilder: (context, index) {
                     final emp = filteredEmployees[index];
@@ -248,8 +248,8 @@ class _EmployeeListState extends State<EmployeeList> {
                 );
               },
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

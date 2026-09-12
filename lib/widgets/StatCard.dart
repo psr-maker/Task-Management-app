@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:jwt_decoder/jwt_decoder.dart';
+import 'package:provider/provider.dart';
+import 'package:staff_work_track/core/providers/data_refresh_provider.dart';
 import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
 import 'package:staff_work_track/screen/admin/Navigation/my%20work/Task%20status%20tab/admintask_list.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/Task/edit_goal.dart';
@@ -198,6 +200,11 @@ class _TaskCardState extends State<Taskstatus> {
 
   bool get isCompleted => selectedStatus == TaskStatus.completed;
 
+  void _setStateIfMounted(VoidCallback fn) {
+    if (!mounted) return;
+    setState(fn);
+  }
+
   @override
   void initState() {
     super.initState();
@@ -210,8 +217,9 @@ class _TaskCardState extends State<Taskstatus> {
   Future<void> _checkPermissions() async {
     try {
       final token = await AuthService.getToken();
+      if (!mounted) return;
       if (token == null) {
-        setState(() {
+        _setStateIfMounted(() {
           _canEditStatus = false;
           _permissionChecked = true;
         });
@@ -225,7 +233,7 @@ class _TaskCardState extends State<Taskstatus> {
       )?.toLowerCase().trim();
 
       if (loginUserId == null || userRole == null) {
-        setState(() {
+        _setStateIfMounted(() {
           _canEditStatus = false;
           _permissionChecked = true;
         });
@@ -234,7 +242,7 @@ class _TaskCardState extends State<Taskstatus> {
 
       final assignedTo = widget.task["assignedTo"] as List?;
       if (assignedTo == null || assignedTo.isEmpty) {
-        setState(() {
+        _setStateIfMounted(() {
           _canEditStatus = false;
           _permissionChecked = true;
         });
@@ -243,7 +251,7 @@ class _TaskCardState extends State<Taskstatus> {
 
       // Directors can edit any task (no restrictions)
       if (userRole == "1") {
-        setState(() {
+        _setStateIfMounted(() {
           _canEditStatus = true;
           _permissionChecked = true;
         });
@@ -264,7 +272,7 @@ class _TaskCardState extends State<Taskstatus> {
 
       // Staff can only edit if task is assigned to them
       if (userRole != "3") {
-        setState(() {
+        _setStateIfMounted(() {
           _canEditStatus = isAssignedToUser;
           _permissionChecked = true;
         });
@@ -273,7 +281,7 @@ class _TaskCardState extends State<Taskstatus> {
 
       // Managers: can edit if assigned to them OR if staff are in their department
       if (isAssignedToUser) {
-        setState(() {
+        _setStateIfMounted(() {
           _canEditStatus = true;
           _permissionChecked = true;
         });
@@ -281,7 +289,7 @@ class _TaskCardState extends State<Taskstatus> {
       }
 
       if (userDepartment == null) {
-        setState(() {
+        _setStateIfMounted(() {
           _canEditStatus = false;
           _permissionChecked = true;
         });
@@ -302,13 +310,13 @@ class _TaskCardState extends State<Taskstatus> {
         }
       }
 
-      setState(() {
+      _setStateIfMounted(() {
         _canEditStatus = hasStaffInDepartment;
         _permissionChecked = true;
       });
     } catch (e) {
       debugPrint("Permission check error: $e");
-      setState(() {
+      _setStateIfMounted(() {
         _canEditStatus = false;
         _permissionChecked = true;
       });
@@ -479,7 +487,7 @@ class _TaskCardState extends State<Taskstatus> {
                           : (value) async {
                               if (value == null) return;
 
-                              setState(() {
+                              _setStateIfMounted(() {
                                 selectedStatus = value;
                                 isUpdating = true;
                               });
@@ -490,15 +498,14 @@ class _TaskCardState extends State<Taskstatus> {
                                   status: value,
                                 );
                               } catch (e) {
+                                if (!mounted) return;
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(
                                     content: Text("Status update failed"),
                                   ),
                                 );
                               } finally {
-                                if (mounted) {
-                                  setState(() => isUpdating = false);
-                                }
+                                _setStateIfMounted(() => isUpdating = false);
                               }
                             },
                     ),
@@ -553,7 +560,8 @@ class _GoalCardState extends State<GoalCard> {
       });
     } catch (e) {
       debugPrint(e.toString());
-      isLoading = false;
+      if (!mounted) return;
+      setState(() => isLoading = false);
     }
   }
 
@@ -590,6 +598,12 @@ class _GoalCardState extends State<GoalCard> {
     return 0;
   }
 
+  void _notifyGoalRefresh() {
+    try {
+      context.read<DataRefreshNotifier>().refreshGoals();
+    } catch (_) {}
+  }
+
   void _showGoalDialog() {
     showDialog(
       context: context,
@@ -613,7 +627,19 @@ class _GoalCardState extends State<GoalCard> {
                       builder: (_) => EditGoalPage(goal: widget.goal),
                     ),
                   );
-                  if (result == true) {
+                  if (!mounted) return;
+                  if (result != null && result != false) {
+                    if (result is Map) {
+                      setState(() {
+                        widget.goal["title"] =
+                            result["title"] ?? widget.goal["title"];
+                        widget.goal["dueDate"] =
+                            result["dueDate"] ?? widget.goal["dueDate"];
+                        widget.goal["priority"] =
+                            result["priority"] ?? widget.goal["priority"];
+                      });
+                    }
+                    _notifyGoalRefresh();
                     widget.onRefresh?.call();
                   }
                 },
@@ -627,24 +653,37 @@ class _GoalCardState extends State<GoalCard> {
                   "completed")
                 TextButton.icon(
                   onPressed: () async {
-                    final confirmed = await showConfirmDialog(
-                      context,
-                      "Delete",
-                      "Goal",
+                    Navigator.pop(context);
+
+                    final confirmed = await showDeleteConfirmDialog(context);
+                    if (confirmed != true) return;
+                    if (!mounted) return;
+
+                    widget.onDelete?.call(
+                      "Goal deleted successfully",
+                      false,
                     );
-                    if (confirmed == true) {
-                      final success = await SuperAdminService.deleteGoal(
-                        widget.goal["goalCode"],
+
+                    final goalCode =
+                        (widget.goal["goalCode"] ??
+                                widget.goal["GoalCode"] ??
+                                "")
+                            .toString()
+                            .trim();
+
+                    final success = await SuperAdminService.deleteGoal(
+                      goalCode,
+                    );
+
+                    if (!success && mounted) {
+                      widget.onDelete?.call(
+                        "Failed to delete goal",
+                        true,
                       );
-                      if (success) {
-                        Navigator.pop(context);
-                        widget.onDelete?.call(
-                          "Goal deleted successfully",
-                          false,
-                        );
-                        widget.onRefresh?.call();
-                      }
+                      return;
                     }
+
+                    _notifyGoalRefresh();
                   },
 
                   label: Text(

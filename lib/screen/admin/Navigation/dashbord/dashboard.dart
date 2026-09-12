@@ -6,7 +6,6 @@ import 'package:staff_work_track/screen/admin/Navigation/dashbord/drawer/attinbh
 import 'package:staff_work_track/screen/admin/Navigation/dashbord/drawer/company/leavlist_hr.dart';
 import 'package:staff_work_track/screen/admin/Navigation/dashbord/drawer/company/punchclist_account.dart';
 import 'package:staff_work_track/screen/admin/Navigation/dashbord/drawer/dept_compensation.dart/compen_list.dart';
-import 'package:staff_work_track/screen/admin/Navigation/dashbord/drawer/overtime/manage_overtime.dart';
 import 'package:staff_work_track/screen/admin/Navigation/dashbord/drawer/punchdeptlist.dart';
 import 'package:staff_work_track/screen/admin/Navigation/dashbord/drawer/staffleaves.dart';
 import 'package:staff_work_track/screen/admin/Navigation/dashbord/drawer/staffworklog.dart';
@@ -581,21 +580,6 @@ class _AdminState extends State<AdminDashboard> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(builder: (_) => ExtraWorkPage(deptt: widget.department)),
-                    );
-                  },
-                ),
-                _buildDrawerItem(
-                  context,
-                  icon: Icons.more_time_rounded,
-                  title: "Overtime",
-                  onTap: () {
-                    Navigator.pop(context);
-
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => ManagerOvertime(dept: widget.department),
-                      ),
                     );
                   },
                 ),

@@ -25,7 +25,12 @@ class UserModel {
       name: json['name'] ?? '',
       email: json['email'] ?? '',
       department: json['department'] ?? '',
-      role: json['role'] ?? '',
+      role: (json['role'] ??
+              json['Role'] ??
+              json['roleId'] ??
+              json['roleName'] ??
+              '')
+          .toString(),
       status: json['status'] ?? '',
       createdBy: json['createdBy'] ?? json['created_by'] ?? '',
       wasEdited: json['wasEdited'] ?? false,
@@ -68,10 +73,10 @@ class UsersDetails {
       userId: admin['userId'],
       name: admin['name'],
       email: admin['email'],
-      role: admin['role'],
-      department: admin['department'],
-      createdBy: admin['created_by'],
-      status: admin['status'],
+      role: (admin['role'] ?? admin['Role'] ?? admin['roleId'] ?? '').toString(),
+      department: admin['department'] ?? '',
+      createdBy: admin['created_by'] ?? admin['createdBy'] ?? '',
+      status: admin['status'] ?? '',
       totalEmployees: json['totalEmployees'],
       totalTasksAssignedTo: json['totalTasksAssignedTo'],
       totalTasksAssignedBy: json['totalTasksAssignedBy'], 

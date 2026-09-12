@@ -390,6 +390,7 @@ class SuperAdminService {
     required String name,
     required String email,
     required String department,
+    required String role,
   }) async {
     final token = await AuthService.getToken();
     final response = await http.put(
@@ -402,6 +403,7 @@ class SuperAdminService {
         "name": name,
         "email": email,
         "department": department,
+        "role": role,
       }),
     );
 
@@ -507,22 +509,32 @@ class SuperAdminService {
 
     final response = await http.delete(
       Uri.parse("$baseUrl/Director/DeleteGoal/$id"),
-      headers: {"Authorization": "Bearer $token"},
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer $token",
+      },
     );
 
-    return response.statusCode == 200;
+    return response.statusCode >= 200 && response.statusCode < 300;
   }
 
   static Future<List<Role>> getRoles() async {
+    final token = await AuthService.getToken();
     final url = Uri.parse('$baseUrl/Director/getall-roles');
 
     final response = await http.get(
       url,
-      headers: {'Content-Type': 'application/json'},
+      headers: {
+        'Content-Type': 'application/json',
+        if (token != null) "Authorization": "Bearer $token",
+      },
     );
 
     if (response.statusCode == 200) {
-      final List<dynamic> data = jsonDecode(response.body);
+      final decoded = jsonDecode(response.body);
+      final List<dynamic> data = decoded is List
+          ? decoded
+          : (decoded['roles'] ?? decoded['data'] ?? []);
 
       return data.map((json) => Role.fromJson(json)).toList();
     }
@@ -626,5 +638,156 @@ class SuperAdminService {
     throw Exception(
       'Failed to delete role. Status code: ${response.statusCode}',
     );
+  }
+
+  static List<Map<String, dynamic>> _asMapList(dynamic decoded) {
+    List<dynamic> data = [];
+    if (decoded is List) {
+      data = decoded;
+    } else if (decoded is Map) {
+      final list =
+          decoded['data'] ??
+          decoded['leaves'] ??
+          decoded['permissions'] ??
+          decoded['result'] ??
+          decoded['items'];
+      if (list is List) data = list;
+    }
+    return data
+        .whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item))
+        .toList();
+  }
+
+  static Map<String, dynamic> _normalizeLeaveItem(Map<String, dynamic> item) {
+    item["id"] ??= item["Id"];
+    item["senderId"] ??= item["SenderId"];
+    item["receiverId"] ??= item["ReceiverId"];
+    item["name"] ??=
+        item["senderName"] ?? item["SenderName"] ?? item["Name"];
+    item["department"] ??=
+        item["senderDepartment"] ??
+        item["SenderDepartment"] ??
+        item["dept"] ??
+        item["departmentName"];
+    item["leaveType"] ??= item["LeaveType"];
+    item["leaveTyp"] ??= item["LeaveTyp"];
+    item["status"] ??= item["Status"];
+    item["fromDate"] ??= item["FromDate"];
+    item["toDate"] ??= item["ToDate"];
+    item["reason"] ??= item["Reason"];
+    item["submittedDate"] ??= item["SubmittedDate"];
+    item["approvedDate"] ??= item["ApprovedDate"];
+    item["rejectionReason"] ??= item["RejectionReason"];
+    return item;
+  }
+
+  static Map<String, dynamic> _normalizePermissionItem(
+    Map<String, dynamic> item,
+  ) {
+    item["id"] ??= item["Id"];
+    item["senderId"] ??= item["SenderId"];
+    item["receiverId"] ??= item["ReceiverId"];
+    item["name"] ??= item["Name"];
+    item["designation"] ??= item["Designation"];
+    item["reason"] ??= item["Reason"];
+    item["date"] ??= item["Date"] ?? item["fromDate"] ?? item["FromDate"];
+    item["fromTime"] ??= item["FromTime"];
+    item["toTime"] ??= item["ToTime"];
+    item["totalHours"] ??= item["TotalHours"] ?? item["totalhours"];
+    item["status"] ??= item["Status"];
+    item["submittedDate"] ??= item["SubmittedDate"];
+    item["department"] ??=
+        item["senderDepartment"] ??
+        item["SenderDepartment"] ??
+        item["dept"] ??
+        item["departmentName"];
+    return item;
+  }
+
+  static Future<List<Map<String, dynamic>>> _getFirstList(
+    List<String> paths, {
+    Map<String, dynamic> Function(Map<String, dynamic>)? normalize,
+  }) async {
+    final token = await AuthService.getToken();
+
+    if (token == null || token.isEmpty) {
+      throw Exception('Authentication token not found.');
+    }
+
+    final mapper = normalize ?? _normalizeLeaveItem;
+
+    for (final path in paths) {
+      final response = await http.get(
+        Uri.parse('$baseUrl$path'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+      if (response.statusCode == 200) {
+        return _asMapList(jsonDecode(response.body)).map(mapper).toList();
+      }
+      if (response.statusCode == 401) {
+        throw Exception('Unauthorized. Please login again.');
+      }
+    }
+
+    return [];
+  }
+
+  static Map<int, String> departmentByUserId(List<UserModel> users) {
+    return {
+      for (final user in users)
+        if (user.department.trim().isNotEmpty) user.userId: user.department.trim(),
+    };
+  }
+
+  static void attachSenderDepartments(
+    List<Map<String, dynamic>> items,
+    Map<int, String> departmentByUserId,
+  ) {
+    if (departmentByUserId.isEmpty) return;
+    for (final item in items) {
+      final current =
+          (item["department"] ??
+                  item["senderDepartment"] ??
+                  item["SenderDepartment"] ??
+                  item["dept"] ??
+                  "")
+              .toString()
+              .trim();
+      if (current.isNotEmpty) continue;
+
+      final senderId = int.tryParse(
+        (item["senderId"] ??
+                item["SenderId"] ??
+                item["userId"] ??
+                item["uid"] ??
+                "")
+            .toString(),
+      );
+      if (senderId == null) continue;
+
+      final department = departmentByUserId[senderId];
+      if (department != null && department.isNotEmpty) {
+        item["department"] = department;
+      }
+    }
+  }
+
+  static Future<List<Map<String, dynamic>>> getLeaveList() {
+    return _getFirstList(['/Manager/leave-list']);
+  }
+
+  static Future<List<Map<String, dynamic>>> getMyReceivedPermissions() {
+    return _getFirstList(
+      ['/Manager/my-received-permissions'],
+      normalize: _normalizePermissionItem,
+    );
+  }
+
+  static Future<List<Map<String, dynamic>>> getPermissionList() {
+    return getMyReceivedPermissions();
   }
 }

@@ -79,11 +79,7 @@ class _EmployeelistState extends State<Employeelist>
         //   tabs: tabs.map((e) => Tab(text: e)).toList(),
         // ),
       ),
-      body:Column(
-        children: [
-          EmployeeList(department: department, searchQuery: ''),
-        ],
-      ),
+      body: EmployeeList(department: department, searchQuery: ''),
       // TabBarView(
       //   controller: _tabController,
       //   children: [

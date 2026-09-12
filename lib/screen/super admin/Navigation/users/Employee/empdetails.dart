@@ -7,12 +7,15 @@ import 'package:staff_work_track/common/search_filter_page.dart';
 import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
 import 'package:staff_work_track/core/providers/data_refresh_provider.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/Task/goalntask_create.dart';
+import 'package:staff_work_track/screen/super%20admin/Navigation/Task/taskdetail.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/drawer/auditlog.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/warnings/craete_warnings.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/users/edit_user.dart';
 import 'package:staff_work_track/services/admin_service.dart';
 import 'package:staff_work_track/services/auth_service.dart';
 import 'package:staff_work_track/services/superadmin_service.dart';
+import 'package:staff_work_track/utils/TaskUtils.dart';
+import 'package:staff_work_track/utils/app_helper.dart';
 import 'package:staff_work_track/utils/jwt_helper.dart';
 import 'package:staff_work_track/widgets/StatCard.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
@@ -44,7 +47,10 @@ class _EmployeeDetailState extends State<EmployeeDetail> {
   bool _isErrorMessage = true;
   bool _showTopMessage = false;
   List<dynamic> staffGoals = [];
+  List<Map<String, dynamic>> standaloneTasks = [];
+  final Set<String> _removedGoalCodes = {};
   DateTime? _lastRefreshTime;
+  DateTime? _lastGoalRefreshTime;
   late UserModel employee;
   List<Role> roles = [];
 
@@ -105,6 +111,73 @@ class _EmployeeDetailState extends State<EmployeeDetail> {
     return filtered;
   }
 
+  List<Map<String, dynamic>> applyTaskSearch(
+    List<Map<String, dynamic>> tasks,
+  ) {
+    List<Map<String, dynamic>> filtered = tasks;
+
+    if (searchQuery.trim().isNotEmpty) {
+      final query = searchQuery.toLowerCase();
+      filtered = filtered.where((task) {
+        final title = (task["task"] ?? task["title"] ?? "")
+            .toString()
+            .toLowerCase();
+        final code = (task["taskCode"] ?? "").toString().toLowerCase();
+        final department = (task["department"] ?? task["assignerDepartment"] ?? "")
+            .toString()
+            .toLowerCase();
+        final status = (task["status"] ?? "").toString().toLowerCase();
+        final priority = (task["priority"] ?? "").toString().toLowerCase();
+
+        return title.contains(query) ||
+            code.contains(query) ||
+            department.contains(query) ||
+            status.contains(query) ||
+            priority.contains(query);
+      }).toList();
+    }
+
+    if (taskFilter.status != null && taskFilter.status!.isNotEmpty) {
+      filtered = filtered.where((task) {
+        final taskStatus = (task["status"] ?? "")
+            .toString()
+            .toLowerCase()
+            .replaceAll(' ', '');
+        final filterStatus = taskFilter.status!.toLowerCase().replaceAll(
+          ' ',
+          '',
+        );
+        return taskStatus == filterStatus;
+      }).toList();
+    }
+
+    if (taskFilter.priority != null && taskFilter.priority!.isNotEmpty) {
+      filtered = filtered.where((task) {
+        return (task["priority"] ?? "").toString().toLowerCase() ==
+            taskFilter.priority!.toLowerCase();
+      }).toList();
+    }
+
+    if (taskFilter.department != null && taskFilter.department!.isNotEmpty) {
+      filtered = filtered.where((task) {
+        final department =
+            (task["department"] ?? task["assignerDepartment"] ?? "")
+                .toString()
+                .toLowerCase();
+        return department == taskFilter.department!.toLowerCase();
+      }).toList();
+    }
+
+    return filtered;
+  }
+
+  bool _isStandaloneTask(Map<String, dynamic> task) {
+    final goalCode = (task["goalCode"] ?? task["goal_code"] ?? "")
+        .toString()
+        .trim();
+    return goalCode.isEmpty || goalCode.toLowerCase() == "null";
+  }
+
   @override
   void initState() {
     super.initState();
@@ -116,24 +189,46 @@ class _EmployeeDetailState extends State<EmployeeDetail> {
   void _initializeData() {
     _checkEditPermission(widget.employee);
     _reloadEmployeeStatus();
-    loadEmployeeGoals();
+    loadEmployeeGoals(showLoader: true);
   }
 
-  /// Reload the latest employee status from server
+  /// Reload the latest employee status and role from server
   Future<void> _reloadEmployeeStatus() async {
     try {
-      // Fetch fresh employee data from server
+      final details = await SuperAdminService.getAdminDetails(
+        widget.employee.userId,
+      );
+
+      if (!mounted) return;
+      setState(() {
+        isActive = details.status.toLowerCase() == "active";
+        employee = UserModel(
+          userId: details.userId,
+          name: details.name,
+          email: details.email,
+          department: details.department,
+          role: details.role,
+          status: details.status,
+          createdBy: details.createdBy,
+          wasEdited: details.wasEdited,
+        );
+      });
+      return;
+    } catch (e) {
+      debugPrint("Failed to reload employee details: $e");
+    }
+
+    try {
       final users = await SuperAdminService.getEmployees();
 
-      if (mounted) {
-        // Find the current employee in the fresh list
-        for (var user in users) {
-          if (user.userId == widget.employee.userId) {
-            setState(() {
-              isActive = user.status.toLowerCase() == "active";
-            });
-            return;
-          }
+      if (!mounted) return;
+      for (var user in users) {
+        if (user.userId == widget.employee.userId) {
+          setState(() {
+            isActive = user.status.toLowerCase() == "active";
+            employee = user;
+          });
+          return;
         }
       }
     } catch (e) {
@@ -161,42 +256,74 @@ class _EmployeeDetailState extends State<EmployeeDetail> {
 
   String getRoleName(dynamic roleId) {
     if (roleId == null) return '-';
+    final raw = roleId.toString().trim();
+    if (raw.isEmpty) return '-';
 
-    final id = int.tryParse(roleId.toString());
-
-    if (id == null) return '-';
+    final id = int.tryParse(raw);
+    if (id == null) return raw;
 
     for (final role in roles) {
-      if (role.id == id) {
-        return role.name;
-      }
+      if (role.id == id) return role.name;
     }
-
-    return '-';
+    return raw;
   }
 
-  Future<void> loadEmployeeGoals() async {
+  Future<void> loadEmployeeGoals({bool showLoader = false}) async {
     try {
-      setState(() => isLoading = true);
+      if (showLoader && mounted) setState(() => isLoading = true);
 
       final goals = await AdminService.getusergoalbyid(widget.employee.userId);
 
+      List<Map<String, dynamic>> tasks = [];
+      try {
+        tasks = await AdminService.getAdminTasks(widget.employee.userId);
+      } catch (e) {
+        debugPrint("Task load error: $e");
+      }
+
+      final nestedCodes = <String>{};
+      for (final goal in goals) {
+        final goalTasks = goal is Map ? (goal["tasks"] ?? []) : [];
+        if (goalTasks is! List) continue;
+        for (final task in goalTasks) {
+          if (task is Map && task["taskCode"] != null) {
+            nestedCodes.add(task["taskCode"].toString());
+          }
+        }
+      }
+
+      final standalone = tasks.where((task) {
+        final taskCode = (task["taskCode"] ?? "").toString();
+        if (taskCode.isNotEmpty && nestedCodes.contains(taskCode)) {
+          return false;
+        }
+        return _isStandaloneTask(task);
+      }).toList();
+
       if (mounted) {
         setState(() {
-          staffGoals = goals;
+          staffGoals = goals.where((goal) {
+            final code = (goal["goalCode"] ?? goal["GoalCode"] ?? "")
+                .toString()
+                .trim();
+            return !_removedGoalCodes.contains(code);
+          }).toList();
+          standaloneTasks = standalone;
 
-          departmentsList = goals
-              .map((g) => (g["department"] ?? "").toString())
-              .where((d) => d.isNotEmpty)
-              .toSet()
-              .toList();
+          departmentsList = {
+            ...goals.map((g) => (g["department"] ?? "").toString()),
+            ...standalone.map(
+              (t) =>
+                  (t["department"] ?? t["assignerDepartment"] ?? "").toString(),
+            ),
+          }.where((d) => d.isNotEmpty).toList();
 
           isLoading = false;
         });
       }
     } catch (e) {
       debugPrint("Goal load error: $e");
-      setState(() => isLoading = false);
+      if (mounted) setState(() => isLoading = false);
     }
   }
 
@@ -210,9 +337,8 @@ class _EmployeeDetailState extends State<EmployeeDetail> {
     if (loginUserIdRaw == null || loginUserRoleRaw == null) return;
 
     final loginUserId = loginUserIdRaw.toString().trim();
-    final loginUserRole = loginUserRoleRaw.toLowerCase().trim();
+    final loginUserRole = loginUserRoleRaw.toString().trim();
 
-    // Extract createdBy ID
     String createdById = "";
     if (employee.createdBy.isNotEmpty) {
       if (employee.createdBy.contains('-')) {
@@ -222,11 +348,35 @@ class _EmployeeDetailState extends State<EmployeeDetail> {
       }
     }
 
-    final isDirector = loginUserRole.contains("1");
-    final isManager = loginUserRole.contains("3");
+    final isDirector = loginUserRole == "1";
+    final isManager = loginUserRole == "3";
+    final isTargetDirector = employee.role.toString().trim() == "1";
+    final createdByMatch = loginUserId == createdById;
 
-    // ✅ RULES
-    final allowEditDelete = isDirector || (loginUserId == createdById);
+    var loginDept = (JwtHelper.getDepartment(token) ?? "")
+        .toString()
+        .trim()
+        .toLowerCase();
+    if (loginDept.isEmpty) {
+      try {
+        final details = await SuperAdminService.getAdminDetails(
+          int.parse(loginUserId),
+        );
+        loginDept = details.department.trim().toLowerCase();
+      } catch (_) {}
+    }
+
+    final employeeDept = employee.department.trim().toLowerCase();
+    final sameDepartment =
+        loginDept.isNotEmpty &&
+        employeeDept.isNotEmpty &&
+        loginDept == employeeDept;
+
+    final allowEditDelete =
+        isDirector ||
+        (isManager &&
+            !isTargetDirector &&
+            (sameDepartment || createdByMatch));
     final allowWarning = isDirector || isManager;
 
     final showMenu = allowEditDelete || allowWarning;
@@ -282,9 +432,9 @@ class _EmployeeDetailState extends State<EmployeeDetail> {
 
     // Reload if goal refresh signal changed
     if (refreshNotifier.lastGoalRefresh != null &&
-        (_lastRefreshTime == null ||
-            refreshNotifier.lastGoalRefresh!.isAfter(_lastRefreshTime!))) {
-      _lastRefreshTime = refreshNotifier.lastGoalRefresh;
+        (_lastGoalRefreshTime == null ||
+            refreshNotifier.lastGoalRefresh!.isAfter(_lastGoalRefreshTime!))) {
+      _lastGoalRefreshTime = refreshNotifier.lastGoalRefresh;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) loadEmployeeGoals();
       });
@@ -358,7 +508,7 @@ class _EmployeeDetailState extends State<EmployeeDetail> {
                       status: employee.status,
                       createdBy: employee.createdBy,
                       wasEdited: employee.wasEdited,
-                      role: employee.role,
+                      role: result["role"] ?? employee.role,
                     );
                   });
                 }
@@ -447,8 +597,10 @@ class _EmployeeDetailState extends State<EmployeeDetail> {
 
   Widget _buildBody() {
     final filteredGoals = applyGoalSearch(staffGoals);
+    final filteredTasks = applyTaskSearch(standaloneTasks);
 
-    final allTasks = staffGoals.expand((g) => (g["tasks"] ?? [])).toList();
+    final nestedTasks = staffGoals.expand((g) => (g["tasks"] ?? [])).toList();
+    final allTasksCount = nestedTasks.length + standaloneTasks.length;
 
     final now = DateTime.now();
 
@@ -488,7 +640,7 @@ class _EmployeeDetailState extends State<EmployeeDetail> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _employeeCard(allTasks.length),
+                _employeeCard(allTasksCount),
 
                 const SizedBox(height: 15),
 
@@ -560,15 +712,100 @@ class _EmployeeDetailState extends State<EmployeeDetail> {
 
                 const SizedBox(height: 20),
 
-                ListView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: filteredGoals.length,
-                  itemBuilder: (context, index) {
-                    final goal = filteredGoals[index];
-                    return GoalCard(goal: goal, onRefresh: loadEmployeeGoals);
-                  },
+                if (filteredGoals.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: Text(
+                      "No goals found",
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                  )
+                else
+                  ListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: filteredGoals.length,
+                    itemBuilder: (context, index) {
+                      final goal = filteredGoals[index];
+                      final goalCode =
+                          (goal["goalCode"] ?? goal["GoalCode"] ?? "")
+                              .toString()
+                              .trim();
+                      return GoalCard(
+                        key: ValueKey(goalCode),
+                        goal: goal,
+                        onDelete: (msg, isError) {
+                          if (!isError) {
+                            setState(() {
+                              if (goalCode.isNotEmpty) {
+                                _removedGoalCodes.add(goalCode.trim());
+                              }
+                              staffGoals = staffGoals
+                                  .where(
+                                    (item) =>
+                                        (item["goalCode"] ??
+                                                item["GoalCode"] ??
+                                                "")
+                                            .toString()
+                                            .trim() !=
+                                        goalCode.trim(),
+                                  )
+                                  .toList();
+                            });
+                          }
+                          showTopMessage(msg, isError: isError);
+                        },
+                        onRefresh: () => loadEmployeeGoals(),
+                      );
+                    },
+                  ),
+
+                const SizedBox(height: 20),
+
+                Text(
+                  "Tasks : ${standaloneTasks.length}",
+                  style: Theme.of(context).textTheme.headlineLarge,
                 ),
+                const SizedBox(height: 10),
+                if (filteredTasks.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: Text(
+                      "No tasks without a goal",
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                  )
+                else
+                  ListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: filteredTasks.length,
+                    itemBuilder: (context, index) {
+                      final task = filteredTasks[index];
+                      final statusEnum = TaskUtils.parseStatus(
+                        (task["status"] ?? "").toString().trim(),
+                      );
+                      return TaskCard(
+                        task: task,
+                        statusColor: TaskUtils.getStatusColor(statusEnum),
+                        priorityColor: TaskUtils.getPriorityColor(
+                          (task["priority"] ?? "").toString(),
+                        ),
+                        formatDate: AppHelpers.formatDate,
+                        onTap: () async {
+                          final taskCode = (task["taskCode"] ?? "").toString();
+                          if (taskCode.isEmpty) return;
+                          await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => TaskDetails(taskCode: taskCode),
+                            ),
+                          );
+                          loadEmployeeGoals();
+                        },
+                      );
+                    },
+                  ),
               ],
             ),
           ),
@@ -689,45 +926,50 @@ class _EmployeeDetailState extends State<EmployeeDetail> {
                     child: Switch(
                       value: isActive,
                       activeColor: Theme.of(context).colorScheme.secondary,
-                      onChanged: (value) async {
-                        setState(() {
-                          isActive = value;
-                          isUpdating = true;
-                        });
+                      onChanged: !canEditDelete
+                          ? null
+                          : (value) async {
+                              setState(() {
+                                isActive = value;
+                                isUpdating = true;
+                              });
 
-                        try {
-                          await SuperAdminService.updateusersstatus(
-                            employee.userId,
-                            value ? "Active" : "Deactive",
-                          );
+                              try {
+                                await SuperAdminService.updateusersstatus(
+                                  employee.userId,
+                                  value ? "Active" : "Deactive",
+                                );
 
-                          // Notify other screens to refresh
-                          if (mounted) {
-                            context.read<DataRefreshNotifier>().refreshUsers();
-                            showTopMessage(
-                              "Status updated successfully",
-                              isError: false,
-                            );
-                          }
-                        } catch (e) {
-                          if (mounted) {
-                            setState(() {
-                              isActive = !value;
-                            });
-                          }
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text("Failed to update status: $e"),
-                            ),
-                          );
-                        } finally {
-                          if (mounted) {
-                            setState(() {
-                              isUpdating = false;
-                            });
-                          }
-                        }
-                      },
+                                if (mounted) {
+                                  context
+                                      .read<DataRefreshNotifier>()
+                                      .refreshUsers();
+                                  showTopMessage(
+                                    "Status updated successfully",
+                                    isError: false,
+                                  );
+                                }
+                              } catch (e) {
+                                if (mounted) {
+                                  setState(() {
+                                    isActive = !value;
+                                  });
+                                }
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      "Failed to update status: $e",
+                                    ),
+                                  ),
+                                );
+                              } finally {
+                                if (mounted) {
+                                  setState(() {
+                                    isUpdating = false;
+                                  });
+                                }
+                              }
+                            },
                     ),
                   ),
           ],

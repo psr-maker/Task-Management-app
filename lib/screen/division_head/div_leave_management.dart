@@ -5,8 +5,10 @@ import 'package:staff_work_track/core/widgets/buttons.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
 import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
 import 'package:staff_work_track/services/admin_service.dart';
-import 'package:staff_work_track/services/reports_service.dart';
+import 'package:staff_work_track/services/auth_service.dart';
+import 'package:staff_work_track/services/superadmin_service.dart';
 import 'package:staff_work_track/utils/app_helper.dart';
+import 'package:staff_work_track/utils/jwt_helper.dart';
 
 class DivLeaveManagement extends StatefulWidget {
   final String department;
@@ -18,16 +20,19 @@ class DivLeaveManagement extends StatefulWidget {
 
 class _DivLeaveManagementState extends State<DivLeaveManagement> {
   String activeTab = "Leave";
-  String selectedDepartment = "All";
-  String selectedStatus = "Pending";
+  late String selectedDepartment;
+  String selectedStatus = "All";
   bool isLoading = true;
   bool isActionLoading = false;
 
-  List<Map<String, dynamic>> leaves = [];
-  List<Map<String, dynamic>> permissions = [];
+  List<Map<String, dynamic>> teamLeaves = [];
+  List<Map<String, dynamic>> ownLeaves = [];
+  List<Map<String, dynamic>> teamPermissions = [];
+  List<Map<String, dynamic>> ownPermissions = [];
   Set<String> expandedItems = {};
   final Set<String> _rejecting = {};
   final Map<String, TextEditingController> _rejectReasons = {};
+  String? _loginUserId;
 
   String? _topMessage;
   bool _isErrorMessage = true;
@@ -35,10 +40,27 @@ class _DivLeaveManagementState extends State<DivLeaveManagement> {
 
   final statusTabs = const ["All", "Pending", "Approved", "Rejected"];
 
-  List<String> get departments => [
-    if (widget.department.trim().isNotEmpty) widget.department,
-    ...DivisionConfig.childDepartments(widget.department),
-  ];
+  List<String> get childDepartments =>
+      DivisionConfig.childDepartments(widget.department);
+
+  List<String> get departments {
+    final parent = widget.department.trim();
+    final children = childDepartments;
+    final chips = <String>[];
+    if (parent.isNotEmpty) chips.add(parent);
+    for (final dept in children) {
+      if (!DivisionConfig.isAllowedDepartment(dept, chips)) {
+        chips.add(dept);
+      }
+    }
+    return chips;
+  }
+
+  bool get _isOwnLeaveTab {
+    final parent = widget.department.trim();
+    if (parent.isEmpty || selectedDepartment == "All") return false;
+    return DivisionConfig.isAllowedDepartment(selectedDepartment, [parent]);
+  }
 
   @override
   void dispose() {
@@ -51,13 +73,48 @@ class _DivLeaveManagementState extends State<DivLeaveManagement> {
   @override
   void initState() {
     super.initState();
-    _loadData();
+    final parent = widget.department.trim();
+    selectedDepartment = parent.isNotEmpty ? parent : "All";
+    _init();
   }
 
-  bool get _isOperationsSelected => DivisionConfig.isAllowedDepartment(
-    selectedDepartment,
-    const ["Operations Department"],
-  );
+  Future<void> _init() async {
+    await _loadLoginUser();
+    await _loadData();
+  }
+
+  Future<void> _loadLoginUser() async {
+    final token = await AuthService.getToken();
+    if (token == null) return;
+    _loginUserId = JwtHelper.getuid(token)?.toString().trim();
+  }
+
+  bool _canApproveOrReject(Map<String, dynamic> item) {
+    if (_isOwnLeaveTab) return false;
+
+    final senderId =
+        (item["senderId"] ??
+                item["SenderId"] ??
+                item["userId"] ??
+                item["uid"] ??
+                item["staffId"] ??
+                "")
+            .toString()
+            .trim();
+    if (_loginUserId != null &&
+        senderId.isNotEmpty &&
+        senderId == _loginUserId) {
+      return false;
+    }
+
+    final senderRole =
+        (item["senderRole"] ?? item["role"] ?? item["Role"] ?? "")
+            .toString()
+            .trim();
+    if (senderRole == "2" || senderRole == "3") return false;
+
+    return true;
+  }
 
   String _statusOf(Map<String, dynamic> item) {
     return (item["status"] ?? "").toString().trim().toLowerCase();
@@ -74,17 +131,6 @@ class _DivLeaveManagementState extends State<DivLeaveManagement> {
     return int.tryParse(
       (item["id"] ?? item["leaveId"] ?? item["permissionId"] ?? "").toString(),
     );
-  }
-
-  int? _userIdOf(Map<String, dynamic> item) {
-    final value =
-        item["userId"] ??
-        item["staffId"] ??
-        item["employeeId"] ??
-        item["uid"] ??
-        item["senderId"];
-    if (value == null) return null;
-    return int.tryParse(value.toString());
   }
 
   List<Map<String, dynamic>> _asMaps(dynamic data) {
@@ -146,85 +192,70 @@ class _DivLeaveManagementState extends State<DivLeaveManagement> {
       });
     }
 
+    final allowed = [
+      if (widget.department.trim().isNotEmpty) widget.department,
+      ...childDepartments,
+    ];
+    final teamAllowed =
+        childDepartments.isNotEmpty ? childDepartments : allowed;
+
     try {
-      final allowed = departments;
-      final loadedLeaves = <Map<String, dynamic>>[];
-      final loadedPermissions = <Map<String, dynamic>>[];
-
-      final staff = await AdminService.getEmployeesByDepartments(allowed);
-      final namesById = {
-        for (final user in staff)
-          if (user.name.trim().isNotEmpty) user.userId: user.name.trim(),
-      };
-
-      final reports = await Future.wait(
-        staff.map((user) async {
-          try {
-            final report = await ReportsService.getFullReport(
-              userId: user.userId,
-            );
-            return MapEntry(user, report);
-          } catch (_) {
-            return MapEntry(user, <String, dynamic>{});
-          }
-        }),
-      );
-
-      for (final entry in reports) {
-        final user = entry.key;
-        final report = entry.value;
-
-        for (final raw in List<dynamic>.from(report["leaveList"] ?? [])) {
-          final item = Map<String, dynamic>.from(raw as Map);
-          item["name"] = user.name;
-          item["department"] ??= user.department;
-          if (_isAllowedDept(_departmentOf(item), allowed)) {
-            loadedLeaves.add(item);
-          }
-        }
-
-        for (final raw in List<dynamic>.from(report["permissionList"] ?? [])) {
-          final item = Map<String, dynamic>.from(raw as Map);
-          item["name"] = user.name;
-          item["department"] ??= user.department;
-          if (_isAllowedDept(_departmentOf(item), allowed)) {
-            loadedPermissions.add(item);
-          }
-        }
-      }
+      final loadedTeamLeaves = <Map<String, dynamic>>[];
+      final loadedOwnLeaves = <Map<String, dynamic>>[];
+      final loadedTeamPermissions = <Map<String, dynamic>>[];
+      final loadedOwnPermissions = <Map<String, dynamic>>[];
 
       try {
-        for (final item in _asMaps(await AdminService.getDepartmentLeaves())) {
-          final userId = _userIdOf(item);
-          if ((item["name"] ?? "").toString().trim().isEmpty &&
-              userId != null &&
-              namesById[userId] != null) {
-            item["name"] = namesById[userId];
-          }
-          if (_isAllowedDept(_departmentOf(item), allowed)) {
-            loadedLeaves.add(item);
+        for (final item in await SuperAdminService.getLeaveList()) {
+          if (_isAllowedDept(_departmentOf(item), teamAllowed) ||
+              _departmentOf(item).trim().isEmpty) {
+            loadedTeamLeaves.add(item);
           }
         }
       } catch (_) {}
 
       try {
-        for (final item in _asMaps(await AdminService.getDepartmentPermissions())) {
-          final userId = _userIdOf(item);
-          if ((item["name"] ?? "").toString().trim().isEmpty &&
-              userId != null &&
-              namesById[userId] != null) {
-            item["name"] = namesById[userId];
+        for (final item in _asMaps(await AdminService.getLeaves())) {
+          item["department"] ??= widget.department;
+          loadedOwnLeaves.add(item);
+        }
+      } catch (_) {}
+
+      final departmentByUserId = <int, String>{};
+      try {
+        final staff = await AdminService.getEmployeesByDepartments(allowed);
+        departmentByUserId.addAll(
+          SuperAdminService.departmentByUserId(staff),
+        );
+      } catch (_) {}
+
+      try {
+        final permissions = await SuperAdminService.getPermissionList();
+        SuperAdminService.attachSenderDepartments(
+          permissions,
+          departmentByUserId,
+        );
+        for (final item in permissions) {
+          if (_isAllowedDept(_departmentOf(item), teamAllowed) ||
+              _departmentOf(item).trim().isEmpty) {
+            loadedTeamPermissions.add(item);
           }
-          if (_isAllowedDept(_departmentOf(item), allowed)) {
-            loadedPermissions.add(item);
-          }
+        }
+      } catch (_) {}
+
+      try {
+        for (final item in _asMaps(await AdminService.getPermissions())) {
+          item["department"] ??= widget.department;
+          loadedOwnPermissions.add(item);
         }
       } catch (_) {}
 
       if (!mounted) return;
       setState(() {
-        leaves = _uniqueById(loadedLeaves);
-        permissions = _uniqueById(loadedPermissions);
+        teamLeaves = _uniqueById(loadedTeamLeaves);
+        ownLeaves = _uniqueById(loadedOwnLeaves);
+        teamPermissions = _uniqueById(loadedTeamPermissions);
+        ownPermissions = _uniqueById(loadedOwnPermissions);
         isLoading = false;
       });
     } catch (_) {
@@ -233,25 +264,55 @@ class _DivLeaveManagementState extends State<DivLeaveManagement> {
     }
   }
 
-  List<Map<String, dynamic>> get _filteredItems {
-    final source = activeTab == "Leave" ? leaves : permissions;
-    return source.where((item) {
-      if (selectedDepartment != "All" &&
+  List<Map<String, dynamic>> get _sourceItems {
+    return activeTab == "Leave"
+        ? (_isOwnLeaveTab ? ownLeaves : teamLeaves)
+        : (_isOwnLeaveTab ? ownPermissions : teamPermissions);
+  }
+
+  List<Map<String, dynamic>> get _departmentScopedItems {
+    return _sourceItems.where((item) {
+      if (!_isOwnLeaveTab &&
+          selectedDepartment != "All" &&
           !DivisionConfig.isAllowedDepartment(_departmentOf(item), [
             selectedDepartment,
           ])) {
         return false;
       }
+      return true;
+    }).toList();
+  }
 
-      if (_isOperationsSelected) {
-        if (selectedStatus != "All" &&
-            _statusOf(item) != selectedStatus.toLowerCase()) {
-          return false;
-        }
-        return true;
+  Map<String, int> get _statusCounts {
+    final items = _departmentScopedItems;
+    var pending = 0;
+    var approved = 0;
+    var rejected = 0;
+    for (final item in items) {
+      switch (_statusOf(item)) {
+        case "pending":
+          pending++;
+        case "approved":
+          approved++;
+        case "rejected":
+          rejected++;
       }
+    }
+    return {
+      "All": items.length,
+      "Pending": pending,
+      "Approved": approved,
+      "Rejected": rejected,
+    };
+  }
 
-      return _statusOf(item) == "approved" || _statusOf(item).isEmpty;
+  List<Map<String, dynamic>> get _filteredItems {
+    return _departmentScopedItems.where((item) {
+      if (selectedStatus != "All" &&
+          _statusOf(item) != selectedStatus.toLowerCase()) {
+        return false;
+      }
+      return true;
     }).toList();
   }
 
@@ -272,8 +333,9 @@ class _DivLeaveManagementState extends State<DivLeaveManagement> {
   }
 
   String _leaveTypeOf(Map<String, dynamic> item) {
-    final type = (item["type"] ?? "").toString().trim();
-    final session = (item["leavecategory"] ?? "").toString().trim();
+    final type = (item["leaveType"] ?? item["type"] ?? "").toString().trim();
+    final session =
+        (item["leaveTyp"] ?? item["leavecategory"] ?? "").toString().trim();
     if (type.isNotEmpty && session.isNotEmpty) return "$type - $session";
     if (type.isNotEmpty) return type;
     if (session.isNotEmpty) return session;
@@ -318,11 +380,6 @@ class _DivLeaveManagementState extends State<DivLeaveManagement> {
           selectedDepartment = dept;
           expandedItems.clear();
           _rejecting.clear();
-          if (DivisionConfig.isAllowedDepartment(dept, const [
-            "Operations Department",
-          ])) {
-            selectedStatus = "Pending";
-          }
         }),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
@@ -358,40 +415,104 @@ class _DivLeaveManagementState extends State<DivLeaveManagement> {
     );
   }
 
-  Widget _buildStatusChip(String status) {
-    final selected = selectedStatus == status;
+  Color _filterColor(String status) {
+    switch (status) {
+      case "Pending":
+        return const Color(0xFFE8A317);
+      case "Approved":
+        return const Color(0xFF2E9B57);
+      case "Rejected":
+        return const Color(0xFFD64545);
+      default:
+        return Theme.of(context).colorScheme.secondary;
+    }
+  }
+
+  IconData _statusIcon(String status) {
+    switch (status) {
+      case "Pending":
+        return Icons.hourglass_top_rounded;
+      case "Approved":
+        return Icons.check_circle_rounded;
+      case "Rejected":
+        return Icons.cancel_rounded;
+      default:
+        return Icons.layers_rounded;
+    }
+  }
+
+  Widget _buildStatusFilters() {
+    final counts = _statusCounts;
+
     return Padding(
-      padding: const EdgeInsets.only(right: 8),
-      child: GestureDetector(
-        onTap: () => setState(() {
-          selectedStatus = status;
-          expandedItems.clear();
-        }),
-        child: Container(
-          height: 30,
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: selected
-                ? Theme.of(context).colorScheme.secondary
-                : Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: selected
-                  ? Theme.of(context).colorScheme.secondary
-                  : const Color(0xFFD0D5D2),
-            ),
-          ),
-          child: Text(
-            status,
-            style: TextStyle(
-              color: selected
-                  ? Colors.white
-                  : Theme.of(context).colorScheme.secondary,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
+      padding: const EdgeInsets.fromLTRB(10, 12, 10, 0),
+      child: Container(
+        padding: const EdgeInsets.all(4),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF3F5F4),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Row(
+          children: statusTabs.map((status) {
+            final selected = selectedStatus == status;
+            final color = _filterColor(status);
+            final count = counts[status] ?? 0;
+
+            return Expanded(
+              child: GestureDetector(
+                onTap: () => setState(() {
+                  selectedStatus = status;
+                  expandedItems.clear();
+                }),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  decoration: BoxDecoration(
+                    color: selected ? color : Colors.transparent,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: selected
+                        ? [
+                            BoxShadow(
+                              color: color.withValues(alpha: 0.28),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ]
+                        : null,
+                  ),
+                  child: Column(
+                    children: [
+                      Icon(
+                        _statusIcon(status),
+                        size: 18,
+                        color: selected ? Colors.white : color,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        status,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: selected
+                              ? Colors.white
+                              : const Color(0xFF5C6560),
+                        ),
+                      ),
+                      const SizedBox(height: 1),
+                      Text(
+                        "$count",
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                          color: selected ? Colors.white : color,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
         ),
       ),
     );
@@ -536,17 +657,7 @@ class _DivLeaveManagementState extends State<DivLeaveManagement> {
                   ),
                 ),
               ),
-              if (_isOperationsSelected)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(10, 10, 10, 0),
-                  child: SizedBox(
-                    height: 30,
-                    child: ListView(
-                      scrollDirection: Axis.horizontal,
-                      children: statusTabs.map(_buildStatusChip).toList(),
-                    ),
-                  ),
-                ),
+              _buildStatusFilters(),
               const SizedBox(height: 8),
               Expanded(
                 child: isLoading
@@ -554,11 +665,7 @@ class _DivLeaveManagementState extends State<DivLeaveManagement> {
                     : items.isEmpty
                     ? Center(
                         child: Text(
-                          !_isOperationsSelected
-                              ? (isPermission
-                                    ? "No approved permissions found"
-                                    : "No approved leaves found")
-                              : selectedStatus == "All"
+                          selectedStatus == "All"
                               ? (isPermission
                                     ? "No permissions found"
                                     : "No leaves found")
@@ -742,6 +849,14 @@ class _DivLeaveManagementState extends State<DivLeaveManagement> {
                     _infoRow("Reason", item["reason"]),
                   ] else ...[
                     _infoRow("Leave Type", _leaveTypeOf(item)),
+                    _infoRow(
+                      "From Date",
+                      _formatDate(item["fromDate"] ?? item["date"]),
+                    ),
+                    _infoRow(
+                      "To Date",
+                      _formatDate(item["toDate"] ?? item["fromDate"]),
+                    ),
                     _infoRow("Reason", item["reason"]),
                     if (_statusOf(item) == "approved")
                       _infoRow(
@@ -757,10 +872,15 @@ class _DivLeaveManagementState extends State<DivLeaveManagement> {
                         item["rejectionReason"] ?? item["reason"],
                       ),
                   ],
-                  if (_isOperationsSelected && _isPending(item)) ...[
+                  if (!_isOwnLeaveTab &&
+                      _isPending(item) &&
+                      _canApproveOrReject(item)) ...[
                     const SizedBox(height: 10),
                     _actionButtons(item, isPermission, key),
-                  ],
+                  ] else if (!_isOwnLeaveTab &&
+                      _isPending(item) &&
+                      !_canApproveOrReject(item))
+                    _infoRow("Approval", "Awaiting Director approval"),
                 ],
               ),
             ),

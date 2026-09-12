@@ -4,6 +4,26 @@ class AppRoles {
   static const String divisionHead = "2";
   static const String fiveS = "50";
 
+  static bool isManager(String? role) {
+    if (role == null) return false;
+    final value = role.trim();
+    if (value == manager) return true;
+    final lower = value.toLowerCase();
+    if (lower.contains("assistant")) return false;
+    if (lower.contains("division")) return false;
+    return lower == "manager" || lower.contains("manager");
+  }
+
+  static bool isAssistantManager(String? role) {
+    if (role == null) return false;
+    final lower = role.trim().toLowerCase();
+    return lower.contains("assistant") && lower.contains("manager");
+  }
+
+  static bool shouldHideOvertime(String? role) {
+    return isManager(role) || isAssistantManager(role);
+  }
+
   static bool isDivisionHead(String? role) {
     if (role == null) return false;
     final value = role.trim();

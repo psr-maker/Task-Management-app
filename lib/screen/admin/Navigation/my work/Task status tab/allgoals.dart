@@ -23,19 +23,24 @@ class Allgoals extends StatefulWidget {
 class _AllgoalsState extends State<Allgoals> {
   List goals = [];
   bool isLoading = true;
+  final Set<String> _removedGoalCodes = {};
 
   @override
   void initState() {
     super.initState();
-    loadGoals();
+    loadGoals(showLoader: true);
   }
 
-  Future<void> loadGoals() async {
+  Future<void> loadGoals({bool showLoader = false}) async {
     try {
+      if (showLoader && mounted) setState(() => isLoading = true);
       final data = await SuperAdminService.getGoals();
       if (!mounted) return;
       setState(() {
-        goals = data;
+        goals = data.where((goal) {
+          final code = (goal["goalCode"] ?? "").toString();
+          return !_removedGoalCodes.contains(code);
+        }).toList();
         isLoading = false;
       });
     } catch (e) {
@@ -103,10 +108,30 @@ class _AllgoalsState extends State<Allgoals> {
     return ListView.builder(
       itemCount: filteredGoals.length,
       itemBuilder: (context, index) {
+        final goal = filteredGoals[index];
+        final goalCode =
+            (goal["goalCode"] ?? goal["GoalCode"] ?? "").toString().trim();
         return GoalCard(
-          goal: filteredGoals[index],
-          onDelete: widget.onDelete,
-          onRefresh: loadGoals,
+          key: ValueKey(goalCode),
+          goal: goal,
+          onDelete: (msg, isError) {
+            if (!isError) {
+              setState(() {
+                if (goalCode.isNotEmpty) _removedGoalCodes.add(goalCode);
+                goals = goals
+                    .where(
+                      (item) =>
+                          (item["goalCode"] ?? item["GoalCode"] ?? "")
+                              .toString()
+                              .trim() !=
+                          goalCode,
+                    )
+                    .toList();
+              });
+            }
+            widget.onDelete?.call(msg, isError);
+          },
+          onRefresh: () => loadGoals(),
         );
       },
     );

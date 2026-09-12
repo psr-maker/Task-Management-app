@@ -4,6 +4,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:staff_work_track/Models/warning_model.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
+import 'package:staff_work_track/screen/admin/Navigation/dashbord/drawer/staffleaves.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/admin_approval.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/drawer/anouncement.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/drawer/auditlog.dart';
@@ -439,6 +440,25 @@ class _OverallReportsTabState extends State<SuperAdminDashboard> {
             ),
           ),
           const SizedBox(height: 10),
+          ListTile(
+            leading: Icon(
+              Icons.event_available_rounded,
+              color: Theme.of(context).colorScheme.secondary,
+            ),
+            title: Text(
+              "Leave Management",
+              style: Theme.of(context).textTheme.headlineMedium,
+            ),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const StaffLeaves(isDirectorView: true),
+                ),
+              );
+            },
+          ),
             ListTile(
             leading: Icon(
               Icons.reviews_sharp,

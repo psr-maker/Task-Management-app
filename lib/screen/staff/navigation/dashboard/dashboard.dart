@@ -11,6 +11,7 @@ import 'package:staff_work_track/screen/super%20admin/Navigation/Reports/reports
 import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/warnings/warning.dart';
 import 'package:staff_work_track/services/announ_service.dart';
 import 'package:staff_work_track/services/reports_service.dart';
+import 'package:staff_work_track/services/superadmin_service.dart';
 import 'package:staff_work_track/widgets/StatCard.dart';
 import 'package:staff_work_track/widgets/monthlytrend.dart';
 import 'package:staff_work_track/widgets/kpicard.dart';
@@ -45,13 +46,35 @@ class _StaffDashboardState extends State<StaffDashboard> {
   int notificationCount = 0;
   DateTime selectedYear = DateTime.now();
   List<dynamic> monthlyData = [];
+  late bool _hideOvertime;
 
   @override
   void initState() {
     super.initState();
+    _hideOvertime = AppRoles.shouldHideOvertime(widget.role);
+    _resolveOvertimeVisibility();
     fetchAllData();
     //_fetchNotifications();
     _fetchWarnings();
+  }
+
+  Future<void> _resolveOvertimeVisibility() async {
+    if (_hideOvertime) return;
+    try {
+      final roles = await SuperAdminService.getRoles();
+      final roleId = int.tryParse(widget.role.trim());
+      for (final role in roles) {
+        final matchesId = roleId != null && role.id == roleId;
+        final matchesName =
+            role.name.toLowerCase() == widget.role.trim().toLowerCase();
+        if (!matchesId && !matchesName) continue;
+        if (AppRoles.shouldHideOvertime(role.name) ||
+            AppRoles.shouldHideOvertime(role.id.toString())) {
+          if (mounted) setState(() => _hideOvertime = true);
+        }
+        break;
+      }
+    } catch (_) {}
   }
 
   // void _fetchNotifications() async {
@@ -528,18 +551,19 @@ class _StaffDashboardState extends State<StaffDashboard> {
                 );
               },
             ),
-            _buildDrawerItem(
-              context,
-              icon: Icons.more_time_rounded,
-              title: "Overtime",
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => OvertimeListttt()),
-                );
-              },
-            ),
+            if (!_hideOvertime)
+              _buildDrawerItem(
+                context,
+                icon: Icons.more_time_rounded,
+                title: "Overtime",
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => OvertimeListttt()),
+                  );
+                },
+              ),
             _buildDrawerItem(
               context,
               icon: Icons.edit_calendar_rounded,

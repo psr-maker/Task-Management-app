@@ -1,13 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:staff_work_track/core/constant/division_config.dart';
 import 'package:staff_work_track/core/widgets/buttons.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
 import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
 import 'package:staff_work_track/services/admin_service.dart';
+import 'package:staff_work_track/services/auth_service.dart';
+import 'package:staff_work_track/services/superadmin_service.dart';
 import 'package:staff_work_track/utils/app_helper.dart';
+import 'package:staff_work_track/utils/jwt_helper.dart';
 
 class StaffLeaves extends StatefulWidget {
-  const StaffLeaves({super.key});
+  final bool isDirectorView;
+  const StaffLeaves({super.key, this.isDirectorView = false});
   @override
   State<StaffLeaves> createState() => _StaffLeavesState();
 }
@@ -28,15 +33,109 @@ class _StaffLeavesState extends State<StaffLeaves>
   final tabs = ["All", "Pending", "Approved", "Rejected"];
   final permissionTabs = ["All", "Pending", "Approved", "Rejected"];
   Set<int> expandedItems = {};
+  String? _loginUserId;
+  String selectedDepartment = "All";
+  List<String> departments = [];
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
-    loadItems();
     _tabController.addListener(() {
       filterItems();
     });
+    _init();
+  }
+
+  Future<void> _init() async {
+    await _loadLoginUser();
+    if (widget.isDirectorView) {
+      await _loadDepartments();
+    }
+    await loadItems();
+  }
+
+  Future<void> _loadDepartments() async {
+    try {
+      final data = await SuperAdminService().getDepartments();
+      final names = data
+          .map((d) => d.departmentName.trim())
+          .where((name) => name.isNotEmpty)
+          .toSet()
+          .toList()
+        ..sort();
+      if (!mounted) return;
+      setState(() => departments = names);
+    } catch (_) {}
+  }
+
+  String _departmentOf(dynamic item) {
+    return (item["department"] ??
+            item["senderDepartment"] ??
+            item["SenderDepartment"] ??
+            item["dept"] ??
+            item["departmentName"] ??
+            "")
+        .toString()
+        .trim();
+  }
+
+  void _mergeDepartmentsFromItems(List items) {
+    if (!widget.isDirectorView) return;
+    final names = <String>{...departments};
+    for (final item in items) {
+      final dept = _departmentOf(item);
+      if (dept.isNotEmpty) names.add(dept);
+    }
+    final sorted = names.toList()..sort();
+    departments = sorted;
+  }
+
+  Future<void> _loadLoginUser() async {
+    final token = await AuthService.getToken();
+    if (token == null) return;
+    _loginUserId = JwtHelper.getuid(token)?.toString().trim();
+  }
+
+  int? _itemId(dynamic item) {
+    return int.tryParse(
+      (item["id"] ?? item["leaveId"] ?? item["permissionId"] ?? "").toString(),
+    );
+  }
+
+  bool _canApproveOrReject(dynamic item) {
+    if (widget.isDirectorView) return true;
+
+    final senderId =
+        (item["senderId"] ??
+                item["SenderId"] ??
+                item["userId"] ??
+                item["uid"] ??
+                item["staffId"] ??
+                "")
+            .toString()
+            .trim();
+    if (_loginUserId != null &&
+        senderId.isNotEmpty &&
+        senderId == _loginUserId) {
+      return false;
+    }
+
+    final receiverId =
+        (item["receiverId"] ?? item["ReceiverId"] ?? "").toString().trim();
+    if (_loginUserId != null &&
+        receiverId.isNotEmpty &&
+        receiverId != _loginUserId) {
+      return false;
+    }
+
+    final senderRole =
+        (item["senderRole"] ?? item["role"] ?? item["Role"] ?? "")
+            .toString()
+            .trim();
+    if (senderRole == "2" || senderRole == "3") return false;
+
+    return true;
   }
 
   Future<void> loadItems() async {
@@ -51,13 +150,35 @@ class _StaffLeavesState extends State<StaffLeaves>
       List data = [];
 
       if (activeTab == "Leave") {
-        data = await AdminService.getDepartmentLeaves();
+        data = widget.isDirectorView
+            ? await SuperAdminService.getLeaveList()
+            : await AdminService.getDepartmentLeaves();
       } else if (activeTab == "Permission") {
-        data = await AdminService.getDepartmentPermissions();
+        data = widget.isDirectorView
+            ? await SuperAdminService.getPermissionList()
+            : await AdminService.getDepartmentPermissions();
+        if (widget.isDirectorView) {
+          try {
+            final users = await SuperAdminService.getAllUsers();
+            SuperAdminService.attachSenderDepartments(
+              data.whereType<Map<String, dynamic>>().toList(),
+              SuperAdminService.departmentByUserId(users),
+            );
+          } catch (_) {}
+        }
       }
 
       setState(() {
         allItems = data;
+        _mergeDepartmentsFromItems(data);
+        if (selectedDepartment != "All" &&
+            !departments.any(
+              (dept) => DivisionConfig.isAllowedDepartment(selectedDepartment, [
+                dept,
+              ]),
+            )) {
+          selectedDepartment = "All";
+        }
         filteredItems = data;
         isLoading = false;
       });
@@ -99,10 +220,19 @@ class _StaffLeavesState extends State<StaffLeaves>
     }
 
     setState(() {
+      Iterable items = allItems;
+      if (widget.isDirectorView && selectedDepartment != "All") {
+        items = items.where((item) {
+          return DivisionConfig.isAllowedDepartment(_departmentOf(item), [
+            selectedDepartment,
+          ]);
+        });
+      }
+
       if (selected == "All") {
-        filteredItems = allItems;
+        filteredItems = items.toList();
       } else {
-        filteredItems = allItems.where((item) {
+        filteredItems = items.where((item) {
           return (item["status"] ?? "").toString().toLowerCase() ==
               selected.toLowerCase();
         }).toList();
@@ -162,7 +292,9 @@ class _StaffLeavesState extends State<StaffLeaves>
     final groupedData = groupByMonth(filteredItems);
     return Scaffold(
       appBar: AppBar(
-        title: Text(activeTab),
+        title: Text(
+          widget.isDirectorView ? "$activeTab Approvals" : activeTab,
+        ),
         leading: IconButton(
           onPressed: () => Navigator.pop(context),
           icon: const Icon(Icons.arrow_back_ios),
@@ -258,57 +390,78 @@ class _StaffLeavesState extends State<StaffLeaves>
           ),
         ),
       ),
-      body: isLoading
-          ? const Center(child: RotatingFlower())
-          : filteredItems.isEmpty
-          ? Center(
-              child: Text(
-                activeTab == "Leave"
-                    ? "No Leave Found"
-                    : "No Permission Found"
+      body: Column(
+        children: [
+          if (widget.isDirectorView)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(10, 12, 10, 0),
+              child: SizedBox(
+                height: 34,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  children: ["All", ...departments]
+                      .map(_buildDeptChip)
+                      .toList(),
+                ),
               ),
-            )
-          : Stack(
-              children: [
-                ListView(
-                  padding: const EdgeInsets.all(12),
-                  children: groupedData.entries.map((entry) {
-                    String month = entry.key;
-                    List items = entry.value;
+            ),
+          Expanded(
+            child: isLoading
+                ? const Center(child: RotatingFlower())
+                : filteredItems.isEmpty
+                ? Center(
+                    child: Text(
+                      activeTab == "Leave"
+                          ? "No Leave Found"
+                          : "No Permission Found",
+                    ),
+                  )
+                : Stack(
+                    children: [
+                      ListView(
+                        padding: const EdgeInsets.all(12),
+                        children: groupedData.entries.map((entry) {
+                          String month = entry.key;
+                          List items = entry.value;
 
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 10),
-                          child: Text(
-                            month,
-                            style: Theme.of(context).textTheme.bodyMedium,
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 10,
+                                ),
+                                child: Text(
+                                  month,
+                                  style: Theme.of(context).textTheme.bodyMedium,
+                                ),
+                              ),
+                              ...items.asMap().entries.map((entry) {
+                                int index = entry.key;
+                                var item = entry.value;
+                                return buildItem(item, index);
+                              }),
+                            ],
+                          );
+                        }).toList(),
+                      ),
+                      if (_topMessage != null)
+                        AnimatedPositioned(
+                          top: _showTopMessage ? 20 : -120,
+                          left: 16,
+                          right: 16,
+                          duration: const Duration(milliseconds: 300),
+                          child: Msgsnackbar(
+                            context,
+                            message: _topMessage!,
+                            isError: _isErrorMessage,
                           ),
                         ),
-                        ...items.asMap().entries.map((entry) {
-                          int index = entry.key;
-                          var item = entry.value;
-                          return buildItem(item, index);
-                        }).toList(),
-                      ],
-                    );
-                  }).toList(),
-                ),
-                if (_topMessage != null)
-                  AnimatedPositioned(
-                    top: _showTopMessage ? 20 : -120,
-                    left: 16,
-                    right: 16,
-                    duration: const Duration(milliseconds: 300),
-                    child: Msgsnackbar(
-                      context,
-                      message: _topMessage!,
-                      isError: _isErrorMessage,
-                    ),
+                    ],
                   ),
-              ],
-            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -352,10 +505,17 @@ class _StaffLeavesState extends State<StaffLeaves>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-           
-               (e["name"] ?? ""),
+                          (e["name"] ?? "").toString(),
                           style: Theme.of(context).textTheme.headlineLarge,
                         ),
+                        if (widget.isDirectorView &&
+                            _departmentOf(e).isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            _departmentOf(e),
+                            style: Theme.of(context).textTheme.labelMedium,
+                          ),
+                        ],
                         const SizedBox(height: 4),
                         if (isPermission) ...[
                           Text(
@@ -417,14 +577,21 @@ class _StaffLeavesState extends State<StaffLeaves>
                   Divider(color: Colors.grey.shade200),
                 if (isPermission) ...[
                     infoRow("Name", e["name"]),
+                    if (widget.isDirectorView)
+                      infoRow("Department", _departmentOf(e)),
                     infoRow("Date", formatDate(e["date"] ?? e["fromDate"])),
                     infoRow("From Time", formatTime(e["fromTime"])),
                     infoRow("To Time", formatTime(e["toTime"])),
                     infoRow("Total Hours", e["totalHours"] ?? "-"),
                     infoRow("Reason", e["reason"]),
-                    if (status == "pending") buildPermissionActionSection(e),
+                    if (status == "pending" && _canApproveOrReject(e))
+                      buildPermissionActionSection(e)
+                    else if (status == "pending")
+                      infoRow("Approval", "Awaiting Director approval"),
                   ] else ...[
                     infoRow("Name", e["name"]),
+                    if (widget.isDirectorView)
+                      infoRow("Department", _departmentOf(e)),
                     infoRow("Designation", e["designation"]),
                     infoRow("Reason", e["reason"]),
                     infoRow("Contact", e["contactNumber"]),
@@ -451,8 +618,11 @@ class _StaffLeavesState extends State<StaffLeaves>
                         ),
                       ),
                     const SizedBox(height: 8),
-                    if (status.toLowerCase() == "pending")
-                      buildActionSection(e),
+                    if (status.toLowerCase() == "pending" &&
+                        _canApproveOrReject(e))
+                      buildActionSection(e)
+                    else if (status.toLowerCase() == "pending")
+                      infoRow("Approval", "Awaiting Director approval"),
                     if (status == "approved")
                       infoRow(
                         "Approved Date",
@@ -465,6 +635,55 @@ class _StaffLeavesState extends State<StaffLeaves>
               ),
             ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildDeptChip(String dept) {
+    final selected = selectedDepartment == dept;
+    final label = dept == "All" ? "All" : dept.replaceAll(" Department", "");
+    final secondary = Theme.of(context).colorScheme.secondary;
+
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: GestureDetector(
+        onTap: () {
+          setState(() {
+            selectedDepartment = dept;
+            expandedItems.clear();
+          });
+          filterItems();
+        },
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          height: 34,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: selected ? secondary : Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: selected ? secondary : const Color(0xFFD0D5D2),
+            ),
+          ),
+          alignment: Alignment.center,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (selected) ...[
+                const Icon(Icons.check, size: 16, color: Colors.white),
+                const SizedBox(width: 4),
+              ],
+              Text(
+                label,
+                style: TextStyle(
+                  color: selected ? Colors.white : secondary,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -511,9 +730,15 @@ class _StaffLeavesState extends State<StaffLeaves>
                     text: "Approve",
                     isLoading: _isLoading,
                     onPressed: () async {
+                      final id = _itemId(e);
+                      if (id == null) {
+                        showTopMessage("Invalid leave ID", isError: true);
+                        return;
+                      }
                       bool success = await AdminService.updateLeaveStatus(
-                        id: e["id"],
+                        id: id,
                         status: "Approved",
+                        asDirector: widget.isDirectorView,
                       );
 
                       if (success) {
@@ -571,10 +796,16 @@ class _StaffLeavesState extends State<StaffLeaves>
                 text: "Submit Rejection",
                 isLoading: _isLoading,
                 onPressed: () async {
+                  final id = _itemId(e);
+                  if (id == null) {
+                    showTopMessage("Invalid leave ID", isError: true);
+                    return;
+                  }
                   bool success = await AdminService.updateLeaveStatus(
-                    id: e["id"],
+                    id: id,
                     status: "Rejected",
                     reason: reasonController.text,
+                    asDirector: widget.isDirectorView,
                   );
 
                   if (success) {
@@ -607,9 +838,15 @@ class _StaffLeavesState extends State<StaffLeaves>
                 text: "Approve",
                 isLoading: _isLoading,
                 onPressed: () async {
+                  final id = _itemId(e);
+                  if (id == null) {
+                    showTopMessage("Invalid permission ID", isError: true);
+                    return;
+                  }
                   bool success = await AdminService.updatePermissionStatus(
-                    id: e["id"],
+                    id: id,
                     status: "Approved",
+                    asDirector: widget.isDirectorView,
                   );
 
                   if (success) {
@@ -635,9 +872,15 @@ class _StaffLeavesState extends State<StaffLeaves>
                 text: "Reject",
                 isLoading: _isLoading,
                 onPressed: () async {
+                  final id = _itemId(e);
+                  if (id == null) {
+                    showTopMessage("Invalid permission ID", isError: true);
+                    return;
+                  }
                   bool success = await AdminService.updatePermissionStatus(
-                    id: e["id"],
+                    id: id,
                     status: "Rejected",
+                    asDirector: widget.isDirectorView,
                   );
 
                   if (success) {

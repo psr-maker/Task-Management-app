@@ -77,9 +77,11 @@ class AdminService {
     );
 
     if (response.statusCode == 200) {
-      return List<Map<String, dynamic>>.from(
-        json.decode(response.body)["result"],
-      );
+      final decoded = json.decode(response.body);
+      final list = decoded is List
+          ? decoded
+          : (decoded["result"] ?? decoded["tasks"] ?? decoded["data"] ?? []);
+      return List<Map<String, dynamic>>.from(list);
     } else {
       throw Exception("Failed to load admin tasks");
     }
@@ -402,32 +404,106 @@ class AdminService {
     }
   }
 
+  static List<dynamic> _decodeList(String body) {
+    final data = jsonDecode(body);
+    if (data is List) return data;
+    if (data is Map) {
+      final list =
+          data["data"] ??
+          data["leaves"] ??
+          data["permissions"] ??
+          data["result"] ??
+          data["items"];
+      if (list is List) return list;
+    }
+    return [];
+  }
+
+  static Future<List<dynamic>> _getFirstSuccessfulList(
+    List<String> paths,
+  ) async {
+    final token = await AuthService.getToken();
+    if (token == null) throw Exception("Token not found");
+
+    http.Response? last;
+    for (final path in paths) {
+      final response = await http.get(
+        Uri.parse("$baseUrl$path"),
+        headers: {
+          "Authorization": "Bearer $token",
+          "Content-Type": "application/json",
+        },
+      );
+      last = response;
+      if (response.statusCode == 200) {
+        return _decodeList(response.body);
+      }
+      if (response.statusCode != 404) {
+        throw Exception("Failed to load: ${response.body}");
+      }
+    }
+    throw Exception("Failed to load: ${last?.body ?? "no response"}");
+  }
+
+  static Future<bool> _postFirstSuccessful(
+    List<String> paths,
+  ) async {
+    final token = await AuthService.getToken();
+    http.Response? last;
+    for (final path in paths) {
+      final response = await http.post(
+        Uri.parse("$baseUrl$path"),
+        headers: {
+          "Content-Type": "application/json",
+          if (token != null) "Authorization": "Bearer $token",
+        },
+      );
+      last = response;
+      print("STATUS: ${response.statusCode}");
+      print("BODY: ${response.body}");
+      if (response.statusCode == 200) return true;
+      if (response.statusCode != 404) return false;
+    }
+    print("STATUS: ${last?.statusCode}");
+    print("BODY: ${last?.body}");
+    return false;
+  }
+
   static Future<bool> updateLeaveStatus({
     required int id,
     required String status,
     String? reason,
+    bool asDirector = false,
   }) async {
     try {
-      final url =
-          "$baseUrl/Manager/update-leave-status?id=$id&status=$status&reason=${reason ?? ""}";
-
-      final response = await http.post(
-        Uri.parse(url),
-        headers: {"Content-Type": "application/json"},
-      );
-
-      print("STATUS: ${response.statusCode}");
-      print("BODY: ${response.body}");
-
-      if (response.statusCode == 200) {
-        return true;
-      } else {
-        return false;
-      }
+      final encodedReason = Uri.encodeQueryComponent(reason ?? "");
+      final query =
+          "id=$id&status=$status&reason=$encodedReason";
+      final paths = asDirector
+          ? [
+              "/Director/update-leave-status?$query",
+              "/Manager/update-leave-status?$query",
+            ]
+          : ["/Manager/update-leave-status?$query"];
+      return await _postFirstSuccessful(paths);
     } catch (e) {
       print(e);
       return false;
     }
+  }
+
+  static Future<List<dynamic>> getDirectorLeaves() {
+    return _getFirstSuccessfulList([
+      "/Director/get-leaves",
+      "/Director/get-department-leaves",
+    ]);
+  }
+
+  static Future<List<dynamic>> getDirectorPermissions() {
+    return _getFirstSuccessfulList([
+      "/Director/get-permissions",
+      "/Director/get-department-permissions",
+    ]);
   }
 
   static Future<Map<String, dynamic>?> applyPermission({
@@ -482,20 +558,17 @@ class AdminService {
   static Future<bool> updatePermissionStatus({
     required int id,
     required String status,
+    bool asDirector = false,
   }) async {
     try {
-      final token = await AuthService.getToken();
-      final response = await http.post(
-        Uri.parse(
-          "$baseUrl/Manager/update-permission-status?id=$id&status=$status",
-        ),
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": "Bearer $token",
-        },
-      );
-
-      return response.statusCode == 200;
+      final query = "id=$id&status=$status";
+      final paths = asDirector
+          ? [
+              "/Director/update-permission-status?$query",
+              "/Manager/update-permission-status?$query",
+            ]
+          : ["/Manager/update-permission-status?$query"];
+      return await _postFirstSuccessful(paths);
     } catch (e) {
       return false;
     }
@@ -553,7 +626,7 @@ class AdminService {
       );
 
       if (response.statusCode == 200) {
-        return jsonDecode(response.body);
+        return _decodeList(response.body);
       } else {
         print("Error: ${response.body}");
         return [];
@@ -582,8 +655,7 @@ class AdminService {
 
       // ✅ Success
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        return data;
+        return _decodeList(response.body);
       } else {
         throw Exception("Failed to load department leaves: ${response.body}");
       }

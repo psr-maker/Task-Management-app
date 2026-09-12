@@ -84,7 +84,11 @@ class _EditGoalPageState extends State<EditGoalPage> {
     if (success) {
       showTopMessage("Goal updated successfully", isError: false);
       await Future.delayed(const Duration(seconds: 1));
-      Navigator.pop(context, true);
+      Navigator.pop(context, {
+        "title": goalTitleController.text,
+        "dueDate": goalDueController.text,
+        "priority": selectedPriority,
+      });
     } else {
       showTopMessage("Failed to update goal");
     }

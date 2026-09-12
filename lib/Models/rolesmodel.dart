@@ -13,10 +13,17 @@ class Role {
 
   factory Role.fromJson(Map<String, dynamic> json) {
     return Role(
-      id: json['id'] ?? 0,
-      name: json['roleName'] ?? '',
+      id: json['id'] ?? json['roleId'] ?? 0,
+      name: json['roleName'] ?? json['name'] ?? '',
       position: json['position'] ?? 0,
       status: json['status'] ?? false,
     );
   }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) || other is Role && other.id == id;
+
+  @override
+  int get hashCode => id.hashCode;
 }
