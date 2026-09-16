@@ -11,15 +11,23 @@ class AdminService {
   static Future<List<UserModel>> getEmployeesByDepartment(
     String department,
   ) async {
+    final token = await AuthService.getToken();
+    final encodedDepartment = Uri.encodeComponent(department.trim());
     final response = await http.get(
-      Uri.parse('$baseUrl/Manager/staffbydept/$department'),
-      headers: {"Content-Type": "application/json"},
+      Uri.parse('$baseUrl/Manager/staffbydept/$encodedDepartment'),
+      headers: {
+        "Content-Type": "application/json",
+        if (token != null && token.isNotEmpty) "Authorization": "Bearer $token",
+      },
     );
 
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
-      final List employeesJson = data['employees'] ?? [];
-      return employeesJson.map((e) => UserModel.fromJson(e)).toList();
+      final List employeesJson = data['employees'] ?? data['data'] ?? [];
+      return employeesJson
+          .whereType<Map>()
+          .map((e) => UserModel.fromJson(Map<String, dynamic>.from(e)))
+          .toList();
     } else {
       throw Exception("Failed to load employees");
     }

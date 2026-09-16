@@ -7,9 +7,9 @@ import 'package:staff_work_track/core/widgets/loading.dart';
 import 'package:staff_work_track/screen/division_head/div_compensation.dart';
 import 'package:staff_work_track/screen/division_head/div_leave_management.dart';
 import 'package:staff_work_track/screen/division_head/div_overtime.dart';
+import 'package:staff_work_track/screen/division_head/drawer/div_auditlog.dart';
 import 'package:staff_work_track/screen/staff/navigation/dashboard/dashboard.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/drawer/anouncement.dart';
-import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/drawer/auditlog.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/drawer/points.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/drawer/usersworklog.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/settings/settings.dart';
@@ -446,12 +446,8 @@ class _DivDashboardState extends State<DivDashboard> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => AuditLogPage(
-                          allowedDepartments: [
-                            if (widget.department.isNotEmpty)
-                              widget.department,
-                            ...childDepartments,
-                          ],
+                        builder: (_) => DivAuditLog(
+                          department: widget.department,
                         ),
                       ),
                     );

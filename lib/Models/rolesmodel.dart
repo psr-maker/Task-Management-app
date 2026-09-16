@@ -13,11 +13,16 @@ class Role {
 
   factory Role.fromJson(Map<String, dynamic> json) {
     return Role(
-      id: json['id'] ?? json['roleId'] ?? 0,
+      id: _asInt(json['id'] ?? json['roleId']),
       name: json['roleName'] ?? json['name'] ?? '',
-      position: json['position'] ?? 0,
-      status: json['status'] ?? false,
+      position: _asInt(json['position']),
+      status: json['status'] == true || json['status'] == 'true',
     );
+  }
+
+  static int _asInt(dynamic value) {
+    if (value is int) return value;
+    return int.tryParse(value?.toString() ?? '') ?? 0;
   }
 
   @override

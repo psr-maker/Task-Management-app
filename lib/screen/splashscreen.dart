@@ -37,31 +37,28 @@ class _SplashScreenState extends State<SplashScreen>
 
 
   Future<void> checkLogin() async {
-    // 1. Check application version
-    final versionResult = await VersionService.checkVersion();
+    if (VersionService.shouldCheckUpdate) {
+      final versionResult = await VersionService.checkVersion();
 
-    if (versionResult != null) {
-      final currentVersion = versionResult['currentVersion'];
-      final latestVersion = versionResult['latestVersion'];
+      if (versionResult != null) {
+        final currentVersion =
+            (versionResult['currentVersion'] ?? '').toString();
+        final latestVersion =
+            (versionResult['latestVersion'] ?? '').toString();
 
-      final updateAvailable = VersionService.isNewerVersion(
-        currentVersion,
-        latestVersion,
-      );
+        if (VersionService.isNewerVersion(currentVersion, latestVersion)) {
+          if (!mounted) return;
 
-      // 2. If new version exists, show update dialog
-      if (updateAvailable) {
-        if (!mounted) return;
-
-        await _showUpdateDialog(
-          currentVersion: currentVersion,
-          latestVersion: latestVersion,
-          downloadUrl: versionResult['downloadUrl'],
-        );
+          await _showUpdateDialog(
+            currentVersion: currentVersion,
+            latestVersion: latestVersion,
+            downloadUrl: (versionResult['downloadUrl'] ?? '').toString(),
+          );
+          return;
+        }
       }
     }
 
-    // 3. Continue with your existing login logic
     final token = await AuthService.getToken();
 
     await Future.delayed(const Duration(seconds: 2));
@@ -95,36 +92,141 @@ class _SplashScreenState extends State<SplashScreen>
   }) async {
     await showDialog(
       context: context,
-      barrierDismissible: true,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Update Available'),
-          content: Text(
-            'A new version of WorkPulse is available.\n\n'
-            'Current version: $currentVersion\n'
-            'Latest version: $latestVersion',
-          ),
-          actions: [
-            // TextButton(
-            //   onPressed: () {
-            //     Navigator.pop(context);
-            //   },
-            //   child: const Text('Later'),
-            // ),
-            AppButton(
-              text: 'Update Now',
-              onPressed: () async {
-                final uri = Uri.parse(downloadUrl);
-
-                if (await canLaunchUrl(uri)) {
-                  await launchUrl(uri, mode: LaunchMode.externalApplication);
-                }
-              },
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return PopScope(
+          canPop: false,
+          child: Dialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(22),
             ),
-          ],
+            insetPadding: const EdgeInsets.symmetric(horizontal: 28),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(22, 28, 22, 22),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 72,
+                    height: 72,
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.secondary
+                          .withOpacity(0.12),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.system_update_alt_rounded,
+                      size: 34,
+                      color: Theme.of(context).colorScheme.secondary,
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  const Text(
+                    'Update Required',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'A new version of WorkPulse is available.\nPlease update to continue.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 13,
+                      height: 1.4,
+                      color: Colors.grey.shade700,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  _versionRow('Current version', currentVersion),
+                  const SizedBox(height: 8),
+                  _versionRow('Latest version', latestVersion, highlight: true),
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    width: double.infinity,
+                    child: AppButton(
+                      text: 'Update Now',
+                      color: Theme.of(context).colorScheme.secondary,
+                      txtcolor: Theme.of(context).colorScheme.onPrimary,
+                      onPressed: () => _openUpdateLink(downloadUrl),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         );
       },
     );
+  }
+
+  Widget _versionRow(String label, String version, {bool highlight = false}) {
+    final color = highlight
+        ? Theme.of(context).colorScheme.secondary
+        : Colors.grey.shade700;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: highlight
+            ? Theme.of(context).colorScheme.secondary.withOpacity(0.08)
+            : Colors.grey.shade100,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+          ),
+          Text(
+            version,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _openUpdateLink(String downloadUrl) async {
+    final url = downloadUrl.trim();
+    if (url.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Update link is missing.')),
+      );
+      return;
+    }
+
+    final uri = Uri.tryParse(url);
+    if (uri == null || (!uri.isScheme('http') && !uri.isScheme('https'))) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Invalid update link.')),
+      );
+      return;
+    }
+
+    try {
+      final launched = await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+      );
+      if (!launched) {
+        await launchUrl(uri, mode: LaunchMode.platformDefault);
+      }
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not open the update link.')),
+      );
+    }
   }
 
   @override

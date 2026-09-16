@@ -451,6 +451,46 @@ class SuperAdminService {
     }
   }
 
+  static Future<List<AuditLogModel>> getMyDepartmentAuditLogs() async {
+    final token = await AuthService.getToken();
+    final paths = [
+      '/Director/my-department-auditlogs',
+    ];
+
+    for (final path in paths) {
+      final response = await http.get(
+        Uri.parse('$baseUrl$path'),
+        headers: {
+          'Content-Type': 'application/json',
+          if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body);
+        List list = [];
+        if (decoded is List) {
+          list = decoded;
+        } else if (decoded is Map) {
+          list = decoded['auditLogs'] ??
+              decoded['AuditLogs'] ??
+              decoded['data'] ??
+              decoded['Data'] ??
+              [];
+        }
+        return list
+            .whereType<Map>()
+            .map((e) => AuditLogModel.fromJson(Map<String, dynamic>.from(e)))
+            .toList();
+      }
+      if (response.statusCode == 401) {
+        throw Exception('Unauthorized. Please login again.');
+      }
+    }
+
+    throw Exception('Failed to load department audit logs');
+  }
+
   Future<List<Department>> getDepartments() async {
     final response = await http.get(
       Uri.parse("$baseUrl/Director/getdepartments"),

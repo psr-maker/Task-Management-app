@@ -7,6 +7,24 @@ import 'package:staff_work_track/services/auth_service.dart';
 class OvertimeService {
   static const String baseUrl = ApiConstants.apiurl;
 
+  static Map<String, dynamic> _asSuccessMap(String body) {
+    if (body.trim().isEmpty) {
+      return {"success": true};
+    }
+
+    final decoded = jsonDecode(body);
+    if (decoded is Map) {
+      final map = Map<String, dynamic>.from(decoded);
+      final failed = map["success"] == false || map["Success"] == false;
+      return {
+        ...map,
+        "success": !failed,
+      };
+    }
+
+    return {"success": true, "data": decoded};
+  }
+
   static Future<Map<String, dynamic>> createOvertime({
     required int uid,
     required String dept,
@@ -79,7 +97,7 @@ class OvertimeService {
       );
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
-        return jsonDecode(response.body);
+        return _asSuccessMap(response.body);
       } else {
         print("Staff overtime response error: ${response.body}");
 
@@ -113,7 +131,7 @@ class OvertimeService {
       );
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
-        return jsonDecode(response.body);
+        return _asSuccessMap(response.body);
       } else {
         print("Manager overtime response error: ${response.body}");
 

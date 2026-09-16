@@ -28,6 +28,7 @@ class _ManagerOvertimeState extends State<ManagerOvertime> {
   DateTime? endDate;
 
   int? processingId;
+  final Set<int> _handledIds = {};
   String? _topMessage;
   bool _isErrorMessage = true;
   bool _showTopMessage = false;
@@ -38,19 +39,24 @@ class _ManagerOvertimeState extends State<ManagerOvertime> {
     loadData();
   }
 
-  Future<void> loadData() async {
+  Future<void> loadData({bool showSpinner = true}) async {
     if (!mounted) return;
 
-    setState(() {
-      loading = true;
-    });
+    if (showSpinner) {
+      setState(() {
+        loading = true;
+      });
+    }
 
     try {
       final data = await OvertimeService.getDepartmentOvertime();
 
       if (!mounted) return;
 
-      allData = List<dynamic>.from(data);
+      allData = List<dynamic>.from(data).where((item) {
+        final id = int.tryParse(item["id"]?.toString() ?? "");
+        return id == null || !_handledIds.contains(id);
+      }).toList();
 
       _applyFilters();
 
@@ -263,13 +269,22 @@ class _ManagerOvertimeState extends State<ManagerOvertime> {
 
       if (!mounted) return;
 
+      setState(() {
+        _handledIds.add(id);
+        allData = allData
+            .where((entry) => int.tryParse(entry["id"]?.toString() ?? "") != id)
+            .toList();
+        _applyFilters();
+        processingId = null;
+      });
+
       showTopMessage(
         approve
             ? "Overtime approved successfully"
             : "Overtime rejected successfully",
         isError: approve ? false : true,
       );
-      await loadData();
+      await loadData(showSpinner: false);
     } catch (e) {
       if (!mounted) return;
 

@@ -158,13 +158,10 @@ class _EditTaskState extends State<EditTask> {
   }
 
   Future<void> _assignUsers() async {
-    final users = await SuperAdminService.getAllUsers();
-
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) =>
-            AssignUsersPage(users: users, selectedUsers: assignedUsers),
+        builder: (_) => AssignUsersPage(selectedUsers: assignedUsers, users: [],),
       ),
     );
 

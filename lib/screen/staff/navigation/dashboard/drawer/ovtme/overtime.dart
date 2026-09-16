@@ -15,6 +15,8 @@ class OvertimeListttt extends StatefulWidget {
 
 class _OvertimeListtttState extends State<OvertimeListttt> {
   bool loading = true;
+  int? processingId;
+  final Set<int> _handledIds = {};
 
   List<dynamic> allData = [];
   List<dynamic> filteredData = [];
@@ -30,9 +32,9 @@ class _OvertimeListtttState extends State<OvertimeListttt> {
     loadData();
   }
 
-  Future<void> loadData() async {
+  Future<void> loadData({bool showSpinner = true}) async {
     try {
-      if (mounted) {
+      if (mounted && showSpinner) {
         setState(() {
           loading = true;
         });
@@ -48,6 +50,9 @@ class _OvertimeListtttState extends State<OvertimeListttt> {
       debugPrint("==========================================");
 
       final pendingManagerRequests = data.where((item) {
+        final id = int.tryParse(item["id"].toString());
+        if (id != null && _handledIds.contains(id)) return false;
+
         final staffStatus = (item["staffStatus"] ?? "")
             .toString()
             .trim()
@@ -321,7 +326,7 @@ class _OvertimeListtttState extends State<OvertimeListttt> {
       if (!mounted) return;
 
       setState(() {
-        loading = true;
+        processingId = overtimeId;
       });
 
       final response = await OvertimeService.staffResponse(
@@ -336,18 +341,8 @@ class _OvertimeListtttState extends State<OvertimeListttt> {
           response["success"] == true || response["success"] == "true";
 
       if (success) {
-        // Remove accepted/rejected request from current list
-        setState(() {
-          allData.removeWhere(
-            (item) => int.tryParse(item["id"].toString()) == overtimeId,
-          );
-
-          filteredData.removeWhere(
-            (item) => int.tryParse(item["id"].toString()) == overtimeId,
-          );
-
-          loading = false;
-        });
+        _handledIds.add(overtimeId);
+        _removeOvertimeFromLists(overtimeId);
 
         showTopMessage(
           status == "Accepted"
@@ -355,14 +350,12 @@ class _OvertimeListtttState extends State<OvertimeListttt> {
               : "Overtime rejected successfully",
           isError: false,
         );
-      } else {
-        setState(() {
-          loading = false;
-        });
 
+        await loadData(showSpinner: false);
+      } else {
         showTopMessage(
           response["message"]?.toString() ?? "Unable to update overtime",
-          isError: false,
+          isError: true,
         );
       }
     } catch (e) {
@@ -370,15 +363,28 @@ class _OvertimeListtttState extends State<OvertimeListttt> {
 
       if (!mounted) return;
 
-      setState(() {
-        loading = false;
-      });
-
       showTopMessage(
         e.toString().replaceFirst("Exception: ", ""),
         isError: true,
       );
+    } finally {
+      if (mounted) {
+        setState(() {
+          processingId = null;
+        });
+      }
     }
+  }
+
+  void _removeOvertimeFromLists(int overtimeId) {
+    setState(() {
+      allData = allData
+          .where((item) => int.tryParse(item["id"].toString()) != overtimeId)
+          .toList();
+      filteredData = filteredData
+          .where((item) => int.tryParse(item["id"].toString()) != overtimeId)
+          .toList();
+    });
   }
 
   void showTopMessage(String message, {bool isError = true}) {
@@ -740,8 +746,10 @@ class _OvertimeListtttState extends State<OvertimeListttt> {
               Expanded(
                 child: AppButton(
                   text: "Reject",
-                  isLoading: loading,
-                  onPressed: loading ? null : () => rejectOvertime(item),
+                  isLoading: processingId == int.tryParse(item["id"].toString()),
+                  onPressed: processingId != null
+                      ? null
+                      : () => rejectOvertime(item),
                   color: Theme.of(context).colorScheme.error,
                   txtcolor: Theme.of(context).colorScheme.onPrimary,
                 ),
@@ -752,8 +760,10 @@ class _OvertimeListtttState extends State<OvertimeListttt> {
               Expanded(
                 child: AppButton(
                   text: "Accept",
-                  isLoading: loading,
-                  onPressed: loading ? null : () => acceptOvertime(item),
+                  isLoading: processingId == int.tryParse(item["id"].toString()),
+                  onPressed: processingId != null
+                      ? null
+                      : () => acceptOvertime(item),
                   color: Theme.of(context).colorScheme.secondary,
                   txtcolor: Theme.of(context).colorScheme.onPrimary,
                 ),

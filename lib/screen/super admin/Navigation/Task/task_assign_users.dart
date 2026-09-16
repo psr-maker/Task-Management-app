@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:jwt_decoder/jwt_decoder.dart';
+import 'package:jwt_decode/jwt_decode.dart';
 import 'package:staff_work_track/Models/getusers.dart';
 import 'package:staff_work_track/Models/rolesmodel.dart';
+import 'package:staff_work_track/core/constant/division_config.dart';
 import 'package:staff_work_track/core/widgets/buttons.dart';
+import 'package:staff_work_track/core/widgets/loading.dart';
+import 'package:staff_work_track/services/admin_service.dart';
 import 'package:staff_work_track/services/auth_service.dart';
 import 'package:staff_work_track/services/superadmin_service.dart';
+import 'package:staff_work_track/utils/jwt_helper.dart';
 
 class AssignUsersPage extends StatefulWidget {
   final List<UserModel> users;
@@ -12,7 +16,7 @@ class AssignUsersPage extends StatefulWidget {
 
   const AssignUsersPage({
     super.key,
-    required this.users,
+    this.users = const [],
     required this.selectedUsers,
   });
 
@@ -28,20 +32,25 @@ class _AssignUsersPageState extends State<AssignUsersPage> {
 
   bool isSearching = false;
   bool isLoading = false;
-  bool isStaffUser = false;
 
   String? loginRole;
   String? loginDepartment;
+  int? loginUserId;
   int? loginRolePosition;
 
-  TextEditingController searchController = TextEditingController();
+  final TextEditingController searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     selected = List.from(widget.selectedUsers);
-
     initUserData();
+  }
+
+  @override
+  void dispose() {
+    searchController.dispose();
+    super.dispose();
   }
 
   Future<void> initUserData() async {
@@ -51,34 +60,26 @@ class _AssignUsersPageState extends State<AssignUsersPage> {
       final token = await AuthService.getToken();
       if (token == null) return;
 
-      final decoded = JwtDecoder.decode(token);
-      final userId = int.parse(decoded['UserId'].toString());
+      loginRole = JwtHelper.getRole(token);
+      loginUserId = int.tryParse(JwtHelper.getuid(token)?.toString() ?? '');
+      final decoded = Jwt.parseJwt(token);
+      loginDepartment = (JwtHelper.getDepartment(token) ??
+              decoded['department'] ??
+              decoded['Department'] ??
+              '')
+          .toString()
+          .trim();
+      if (loginDepartment!.isEmpty) loginDepartment = null;
 
-      loginRole = decoded['Role'];
-
-      // Load roles metadata for position-based filtering
-      roles = await SuperAdminService.getRoles();
-      loginRolePosition = _getRolePosition(loginRole);
-
-      // ✅ Find current user in the provided users list to get their department
-      UserModel? currentUser;
-      for (var user in widget.users) {
-        if (user.userId == userId) {
-          currentUser = user;
-          break;
-        }
+      try {
+        roles = await SuperAdminService.getRoles();
+      } catch (_) {
+        roles = [];
       }
 
-      if (currentUser != null) {
-        loginDepartment = currentUser.department;
-        debugPrint(
-          "✅ Got manager department from users list: $loginDepartment",
-        );
-      } else {
-        debugPrint("⚠️ Current user not found in users list. userId: $userId");
-      }
-
-      _applyRoleBasedFilter(); // ✅ NOW SAFE
+      loginRolePosition = _resolveLoginPosition();
+      await _resolveLoginDepartment();
+      await _loadUsersForPosition();
     } catch (e) {
       debugPrint(e.toString());
     } finally {
@@ -86,48 +87,144 @@ class _AssignUsersPageState extends State<AssignUsersPage> {
     }
   }
 
-  /// ✅ Main Role Logic
-  void _applyRoleBasedFilter() {
-    if (loginRole == "Staff") {
-      setState(() {
-        isStaffUser = true;
-      });
-      return;
-    }
+  int? _resolveLoginPosition() {
+    final fromRoles = _getRolePosition(loginRole);
+    if (fromRoles != null && fromRoles > 0) return fromRoles;
 
-    final List<UserModel> users = [];
-    final loginPosition = loginRolePosition;
+    final parsed = int.tryParse((loginRole ?? '').trim());
+    if (parsed != null) return parsed;
 
-    for (final user in widget.users) {
-      if (loginRole != null && user.role == loginRole) continue;
+    if (AppRoles.isManager(loginRole)) return 3;
+    if (AppRoles.isDivisionHead(loginRole)) return 2;
+    final lower = (loginRole ?? '').toLowerCase();
+    if (lower == 'director' || loginRole == AppRoles.director) return 1;
+    return null;
+  }
 
-      final roleMeta = _roleForUser(user);
-      if (roleMeta == null) continue;
+  Future<void> _resolveLoginDepartment() async {
+    if (loginDepartment != null && loginDepartment!.isNotEmpty) return;
 
-      if (loginPosition != null) {
-        if (roleMeta.position > loginPosition) {
-          users.add(user);
-        }
-      } else {
-        // fallback to old logic when position metadata is unavailable
-        if (loginRole == "1") {
-          if (user.role != "1") users.add(user);
-        } else if (loginRole == "3") {
-          if (loginDepartment != null && loginDepartment!.isNotEmpty) {
-            if (user.department.toLowerCase().trim() ==
-                    loginDepartment!.toLowerCase().trim() &&
-                user.role != "1") {
-              users.add(user);
-            }
-          }
+    if (loginUserId != null) {
+      for (final user in widget.users) {
+        if (user.userId == loginUserId && user.department.trim().isNotEmpty) {
+          loginDepartment = user.department.trim();
+          return;
         }
       }
+
+      try {
+        final details = await SuperAdminService.getAdminDetails(loginUserId!);
+        if (details.department.trim().isNotEmpty) {
+          loginDepartment = details.department.trim();
+          return;
+        }
+      } catch (_) {}
+    }
+  }
+
+  Future<void> _loadUsersForPosition() async {
+    List<UserModel> users = List.from(widget.users);
+
+    if (loginRolePosition == 1) {
+      try {
+        users = await SuperAdminService.getAllUsers();
+      } catch (_) {}
+    } else if (loginRolePosition == 2) {
+      final allowedDepartments = <String>{
+        if (loginDepartment != null && loginDepartment!.isNotEmpty)
+          loginDepartment!,
+        ...DivisionConfig.childDepartments(loginDepartment),
+      }.toList();
+
+      if (allowedDepartments.isNotEmpty) {
+        users = await AdminService.getEmployeesByDepartments(allowedDepartments);
+      }
+
+      if (users.isEmpty) {
+        try {
+          final allUsers = await SuperAdminService.getAllUsers();
+          users = allUsers
+              .where(
+                (user) => DivisionConfig.isAllowedDepartment(
+                  user.department,
+                  allowedDepartments,
+                ),
+              )
+              .toList();
+        } catch (_) {}
+      }
+    } else {
+      users = await _loadDepartmentUsers();
     }
 
+    users = _applyHierarchy(_uniqueUsers(users));
+
+    if (!mounted) return;
     setState(() {
       allowedUsers = users;
       filteredUsers = users;
     });
+  }
+
+  List<UserModel> _applyHierarchy(List<UserModel> users) {
+    final loginPosition = loginRolePosition;
+    if (loginPosition == null) return [];
+
+    return users.where((user) {
+      if (loginUserId != null && user.userId == loginUserId) return false;
+
+      final position = _positionForUser(user);
+      if (position == null) return false;
+
+      return position >= loginPosition;
+    }).toList();
+  }
+
+  int? _positionForUser(UserModel user) {
+    final roleMeta = _roleForUser(user);
+    if (roleMeta != null && roleMeta.position > 0) return roleMeta.position;
+
+    final parsed = int.tryParse(user.role.trim());
+    if (parsed != null && parsed > 0) {
+      for (final role in roles) {
+        if (role.id == parsed) return role.position;
+      }
+    }
+    return null;
+  }
+
+  Future<List<UserModel>> _loadDepartmentUsers() async {
+    final department = loginDepartment?.trim() ?? '';
+    if (department.isEmpty) return [];
+
+    List<UserModel> users = [];
+    try {
+      users = await AdminService.getEmployeesByDepartment(department);
+    } catch (_) {}
+
+    if (users.isEmpty) {
+      try {
+        users = await SuperAdminService.getAllUsers();
+      } catch (_) {
+        users = List.from(widget.users);
+      }
+    }
+
+    return users
+        .where(
+          (user) => DivisionConfig.isAllowedDepartment(user.department, [
+            department,
+          ]),
+        )
+        .toList();
+  }
+
+  List<UserModel> _uniqueUsers(List<UserModel> users) {
+    final unique = <int, UserModel>{};
+    for (final user in users) {
+      unique[user.userId] = user;
+    }
+    return unique.values.toList();
   }
 
   int? _getRolePosition(String? roleValue) {
@@ -182,6 +279,16 @@ class _AssignUsersPageState extends State<AssignUsersPage> {
     });
   }
 
+  bool get _isDepartmentScoped =>
+      loginRolePosition != null && loginRolePosition != 1;
+
+  String get _title {
+    if (_isDepartmentScoped && loginDepartment != null) {
+      return "Assign Users (${allowedUsers.length} in ${loginDepartment!.replaceAll(" Department", "")})";
+    }
+    return "Assign Users (${selected.length})";
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -202,7 +309,7 @@ class _AssignUsersPageState extends State<AssignUsersPage> {
                 ),
                 onChanged: applySearch,
               )
-            : Text("Assign Users (${selected.length})"),
+            : Text(_title),
         actions: [
           IconButton(
             icon: Icon(isSearching ? Icons.close : Icons.search),
@@ -210,7 +317,7 @@ class _AssignUsersPageState extends State<AssignUsersPage> {
               setState(() {
                 isSearching = !isSearching;
                 searchController.clear();
-                _applyRoleBasedFilter();
+                filteredUsers = allowedUsers;
               });
             },
           ),
@@ -218,145 +325,135 @@ class _AssignUsersPageState extends State<AssignUsersPage> {
       ),
       body: Padding(
         padding: const EdgeInsets.all(15),
-        child: !isStaffUser
-            ? Column(
-                children: [
-                  //isStaffUser
-                  // ? Text(
-                  //     "You can't assign any staff",
-                  //     style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-                  //   )
-                  // :
-                  Expanded(
-                    child: filteredUsers.isEmpty
-                        ? const Center(child: Text("No users found"))
-                        : ListView.builder(
-                            itemCount: filteredUsers.length,
-                            itemBuilder: (context, index) {
-                              final user = filteredUsers[index];
-                              final isSelected = selected.any(
-                                (u) => u.userId == user.userId,
-                              );
-                              final roleMeta = _roleForUser(user);
-                              final roleLabel = roleMeta != null
-                                  ? roleMeta.name
-                                  : user.role;
+        child: Column(
+          children: [
+            if (_isDepartmentScoped && loginDepartment != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    "${allowedUsers.length} users in $loginDepartment",
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                ),
+              ),
+            Expanded(
+              child: isLoading
+                  ? const Center(child: RotatingFlower())
+                  : filteredUsers.isEmpty
+                  ? Center(
+                      child: Text(
+                        _isDepartmentScoped
+                            ? "No users found in ${loginDepartment ?? "your department"}"
+                            : "No users found",
+                      ),
+                    )
+                  : ListView.builder(
+                      itemCount: filteredUsers.length,
+                      itemBuilder: (context, index) {
+                        final user = filteredUsers[index];
+                        final isSelected = selected.any(
+                          (u) => u.userId == user.userId,
+                        );
+                        final roleMeta = _roleForUser(user);
+                        final roleLabel = roleMeta != null
+                            ? roleMeta.name
+                            : user.role;
 
-                              return GestureDetector(
-                                onTap: () {
-                                  setState(() {
-                                    if (isSelected) {
-                                      selected.removeWhere(
-                                        (u) => u.userId == user.userId,
-                                      );
-                                    } else {
-                                      selected.add(user);
-                                    }
-                                  });
-                                },
-                                child: Container(
-                                  margin: const EdgeInsets.only(bottom: 14),
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(16),
-                                    color: const Color.fromARGB(
+                        return GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              if (isSelected) {
+                                selected.removeWhere(
+                                  (u) => u.userId == user.userId,
+                                );
+                              } else {
+                                selected.add(user);
+                              }
+                            });
+                          },
+                          child: Container(
+                            margin: const EdgeInsets.only(bottom: 14),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(16),
+                              color: const Color.fromARGB(255, 134, 170, 136),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(10),
+                              child: Row(
+                                children: [
+                                  Checkbox(
+                                    value: isSelected,
+                                    activeColor: const Color.fromARGB(
                                       255,
-                                      134,
-                                      170,
-                                      136,
+                                      50,
+                                      99,
+                                      49,
                                     ),
+                                    onChanged: (value) {
+                                      setState(() {
+                                        if (value == true) {
+                                          selected.add(user);
+                                        } else {
+                                          selected.removeWhere(
+                                            (u) => u.userId == user.userId,
+                                          );
+                                        }
+                                      });
+                                    },
                                   ),
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(10),
-                                    child: Row(
+                                  CircleAvatar(
+                                    radius: 18,
+                                    backgroundColor: const Color.fromARGB(
+                                      255,
+                                      50,
+                                      99,
+                                      49,
+                                    ),
+                                    child: Text(user.name[0].toUpperCase()),
+                                  ),
+                                  const SizedBox(width: 15),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
-                                        Checkbox(
-                                          value: isSelected,
-                                          activeColor: const Color.fromARGB(
-                                            255,
-                                            50,
-                                            99,
-                                            49,
-                                          ),
-                                          onChanged: (value) {
-                                            setState(() {
-                                              if (value == true) {
-                                                selected.add(user);
-                                              } else {
-                                                selected.removeWhere(
-                                                  (u) =>
-                                                      u.userId == user.userId,
-                                                );
-                                              }
-                                            });
-                                          },
+                                        Text(
+                                          user.name,
+                                          style: Theme.of(
+                                            context,
+                                          ).textTheme.labelMedium,
                                         ),
-                                        CircleAvatar(
-                                          radius: 18,
-                                          backgroundColor: const Color.fromARGB(
-                                            255,
-                                            50,
-                                            99,
-                                            49,
-                                          ),
-                                          child: Text(
-                                            user.name[0].toUpperCase(),
-                                          ),
-                                        ),
-                                        const SizedBox(width: 15),
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                user.name,
-                                                style: Theme.of(
-                                                  context,
-                                                ).textTheme.labelMedium,
-                                              ),
-                                              const SizedBox(height: 3),
-                                              Text(
-                                                "$roleLabel - ${user.department}",
-                                                style: Theme.of(
-                                                  context,
-                                                ).textTheme.labelMedium,
-                                              ),
-                                            ],
-                                          ),
+                                        const SizedBox(height: 3),
+                                        Text(
+                                          "$roleLabel - ${user.department}",
+                                          style: Theme.of(
+                                            context,
+                                          ).textTheme.labelMedium,
                                         ),
                                       ],
                                     ),
                                   ),
-                                ),
-                              );
-                            },
+                                ],
+                              ),
+                            ),
                           ),
-                  ),
-                  AppButton(
-                    text: "Done",
-                    isLoading: isLoading,
-                    onPressed: () {
-                      Navigator.pop(context, selected);
-                    },
-                    color: Theme.of(context).colorScheme.secondary,
-                    txtcolor: Theme.of(context).colorScheme.onPrimary,
-                  ),
-                ],
-              )
-            : Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Center(
-                    child: Text(
-                      "You can't assign any staff",
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                      ),
+                        );
+                      },
                     ),
-                  ),
-                ],
-              ),
+            ),
+            AppButton(
+              text: "Done",
+              isLoading: isLoading,
+              onPressed: () {
+                Navigator.pop(context, selected);
+              },
+              color: Theme.of(context).colorScheme.secondary,
+              txtcolor: Theme.of(context).colorScheme.onPrimary,
+            ),
+          ],
+        ),
       ),
     );
   }
