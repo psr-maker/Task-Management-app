@@ -1,21 +1,30 @@
 import 'package:flutter/material.dart';
+import 'package:staff_work_track/core/widgets/load_error.dart';
 import 'package:staff_work_track/Models/getusers.dart';
 import 'package:staff_work_track/common/filter_model.dart';
+import 'package:staff_work_track/screen/super%20admin/Navigation/Reports/users/emp.dart';
 import 'package:staff_work_track/screen/super admin/Navigation/users/Employee/empdetails.dart';
 import 'package:staff_work_track/screen/super admin/Navigation/users/user_create.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/Task/goalntask_create.dart';
 import 'package:staff_work_track/services/admin_service.dart';
 import 'package:staff_work_track/services/auth_service.dart';
 import 'package:staff_work_track/utils/jwt_helper.dart';
+import 'package:staff_work_track/core/responsive/app_layout.dart';
+import 'package:staff_work_track/core/widgets/form_popup.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
+import 'package:staff_work_track/widgets/users_data_table.dart';
 
 class EmployeeList extends StatefulWidget {
   final String department;
   final String searchQuery;
+  final bool openReports;
+  final bool shrinkWrap;
   const EmployeeList({
     super.key,
     required this.department,
     required this.searchQuery,
+    this.openReports = false,
+    this.shrinkWrap = false,
   });
 
   @override
@@ -31,6 +40,19 @@ class _EmployeeListState extends State<EmployeeList> {
   bool isSearching = false;
   final TaskFilterModel activeFilter = TaskFilterModel();
   final TextEditingController searchController = TextEditingController();
+
+  Future<void> _openReport(UserModel emp) {
+    return Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => EmployeeReportPage(
+          userid: emp.userId,
+          username: emp.name,
+          role: emp.role,
+        ),
+      ),
+    );
+  }
 
   @override
   void initState() {
@@ -72,11 +94,15 @@ class _EmployeeListState extends State<EmployeeList> {
 
   @override
   Widget build(BuildContext context) {
+    final isWeb = !AppLayout.isMobile(context);
     return Padding(
-      padding: const EdgeInsets.all(10),
+      padding: isWeb
+          ? AppLayout.pagePadding(context)
+          : const EdgeInsets.all(10),
       child: Column(
+        mainAxisSize: widget.shrinkWrap ? MainAxisSize.min : MainAxisSize.max,
         children: [
-          if (isAdmin)
+          if (isAdmin && !widget.openReports)
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
@@ -96,8 +122,11 @@ class _EmployeeListState extends State<EmployeeList> {
                           onChanged: (_) => setState(() {}),
                         )
                       : Text(
-                          "Users List",
-                          style: Theme.of(context).textTheme.displaySmall,
+                          "Users",
+                          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                            fontSize: isWeb ? 16 : 18,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
                 ),
                 IconButton(
@@ -112,20 +141,19 @@ class _EmployeeListState extends State<EmployeeList> {
                 GestureDetector(
                   onTap: () async {
                     if (selectedEmpIds.isNotEmpty) {
-                      Navigator.push(
+                      await openFormPage(
                         context,
-                        MaterialPageRoute(
-                          builder: (_) => Createtask(
-                            assignedToIds: selectedEmpIds.toList(),
-                          ),
+                        Createtask(
+                          assignedToIds: selectedEmpIds.toList(),
+                          assignedDepartments: [widget.department],
                         ),
+                        maxWidth: 880,
                       );
                     } else {
-                      final result = await Navigator.push(
+                      final result = await openFormPage(
                         context,
-                        MaterialPageRoute(
-                          builder: (_) => CreateUsers(),
-                        ),
+                        const CreateUsers(),
+                        maxWidth: 560,
                       );
                       if (result == true) {
                         setState(() {
@@ -148,20 +176,22 @@ class _EmployeeListState extends State<EmployeeList> {
               ],
             ),
           const SizedBox(height: 10),
-          Expanded(
-            child: FutureBuilder<List<UserModel>>(
+          _staffBody(),
+        ],
+      ),
+    );
+  }
+
+  Widget _staffBody() {
+    final isWeb = !AppLayout.isMobile(context);
+    final body = FutureBuilder<List<UserModel>>(
               future: employeesFuture,
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: RotatingFlower());
                 }
                 if (snapshot.hasError) {
-                  return Center(
-                    child: Text(
-                      snapshot.error.toString(),
-                      style: const TextStyle(color: Colors.red),
-                    ),
-                  );
+                  return const AppLoadError();
                 }
                 if (!snapshot.hasData || snapshot.data!.isEmpty) {
                   return const Center(child: Text("No Employees Found"));
@@ -177,8 +207,44 @@ class _EmployeeListState extends State<EmployeeList> {
                       emp.email.toLowerCase().contains(query) ||
                       emp.department.toLowerCase().contains(query);
                 }).toList();
+                if (isWeb) {
+                  return UsersDataTable(
+                    users: filteredEmployees,
+                    shrinkWrap: widget.shrinkWrap,
+                    selectedIds: selectedEmpIds,
+                    selectionMode: widget.openReports ? false : isSelectionMode,
+                    onToggle: (emp) => _toggleSelection(emp.userId),
+                    onTap: (emp) async {
+                      if (isSelectionMode) {
+                        _toggleSelection(emp.userId);
+                        return;
+                      }
+                      if (widget.openReports) {
+                        await _openReport(emp);
+                        return;
+                      }
+                      final result = await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => EmployeeDetail(employee: emp),
+                        ),
+                      );
+                      if (result == true) {
+                        setState(() {
+                          employeesFuture =
+                              AdminService.getEmployeesByDepartment(
+                                widget.department,
+                              );
+                        });
+                      }
+                    },
+                  );
+                }
                 return ListView.builder(
-                  physics: const AlwaysScrollableScrollPhysics(),
+                  shrinkWrap: widget.shrinkWrap,
+                  physics: widget.shrinkWrap
+                      ? const NeverScrollableScrollPhysics()
+                      : const AlwaysScrollableScrollPhysics(),
                   itemCount: filteredEmployees.length,
                   itemBuilder: (context, index) {
                     final emp = filteredEmployees[index];
@@ -191,7 +257,9 @@ class _EmployeeListState extends State<EmployeeList> {
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: ListTile(
-                        onLongPress: () => _toggleSelection(emp.userId),
+                        onLongPress: widget.openReports
+                            ? null
+                            : () => _toggleSelection(emp.userId),
                         leading: isSelectionMode
                             ? Checkbox(
                                 value: isSelected,
@@ -225,6 +293,8 @@ class _EmployeeListState extends State<EmployeeList> {
                         onTap: () async {
                           if (isSelectionMode) {
                             _toggleSelection(emp.userId);
+                          } else if (widget.openReports) {
+                            await _openReport(emp);
                           } else {
                             final result = await Navigator.push(
                               context,
@@ -247,10 +317,8 @@ class _EmployeeListState extends State<EmployeeList> {
                   },
                 );
               },
-            ),
-          ),
-        ],
-      ),
-    );
+            );
+    if (widget.shrinkWrap) return body;
+    return Expanded(child: body);
   }
 }

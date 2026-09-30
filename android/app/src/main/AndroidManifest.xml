@@ -64,5 +64,13 @@
             <action android:name="android.intent.action.VIEW" />
             <data android:scheme="market" />
         </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:mimeType="application/pdf" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:mimeType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" />
+        </intent>
     </queries>
 </manifest>

@@ -1,8 +1,12 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:staff_work_track/core/theme/web_theme.dart';
+import 'package:staff_work_track/core/widgets/buttons.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
 import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
+import 'package:staff_work_track/screen/staff/navigation/fullimg.dart';
+import 'package:staff_work_track/screen/staff/navigation/worklog/checkout_worklog.dart';
 import 'package:staff_work_track/services/local_worklog_db.dart';
 import 'package:staff_work_track/services/worklog_sync_service.dart';
 import 'package:staff_work_track/utils/time_utils.dart';
@@ -69,13 +73,13 @@ class _OfflineWorkLogsState extends State<OfflineWorkLogs> {
     });
 
     try {
-      await WorkLogSyncService.syncPendingWorkLogs();
+      final result = await WorkLogSyncService.syncPendingWorkLogs();
 
       await loadPendingLogs();
 
       if (!mounted) return;
 
-      showTopMessage("Pending worklogs synchronized", isError: false);
+      showTopMessage(result.message, isError: result.isError);
     } catch (e) {
       if (!mounted) return;
 
@@ -112,7 +116,7 @@ class _OfflineWorkLogsState extends State<OfflineWorkLogs> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Offline Worklogs"),
+        title: const Text("Local worklogs"),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios),
           onPressed: () => Navigator.pop(context),
@@ -204,179 +208,112 @@ class _OfflineWorkLogsState extends State<OfflineWorkLogs> {
     );
   }
 
+  Future<void> _checkOut(Map<String, dynamic> log) async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => CheckoutWorklogPage(
+          localId: log['id'] as int,
+          title: (log['title'] ?? '').toString(),
+        ),
+      ),
+    );
+
+    if (!mounted || result == null) return;
+    showTopMessage('Your check out saved locally.', isError: false);
+    await loadPendingLogs();
+  }
+
   Widget _buildWorkLogCard(Map<String, dynamic> log) {
     final int id = log['id'];
-
     final bool syncing = syncingIds.contains(id);
-
-    final String workType = log['workType'] ?? "";
-
-    final String title = log['title'] ?? "";
-
-    final String description = log['description'] ?? "";
-
-    final String location = log['locationName'] ?? "";
-
-    final String imagePath = log['imagePath'] ?? "";
-
-    DateTime? workDate;
-
-    try {
-      // Use TimeUtils to properly convert UTC to local
-      workDate = TimeUtils.fromUtcIso8601(log['workDate']);
-    } catch (_) {}
+    final title = (log['title'] ?? '').toString();
+    final description = (log['description'] ?? '').toString();
+    final inPath = (log['imagePath'] ?? '').toString();
+    final outPath = (log['outImagePath'] ?? '').toString();
+    final inLocation = (log['locationName'] ?? '').toString();
+    final outLocation = (log['outLocationName'] ?? '').toString();
+    final serverId = log['serverId'];
+    final queuedCheckout = serverId != null && outPath.isNotEmpty && inPath == outPath;
+    final hasOut = outPath.isNotEmpty;
+    final dateText = TimeUtils.formatDateValue(log['workDate'], empty: '');
+    final inTime = TimeUtils.formatTime12(log['createdAt'], empty: '--');
+    final outTime = TimeUtils.formatTime12(log['outTime'], empty: '--');
 
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
-
       padding: const EdgeInsets.all(14),
-
-      decoration: BoxDecoration(
-        color: Colors.white,
-
-        borderRadius: BorderRadius.circular(16),
-
-        border: Border.all(color: Colors.orange.shade200),
-
-        boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(.04), blurRadius: 8),
-        ],
-      ),
-
+      decoration: WebTheme.card(context),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-
         children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-
-                decoration: BoxDecoration(
-                  color: workType == "IN"
-                      ? Colors.green.shade50
-                      : Colors.red.shade50,
-
-                  borderRadius: BorderRadius.circular(8),
-                ),
-
-                child: Text(
-                  workType,
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: workType == "IN" ? Colors.green : Colors.red,
-                    fontSize: 14,
-                  ),
-                ),
-              ),
-
-              const SizedBox(width: 10),
-
-              Expanded(
-                child: Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ],
+          Text(
+            title.isEmpty ? 'Worklog' : title,
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: WebTheme.inkOf(context),
+            ),
           ),
-
-          const SizedBox(height: 8),
-
-          if (workDate != null)
-            Row(
-              children: [
-                const Icon(Icons.calendar_today, size: 15, color: Colors.grey),
-
-                const SizedBox(width: 6),
-
-                Text(
-                  "${workDate.day.toString().padLeft(2, '0')}/"
-                  "${workDate.month.toString().padLeft(2, '0')}/"
-                  "${workDate.year}",
-                  style: const TextStyle(color: Colors.grey, fontSize: 12),
-                ),
-              ],
-            ),
-
-          const SizedBox(height: 8),
-
-          if (description.isNotEmpty)
-            Text(
-              description,
-              style: TextStyle(color: Colors.grey.shade700, fontSize: 14),
-            ),
-
-          const SizedBox(height: 8),
-
-          if (location.isNotEmpty)
+          if (dateText.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(dateText, style: TextStyle(color: WebTheme.mutedOf(context))),
+          ],
+          if (description.isNotEmpty && !queuedCheckout) ...[
+            const SizedBox(height: 6),
+            Text(description, style: TextStyle(color: WebTheme.mutedOf(context))),
+          ],
+          const SizedBox(height: 12),
+          if (queuedCheckout)
+            _localPhoto(
+              label: 'OUT  $outTime',
+              path: outPath,
+              location: outLocation,
+              color: const Color(0xFFC2410C),
+            )
+          else
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
-
               children: [
-                const Icon(
-                  Icons.location_on,
-                  size: 17,
-                  color: Colors.redAccent,
-                ),
-
-                const SizedBox(width: 5),
-
                 Expanded(
-                  child: Text(
-                    location,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: Color.fromARGB(255, 100, 100, 100),
-                    ),
+                  child: _localPhoto(
+                    label: 'IN  $inTime',
+                    path: inPath,
+                    location: inLocation,
+                    color: const Color(0xFF166534),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _localPhoto(
+                    label: hasOut ? 'OUT  $outTime' : 'OUT',
+                    path: outPath,
+                    location: outLocation,
+                    color: const Color(0xFFC2410C),
+                    emptyText: 'Not checked out',
                   ),
                 ),
               ],
             ),
-
-          if (imagePath.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: 10),
-
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(10),
-
-                child: kIsWeb
-                    ? Image.network(
-                        imagePath,
-                        height: 150,
-                        width: double.infinity,
-                        fit: BoxFit.cover,
-                      )
-                    : Image.file(
-                        File(imagePath),
-                        height: 150,
-                        width: double.infinity,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return Container(
-                            height: 150,
-                            color: Colors.grey.shade100,
-                            child: const Icon(Icons.broken_image),
-                          );
-                        },
-                      ),
+          if (!hasOut) ...[
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: AppButton(
+                text: 'Check Out',
+                onPressed: () => _checkOut(log),
+                color: WebTheme.brand,
+                txtcolor: Colors.white,
               ),
             ),
-
+          ],
           const SizedBox(height: 10),
-
           Row(
             children: [
               Icon(Icons.cloud_off, size: 16, color: Colors.orange.shade700),
-
               const SizedBox(width: 5),
-
               Text(
-                syncing ? "Syncing..." : "Pending Sync",
+                syncing ? 'Syncing...' : 'Pending sync',
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
@@ -387,6 +324,63 @@ class _OfflineWorkLogsState extends State<OfflineWorkLogs> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _localPhoto({
+    required String label,
+    required String path,
+    required String location,
+    required Color color,
+    String emptyText = 'No photo',
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: TextStyle(fontWeight: FontWeight.w700, color: color, fontSize: 12)),
+        const SizedBox(height: 6),
+        GestureDetector(
+          onTap: path.isEmpty
+              ? null
+              : () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => FullScreenImageViewer(imageFile: File(path)),
+                    ),
+                  );
+                },
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: SizedBox(
+              height: 110,
+              width: double.infinity,
+              child: path.isEmpty
+                  ? Container(
+                      alignment: Alignment.center,
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? Colors.white10
+                          : Colors.grey.shade100,
+                      child: Text(emptyText, style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                    )
+                  : kIsWeb
+                  ? Image.network(path, fit: BoxFit.cover)
+                  : Image.file(
+                      File(path),
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, _, _) => const Center(child: Icon(Icons.broken_image)),
+                    ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          location.isEmpty ? 'No location' : location,
+          maxLines: 3,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(fontSize: 11, color: WebTheme.mutedOf(context)),
+        ),
+      ],
     );
   }
 }

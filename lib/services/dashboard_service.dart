@@ -2,18 +2,26 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:staff_work_track/Models/getusers.dart';
 import 'package:staff_work_track/core/constant/apiurl.dart';
+import 'package:staff_work_track/services/auth_service.dart';
 
 class DashboardService {
   static const String baseUrl = ApiConstants.apiurl;
 
   Future<Map<String, dynamic>> getDashboardSummary() async {
+    final token = await AuthService.getToken();
     final response = await http.get(
       Uri.parse("$baseUrl/Dashboard/dashboard-summary"),
-      headers: {"Content-Type": "application/json"},
+      headers: {
+        "Content-Type": "application/json",
+        if (token != null && token.isNotEmpty) "Authorization": "Bearer $token",
+      },
     );
 
     if (response.statusCode == 200) {
-      return json.decode(response.body);
+      final decoded = json.decode(response.body);
+      if (decoded is Map<String, dynamic>) return decoded;
+      if (decoded is Map) return Map<String, dynamic>.from(decoded);
+      throw Exception("Failed to load dashboard data");
     } else {
       throw Exception("Failed to load dashboard data");
     }

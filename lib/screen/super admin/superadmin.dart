@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:staff_work_track/core/widgets/adaptive_app_shell.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/Reports/Reports.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/dahboard.dart';
 import 'package:staff_work_track/utils/enum.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/Task/Userstasklist.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/users/Users.dart';
-import 'package:staff_work_track/core/widgets/curved_bottom_nav.dart';
 
 class SuperAdmin extends StatefulWidget {
   const SuperAdmin({super.key});
@@ -24,21 +24,11 @@ class _SuperadminState extends State<SuperAdmin> {
   ];
   @override
   Widget build(BuildContext context) {
-    final isPortrait =
-        MediaQuery.of(context).orientation == Orientation.portrait;
-
-    return Scaffold(
-      body: _pages[_currentIndex],
-      bottomNavigationBar: isPortrait
-          ? SafeArea(
-              top: false,
-              child: CurvedBottomNav(
-                currentIndex: _currentIndex,
-                onTap: (i) => setState(() => _currentIndex = i),
-                role: UserRole.superAdmin,
-              ),
-            )
-          : null,
+    return AdaptiveAppShell(
+      currentIndex: _currentIndex,
+      onTap: (i) => setState(() => _currentIndex = i),
+      role: UserRole.superAdmin,
+      pages: _pages,
     );
   }
 }

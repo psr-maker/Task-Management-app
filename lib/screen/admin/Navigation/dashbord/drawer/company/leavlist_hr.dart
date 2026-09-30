@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
+import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
 import 'package:staff_work_track/services/dashboard_service.dart';
 
 class HrLeaves extends StatefulWidget {
@@ -54,12 +55,7 @@ class _HrLeavesState extends State<HrLeaves> {
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(e.toString()),
-          backgroundColor: Colors.red.shade700,
-        ),
-      );
+      showAppMessage(context, e.toString());
     } finally {
       if (mounted) {
         setState(() {

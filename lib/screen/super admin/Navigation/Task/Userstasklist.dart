@@ -119,7 +119,7 @@ class _TaskListPageState extends State<UsersTasklist> {
                     setState(() {});
                   },
                 ),
-                const Divider(height: 1),
+                const Divider(height: 1), 
               ],
 
               /// GOALS SECTION

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:staff_work_track/core/widgets/load_error.dart';
 import 'package:staff_work_track/Models/getusers.dart';
 import 'package:staff_work_track/services/dashboard_service.dart';
 import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
@@ -41,7 +42,7 @@ class _PendingApprovalsState extends State<PendingApprovals> {
         }
 
         if (snapshot.hasError) {
-          return Center(child: Text("Error: ${snapshot.error}"));
+          return const AppLoadError();
         }
 
         final users = snapshot.data;

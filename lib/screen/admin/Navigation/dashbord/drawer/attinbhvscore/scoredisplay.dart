@@ -1,12 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:staff_work_track/Models/getusers.dart';
+import 'package:staff_work_track/core/constant/division_config.dart';
+import 'package:staff_work_track/core/widgets/load_error.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
 import 'package:staff_work_track/screen/admin/Navigation/dashbord/drawer/attinbhvscore/addattnbhv.dart';
 import 'package:staff_work_track/services/admin_service.dart';
+import 'package:staff_work_track/services/superadmin_service.dart';
 
 class BehaviourScoreDisplay extends StatefulWidget {
   final String Dept;
+  final bool scoreLeaders;
 
-  const BehaviourScoreDisplay({super.key, required this.Dept});
+  const BehaviourScoreDisplay({
+    super.key,
+    this.Dept = '',
+    this.scoreLeaders = false,
+  });
 
   @override
   State<BehaviourScoreDisplay> createState() => _BehaviourScoreDisplayState();
@@ -14,6 +23,8 @@ class BehaviourScoreDisplay extends StatefulWidget {
 
 class _BehaviourScoreDisplayState extends State<BehaviourScoreDisplay> {
   int? selectedMonth;
+  String departmentFilter = "All";
+  List<String> departments = [];
 
   List<Map<String, dynamic>> allStaffScores = [];
 
@@ -33,6 +44,55 @@ class _BehaviourScoreDisplayState extends State<BehaviourScoreDisplay> {
     });
 
     try {
+      if (widget.scoreLeaders) {
+        final scores = await AdminService.getDirectorAttitudeBehaviourScores();
+        List<UserModel> users = [];
+        try {
+          users = await SuperAdminService.getAllUsers();
+        } catch (_) {}
+
+        final leaderUsers = users.where((user) {
+          if (!AppRoles.isScoreLeader(user.role)) return false;
+          return user.status.trim().toLowerCase() != "inactive";
+        }).toList();
+
+        final visible = scores
+            .where((score) => _isLeaderScore(score, leaderUsers))
+            .map((score) => _withLeaderDetails(score, leaderUsers))
+            .toList();
+        final departmentNames = <String>[];
+        for (final user in leaderUsers) {
+          final name = user.department.trim();
+          if (name.isEmpty) continue;
+          if (departmentNames.any(
+            (item) => DivisionConfig.isAllowedDepartment(name, [item]),
+          )) {
+            continue;
+          }
+          departmentNames.add(name);
+        }
+        departmentNames.sort(
+          (a, b) => a.toLowerCase().compareTo(b.toLowerCase()),
+        );
+
+        if (!mounted) return;
+        setState(() {
+          allStaffScores = visible;
+          departments = departmentNames;
+          if (departmentFilter != "All" &&
+              !departmentNames.any(
+                (item) => DivisionConfig.isAllowedDepartment(
+                  departmentFilter,
+                  [item],
+                ),
+              )) {
+            departmentFilter = "All";
+          }
+          isLoading = false;
+        });
+        return;
+      }
+
       final scores = await AdminService.getDepartmentAttitudeBehaviourScores();
 
       if (!mounted) return;
@@ -52,24 +112,19 @@ class _BehaviourScoreDisplayState extends State<BehaviourScoreDisplay> {
   }
 
   List<Map<String, dynamic>> get filteredStaffScores {
-    if (selectedMonth == null) {
-      return allStaffScores;
-    }
-
     return allStaffScores.where((staff) {
-      final dateValue = staff["date"];
-
-      if (dateValue == null) {
-        return false;
+      if (selectedMonth != null) {
+        final dateValue = staff["date"];
+        if (dateValue == null) return false;
+        final date = DateTime.tryParse(dateValue.toString());
+        if (date == null || date.month != selectedMonth) return false;
       }
 
-      final date = DateTime.tryParse(dateValue.toString());
-
-      if (date == null) {
-        return false;
-      }
-
-      return date.month == selectedMonth;
+      if (!widget.scoreLeaders || departmentFilter == "All") return true;
+      return DivisionConfig.isAllowedDepartment(
+        "${staff["department"] ?? ""}",
+        [departmentFilter],
+      );
     }).toList();
   }
 
@@ -175,6 +230,16 @@ class _BehaviourScoreDisplayState extends State<BehaviourScoreDisplay> {
         ),
 
         actions: [
+          if (widget.scoreLeaders)
+            IconButton(
+              tooltip: "Filter",
+              onPressed: _openDepartmentFilter,
+              icon: Badge(
+                isLabelVisible: departmentFilter != "All",
+                smallSize: 8,
+                child: const Icon(Icons.filter_alt_outlined),
+              ),
+            ),
           IconButton(
             tooltip: "Add Score",
 
@@ -183,7 +248,10 @@ class _BehaviourScoreDisplayState extends State<BehaviourScoreDisplay> {
                 context,
 
                 MaterialPageRoute(
-                  builder: (_) => AddBehaviourScore(department: widget.Dept),
+                  builder: (_) => AddBehaviourScore(
+                    department: widget.Dept,
+                    scoreLeaders: widget.scoreLeaders,
+                  ),
                 ),
               );
 
@@ -267,35 +335,7 @@ class _BehaviourScoreDisplayState extends State<BehaviourScoreDisplay> {
     }
 
     if (errorMessage != null) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-
-          children: [
-            const Icon(Icons.error_outline, size: 50, color: Colors.redAccent),
-
-            const SizedBox(height: 10),
-
-            const Text(
-              "Failed to load scores",
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-            ),
-
-            const SizedBox(height: 15),
-
-            ElevatedButton(
-              onPressed: loadScores,
-
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xff194d26),
-                foregroundColor: Colors.white,
-              ),
-
-              child: const Text("Retry"),
-            ),
-          ],
-        ),
-      );
+      return AppLoadError(onRetry: loadScores);
     }
 
     final scores = filteredStaffScores;
@@ -326,10 +366,7 @@ class _BehaviourScoreDisplayState extends State<BehaviourScoreDisplay> {
             const SizedBox(height: 5),
 
             Text(
-              selectedMonth == null
-                  ? "No behaviour scores available"
-                  : "No behaviour scores for "
-                        "${_monthName(selectedMonth!)}",
+              _emptyScoreMessage(),
 
               style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
             ),
@@ -372,16 +409,18 @@ class _BehaviourScoreDisplayState extends State<BehaviourScoreDisplay> {
                 color: Colors.black87,
               ),
 
-              columns: const [
-                DataColumn(label: Text("Staff Name")),
-
-                DataColumn(label: Text("Communication")),
-
-                DataColumn(label: Text("Punctuality")),
-
-                DataColumn(label: Text("Integrity")),
-
-                DataColumn(label: Text("Total")),
+              columns: [
+                DataColumn(
+                  label: Text(widget.scoreLeaders ? "Name" : "Staff Name"),
+                ),
+                if (widget.scoreLeaders) ...const [
+                  DataColumn(label: Text("Role")),
+                  DataColumn(label: Text("Department")),
+                ],
+                const DataColumn(label: Text("Communication")),
+                const DataColumn(label: Text("Punctuality")),
+                const DataColumn(label: Text("Integrity")),
+                const DataColumn(label: Text("Total")),
               ],
 
               rows: scores.map((staff) {
@@ -389,7 +428,6 @@ class _BehaviourScoreDisplayState extends State<BehaviourScoreDisplay> {
 
                 return DataRow(
                   cells: [
-                    // STAFF
                     DataCell(
                       Text(
                         staff["staffName"] ?? "-",
@@ -398,7 +436,11 @@ class _BehaviourScoreDisplayState extends State<BehaviourScoreDisplay> {
                       ),
                     ),
 
-                    // COMMUNICATION
+                    if (widget.scoreLeaders) ...[
+                      DataCell(Text("${staff["roleLabel"] ?? "-"}")),
+                      DataCell(Text("${staff["department"] ?? "-"}")),
+                    ],
+
                     DataCell(_scoreText(staff["communication"])),
 
                     // PUNCTUALITY
@@ -444,6 +486,121 @@ class _BehaviourScoreDisplayState extends State<BehaviourScoreDisplay> {
         ),
       ),
     );
+  }
+
+  String _emptyScoreMessage() {
+    if (widget.scoreLeaders && departmentFilter != "All") {
+      return "No scores for $departmentFilter";
+    }
+    if (selectedMonth != null) {
+      return "No behaviour scores for ${_monthName(selectedMonth!)}";
+    }
+    if (widget.scoreLeaders) {
+      return "No scores for department managers or division heads";
+    }
+    return "No behaviour scores available";
+  }
+
+  Future<void> _openDepartmentFilter() async {
+    final selected = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) {
+        return SafeArea(
+          child: ListView(
+            shrinkWrap: true,
+            children: [
+              const Padding(
+                padding: EdgeInsets.fromLTRB(20, 4, 20, 8),
+                child: Text(
+                  "Filter by department",
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                ),
+              ),
+              _filterTile("All"),
+              ...departments.map(_filterTile),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (selected == null || !mounted) return;
+    setState(() => departmentFilter = selected);
+  }
+
+  Widget _filterTile(String name) {
+    final selected = departmentFilter == name ||
+        (name != "All" &&
+            DivisionConfig.isAllowedDepartment(departmentFilter, [name]));
+    return ListTile(
+      title: Text(name == "All" ? "All" : name),
+      trailing: selected
+          ? const Icon(Icons.check, color: Color(0xff194d26))
+          : null,
+      onTap: () => Navigator.pop(context, name),
+    );
+  }
+
+  int? _readId(Map<String, dynamic> item) {
+    for (final key in ["staffId", "StaffId", "userId", "UserId", "employeeId"]) {
+      final value = int.tryParse("${item[key] ?? ""}");
+      if (value != null && value > 0) return value;
+    }
+    return null;
+  }
+
+  String _readName(Map<String, dynamic> item) {
+    for (final key in ["staffName", "StaffName", "name", "Name", "userName"]) {
+      final value = (item[key] ?? "").toString().trim();
+      if (value.isNotEmpty) return value;
+    }
+    return "";
+  }
+
+  UserModel? _findLeader(Map<String, dynamic> score, List<UserModel> users) {
+    final id = _readId(score);
+    if (id != null) {
+      for (final user in users) {
+        if (user.userId == id) return user;
+      }
+    }
+
+    final name = _readName(score).toLowerCase();
+    if (name.isEmpty) return null;
+    for (final user in users) {
+      if (user.name.trim().toLowerCase() == name) return user;
+    }
+    return null;
+  }
+
+  bool _isLeaderScore(Map<String, dynamic> score, List<UserModel> users) {
+    if (users.isEmpty) return true;
+    if (_findLeader(score, users) != null) return true;
+    final role = (score["role"] ?? score["Role"] ?? score["roleName"] ?? "")
+        .toString();
+    return AppRoles.isScoreLeader(role);
+  }
+
+  Map<String, dynamic> _withLeaderDetails(
+    Map<String, dynamic> score,
+    List<UserModel> users,
+  ) {
+    final user = _findLeader(score, users);
+    final role = user?.role ??
+        (score["role"] ?? score["Role"] ?? score["roleName"] ?? "").toString();
+    final department = user?.department ??
+        (score["department"] ?? score["Department"] ?? "").toString();
+    return {
+      ...score,
+      "staffName": _readName(score).isNotEmpty
+          ? _readName(score)
+          : (user?.name ?? "-"),
+      "roleLabel": AppRoles.leaderLabel(role).isNotEmpty
+          ? AppRoles.leaderLabel(role)
+          : (role.isEmpty ? "-" : role),
+      "department": department.trim().isEmpty ? "-" : department,
+    };
   }
 
   Widget _scoreText(dynamic score) {

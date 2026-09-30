@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:staff_work_track/core/constant/apiurl.dart';
 import 'package:staff_work_track/core/constant/division_config.dart';
 import 'package:staff_work_track/core/widgets/buttons.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
-import 'package:staff_work_track/screen/staff/navigation/fullimg.dart';
+import 'package:staff_work_track/core/widgets/worklog_session_tile.dart';
 import 'package:staff_work_track/services/announ_service.dart';
 import 'package:staff_work_track/utils/time_utils.dart';
 
@@ -85,7 +84,7 @@ class _UsersWorklogState extends State<UsersWorklog> {
                 .toString();
         unique[key] = log;
       }
-      data = unique.values.toList();
+      data = pairWorkLogs(unique.values.toList());
 
       if (allowed != null && allowed.isNotEmpty) {
         data = data.where((log) {
@@ -152,9 +151,14 @@ class _UsersWorklogState extends State<UsersWorklog> {
     if (searchQuery.isNotEmpty) {
       temp = temp
           .where(
-            (w) => (w['userName'] ?? "").toString().toLowerCase().contains(
-              searchQuery.toLowerCase(),
-            ),
+            (w) {
+              final name = (w['name'] ?? w['userName'] ?? "")
+                  .toString()
+                  .toLowerCase();
+              final title = (w['title'] ?? "").toString().toLowerCase();
+              final query = searchQuery.toLowerCase();
+              return name.contains(query) || title.contains(query);
+            },
           )
           .toList();
     }
@@ -490,14 +494,11 @@ class _UsersWorklogState extends State<UsersWorklog> {
                           Padding(
                             padding: const EdgeInsets.symmetric(vertical: 10),
                             child: Text(
-                              DateFormat(
-                                "yyyy-MMMM-dd",
-                              ).format(DateTime.parse(date)),
+                              TimeUtils.formatDate(DateTime.parse(date)),
                               style: Theme.of(context).textTheme.labelMedium,
                             ),
                           ),
-                          ...logs
-                              .map((log) => buildTimelineItem(context, log)),
+                          ...logs.map((log) => WorklogSessionTile(log: log)),
                         ],
                       );
                     }).toList(),
@@ -505,199 +506,6 @@ class _UsersWorklogState extends State<UsersWorklog> {
           ),
         ],
       ),
-    );
-  }
-
-  Widget buildTimelineItem(BuildContext context, dynamic log) {
-    final accentColor = Theme.of(context).colorScheme.secondary;
-    final String workType = (log["workType"] ?? "").toString().toUpperCase();
-
-    String displayTime = "--:--";
-
-    if (log["time"] != null) {
-      try {
-        final localDateTime = TimeUtils.fromUtcIso8601(log["time"].toString());
-        displayTime = DateFormat("HH:mm:ss").format(localDateTime);
-      } catch (e) {
-        displayTime = log["time"].toString();
-      }
-    }
-
-    final bool isIn = workType == "IN";
-    return StatefulBuilder(
-      builder: (context, setLocalState) {
-        bool isExpanded = false;
-
-        return StatefulBuilder(
-          builder: (context, setStateItem) {
-            return Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Column(
-                  children: [
-                    Icon(
-                      Icons.location_history,
-                      size: 30,
-                      color: Theme.of(context).colorScheme.error,
-                    ),
-                    Container(width: 2, height: 25, color: accentColor),
-                  ],
-                ),
-
-                const SizedBox(width: 15),
-
-                // 📦 CONTENT BOX
-                Expanded(
-                  child: Container(
-                    margin: const EdgeInsets.only(bottom: 5),
-                    padding: const EdgeInsets.only(
-                      left: 10,
-                      right: 10,
-                      bottom: 10,
-                    ),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(15),
-                      border: Border.all(
-                        color: accentColor.withOpacity(0.3),
-                        width: 1,
-                      ),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            // IN / OUT
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 9,
-                                vertical: 5,
-                              ),
-
-                              decoration: BoxDecoration(
-                                color: isIn
-                                    ? Colors.green.withOpacity(0.12)
-                                    : Colors.orange.withOpacity(0.12),
-
-                                borderRadius: BorderRadius.circular(7),
-                              ),
-
-                              child: Text(
-                                workType.isEmpty ? "-" : workType,
-
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.bold,
-                                  color: isIn
-                                      ? Colors.green.shade700
-                                      : Colors.orange.shade700,
-                                ),
-                              ),
-                            ),
-
-                            const Spacer(),
-
-                            // TIME
-                            Text(
-                              displayTime,
-                              style: Theme.of(context).textTheme.labelMedium
-                                  ?.copyWith(fontWeight: FontWeight.bold),
-                            ),
-
-                            IconButton(
-                              icon: Icon(
-                                isExpanded
-                                    ? Icons.keyboard_arrow_up
-                                    : Icons.keyboard_arrow_down,
-                              ),
-                              onPressed: () {
-                                setStateItem(() {
-                                  isExpanded = !isExpanded;
-                                });
-                              },
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 5),
-                        Text(
-                          log["title"] ?? "",
-                          style: Theme.of(context).textTheme.labelMedium,
-                        ),
-
-                        const SizedBox(height: 5),
-
-                        // 📍 LOCATION
-                        Text(
-                          " Location : ${log["locationName"] ?? "No location"}",
-                          style: Theme.of(context).textTheme.titleLarge,
-                        ),
-
-                        // // ⬇ EXPANDED CONTENT
-                        if (isExpanded) ...[
-                          Divider(color: accentColor),
-                          const SizedBox(height: 5),
-
-                          Text(
-                            "Description: ${log["description"] ?? ""}",
-                            style: Theme.of(context).textTheme.labelMedium,
-                          ),
-                          if (log["imageUrl"] != null &&
-                              log["imageUrl"].toString().isNotEmpty)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 8),
-                              child: GestureDetector(
-                                onTap: () {
-                                  final fullUrl =
-                                      "${ApiConstants.Uploaded}${log["imageUrl"].toString()}";
-
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) => FullScreenImageViewer(
-                                        imageUrl: fullUrl,
-                                      ),
-                                    ),
-                                  );
-                                },
-
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(10),
-                                  child: SizedBox(
-                                    height: 150,
-                                    width: double.infinity,
-                                    child: Image.network(
-                                      "${ApiConstants.Uploaded}${log["imageUrl"]}",
-                                      fit: BoxFit.cover,
-                                      loadingBuilder:
-                                          (context, child, loadingProgress) {
-                                            if (loadingProgress == null)
-                                              return child;
-
-                                            return const Center(
-                                              child: RotatingFlower(),
-                                            );
-                                          },
-                                      errorBuilder:
-                                          (context, error, stackTrace) {
-                                            return const Center(
-                                              child: Icon(Icons.broken_image),
-                                            );
-                                          },
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                        ],
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            );
-          },
-        );
-      },
     );
   }
 }

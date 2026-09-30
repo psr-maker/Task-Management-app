@@ -95,7 +95,7 @@ class CustomFormWidgets {
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
-          value: value,
+          value: items.contains(value) ? value : null,
           hint: Text(
             hint,
             style: Theme.of(

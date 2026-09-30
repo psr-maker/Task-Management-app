@@ -1,10 +1,11 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
 import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
 import 'package:staff_work_track/services/admin_service.dart';
 import 'package:staff_work_track/screen/staff/navigation/dashboard/drawer/leave/leaveapply.dart';
 import 'package:staff_work_track/utils/app_helper.dart';
+import 'package:staff_work_track/utils/time_utils.dart';
 
 class Leavelist extends StatefulWidget {
   const Leavelist({super.key});
@@ -130,7 +131,7 @@ class _LeavelistState extends State<Leavelist>
 
   static String formatDate(String? date) {
     if (date == null) return "";
-    return DateFormat("EEE, dd MMMM").format(DateTime.parse(date));
+    return TimeUtils.formatDateValue(date, empty: "");
   }
 
   Future<void> loadItems() async {
@@ -231,19 +232,7 @@ class _LeavelistState extends State<Leavelist>
   }
 
   String formatTime(String? time) {
-    if (time == null || time.isEmpty) return "-";
-
-    try {
-      List<String> parts = time.split(":");
-
-      if (parts.length >= 2) {
-        return "${parts[0]}:${parts[1]}";
-      }
-
-      return time;
-    } catch (e) {
-      return time;
-    }
+    return TimeUtils.formatTime12(time, empty: "-");
   }
 
   @override
@@ -582,7 +571,7 @@ class _LeavelistState extends State<Leavelist>
             ),
           ),
 
-          /// 🔽 EXPANDED CONTENT
+          /// ðŸ”½ EXPANDED CONTENT
           if (isExpanded)
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
@@ -640,66 +629,6 @@ class _LeavelistState extends State<Leavelist>
       ),
     );
   }
-
-  // Widget leaveSummaryCard() {
-  //   return Container(
-  //     width: double.infinity,
-  //     padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
-  //     decoration: BoxDecoration(
-  //       color: Theme.of(context).colorScheme.secondary.withOpacity(0.08),
-  //       borderRadius: BorderRadius.circular(12),
-  //       border: Border.all(
-  //         color: Theme.of(context).colorScheme.secondary.withOpacity(0.3),
-  //       ),
-  //     ),
-  //     child: Column(
-  //       crossAxisAlignment: CrossAxisAlignment.start,
-  //       children: [
-  //         Text(
-  //           DateFormat("MMMM yyyy").format(DateTime.now()),
-  //           style: Theme.of(context).textTheme.labelMedium,
-  //         ),
-  //         const SizedBox(height: 12),
-  //         _summaryLoading
-  //             ? const Center(
-  //                 child: Padding(
-  //                   padding: EdgeInsets.symmetric(vertical: 8),
-  //                   child: SizedBox(
-  //                     height: 18,
-  //                     width: 18,
-  //                     child: CircularProgressIndicator(strokeWidth: 2),
-  //                   ),
-  //                 ),
-  //               )
-  //             : Row(
-  //                 children: [
-  //                   Expanded(
-  //                     child: summaryStat("CL Leave", clUsed, clMonthlyQuota),
-  //                   ),
-  //                   Container(
-  //                     width: 1,
-  //                     height: 40,
-  //                     color: Colors.grey.shade300,
-  //                   ),
-  //                   Expanded(child: summaryStat("LOP Leave", lopUsed, null)),
-  //                   Container(
-  //                     width: 1,
-  //                     height: 40,
-  //                     color: Colors.grey.shade300,
-  //                   ),
-  //                   Expanded(
-  //                     child: summaryStat(
-  //                       "Compensation",
-  //                       compUsed,
-  //                       compApprovedTotal,
-  //                     ),
-  //                   ),
-  //                 ],
-  //               ),
-  //       ],
-  //     ),
-  //   );
-  // }
 
   Widget summaryStat(String label, num used, num? total) {
     return Column(

@@ -38,6 +38,23 @@ class SuperAdminService {
     }
   }
 
+  static List<dynamic> parseGoalList(dynamic decoded) {
+    if (decoded is List) return decoded;
+    if (decoded is Map) {
+      for (final key in ['goals', 'Goals', 'data', 'result', 'items']) {
+        final value = decoded[key];
+        if (value is List) return value;
+      }
+      if (decoded.containsKey('title') ||
+          decoded.containsKey('Title') ||
+          decoded.containsKey('goalCode') ||
+          decoded.containsKey('GoalCode')) {
+        return [decoded];
+      }
+    }
+    return [];
+  }
+
   static Future<List<dynamic>> getGoals() async {
     try {
       final token = await AuthService.getToken();
@@ -51,12 +68,14 @@ class SuperAdminService {
       );
 
       if (response.statusCode == 200) {
-        return jsonDecode(response.body);
-      } else {
-        throw Exception("Failed to load goals");
+        final decoded = jsonDecode(response.body);
+        return parseGoalList(decoded);
       }
+      debugPrint("GetGoalsWithTasks failed ${response.statusCode}: ${response.body}");
+      throw Exception("Failed to load goals");
     } catch (e) {
-      throw Exception(e.toString());
+      debugPrint("getGoals error: $e");
+      rethrow;
     }
   }
 
@@ -72,7 +91,7 @@ class SuperAdminService {
     );
 
     if (response.statusCode == 200) {
-      return jsonDecode(response.body);
+      return parseGoalList(jsonDecode(response.body));
     } else {
       throw Exception("Failed to load goals");
     }
@@ -149,16 +168,20 @@ class SuperAdminService {
 
   // create task to users
 
-  static Future<bool> createGoal({
+  static Future<String?> createGoal({
+    required String goalType,
     required String title,
     required String priority,
     required DateTime startDate,
     required DateTime dueDate,
-    required String assignTo,
+    int? targetQuantity,
+    List<int>? assignedUserIds,
+    List<Map<String, dynamic>>? monthlyGoals,
+    int? parentGoalId,
+    bool sendParentGoalId = false,
   }) async {
     final token = await AuthService.getToken();
     if (token == null) throw Exception("User not logged in");
-    print("JWT token: $token");
     final response = await http.post(
       Uri.parse("$baseUrl/Director/CreateGoal"),
       headers: {
@@ -166,19 +189,77 @@ class SuperAdminService {
         "Authorization": "Bearer $token",
       },
       body: jsonEncode({
+        "goalType": goalType,
         "title": title,
         "priority": priority,
         "startDate": startDate.toIso8601String(),
         "dueDate": dueDate.toIso8601String(),
-        "assign_To": assignTo,
+        if (targetQuantity != null) "targetQuantity": targetQuantity,
+        if (sendParentGoalId) "parentGoalId": parentGoalId,
+        if (assignedUserIds != null) "assignedUserIds": assignedUserIds,
+        if (monthlyGoals != null && monthlyGoals.isNotEmpty)
+          "monthlyGoals": monthlyGoals,
       }),
     );
 
-    if (response.statusCode == 200) {
-      return true;
-    } else {
-      return false;
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      return null;
     }
+    debugPrint("CreateGoal failed ${response.statusCode}: ${response.body}");
+    final body = response.body.trim();
+    if (body.isEmpty) return "Failed to create Goal";
+    try {
+      final decoded = jsonDecode(body);
+      if (decoded is String && decoded.trim().isNotEmpty) return decoded;
+      if (decoded is Map) {
+        final message = decoded['message'] ??
+            decoded['title'] ??
+            decoded['error'] ??
+            decoded['detail'];
+        if (message != null && message.toString().trim().isNotEmpty) {
+          return message.toString();
+        }
+      }
+    } catch (_) {}
+    return body;
+  }
+
+  static Future<String?> updateGoalQuantity({
+    required int goalId,
+    required int completedQuantity,
+  }) async {
+    final token = await AuthService.getToken();
+    if (token == null) return "User not logged in";
+
+    final response = await http.put(
+      Uri.parse("$baseUrl/Director/UpdateGoalQuantity/$goalId"),
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer $token",
+      },
+      body: jsonEncode({"completedQuantity": completedQuantity}),
+    );
+
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      return null;
+    }
+
+    final body = response.body.trim();
+    if (body.isEmpty) return "Failed to update quantity";
+    try {
+      final decoded = jsonDecode(body);
+      if (decoded is String && decoded.trim().isNotEmpty) return decoded;
+      if (decoded is Map) {
+        final message = decoded['message'] ??
+            decoded['title'] ??
+            decoded['error'] ??
+            decoded['detail'];
+        if (message != null && message.toString().trim().isNotEmpty) {
+          return message.toString();
+        }
+      }
+    } catch (_) {}
+    return body;
   }
 
   static Future<bool> createTask({
@@ -193,6 +274,7 @@ class SuperAdminService {
     String? startTime,
     String? endTime,
     required List<int> assignedToIds,
+    List<Map<String, dynamic>> quantitySplits = const [],
   }) async {
     try {
       final token = await AuthService.getToken();
@@ -231,6 +313,8 @@ class SuperAdminService {
         "performanceType": performanceType,
 
         if (quantity != null) "quantity": quantity,
+
+        if (quantitySplits.isNotEmpty) "quantitySplits": quantitySplits,
 
         if (formattedStartTime != null) "startTime": formattedStartTime,
 
@@ -281,16 +365,42 @@ class SuperAdminService {
   }
 
   static Future<Map<String, dynamic>> getTaskByCode(String taskCode) async {
+    final token = await AuthService.getToken();
+    if (token == null) throw Exception("User not logged in");
+
     final response = await http.get(
       Uri.parse("$baseUrl/Director/taskbyid/$taskCode"),
-      headers: {"Content-Type": "application/json"},
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer $token",
+      },
     );
 
     if (response.statusCode == 200) {
-      return json.decode(response.body);
-    } else {
+      final decoded = json.decode(response.body);
+      if (decoded is Map<String, dynamic>) return decoded;
+      if (decoded is Map) return Map<String, dynamic>.from(decoded);
       throw Exception("Failed to load task details");
     }
+
+    var message = "Failed to load task details";
+    final body = response.body.trim();
+    if (body.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(body);
+        if (decoded is String && decoded.trim().isNotEmpty) {
+          message = decoded;
+        } else if (decoded is Map) {
+          final detail = decoded["message"] ?? decoded["title"] ?? decoded["detail"];
+          if (detail != null && detail.toString().trim().isNotEmpty) {
+            message = detail.toString();
+          }
+        }
+      } catch (_) {
+        message = body;
+      }
+    }
+    throw Exception(message);
   }
 
   static Future<bool> updateTask(EditTaskRequest request) async {
@@ -469,7 +579,7 @@ class SuperAdminService {
       if (response.statusCode == 200) {
         final decoded = jsonDecode(response.body);
         List list = [];
-        if (decoded is List) {
+        if (decoded is List) { 
           list = decoded;
         } else if (decoded is Map) {
           list = decoded['auditLogs'] ??
@@ -528,19 +638,50 @@ class SuperAdminService {
     }
   }
 
-  static Future<bool> updateGoal(String id, Map<String, dynamic> data) async {
+  static Future<String?> updateGoal({
+    required String goalCode,
+    required String title,
+    String? priority,
+    required DateTime dueDate,
+    int? targetQuantity,
+    List<int>? assignedUserIds,
+  }) async {
     final token = await AuthService.getToken();
+    if (token == null) return "User not logged in";
 
     final response = await http.put(
-      Uri.parse("$baseUrl/Director/UpdateGoal/$id"),
+      Uri.parse("$baseUrl/Director/UpdateGoal/${Uri.encodeComponent(goalCode)}"),
       headers: {
         "Content-Type": "application/json",
         "Authorization": "Bearer $token",
       },
-      body: jsonEncode(data),
+      body: jsonEncode({
+        "title": title,
+        "priority": priority,
+        "dueDate": dueDate.toIso8601String(),
+        if (targetQuantity != null) "targetQuantity": targetQuantity,
+        if (assignedUserIds != null) "assignedUserIds": assignedUserIds,
+      }),
     );
 
-    return response.statusCode == 200;
+    if (response.statusCode == 200) return null;
+
+    final body = response.body.trim();
+    if (body.isEmpty) return "Failed to update goal";
+    try {
+      final decoded = jsonDecode(body);
+      if (decoded is String && decoded.trim().isNotEmpty) return decoded;
+      if (decoded is Map) {
+        final message = decoded['message'] ??
+            decoded['title'] ??
+            decoded['error'] ??
+            decoded['detail'];
+        if (message != null && message.toString().trim().isNotEmpty) {
+          return message.toString();
+        }
+      }
+    } catch (_) {}
+    return body;
   }
 
   // ✅ DELETE

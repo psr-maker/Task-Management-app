@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:staff_work_track/core/widgets/load_error.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:staff_work_track/core/constant/apiurl.dart';
 import 'package:staff_work_track/core/widgets/buttons.dart';
@@ -9,6 +10,7 @@ import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
 import 'package:staff_work_track/services/auth_service.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
 import 'package:staff_work_track/utils/app_helper.dart';
+import 'package:staff_work_track/utils/time_utils.dart';
 import 'package:staff_work_track/widgets/customfieldwidget.dart';
 
 class UserEditProfile extends StatefulWidget {
@@ -95,8 +97,12 @@ class _UserEditProfileState extends State<UserEditProfile> {
         "email": _email.text.trim(),
         "bloodGroup": _blood.text.trim(),
 
-        "dateOfBirth": _dob.text.isEmpty ? null : _dob.text,
-        "dateOfJoining": _doj.text.isEmpty ? null : _doj.text,
+        "dateOfBirth": _dob.text.isEmpty
+            ? null
+            : TimeUtils.toApiDateString(_dob.text),
+        "dateOfJoining": _doj.text.isEmpty
+            ? null
+            : TimeUtils.toApiDateString(_doj.text),
 
         "gender": gender ?? "",
 
@@ -164,7 +170,7 @@ class _UserEditProfileState extends State<UserEditProfile> {
             return const Center(child: RotatingFlower());
           }
           if (s.hasError) {
-            return const Center(child: Text("Error loading profile"));
+            return const AppLoadError();
           }
 
           final d = s.data ?? {};

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:staff_work_track/core/widgets/buttons.dart';
+import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
 import 'package:staff_work_track/screen/super%20admin/fives/create_fives.dart';
 import 'package:staff_work_track/services/version_service.dart';
 import 'package:staff_work_track/core/constant/division_config.dart';
@@ -199,17 +200,13 @@ class _SplashScreenState extends State<SplashScreen>
   Future<void> _openUpdateLink(String downloadUrl) async {
     final url = downloadUrl.trim();
     if (url.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Update link is missing.')),
-      );
+      showAppMessage(context, "Update link is missing.");
       return;
     }
 
     final uri = Uri.tryParse(url);
     if (uri == null || (!uri.isScheme('http') && !uri.isScheme('https'))) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Invalid update link.')),
-      );
+      showAppMessage(context, "Invalid update link.");
       return;
     }
 
@@ -223,9 +220,7 @@ class _SplashScreenState extends State<SplashScreen>
       }
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not open the update link.')),
-      );
+      showAppMessage(context, "Could not open the update link.");
     }
   }
 
@@ -243,8 +238,17 @@ class _SplashScreenState extends State<SplashScreen>
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             const Text(
+              "WorkPulse",
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.w800,
+                letterSpacing: -0.4,
+              ),
+            ),
+            const SizedBox(height: 6),
+            const Text(
               "Performance Tracking",
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              style: TextStyle(fontSize: 14, color: Color(0xFF6B7280)),
             ),
             const SizedBox(height: 20),
             RotationTransition(

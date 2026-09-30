@@ -1,5 +1,6 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
+import 'package:staff_work_track/core/widgets/load_error.dart';
 import 'package:percent_indicator/circular_percent_indicator.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
 import 'package:staff_work_track/services/dashboard_service.dart';
@@ -873,7 +874,7 @@ class _AlldeptproducticityState extends State<Alldeptproducticity> {
             child: Center(child: RotatingFlower()),
           );
         } else if (snapshot.hasError) {
-          return Center(child: Text('Error: ${snapshot.error}'));
+          return const AppLoadError();
         } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
           return const SizedBox();
         }

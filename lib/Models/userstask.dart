@@ -1,3 +1,5 @@
+import 'package:staff_work_track/utils/goal_quantity.dart';
+
 class TaskModel {
   final String taskCode;
   final int totalTasks;
@@ -19,6 +21,8 @@ class TaskModel {
   final bool wasEdited;
   final String performanceType;
   final int? quantity;
+  final int? completedQuantity;
+  final int? pendingQuantity;
   final String? goalCode;
   final String? startTime;
   final String? endTime;
@@ -43,6 +47,8 @@ class TaskModel {
     this.completed_date,
     required this.performanceType,
     this.quantity,
+    this.completedQuantity,
+    this.pendingQuantity,
     this.goalCode,
     this.startTime,
     this.endTime,
@@ -50,31 +56,60 @@ class TaskModel {
 
   factory TaskModel.fromJson(Map<String, dynamic> json) {
     return TaskModel(
-      taskCode: json['taskCode'],
-      task: json['task'],
-      description: json['description'],
-      priority: json['priority'],
-      status: json['status'],
-      createdAt: json['createdAt'],
-      dueDate: json['dueDate'],
-      totalMembers: json['totalMembers'],
-      assignedTo: json['assignedTo'],
+      taskCode: json['taskCode']?.toString() ?? '',
+      task: json['task']?.toString() ?? '',
+      description: json['description']?.toString() ?? '',
+      priority: json['priority']?.toString() ?? '',
+      status: json['status']?.toString() ?? '',
+      createdAt: json['createdAt']?.toString() ?? '',
+      dueDate: json['dueDate']?.toString(),
+      totalMembers: json['totalMembers'] ?? 0,
+      assignedTo: json['assignedTo'] ?? [],
       assignerRole: json['assignerRole'],
       assignerDepartment: json['assignerDepartment'],
-      assignedBy: json['assignedBy'] as String?,
+      assignedBy: _assignedByLabel(json['assignedBy']),
       totalTasks: json["totalTasks"] ?? 0,
       pendingCount: json["pendingCount"] ?? 0,
       inProgressCount: json["inProgressCount"] ?? 0,
       completedCount: json["completedCount"] ?? 0,
       wasEdited: json["wasEdited"] ?? false,
-      completed_date: json['completed_date'],
-      performanceType: json['performanceType'] ?? 'Default',
-      quantity: json['quantity'],
+      completed_date: (json['completedDate'] ?? json['completed_date'])?.toString(),
+      performanceType: json['performanceType'] ?? json['PerformanceType'] ?? 'Default',
+      quantity: readGoalInt(json, const [
+        "quantity",
+        "Quantity",
+        "qty",
+        "Qty",
+        "taskQuantity",
+        "TaskQuantity",
+      ]),
+      completedQuantity: readGoalInt(json, const [
+        "completedQuantity",
+        "CompletedQuantity",
+        "achievedQuantity",
+        "AchievedQuantity",
+      ]),
+      pendingQuantity: readGoalInt(json, const [
+        "pendingQuantity",
+        "PendingQuantity",
+      ]),
       goalCode: json['goalCode'],
       startTime: json['startTime'],
       endTime: json['endTime'],
     );
   }
+}
+
+String? _assignedByLabel(dynamic raw) {
+  if (raw == null) return null;
+  if (raw is String) return raw;
+  if (raw is Map) {
+    final id = raw["userId"] ?? raw["UserId"];
+    final name = raw["name"] ?? raw["Name"];
+    if (id != null && name != null) return "$id-$name";
+    return name?.toString() ?? id?.toString();
+  }
+  return raw.toString();
 }
 
 class EditTaskRequest {

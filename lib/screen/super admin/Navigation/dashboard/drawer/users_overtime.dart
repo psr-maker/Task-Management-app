@@ -6,6 +6,7 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:staff_work_track/core/widgets/loading.dart';
 import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
 import 'package:staff_work_track/services/admin_service.dart';
+import 'package:staff_work_track/utils/role_hierarchy.dart';
 
 class UsersOverTime extends StatefulWidget {
   const UsersOverTime({super.key});
@@ -39,14 +40,18 @@ class _UsersOverTimeState extends State<UsersOverTime> {
   Future<void> loadOvertimes() async {
     try {
       final data = await getApprovedOvertimes();
+      final eligibility = await loadOvertimeEligibility();
+      final visible = data.where((item) {
+        return item is! Map || !eligibility.excludesRecord(item);
+      }).toList();
 
-      allOvertimes = data;
+      allOvertimes = visible;
 
-      final depts = data.map((e) => e["dept"].toString()).toSet().toList();
+      final depts = visible.map((e) => e["dept"].toString()).toSet().toList();
 
       departments = ["All", ...depts];
 
-      filteredOvertimes = data;
+      filteredOvertimes = visible;
 
       setState(() {
         isLoading = false;
@@ -167,9 +172,9 @@ class _UsersOverTimeState extends State<UsersOverTime> {
 
             if (selectedDateRange != null)
               pw.Text(
-                "${DateFormat('dd-MM-yyyy').format(selectedDateRange!.start)}"
+                "${DateFormat('dd/MM/yyyy').format(selectedDateRange!.start)}"
                 " to "
-                "${DateFormat('dd-MM-yyyy').format(selectedDateRange!.end)}",
+                "${DateFormat('dd/MM/yyyy').format(selectedDateRange!.end)}",
               ),
 
             pw.SizedBox(height: 20),
@@ -256,7 +261,7 @@ class _UsersOverTimeState extends State<UsersOverTime> {
                             _pdfCell(e["name"]?.toString() ?? "-"),
                             _pdfCell(
                               DateFormat(
-                                "dd-MM-yyyy",
+                                "dd/MM/yyyy",
                               ).format(DateTime.parse(e["date"].toString())),
                             ),
                             _pdfCell(
@@ -294,12 +299,7 @@ class _UsersOverTimeState extends State<UsersOverTime> {
       debugPrint("PDF Error: $e");
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("Download failed: $e"),
-            backgroundColor: Colors.red,
-          ),
-        );
+        showAppMessage(context, "Download failed: $e");
       }
     } finally {
       if (mounted) {
@@ -416,9 +416,9 @@ class _UsersOverTimeState extends State<UsersOverTime> {
                         selectedDateRange == null
                             ? "Department : $selectedDepartment"
                             : "Department : $selectedDepartment\n\n"
-                                  "${DateFormat('dd-MM-yyyy').format(selectedDateRange!.start)}"
+                                  "${DateFormat('dd/MM/yyyy').format(selectedDateRange!.start)}"
                                   " to "
-                                  "${DateFormat('dd-MM-yyyy').format(selectedDateRange!.end)}",
+                                  "${DateFormat('dd/MM/yyyy').format(selectedDateRange!.end)}",
                         style: Theme.of(context).textTheme.headlineMedium,
                       ),
                     ),
@@ -562,7 +562,7 @@ class _UsersOverTimeState extends State<UsersOverTime> {
                     DataCell(
                       Text(
                         DateFormat(
-                          "dd-MM-yyyy",
+                          "dd/MM/yyyy",
                         ).format(DateTime.parse(e["date"].toString())),
                         style: Theme.of(context).textTheme.labelMedium,
                       ),

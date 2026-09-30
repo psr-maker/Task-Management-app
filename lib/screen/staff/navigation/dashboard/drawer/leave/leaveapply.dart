@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:staff_work_track/core/widgets/buttons.dart';
 import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
 import 'package:staff_work_track/services/admin_service.dart';
 import 'package:staff_work_track/services/auth_service.dart';
 import 'package:staff_work_track/utils/jwt_helper.dart';
+import 'package:staff_work_track/utils/time_utils.dart';
 
 class Leaveapply extends StatefulWidget {
   const Leaveapply({super.key});
@@ -480,7 +480,7 @@ class _LeaveapplyState extends State<Leaveapply> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                DateFormat("dd MMM yyyy").format(day["date"]),
+                                TimeUtils.formatDate(day["date"]),
                                 style: Theme.of(
                                   context,
                                 ).textTheme.headlineMedium,
@@ -636,9 +636,7 @@ class _LeaveapplyState extends State<Leaveapply> {
                                             (c) => DropdownMenuItem<int>(
                                               value: c["id"] as int,
                                               child: Text(
-                                                DateFormat(
-                                                  "dd MMM yyyy",
-                                                ).format(c["date"]),
+                                                TimeUtils.formatDate(c["date"]),
                                               ),
                                             ),
                                           )
@@ -883,7 +881,7 @@ class _LeaveapplyState extends State<Leaveapply> {
       child: ListTile(
         leading: const Icon(Icons.calendar_today_outlined),
         title: Text(
-          date == null ? label : DateFormat("dd MMM yyyy").format(date),
+          date == null ? label : TimeUtils.formatDate(date),
         ),
         onTap: onTap,
       ),

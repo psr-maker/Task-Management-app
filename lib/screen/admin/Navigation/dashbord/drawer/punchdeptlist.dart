@@ -85,12 +85,6 @@ class _PunchCorrdeptlistState extends State<PunchCorrdeptlist> {
       );
       await loadPunchCorrections(); // refresh so item moves out of Pending
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Failed to update punch correction"),
-          backgroundColor: Colors.red,
-        ),
-      );
       showTopMessage("Failed to update punch correction", isError: true);
     }
   }

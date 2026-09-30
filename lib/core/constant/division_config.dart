@@ -31,20 +31,20 @@ class AppRoles {
     final lower = value.toLowerCase();
     return lower.contains("division") && lower.contains("head");
   }
+
+  static bool isScoreLeader(String? role) {
+    return isDivisionHead(role) || isManager(role);
+  }
+
+  static String leaderLabel(String? role) {
+    if (isDivisionHead(role)) return "Division Head";
+    if (isManager(role)) return "Dept Manager";
+    return "";
+  }
 }
 
 class DivisionConfig {
-  static const Map<String, List<String>> childDepartmentsByParent = {
-    "Operations Department": [
-      "Production Department",
-      "IT Department",
-      "Purchase Department",
-      "Quality Department",
-      "Store Department",
-    ],
-  };
-
-  static String _normalize(String value) {
+  static String normalize(String value) {
     return value
         .trim()
         .toLowerCase()
@@ -52,21 +52,9 @@ class DivisionConfig {
         .trim();
   }
 
-  static List<String> childDepartments(String? department) {
-    if (department == null || department.trim().isEmpty) return [];
-
-    final key = _normalize(department);
-    for (final entry in childDepartmentsByParent.entries) {
-      if (_normalize(entry.key) == key) {
-        return List<String>.from(entry.value);
-      }
-    }
-    return [];
-  }
-
   static bool isAllowedDepartment(String? department, List<String> allowed) {
     if (department == null || department.trim().isEmpty) return false;
-    final key = _normalize(department);
-    return allowed.any((item) => _normalize(item) == key);
+    final key = normalize(department);
+    return allowed.any((item) => normalize(item) == key);
   }
 }

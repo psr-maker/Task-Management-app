@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 
 import 'package:staff_work_track/core/widgets/loading.dart';
+import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
 import 'package:staff_work_track/services/overtime_service.dart';
+import 'package:staff_work_track/utils/time_utils.dart';
 
 class ManagerOvertimeDetails extends StatefulWidget {
   final String staffId;
@@ -61,12 +62,7 @@ class _ManagerOvertimeDetailsState extends State<ManagerOvertimeDetails> {
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("Failed to load overtime history: $e"),
-          backgroundColor: Colors.red,
-        ),
-      );
+      showAppMessage(context, "Failed to load overtime history: $e");
     } finally {
       if (!mounted) return;
 
@@ -95,30 +91,11 @@ class _ManagerOvertimeDetailsState extends State<ManagerOvertimeDetails> {
       return "-";
     }
 
-    return DateFormat("dd MMM yyyy").format(date);
+    return TimeUtils.formatDate(date);
   }
 
   String _formatTime(dynamic value) {
-    if (value == null) {
-      return "-";
-    }
-
-    final text = value.toString();
-
-    try {
-      final parts = text.split(":");
-
-      if (parts.length >= 2) {
-        final hour = int.parse(parts[0]);
-        final minute = int.parse(parts[1]);
-
-        final time = TimeOfDay(hour: hour, minute: minute);
-
-        return time.format(context);
-      }
-    } catch (_) {}
-
-    return text;
+    return TimeUtils.formatTime12(value, empty: "-");
   }
 
   String _getStatusText(dynamic item) {

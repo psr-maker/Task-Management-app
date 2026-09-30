@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:jwt_decoder/jwt_decoder.dart';
 
 import 'package:staff_work_track/core/widgets/loading.dart';
 import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
 import 'package:staff_work_track/screen/admin/Navigation/dashbord/drawer/dept_compensation.dart/add_compen.dart';
+import 'package:staff_work_track/services/auth_service.dart';
 import 'package:staff_work_track/services/overtime_service.dart';
+import 'package:staff_work_track/utils/time_utils.dart';
 
 class ExtraWorkPage extends StatefulWidget {
   final String deptt;
@@ -25,6 +28,7 @@ class _ExtraWorkPageState extends State<ExtraWorkPage>
   bool isRefreshing = false;
 
   int? processingId;
+  int? _currentUserId;
 
   List<Map<String, dynamic>> extraWorks = [];
 
@@ -37,6 +41,7 @@ class _ExtraWorkPageState extends State<ExtraWorkPage>
     _tabController = TabController(length: 4, vsync: this);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadCurrentUser();
       _loadExtraWorks();
     });
   }
@@ -45,6 +50,42 @@ class _ExtraWorkPageState extends State<ExtraWorkPage>
   void dispose() {
     _tabController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadCurrentUser() async {
+    try {
+      final token = await AuthService.getToken();
+      if (token == null || token.isEmpty) return;
+      final decoded = JwtDecoder.decode(token);
+      final id = int.tryParse(
+        (decoded['UserId'] ?? decoded['userId'] ?? '').toString(),
+      );
+      if (!mounted) return;
+      setState(() => _currentUserId = id);
+    } catch (_) {}
+  }
+
+  int? _personId(Map<String, dynamic> item) {
+    for (final key in [
+      'staffId',
+      'StaffId',
+      'employeeId',
+      'EmployeeId',
+      'userId',
+      'UserId',
+    ]) {
+      final value = item[key];
+      if (value == null) continue;
+      if (value is int) return value;
+      final parsed = int.tryParse(value.toString());
+      if (parsed != null) return parsed;
+    }
+    return null;
+  }
+
+  bool _isOwnCompensation(Map<String, dynamic> item) {
+    final staffId = _personId(item);
+    return _currentUserId != null && staffId != null && staffId == _currentUserId;
   }
 
   Future<void> _loadExtraWorks({bool refresh = false}) async {
@@ -602,10 +643,22 @@ class _ExtraWorkPageState extends State<ExtraWorkPage>
               _remarksBox('Manager Remarks', managerRemarks),
             ],
 
-            if (status == 'Accepted') ...[
+            if (status == 'Accepted' && !_isOwnCompensation(item)) ...[
               const SizedBox(height: 18),
 
               _managerActionButtons(item),
+            ],
+
+            if (status == 'Accepted' && _isOwnCompensation(item)) ...[
+              const SizedBox(height: 18),
+              Text(
+                'Waiting for division head approval',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.secondary,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ],
 
             if (isProcessing) ...[
@@ -725,38 +778,14 @@ class _ExtraWorkPageState extends State<ExtraWorkPage>
     try {
       final date = DateTime.parse(value.toString());
 
-      return DateFormat('dd MMM yyyy').format(date);
+      return TimeUtils.formatDate(date);
     } catch (_) {
       return value.toString();
     }
   }
 
   String _formatTime(dynamic value) {
-    if (value == null) {
-      return '-';
-    }
-
-    try {
-      final parts = value.toString().split(':');
-
-      if (parts.length < 2) {
-        return value.toString();
-      }
-
-      final hour = int.parse(parts[0]);
-
-      final minute = int.parse(parts[1]);
-
-      final time = TimeOfDay(hour: hour, minute: minute);
-
-      final hour12 = time.hourOfPeriod == 0 ? 12 : time.hourOfPeriod;
-
-      final period = time.period == DayPeriod.am ? 'AM' : 'PM';
-
-      return '$hour12:${minute.toString().padLeft(2, '0')} $period';
-    } catch (_) {
-      return value.toString();
-    }
+    return TimeUtils.formatTime12(value, empty: '-');
   }
 
   String _formatHours(dynamic value) {

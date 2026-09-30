@@ -11,17 +11,21 @@ class TaskUtils {
       case TaskStatus.pending:
         return "Pending";
       case TaskStatus.inProgress:
-        return "Inprogress";
+        return "In progress";
       case TaskStatus.paused:
         return "Paused";
       case TaskStatus.completed:
         return "Completed";
       case TaskStatus.NotStarted:
-        return "NotStarted";
+        return "Not started";
     }
   }
  static TaskStatus parseStatus(String status) {
-  final normalized = status.toLowerCase().trim().replaceAll('_', '');
+  final normalized = status
+      .toLowerCase()
+      .trim()
+      .replaceAll('_', '')
+      .replaceAll(' ', '');
 
   switch (normalized) {
     case "pending":

@@ -1,15 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/Task/taskdetail.dart';
 import 'package:staff_work_track/widgets/StatCard.dart';
+import 'package:staff_work_track/widgets/adaptive_goal_cards.dart';
 
 class Alltasklist extends StatelessWidget {
   final List tasks;
   final String searchQuery;
+  final Future<void> Function(Map<String, dynamic> task)? onStatusSaved;
 
   const Alltasklist({
     super.key,
     required this.tasks,
     required this.searchQuery,
+    this.onStatusSaved,
   });
 
   @override
@@ -37,15 +40,14 @@ class Alltasklist extends StatelessWidget {
 
     return Padding(
       padding: const EdgeInsets.all(15),
-      child: ListView.builder(
+      child: AdaptiveGoalCards(
         shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
         itemCount: filteredTasks.length,
         itemBuilder: (context, index) {
           final task = filteredTasks[index];
-
           return Taskstatus(
             task: task,
+            onStatusSaved: onStatusSaved,
             onTap: () {
               Navigator.push(
                 context,

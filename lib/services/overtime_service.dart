@@ -195,6 +195,7 @@ class OvertimeService {
     required String startTime,
     required String endTime,
     required String reason,
+    bool asDirector = false,
   }) async {
     final token = await AuthService.getToken();
 
@@ -202,7 +203,12 @@ class OvertimeService {
       throw Exception('Authentication token not found.');
     }
 
-    final uri = Uri.parse('$baseUrl/Manager/create-compensation');
+    final paths = asDirector
+        ? const [
+            '/Director/create-compensation',
+            '/Manager/create-compensation',
+          ]
+        : const ['/Manager/create-compensation'];
 
     final body = {
       'staffId': staffId,
@@ -215,31 +221,39 @@ class OvertimeService {
       'reason': reason,
     };
 
-    final response = await http.post(
-      uri,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
-      body: jsonEncode(body),
-    );
-
+    http.Response? response;
     Map<String, dynamic> responseData = {};
 
-    try {
-      responseData = jsonDecode(response.body);
-    } catch (_) {
-      responseData = {};
-    }
+    for (final path in paths) {
+      response = await http.post(
+        Uri.parse('$baseUrl$path'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode(body),
+      );
 
-    if (response.statusCode >= 200 && response.statusCode < 300) {
-      return responseData;
+      try {
+        final decoded = jsonDecode(response.body);
+        responseData = decoded is Map
+            ? Map<String, dynamic>.from(decoded)
+            : {};
+      } catch (_) {
+        responseData = {};
+      }
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        return responseData;
+      }
+
+      if (!asDirector || response.statusCode != 404) break;
     }
 
     throw Exception(
       responseData['message'] ??
           'Failed to create extra work request. '
-              'Status: ${response.statusCode}',
+              'Status: ${response?.statusCode}',
     );
   }
 
@@ -427,17 +441,7 @@ class OvertimeService {
       print('My ExtraWork Response: ${response.body}');
 
       if (response.statusCode == 200) {
-        final dynamic decoded = jsonDecode(response.body);
-
-        if (decoded is List) {
-          return decoded
-              .map<Map<String, dynamic>>(
-                (item) => Map<String, dynamic>.from(item as Map),
-              )
-              .toList();
-        }
-
-        throw Exception('Invalid response format.');
+        return _parseExtraWorkList(jsonDecode(response.body));
       }
 
       if (response.statusCode == 401) {
@@ -525,6 +529,7 @@ class OvertimeService {
     required int extraWorkId,
     required String status,
     String? managerRemarks,
+    bool asDirector = false,
   }) async {
     final token = await AuthService.getToken();
 
@@ -532,22 +537,42 @@ class OvertimeService {
       throw Exception('Authentication token not found.');
     }
 
-    final response = await http.put(
-      Uri.parse('$baseUrl/Manager/manager-response/$extraWorkId'),
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
-      body: jsonEncode({'status': status, 'managerRemarks': managerRemarks}),
-    );
+    final paths = asDirector
+        ? [
+            '/Director/manager-response/$extraWorkId',
+            '/Manager/manager-response/$extraWorkId',
+          ]
+        : ['/Manager/manager-response/$extraWorkId'];
 
-    if (response.statusCode >= 200 && response.statusCode < 300) {
-      return jsonDecode(response.body);
+    http.Response? response;
+    for (final path in paths) {
+      response = await http.put(
+        Uri.parse('$baseUrl$path'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({'status': status, 'managerRemarks': managerRemarks}),
+      );
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        if (response.body.trim().isEmpty) return {'success': true};
+        final decoded = jsonDecode(response.body);
+        if (decoded is Map) return Map<String, dynamic>.from(decoded);
+        return {'success': true, 'data': decoded};
+      }
+
+      if (!asDirector || response.statusCode != 404) break;
     }
 
-    throw Exception(
-      jsonDecode(response.body)['message'] ?? 'Failed to update extra work.',
-    );
+    var message = 'Failed to update extra work.';
+    try {
+      final decoded = jsonDecode(response?.body ?? '');
+      if (decoded is Map && decoded['message'] != null) {
+        message = decoded['message'].toString();
+      }
+    } catch (_) {}
+    throw Exception(message);
   }
 
   static String _formatDateTime(DateTime date) {
@@ -559,8 +584,9 @@ class OvertimeService {
   }
 
   static Future<List<Map<String, dynamic>>> getExtraWorkByDepartments(
-    List<String> departments,
-  ) async {
+    List<String> departments, {
+    bool asDirector = false,
+  }) async {
     final token = await AuthService.getToken();
 
     if (token == null || token.isEmpty) {
@@ -581,30 +607,50 @@ class OvertimeService {
       throw Exception('At least one valid department is required.');
     }
 
-    final uri = Uri.parse('$baseUrl/Manager/departments-extra-work').replace(
-      queryParameters: {
-        'departments': departmentList.join(','),
-      },
-    );
+    final paths = asDirector
+        ? const [
+            '/Director/departments-extra-work',
+            '/Manager/departments-extra-work',
+          ]
+        : const ['/Manager/departments-extra-work'];
 
-    final response = await http.get(
-      uri,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
-    );
-
-    print('getExtraWorkByDepartments Status: ${response.statusCode}');
-    print('getExtraWorkByDepartments URL: $uri');
-    print('getExtraWorkByDepartments Response: ${response.body}');
-
+    http.Response? response;
     dynamic decoded;
-    try {
-      decoded = jsonDecode(response.body);
-    } catch (_) {}
+    for (final path in paths) {
+      final uri = Uri.parse('$baseUrl$path').replace(
+        queryParameters: {
+          'departments': departmentList.join(','),
+        },
+      );
 
-    if (response.statusCode != 200) {
+      response = await http.get(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      print('getExtraWorkByDepartments Status: ${response.statusCode}');
+      print('getExtraWorkByDepartments URL: $uri');
+      print('getExtraWorkByDepartments Response: ${response.body}');
+
+      try {
+        decoded = jsonDecode(response.body);
+      } catch (_) {
+        decoded = null;
+      }
+
+      if (response.statusCode == 200) break;
+      if (!asDirector ||
+          (response.statusCode != 404 &&
+              response.statusCode != 401 &&
+              response.statusCode != 403)) {
+        break;
+      }
+    }
+
+    if (response == null || response.statusCode != 200) {
       final message = decoded is Map ? decoded['message'] : null;
       throw Exception(
         message ?? 'Failed to get department extra work.',

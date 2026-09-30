@@ -32,7 +32,6 @@ class ThemeProvider extends ChangeNotifier {
       useMaterial3: true,
       scaffoldBackgroundColor: background,
 
-      // APPBAR
       appBarTheme: const AppBarTheme(
         backgroundColor: deepGreen,
         foregroundColor: Colors.white,
@@ -46,25 +45,22 @@ class ThemeProvider extends ChangeNotifier {
         ),
       ),
 
-      // BODY ICON
       iconTheme: const IconThemeData(color: deepGreen, size: 18),
 
       primaryColor: deepGreen,
 
-      // COLORS THEME
       colorScheme: const ColorScheme.light(
         primary: Color.fromARGB(255, 68, 99, 80),
         secondary: deepGreen,
         tertiary: Colors.white54,
         onPrimary: Colors.white,
-        background: Color.fromARGB(255, 134, 170, 136),
+        surface: Colors.white,
         error: Colors.red,
       ),
 
       splashColor: Colors.white,
       highlightColor: Colors.white,
 
-      // CARD THEME
       cardTheme: CardThemeData(
         color: Colors.white,
         elevation: 2,
@@ -75,7 +71,6 @@ class ThemeProvider extends ChangeNotifier {
         ),
       ),
 
-      // CHIP  THEME
       chipTheme: const ChipThemeData(
         backgroundColor: deepGreen,
         selectedColor: deepGreen,
@@ -86,7 +81,6 @@ class ThemeProvider extends ChangeNotifier {
         brightness: Brightness.dark,
       ),
 
-      // TEXT THEME
       textTheme: const TextTheme(
         displayLarge: TextStyle(
           fontSize: 22,
@@ -168,19 +162,17 @@ class ThemeProvider extends ChangeNotifier {
     return ThemeData(
       brightness: Brightness.dark,
       useMaterial3: true,
+      scaffoldBackgroundColor: const Color(0xFF0F1A14),
 
-      // COLOR SCHEME
       colorScheme: const ColorScheme.dark(
         primary: Color.fromARGB(255, 82, 112, 90),
         secondary: Color.fromARGB(255, 74, 104, 75),
         tertiary: Colors.white,
-        background: Color.fromARGB(255, 134, 170, 136),
         onPrimary: Colors.white,
         error: Colors.redAccent,
         onSecondary: deepGreen,
       ),
 
-      // APPBAR
       appBarTheme: const AppBarTheme(
         backgroundColor: Color(0xFF132A1B),
         foregroundColor: Colors.white,
@@ -193,10 +185,8 @@ class ThemeProvider extends ChangeNotifier {
         ),
       ),
 
-      // ICON
       iconTheme: const IconThemeData(color: Colors.white, size: 18),
 
-      // CARD
       cardTheme: CardThemeData(
         color: const Color(0xFF132A1B),
         elevation: 2,
@@ -204,7 +194,6 @@ class ThemeProvider extends ChangeNotifier {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       ),
 
-      // CHIP
       chipTheme: const ChipThemeData(
         backgroundColor: Color(0xFF1E3A2F),
         selectedColor: deepGreen,
@@ -215,12 +204,11 @@ class ThemeProvider extends ChangeNotifier {
         brightness: Brightness.dark,
       ),
 
-      splashColor: deepGreen.withOpacity(0.2),
-      highlightColor: deepGreen.withOpacity(0.1),
+      splashColor: const Color(0x33194D26),
+      highlightColor: const Color(0x1A194D26),
 
-      // TEXT THEME (FIXED CONTRAST)
       textTheme: const TextTheme(
-        displayLarge: TextStyle( 
+        displayLarge: TextStyle(
           fontSize: 22,
           fontWeight: FontWeight.bold,
           color: Colors.white,
@@ -235,7 +223,6 @@ class ThemeProvider extends ChangeNotifier {
           fontWeight: FontWeight.bold,
           color: Colors.white,
         ),
-
         headlineLarge: TextStyle(
           fontSize: 15,
           fontWeight: FontWeight.bold,
@@ -251,7 +238,6 @@ class ThemeProvider extends ChangeNotifier {
           fontWeight: FontWeight.w600,
           color: Colors.white,
         ),
-
         titleLarge: TextStyle(
           fontSize: 12,
           fontWeight: FontWeight.bold,
@@ -262,7 +248,6 @@ class ThemeProvider extends ChangeNotifier {
           fontWeight: FontWeight.w600,
           color: Colors.white,
         ),
-
         bodyLarge: TextStyle(fontSize: 16, color: Colors.white),
         bodyMedium: TextStyle(fontSize: 14, color: Colors.white),
         bodySmall: TextStyle(
@@ -270,7 +255,6 @@ class ThemeProvider extends ChangeNotifier {
           color: Colors.white70,
           fontWeight: FontWeight.bold,
         ),
-
         labelLarge: TextStyle(
           fontSize: 15,
           fontWeight: FontWeight.w700,

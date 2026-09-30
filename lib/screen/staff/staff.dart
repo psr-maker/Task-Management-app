@@ -7,7 +7,7 @@ import 'package:staff_work_track/utils/enum.dart';
 import 'package:staff_work_track/screen/staff/navigation/dashboard/dashboard.dart';
 import 'package:staff_work_track/screen/staff/navigation/worklog/worklog.dart';
 import 'package:staff_work_track/screen/staff/navigation/anouncement.dart';
-import 'package:staff_work_track/core/widgets/curved_bottom_nav.dart';
+import 'package:staff_work_track/core/widgets/adaptive_app_shell.dart';
 
 class Staff extends StatefulWidget {
   const Staff({super.key});
@@ -61,16 +61,11 @@ class _StaffState extends State<Staff> {
       const Anouncestaff(),
     ];
 
-    return Scaffold(
-      body: pages[_currentIndex],
-      bottomNavigationBar: SafeArea(
-        top: false,
-        child: CurvedBottomNav(
-          currentIndex: _currentIndex,
-          onTap: (i) => setState(() => _currentIndex = i),
-          role: UserRole.staff,
-        ),
-      ),
+    return AdaptiveAppShell(
+      currentIndex: _currentIndex,
+      onTap: (i) => setState(() => _currentIndex = i),
+      role: UserRole.staff,
+      pages: pages,
     );
   }
 }

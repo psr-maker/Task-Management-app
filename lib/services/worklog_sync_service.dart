@@ -4,13 +4,40 @@ import 'announ_service.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:geocoding/geocoding.dart';
 
+class WorkLogSyncResult {
+  const WorkLogSyncResult({
+    required this.online,
+    required this.syncedCount,
+    required this.failedCount,
+  });
+
+  final bool online;
+  final int syncedCount;
+  final int failedCount;
+
+  String get message {
+    if (!online) {
+      return "Internet is not available to save to the cloud.";
+    }
+    if (syncedCount > 0 && failedCount == 0) {
+      return "Successfully saved to the cloud.";
+    }
+    if (failedCount > 0) {
+      return "Could not save the worklog to the cloud.";
+    }
+    return "No worklogs waiting to sync.";
+  }
+
+  bool get isError => !online || failedCount > 0;
+}
+
 class WorkLogSyncService {
   static bool _isSyncing = false;
 
-  static Future<void> syncPendingWorkLogs() async {
+  static Future<WorkLogSyncResult> syncPendingWorkLogs() async {
     if (_isSyncing) {
       print("Sync already running...");
-      return;
+      return const WorkLogSyncResult(online: true, syncedCount: 0, failedCount: 0);
     }
 
     _isSyncing = true;
@@ -20,33 +47,44 @@ class WorkLogSyncService {
 
       if (!hasNetwork) {
         print("No internet. Sync skipped.");
-        return;
+        return const WorkLogSyncResult(online: false, syncedCount: 0, failedCount: 0);
       }
 
       final pendingLogs = await LocalWorkLogDB.getPendingWorkLogs();
 
       if (pendingLogs.isEmpty) {
         print("No pending worklogs.");
-        return;
+        return const WorkLogSyncResult(online: true, syncedCount: 0, failedCount: 0);
       }
 
       print("Found ${pendingLogs.length} pending worklogs");
 
-      // ================================================
-      // SYNC ONE BY ONE
-      // ================================================
+      var syncedCount = 0;
+      var failedCount = 0;
 
       for (final log in pendingLogs) {
         try {
           await _syncSingleWorkLog(log);
+          syncedCount++;
         } catch (e) {
+          failedCount++;
           print("Failed to sync local worklog ${log['id']}: $e");
-          continue;
         }
       }
+
+      return WorkLogSyncResult(
+        online: true,
+        syncedCount: syncedCount,
+        failedCount: failedCount,
+      );
     } finally {
       _isSyncing = false;
     }
+  }
+
+  static bool _missingLocation(String? name) {
+    final text = (name ?? '').trim().toLowerCase();
+    return text.isEmpty || text == 'unknown location';
   }
 
   static Future<String> _getLocationName(double latitude, double longitude) async {
@@ -81,47 +119,60 @@ class WorkLogSyncService {
   }
 
   static Future<void> _syncSingleWorkLog(Map<String, dynamic> log) async {
-    final imagePath = log['imagePath'] as String;
+    final localId = log['id'] as int;
+    final serverRaw = log['serverId'];
+    int? serverId = serverRaw == null
+        ? null
+        : (serverRaw is int ? serverRaw : int.tryParse(serverRaw.toString()));
 
-    final image = XFile(imagePath);
-    
-    final submittedTime = DateTime.parse(log['createdAt']);
+    if (serverId == null) {
+      final imagePath = log['imagePath'] as String;
+      final image = XFile(imagePath);
+      final submittedTime = DateTime.parse(log['createdAt']);
+      final latitude = (log['latitude'] as num).toDouble();
+      final longitude = (log['longitude'] as num).toDouble();
 
-    final latitude = (log['latitude'] as num).toDouble();
-    final longitude = (log['longitude'] as num).toDouble();
+      var locationName = (log['locationName'] ?? '').toString();
+      if (_missingLocation(locationName)) {
+        locationName = await _getLocationName(latitude, longitude);
+        await LocalWorkLogDB.updateLocationName(localId, locationName);
+      }
 
-    // Get location name if it's missing/null
-    var locationName = log['locationName'] as String?;
-    if (locationName == null || locationName.isEmpty) {
-      print("📍 Location name missing, fetching from coordinates...");
-      locationName = await _getLocationName(latitude, longitude);
-      
-      // Update database with fetched location name
-      await LocalWorkLogDB.updateLocationName(log['id'], locationName);
-      print("✅ Location name updated: $locationName");
+      serverId = await AnnouncementService.addWorkLog(
+        title: log['title'] ?? '',
+        workType: log['workType'] ?? '',
+        description: log['description'] ?? '',
+        workDate: DateTime.parse(log['workDate']),
+        isSubmit: log['isSubmit'] == 1,
+        latitude: latitude,
+        longitude: longitude,
+        locationName: locationName,
+        image: image,
+        submittedAt: submittedTime,
+      );
+
+      await LocalWorkLogDB.setServerId(localId, serverId);
     }
 
-    print("🔄 SYNCING WORKLOG:");
-    print("   ID: ${log['id']}");
-    print("   Original Submission Time (createdAt): ${log['createdAt']}");
-    print("   Sending as SubmittedAt: ${submittedTime.toIso8601String()}");
-    print("   Location: $locationName");
+    final outPath = (log['outImagePath'] ?? '').toString();
+    if (outPath.isNotEmpty) {
+      final outLatitude = (log['outLatitude'] as num?)?.toDouble() ?? 0;
+      final outLongitude = (log['outLongitude'] as num?)?.toDouble() ?? 0;
+      var outLocation = (log['outLocationName'] ?? '').toString();
+      if (_missingLocation(outLocation)) {
+        outLocation = await _getLocationName(outLatitude, outLongitude);
+        await LocalWorkLogDB.updateOutLocationName(localId, outLocation);
+      }
 
-    await AnnouncementService.addWorkLog(
-      title: log['title'] ?? '',
-      workType: log['workType'] ?? '',
-      description: log['description'] ?? '',
-      workDate: DateTime.parse(log['workDate']),
-      isSubmit: log['isSubmit'] == 1,
-      latitude: latitude,
-      longitude: longitude,
-      locationName: locationName,
-      image: image,
-      submittedAt: submittedTime,
-    );
+      await AnnouncementService.checkOutWorkLog(
+        workLogId: serverId,
+        latitude: outLatitude,
+        longitude: outLongitude,
+        locationName: outLocation,
+        image: XFile(outPath),
+      );
+    }
 
-    await LocalWorkLogDB.markAsSynced(log['id']);
-
-    print("✅ Worklog ${log['id']} synced successfully with submission time: ${submittedTime.toIso8601String()}");
+    await LocalWorkLogDB.markAsSynced(localId);
   }
 }

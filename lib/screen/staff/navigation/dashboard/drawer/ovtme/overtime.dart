@@ -5,6 +5,8 @@ import 'package:staff_work_track/core/widgets/loading.dart';
 import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
 import 'package:staff_work_track/screen/staff/navigation/dashboard/drawer/ovtme/overtimes_details.dart';
 import 'package:staff_work_track/services/overtime_service.dart';
+import 'package:staff_work_track/utils/role_hierarchy.dart';
+import 'package:staff_work_track/utils/time_utils.dart';
 
 class OvertimeListttt extends StatefulWidget {
   const OvertimeListttt({super.key});
@@ -41,6 +43,7 @@ class _OvertimeListtttState extends State<OvertimeListttt> {
       }
 
       final data = await OvertimeService.getMyOvertime();
+      final eligibility = await loadOvertimeEligibility();
 
       if (!mounted) return;
 
@@ -50,6 +53,7 @@ class _OvertimeListtttState extends State<OvertimeListttt> {
       debugPrint("==========================================");
 
       final pendingManagerRequests = data.where((item) {
+        if (item is Map && eligibility.excludesRecord(item)) return false;
         final id = int.tryParse(item["id"].toString());
         if (id != null && _handledIds.contains(id)) return false;
 
@@ -165,35 +169,11 @@ class _OvertimeListtttState extends State<OvertimeListttt> {
   }
 
   String formatTime(dynamic value) {
-    if (value == null) return "";
-
-    final text = value.toString().trim();
-
-    if (text.isEmpty) return "";
-
-    try {
-      final parsed = DateFormat("HH:mm:ss").parse(text);
-
-      return DateFormat("h:mm a").format(parsed);
-    } catch (_) {
-      try {
-        final parsed = DateFormat("HH:mm").parse(text);
-
-        return DateFormat("h:mm a").format(parsed);
-      } catch (_) {
-        return text;
-      }
-    }
+    return TimeUtils.formatTime12(value, empty: "");
   }
 
   String formatDate(dynamic value) {
-    if (value == null) return "";
-
-    try {
-      return DateFormat("dd MMM yyyy").format(DateTime.parse(value.toString()));
-    } catch (_) {
-      return value.toString();
-    }
+    return TimeUtils.formatDateValue(value, empty: "");
   }
 
   Future<void> acceptOvertime(dynamic item) async {

@@ -1,5 +1,44 @@
 import 'package:flutter/material.dart';
 
+OverlayEntry? _appMessageEntry;
+
+void showAppMessage(
+  BuildContext context,
+  String message, {
+  bool isError = true,
+}) {
+  final overlay = Overlay.maybeOf(context, rootOverlay: true);
+  if (overlay == null) return;
+
+  _appMessageEntry?.remove();
+  _appMessageEntry = null;
+
+  final entry = OverlayEntry(
+    builder: (overlayContext) {
+      return Positioned(
+        top: MediaQuery.paddingOf(overlayContext).top + 12,
+        left: 16,
+        right: 16,
+        child: Msgsnackbar(
+          overlayContext,
+          message: message,
+          isError: isError,
+        ),
+      );
+    },
+  );
+
+  _appMessageEntry = entry;
+  overlay.insert(entry);
+
+  Future.delayed(const Duration(seconds: 3), () {
+    if (_appMessageEntry == entry) {
+      entry.remove();
+      _appMessageEntry = null;
+    }
+  });
+}
+
 class Msgsnackbar extends StatelessWidget {
   final String message;
   final bool isError;

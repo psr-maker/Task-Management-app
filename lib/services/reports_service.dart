@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 import 'package:staff_work_track/core/constant/apiurl.dart';
+import 'package:staff_work_track/services/auth_service.dart';
 
 class ReportsService {
   static const String baseUrl = ApiConstants.apiurl;
@@ -35,16 +36,51 @@ class ReportsService {
   }
 
   static Future<List<String>> getAllDepartments() async {
+    final token = await AuthService.getToken();
     final response = await http.get(
       Uri.parse("$baseUrl/Reports/GetAllDepartments"),
+      headers: {
+        "Content-Type": "application/json",
+        if (token != null && token.isNotEmpty) "Authorization": "Bearer $token",
+      },
     );
 
-    if (response.statusCode == 200) {
-      final data = json.decode(response.body);
-      return List<String>.from(data['data']);
-    } else {
+    if (response.statusCode != 200) {
       throw Exception("Failed to load departments");
     }
+
+    final decoded = json.decode(response.body);
+    final raw = decoded is List
+        ? decoded
+        : decoded is Map
+        ? decoded["data"] ??
+              decoded["Data"] ??
+              decoded["departments"] ??
+              decoded["Departments"]
+        : null;
+    if (raw is! List) return [];
+
+    final names = <String>[];
+    for (final item in raw) {
+      final name = item is String
+          ? item
+          : item is Map
+          ? (item["departmentName"] ??
+                    item["DepartmentName"] ??
+                    item["name"] ??
+                    item["Name"] ??
+                    "")
+                .toString()
+          : item.toString();
+      final value = name.trim();
+      if (value.isEmpty || value == "null") continue;
+      if (names.any((existing) => existing.toLowerCase() == value.toLowerCase())) {
+        continue;
+      }
+      names.add(value);
+    }
+    names.sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+    return names;
   }
 
   static Future<Map<String, dynamic>> getdeptMonthlyProductivity(
@@ -90,8 +126,12 @@ class ReportsService {
     int employeeId,
     int year,
   ) async {
+    final token = await AuthService.getToken();
     final response = await http.get(
       Uri.parse("$baseUrl/Reports/Staff/$employeeId/Year/$year"),
+      headers: {
+        if (token != null && token.isNotEmpty) "Authorization": "Bearer $token",
+      },
     );
 
     if (response.statusCode == 200) {
@@ -111,7 +151,9 @@ class ReportsService {
 
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      return data["monthlyData"]; // 🔥 important
+      final monthly = data is Map ? data["monthlyData"] : null;
+      if (monthly is List) return monthly;
+      return [];
     } else {
       throw Exception("Failed to load monthly productivity");
     }
@@ -270,33 +312,63 @@ class ReportsService {
     };
   }
 
+  static List<dynamic> _reportList(Map decoded, List<String> keys) {
+    for (final key in keys) {
+      final value = decoded[key];
+      if (value is List) return value;
+    }
+
+    for (final entry in decoded.entries) {
+      final name = entry.key.toString().toLowerCase();
+      final matches = keys.any((key) => key.toLowerCase() == name);
+      if (matches && entry.value is List) {
+        return entry.value as List;
+      }
+    }
+
+    return [];
+  }
+
   static Future<Map<String, dynamic>> getFullReport({
     int? userId,
     String? department,
   }) async {
-    String url = "$baseUrl/Reports/FilteredFullReport";
+    final token = await AuthService.getToken();
+    final departmentName = department?.trim();
+    final uri = Uri.parse("$baseUrl/Reports/FilteredFullReport").replace(
+      queryParameters: {
+        if (userId != null) "userId": userId.toString(),
+        if (departmentName != null && departmentName.isNotEmpty)
+          "department": departmentName,
+      },
+    );
 
-    final queryParams = {
-      if (userId != null) "userId": userId.toString(),
-      if (department != null) "department": department,
-    };
+    final response = await http.get(
+      uri,
+      headers: {
+        "Accept": "application/json",
+        if (token != null && token.isNotEmpty) "Authorization": "Bearer $token",
+      },
+    );
 
-    final uri = Uri.parse(url).replace(queryParameters: queryParams);
-
-    final response = await http.get(uri);
-
-    if (response.statusCode == 200) {
-      final decoded = jsonDecode(response.body);
-
-      return {
-        "tasks": decoded["tasks"],
-
-        "goals": decoded["goals"],
-        "leaveList": decoded["leaveList"],
-        "permissionList": decoded["permissionList"],
-      };
-    } else {
-      throw Exception("Failed to load report");
+    if (response.statusCode != 200) {
+      throw Exception("Failed to load report (${response.statusCode})");
     }
+
+    final decoded = jsonDecode(response.body);
+    if (decoded is! Map) {
+      throw Exception("Report response was not valid");
+    }
+
+    return {
+      "users": _reportList(decoded, ["users", "Users"]),
+      "tasks": _reportList(decoded, ["tasks", "Tasks"]),
+      "goals": _reportList(decoded, ["goals", "Goals"]),
+      "leaveList": _reportList(decoded, ["leaveList", "LeaveList"]),
+      "permissionList": _reportList(decoded, [
+        "permissionList",
+        "PermissionList",
+      ]),
+    };
   }
 }

@@ -98,174 +98,166 @@ class _TaskPointDetailState extends State<TaskPointDetail> {
       return const Center(child: RotatingFlower());
     }
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Container(
-      margin: const EdgeInsets.only(top: 10),
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.primary,
-        borderRadius: BorderRadius.circular(20),
-      ),
+    const green = Color.fromARGB(255, 25, 77, 38);
+    final ink = isDark ? Colors.white : const Color(0xFF1C2B22);
+    final muted = isDark ? const Color(0xFFB7C7BC) : const Color(0xFF66756C);
+    final fieldFill = isDark ? const Color(0xFF102018) : const Color(0xFFF4F7F5);
 
+    InputDecoration fieldDecoration(String hint) {
+      return InputDecoration(
+        hintText: hint,
+        hintStyle: TextStyle(color: muted),
+        filled: true,
+        fillColor: fieldFill,
+        contentPadding: const EdgeInsets.all(14),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFFE3EBE6)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: green, width: 1.4),
+        ),
+        disabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFFE3EBE6)),
+        ),
+      );
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF10241A) : const Color(0xFFF7FAF8),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE3EBE6)),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(widget.assignedTo, style: Theme.of(context).textTheme.bodySmall),
-
-          const SizedBox(height: 20),
-
+          Text(
+            "Review",
+            style: TextStyle(
+              color: muted,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 12),
           Container(
-            padding: const EdgeInsets.all(14),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
             decoration: BoxDecoration(
-              color: isDark
-                  ? Theme.of(context).colorScheme.background
-                  : Theme.of(context).colorScheme.onPrimary,
-
+              color: green,
               borderRadius: BorderRadius.circular(12),
             ),
-
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  "System Points",
-                  style: Theme.of(context).textTheme.labelMedium,
+                const Expanded(
+                  child: Text(
+                    "System Points",
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ),
                 Text(
                   "$systemPoints / 100",
                   style: const TextStyle(
-                    color: Colors.amber,
-                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
               ],
             ),
           ),
-
-          const SizedBox(height: 10),
-
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                "Delay Justified",
-                style: Theme.of(context).textTheme.labelLarge,
+          const SizedBox(height: 8),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text(
+              "Justified",
+              style: TextStyle(
+                color: ink,
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
               ),
-              Switch(
-                value: delayJustified,
-                activeColor: Colors.green,
-                onChanged: isReviewed
-                    ? null
-                    : (value) {
-                        setState(() {
-                          delayJustified = value;
-
-                          if (!delayJustified) {
-                            points = systemPoints;
-                          }
-                        });
-                      },
-              ),
-            ],
+            ),
+            value: delayJustified,
+            activeThumbColor: Colors.white,
+            activeTrackColor: green,
+            onChanged: isReviewed
+                ? null
+                : (value) {
+                    setState(() {
+                      delayJustified = value;
+                      if (!delayJustified) points = systemPoints;
+                    });
+                  },
           ),
-
-          const SizedBox(height: 10),
-
           if (delayJustified) ...[
             Text(
-              "Manager Final Points",
-              style: Theme.of(context).textTheme.titleMedium,
+              "Final points  $points / 100",
+              style: TextStyle(
+                color: ink,
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+              ),
             ),
-
-            const SizedBox(height: 10),
-
             Slider(
               value: points.toDouble(),
               min: 0,
               max: 100,
               divisions: 100,
               label: "$points",
-              activeColor: Colors.amber,
+              activeColor: green,
               onChanged: isReviewed
                   ? null
-                  : (value) {
-                      setState(() {
-                        points = value.toInt();
-                      });
-                    },
+                  : (value) => setState(() => points = value.toInt()),
             ),
-
-            Align(
-              alignment: Alignment.centerRight,
-              child: Text(
-                "$points / 100",
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: Colors.amber,
-                ),
+            Text(
+              "Reason",
+              style: TextStyle(
+                color: ink,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
               ),
             ),
-
-            const SizedBox(height: 10),
-            Text(
-              "delay reason",
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 10),
-
-            /// Delay Reason
+            const SizedBox(height: 8),
             TextField(
               controller: delayReasonController,
               enabled: !isReviewed,
               maxLines: 2,
-              decoration: InputDecoration(
-                hintText: "Enter delay reason...",
-                filled: true,
-                fillColor: isDark
-                    ? Theme.of(context).colorScheme.background
-                    : Theme.of(context).colorScheme.onPrimary,
-                contentPadding: const EdgeInsets.all(15),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(15),
-                  borderSide: BorderSide.none,
-                ),
-              ),
+              style: TextStyle(color: ink),
+              decoration: fieldDecoration("Add a reason"),
             ),
-
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
           ],
           Text(
-            "Manager comment",
-            style: Theme.of(context).textTheme.titleMedium,
+            "Comment",
+            style: TextStyle(
+              color: ink,
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+            ),
           ),
-          const SizedBox(height: 10),
-
-          /// Manager Comment
+          const SizedBox(height: 8),
           TextField(
             controller: commentController,
             enabled: !isReviewed,
             maxLines: 3,
-            decoration: InputDecoration(
-              hintText: "Manager comment...",
-              filled: true,
-              fillColor: isDark
-                  ? Theme.of(context).colorScheme.background
-                  : Theme.of(context).colorScheme.onPrimary,
-              contentPadding: const EdgeInsets.all(15),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(15),
-                borderSide: BorderSide.none,
-              ),
-            ),
+            style: TextStyle(color: ink),
+            decoration: fieldDecoration("Add a comment"),
           ),
-
-          const SizedBox(height: 25),
-
-          /// Submit Button
-          Center(
+          const SizedBox(height: 18),
+          SizedBox(
+            width: double.infinity,
             child: AppButton(
               text: isReviewed ? "Already Submitted" : "Submit Review",
-              color: Theme.of(context).colorScheme.secondary,
-              txtcolor: Theme.of(context).colorScheme.onPrimary,
+              color: green,
+              txtcolor: Colors.white,
               onPressed: isReviewed ? null : submitReview,
             ),
           ),

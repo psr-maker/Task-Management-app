@@ -1,14 +1,18 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:staff_work_track/Models/getusers.dart';
-import 'package:staff_work_track/core/constant/division_config.dart';
 import 'package:staff_work_track/core/responsive/app_layout.dart';
 import 'package:staff_work_track/services/admin_service.dart';
 import 'package:staff_work_track/services/auth_service.dart';
 import 'package:staff_work_track/services/superadmin_service.dart';
 import 'package:staff_work_track/core/widgets/buttons.dart';
 import 'package:staff_work_track/core/providers/data_refresh_provider.dart';
+import 'package:staff_work_track/utils/goal_quantity.dart';
+import 'package:staff_work_track/utils/time_utils.dart';
 import 'package:staff_work_track/utils/jwt_helper.dart';
+import 'package:staff_work_track/utils/role_hierarchy.dart';
+import 'package:staff_work_track/widgets/staff_picker.dart';
 import 'package:staff_work_track/widgets/customfieldwidget.dart';
 import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
 
@@ -19,7 +23,7 @@ class Createtask extends StatefulWidget {
   final String? initialDescription;
   final String? initialGoalCode;
   final String? initialPriority;
-  final String initialPerformanceType;
+  final String initialPerformanceType; 
   final int? initialQuantity;
   final DateTime? initialAssignedAt;
   final DateTime? initialDueDate;
@@ -56,6 +60,7 @@ class _CreateTaskPageState extends State<Createtask> {
   final TextEditingController dueDateController = TextEditingController();
 
   final TextEditingController goalTitleController = TextEditingController();
+  final TextEditingController goalQuantityController = TextEditingController();
   final TextEditingController goalStartController = TextEditingController();
   final TextEditingController goalDueController = TextEditingController();
 
@@ -84,18 +89,30 @@ class _CreateTaskPageState extends State<Createtask> {
   bool _loadingUsers = true;
   List<UserModel> _assignableUsers = [];
   final Set<int> _monthlyAssignedIds = {};
+  final Set<int> _taskAssignedIds = {};
+  final List<_QuantityShare> _quantityShares = [];
   final List<_MonthlySubGoal> _subGoals = [];
   bool _monthsWereGenerated = false;
 
   TimeOfDay? _parseTimeOfDay(String? value) {
     if (value == null || value.isEmpty) return null;
-    final parts = value.split(":");
-    if (parts.length != 2) return null;
-
+    final upper = value.trim().toUpperCase();
+    if (upper.endsWith('AM') || upper.endsWith('PM')) {
+      final isPm = upper.endsWith('PM');
+      final hm = upper.replaceAll('AM', '').replaceAll('PM', '').trim().split(':');
+      if (hm.length < 2) return null;
+      var hour = int.tryParse(hm[0].trim());
+      final minute = int.tryParse(hm[1].trim());
+      if (hour == null || minute == null) return null;
+      if (isPm && hour < 12) hour += 12;
+      if (!isPm && hour == 12) hour = 0;
+      return TimeOfDay(hour: hour, minute: minute);
+    }
+    final parts = value.split(':');
+    if (parts.length < 2) return null;
     final hour = int.tryParse(parts[0]);
     final minute = int.tryParse(parts[1]);
     if (hour == null || minute == null) return null;
-
     return TimeOfDay(hour: hour, minute: minute);
   }
 
@@ -120,28 +137,27 @@ class _CreateTaskPageState extends State<Createtask> {
 
     createdDate = widget.initialAssignedAt;
     if (createdDate != null) {
-      createdDateController.text =
-          "${createdDate!.year}-${createdDate!.month.toString().padLeft(2, '0')}-${createdDate!.day.toString().padLeft(2, '0')}";
+      createdDateController.text = TimeUtils.formatDate(createdDate!);
     }
 
     dueDate = widget.initialDueDate;
     if (dueDate != null) {
-      dueDateController.text =
-          "${dueDate!.year}-${dueDate!.month.toString().padLeft(2, '0')}-${dueDate!.day.toString().padLeft(2, '0')}";
+      dueDateController.text = TimeUtils.formatDate(dueDate!);
     }
 
     startTime = _parseTimeOfDay(widget.initialStartTime);
     if (widget.initialStartTime != null) {
-      startTimeController.text = widget.initialStartTime!;
+      startTimeController.text = TimeUtils.formatTime12(widget.initialStartTime);
     }
 
     endTime = _parseTimeOfDay(widget.initialEndTime);
     if (widget.initialEndTime != null) {
-      endTimeController.text = widget.initialEndTime!;
+      endTimeController.text = TimeUtils.formatTime12(widget.initialEndTime);
     }
 
     loadGoals();
     _monthlyAssignedIds.addAll(widget.assignedToIds);
+    _taskAssignedIds.addAll(widget.assignedToIds);
     _loadAssignableUsers();
   }
 
@@ -152,11 +168,15 @@ class _CreateTaskPageState extends State<Createtask> {
     createdDateController.dispose();
     dueDateController.dispose();
     goalTitleController.dispose();
+    goalQuantityController.dispose();
     goalStartController.dispose();
     goalDueController.dispose();
     quantityController.dispose();
     startTimeController.dispose();
     endTimeController.dispose();
+    for (final share in _quantityShares) {
+      share.dispose();
+    }
     for (final goal in _subGoals) {
       goal.dispose();
     }
@@ -166,7 +186,6 @@ class _CreateTaskPageState extends State<Createtask> {
   Future<void> _loadAssignableUsers() async {
     try {
       final token = await AuthService.getToken();
-      final role = token != null ? JwtHelper.getRole(token) : null;
       var department =
           (token != null ? JwtHelper.getDepartment(token) : null)?.trim();
       final loginUserId = int.tryParse(
@@ -182,83 +201,37 @@ class _CreateTaskPageState extends State<Createtask> {
         } catch (_) {}
       }
 
-      final isDirector =
-          role == AppRoles.director ||
-          (role ?? '').toLowerCase() == 'director';
-      final isDivisionHead = AppRoles.isDivisionHead(role);
-
-      var allowedDepartments = <String>[
-        ...?widget.assignedDepartments
-            ?.map((d) => d.trim())
-            .where((d) => d.isNotEmpty),
-      ];
-
-      if (!isDirector) {
-        final ownDepartments = <String>{
-          if (department != null && department.isNotEmpty) department,
-          if (isDivisionHead) ...DivisionConfig.childDepartments(department),
-        };
-
-        if (allowedDepartments.isEmpty) {
-          allowedDepartments = ownDepartments.toList();
-        } else {
-          allowedDepartments = allowedDepartments
-              .where(
-                (dept) => DivisionConfig.isAllowedDepartment(
-                  dept,
-                  ownDepartments.toList(),
-                ),
-              )
-              .toList();
-          if (allowedDepartments.isEmpty) {
-            allowedDepartments = ownDepartments.toList();
-          }
-        }
-      }
-
+      final ownDepartment = department?.trim() ?? "";
       List<UserModel> users = [];
-      if (isDirector && allowedDepartments.isEmpty) {
+      if (ownDepartment.isNotEmpty) {
         try {
-          users = await SuperAdminService.getAllUsers();
-        } catch (_) {
-          users = await SuperAdminService.getEmployees();
-        }
-      } else if (allowedDepartments.isNotEmpty) {
-        try {
-          users = await AdminService.getEmployeesByDepartments(
-            allowedDepartments,
-          );
+          users = await AdminService.getEmployeesByDepartments([ownDepartment]);
         } catch (_) {}
 
+        final ownKey = ownDepartment.toLowerCase();
         if (users.isEmpty) {
           try {
             final allUsers = await SuperAdminService.getAllUsers();
             users = allUsers
                 .where(
-                  (user) => DivisionConfig.isAllowedDepartment(
-                    user.department,
-                    allowedDepartments,
-                  ),
+                  (user) => user.department.trim().toLowerCase() == ownKey,
                 )
                 .toList();
           } catch (_) {}
-        } else if (!isDirector) {
+        } else {
           users = users
-              .where(
-                (user) => DivisionConfig.isAllowedDepartment(
-                  user.department,
-                  allowedDepartments,
-                ),
-              )
+              .where((user) => user.department.trim().toLowerCase() == ownKey)
               .toList();
         }
       }
 
+      final active = users
+          .where((user) => user.status.toLowerCase() != 'inactive')
+          .toList();
+      final assignable = await keepAssignableUsers(active);
       if (!mounted) return;
       setState(() {
-        _assignableUsers = users
-            .where((user) => user.status.toLowerCase() != 'inactive')
-            .toList();
+        _assignableUsers = assignable;
         _loadingUsers = false;
       });
     } catch (e) {
@@ -345,17 +318,30 @@ class _CreateTaskPageState extends State<Createtask> {
     if (goalStartDate == null || goalDueDate == null) return;
     if (!force && !_monthsWereGenerated && _subGoals.isNotEmpty) return;
 
+    final previousPriority = {
+      for (final goal in _subGoals)
+        if (goal.titleController.text.trim().isNotEmpty)
+          goal.titleController.text.trim(): goal.priority,
+    };
+
     for (final goal in _subGoals) {
       goal.dispose();
     }
+    final generated = _buildMonthGoals();
+    for (final goal in generated) {
+      final kept = previousPriority[goal.titleController.text.trim()];
+      if (kept != null && kept.isNotEmpty) {
+        goal.priority = kept;
+      }
+    }
     _subGoals
       ..clear()
-      ..addAll(_buildMonthGoals());
+      ..addAll(generated);
     _monthsWereGenerated = true;
   }
 
   Future<void> _pickUsers(Set<int> target, {String? title}) async {
-    final picker = _StaffPicker(
+    final picker = StaffPicker(
       users: _assignableUsers,
       selectedIds: target,
       title: title ?? 'Assign staff',
@@ -439,7 +425,7 @@ class _CreateTaskPageState extends State<Createtask> {
       }
     }
     else if (isTask) {
-      // No goal selected → use today's date
+      // No goal selected â†’ use today's date
       initialDate = today;
 
       if (!isCreated && createdDate != null) {
@@ -472,7 +458,7 @@ class _CreateTaskPageState extends State<Createtask> {
 
     if (picked != null) {
       controller.text =
-          "${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}";
+          TimeUtils.formatDate(picked);
 
       setState(() {
         if (isCreated) {
@@ -530,6 +516,47 @@ class _CreateTaskPageState extends State<Createtask> {
       return;
     }
 
+    final quantitySplits = <Map<String, dynamic>>[];
+    if (selectedPerformanceType == "Qty" && _quantityShares.isNotEmpty) {
+      final taskQuantity = int.tryParse(quantityController.text);
+      var splitTotal = 0;
+      for (var i = 0; i < _quantityShares.length; i++) {
+        final share = _quantityShares[i];
+        final shareQuantity = int.tryParse(share.quantityController.text.trim());
+        if (shareQuantity == null || shareQuantity <= 0) {
+          showTopMessage(
+            "Enter a quantity greater than 0 for share ${i + 1}",
+            isError: true,
+          );
+          return;
+        }
+        if (share.memberIds.isEmpty) {
+          showTopMessage("Assign members for share ${i + 1}", isError: true);
+          return;
+        }
+        splitTotal += shareQuantity;
+        quantitySplits.add({
+          "quantity": shareQuantity,
+          "memberIds": share.memberIds.toList(),
+        });
+      }
+      if (taskQuantity != null && splitTotal != taskQuantity) {
+        showTopMessage(
+          "Share quantities (${formatGoalQty(splitTotal)}) must equal the task quantity (${formatGoalQty(taskQuantity)})",
+          isError: true,
+        );
+        return;
+      }
+      _taskAssignedIds
+        ..clear()
+        ..addAll(quantitySplits.expand((share) => (share["memberIds"] as List).cast<int>()));
+    }
+
+    if (_taskAssignedIds.isEmpty) {
+      showTopMessage("Assign at least one staff member", isError: true);
+      return;
+    }
+
     if (startTime != null && endTime != null) {
       final startMinutes = startTime!.hour * 60 + startTime!.minute;
       final endMinutes = endTime!.hour * 60 + endTime!.minute;
@@ -556,7 +583,8 @@ class _CreateTaskPageState extends State<Createtask> {
       quantity: quantity,
       startTime: startTime != null ? formatTimeOfDay(startTime!) : null,
       endTime: endTime != null ? formatTimeOfDay(endTime!) : null,
-      assignedToIds: widget.assignedToIds,
+      assignedToIds: _taskAssignedIds.toList(),
+      quantitySplits: quantitySplits,
     );
 
     setState(() => _isLoading = false);
@@ -596,7 +624,7 @@ class _CreateTaskPageState extends State<Createtask> {
 
     if (picked != null) {
       controller.text =
-          "${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}";
+          TimeUtils.formatDate(picked);
 
       setState(() {
         if (controller == goalStartController) {
@@ -636,6 +664,16 @@ class _CreateTaskPageState extends State<Createtask> {
       return;
     }
 
+    final yearlyQuantityText = goalQuantityController.text.trim();
+    int? targetQuantity;
+    if (yearlyQuantityText.isNotEmpty) {
+      targetQuantity = int.tryParse(yearlyQuantityText);
+      if (targetQuantity == null || targetQuantity <= 0) {
+        showTopMessage("Enter a target quantity greater than 0", isError: true);
+        return;
+      }
+    }
+
     List<Map<String, dynamic>>? monthlyGoals;
     List<int>? assignedUserIds;
 
@@ -645,6 +683,7 @@ class _CreateTaskPageState extends State<Createtask> {
         return;
       }
 
+      var splitTotal = 0;
       final parentStart = DateTime(
         goalStartDate!.year,
         goalStartDate!.month,
@@ -660,7 +699,8 @@ class _CreateTaskPageState extends State<Createtask> {
         final goal = _subGoals[i];
         if (goal.titleController.text.trim().isEmpty ||
             goal.startDate == null ||
-            goal.dueDate == null) {
+            goal.dueDate == null ||
+            goal.priority.trim().isEmpty) {
           showTopMessage("Fill all fields for sub-goal ${i + 1}", isError: true);
           return;
         }
@@ -695,18 +735,42 @@ class _CreateTaskPageState extends State<Createtask> {
           );
           return;
         }
+        final monthQuantityText = goal.quantityController.text.trim();
+        if (monthQuantityText.isNotEmpty) {
+          final monthQuantity = int.tryParse(monthQuantityText);
+          if (monthQuantity == null || monthQuantity <= 0) {
+            showTopMessage(
+              "Enter a quantity greater than 0 for sub-goal ${i + 1}",
+              isError: true,
+            );
+            return;
+          }
+          splitTotal += monthQuantity;
+        }
       }
 
-      monthlyGoals = _subGoals
-          .map(
-            (goal) => {
-              "title": goal.titleController.text.trim(),
-              "startDate": goal.startDate!.toIso8601String(),
-              "dueDate": goal.dueDate!.toIso8601String(),
-              "assignedUserIds": goal.assignedUserIds.toList(),
-            },
-          )
-          .toList();
+      if (targetQuantity != null && splitTotal > targetQuantity) {
+        showTopMessage(
+          "Monthly quantities (${formatGoalQty(splitTotal)}) are more than the yearly target (${formatGoalQty(targetQuantity)})",
+          isError: true,
+        );
+        return;
+      }
+
+      monthlyGoals = _subGoals.map((goal) {
+        final item = <String, dynamic>{
+          "title": goal.titleController.text.trim(),
+          "priority": goal.priority,
+          "startDate": goal.startDate!.toIso8601String(),
+          "dueDate": goal.dueDate!.toIso8601String(),
+          "assignedUserIds": goal.assignedUserIds.toList(),
+        };
+        final monthQuantity = int.tryParse(goal.quantityController.text.trim());
+        if (monthQuantity != null && monthQuantity > 0) {
+          item["targetQuantity"] = monthQuantity;
+        }
+        return item;
+      }).toList();
     } else {
       if (_monthlyAssignedIds.isEmpty) {
         showTopMessage("Assign at least one staff member", isError: true);
@@ -725,6 +789,7 @@ class _CreateTaskPageState extends State<Createtask> {
         priority: selectedPriority!,
         startDate: goalStartDate!,
         dueDate: goalDueDate!,
+        targetQuantity: targetQuantity,
         assignedUserIds: assignedUserIds,
         monthlyGoals: monthlyGoals,
         sendParentGoalId: _goalType == 'Monthly',
@@ -950,6 +1015,152 @@ class _CreateTaskPageState extends State<Createtask> {
     );
   }
 
+  Widget _quantitySplitSection() {
+    final taskQuantity = int.tryParse(quantityController.text.trim()) ?? 0;
+    var splitTotal = 0;
+    for (final share in _quantityShares) {
+      splitTotal += int.tryParse(share.quantityController.text.trim()) ?? 0;
+    }
+    final left = taskQuantity - splitTotal;
+    final status = _quantityShares.isEmpty
+        ? "Optional"
+        : left == 0
+            ? "${formatGoalQty(splitTotal)} of ${formatGoalQty(taskQuantity)}"
+            : left > 0
+                ? "${formatGoalQty(left)} left"
+                : "${formatGoalQty(left.abs())} over";
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text(
+              "Shares",
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey.shade600,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              status,
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+            ),
+            const Spacer(),
+            TextButton(
+              onPressed: () {
+                setState(() => _quantityShares.add(_QuantityShare()));
+              },
+              child: const Text("Add share"),
+            ),
+          ],
+        ),
+        for (var i = 0; i < _quantityShares.length; i++) _quantityShareRow(i),
+      ],
+    );
+  }
+
+  Widget _quantityShareRow(int index) {
+    final share = _quantityShares[index];
+    final brand = Theme.of(context).colorScheme.secondary;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 62,
+            child: Text(
+              "Share ${index + 1}",
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey.shade600,
+              ),
+            ),
+          ),
+          SizedBox(
+            width: 72,
+            child: TextField(
+              controller: share.quantityController,
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              onChanged: (_) => setState(() {}),
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+              decoration: InputDecoration(
+                hintText: "Qty",
+                hintStyle: TextStyle(
+                  fontSize: 13,
+                  color: Colors.grey.shade500,
+                ),
+                isDense: true,
+                filled: true,
+                fillColor: _softFill(),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 10,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide.none,
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide.none,
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(color: brand),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: share.memberIds.isEmpty
+                ? Text(
+                    "No members",
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                  )
+                : Wrap(
+                    spacing: 6,
+                    runSpacing: 4,
+                    children: share.memberIds.map((id) {
+                      return Text(
+                        _userLabel(id),
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      );
+                    }).toList(),
+                  ),
+          ),
+          IconButton(
+            visualDensity: VisualDensity.compact,
+            tooltip: "Add members",
+            onPressed: () => _pickUsers(
+              share.memberIds,
+              title: "Assign share ${index + 1}",
+            ),
+            icon: Icon(Icons.person_add_alt_1, size: 18, color: brand),
+          ),
+          IconButton(
+            visualDensity: VisualDensity.compact,
+            tooltip: "Remove share",
+            onPressed: () {
+              setState(() {
+                final removed = _quantityShares.removeAt(index);
+                removed.dispose();
+              });
+            },
+            icon: Icon(Icons.close, size: 16, color: Colors.grey.shade600),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _taskForm() {
     if (selectedGoalCode != null &&
         goalsList.isNotEmpty &&
@@ -1007,8 +1218,36 @@ class _CreateTaskPageState extends State<Createtask> {
             maxLines: 1,
             keyboardType: TextInputType.number,
           ),
+          const SizedBox(height: 12),
+          _quantitySplitSection(),
         ],
 
+        const SizedBox(height: 20),
+        Row(
+          children: [
+            Expanded(
+              child: CustomFormWidgets.label(context, "Assigned members"),
+            ),
+            IconButton(
+              tooltip: "Add members",
+              onPressed: () => _pickUsers(
+                _taskAssignedIds,
+                title: "Assign members",
+              ),
+              icon: Icon(
+                Icons.person_add_alt_1,
+                color: Theme.of(context).colorScheme.secondary,
+              ),
+            ),
+          ],
+        ),
+        _assignedStaffBox(
+          ids: _taskAssignedIds,
+          onAdd: () => _pickUsers(
+            _taskAssignedIds,
+            title: "Assign members",
+          ),
+        ),
         const SizedBox(height: 20),
         CustomFormWidgets.label(context, "Description"),
         const SizedBox(height: 8),
@@ -1111,7 +1350,7 @@ class _CreateTaskPageState extends State<Createtask> {
               controller: startTimeController,
               onTap: () => _pickTime(isStart: true),
             ),
-            hint: "(optional)",
+            optional: true,
           ),
           _labeled(
             "Due Time",
@@ -1119,7 +1358,7 @@ class _CreateTaskPageState extends State<Createtask> {
               controller: endTimeController,
               onTap: () => _pickTime(isStart: false),
             ),
-            hint: "(optional)",
+            optional: true,
           ),
         ),
       ],
@@ -1137,25 +1376,33 @@ class _CreateTaskPageState extends State<Createtask> {
     );
   }
 
-  Widget _labeled(String label, Widget child, {String? hint}) {
+  Widget _labeled(String label, Widget child, {bool optional = false}) {
+    final labelStyle = optional
+        ? Theme.of(context).textTheme.headlineLarge?.copyWith(
+            color: Colors.grey.shade600,
+            fontWeight: FontWeight.w500,
+          )
+        : Theme.of(context).textTheme.headlineLarge;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            CustomFormWidgets.label(context, label),
-            if (hint != null) ...[
-              const SizedBox(width: 6),
-              Text(
-                hint,
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w500,
-                  color: Colors.grey.shade600,
-                ),
-              ),
-            ],
-          ],
+        Text.rich(
+          TextSpan(
+            text: label,
+            style: labelStyle,
+            children: optional
+                ? [
+                    TextSpan(
+                      text: "  Optional",
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.grey.shade500,
+                      ),
+                    ),
+                  ]
+                : null,
+          ),
         ),
         const SizedBox(height: 8),
         child,
@@ -1185,10 +1432,14 @@ class _CreateTaskPageState extends State<Createtask> {
     setState(() {
       if (isStart) {
         startTime = picked;
-        startTimeController.text = formatTimeOfDay(picked);
+        startTimeController.text = TimeUtils.formatTime12(
+          "${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}",
+        );
       } else {
         endTime = picked;
-        endTimeController.text = formatTimeOfDay(picked);
+        endTimeController.text = TimeUtils.formatTime12(
+          "${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}",
+        );
       }
     });
   }
@@ -1224,7 +1475,10 @@ class _CreateTaskPageState extends State<Createtask> {
           ),
         ),
         const SizedBox(height: 20),
-        CustomFormWidgets.label(context, "Priority"),
+        CustomFormWidgets.label(
+          context,
+          _goalType == 'Yearly' ? "Yearly priority" : "Priority",
+        ),
         const SizedBox(height: 8),
         CustomFormWidgets.dropdown(
           context: context,
@@ -1232,6 +1486,12 @@ class _CreateTaskPageState extends State<Createtask> {
           items: ["Normal", "Medium", "High"],
           onChanged: (v) => setState(() => selectedPriority = v),
           hint: "Select Priority",
+        ),
+        const SizedBox(height: 20),
+        _labeled(
+          _goalType == 'Yearly' ? "Yearly target quantity" : "Target quantity",
+          _quantityInput(goalQuantityController),
+          optional: true,
         ),
         const SizedBox(height: 22),
         if (_goalType == 'Monthly') ...[
@@ -1281,13 +1541,7 @@ class _CreateTaskPageState extends State<Createtask> {
           },
           hint: "Select Goal Type",
         ),
-        const SizedBox(height: 8),
-        Text(
-          _goalType == 'Yearly'
-              ? 'Yearly goals are split into months. Assign staff on each month.'
-              : 'A single goal for this period, assigned to selected staff.',
-          style: TextStyle(fontSize: 13, color: Colors.grey.shade600, height: 1.35),
-        ),
+     
       ],
     );
   }
@@ -1319,6 +1573,8 @@ class _CreateTaskPageState extends State<Createtask> {
           ],
         ),
         const SizedBox(height: 8),
+        _quantitySummary(),
+        const SizedBox(height: 8),
         if (!canGenerate)
           _hintBox('Pick start and due dates. Months will be created for you.')
         else if (_subGoals.isEmpty)
@@ -1341,7 +1597,7 @@ class _CreateTaskPageState extends State<Createtask> {
                 },
               ),
             ActionChip(
-              avatar: Icon(Icons.add, size: 18, color: brand),
+              avatar: Icon(Icons.add, size: 18, color: Colors.white),
               label: const Text('Add month'),
               onPressed: canGenerate
                   ? () {
@@ -1353,6 +1609,134 @@ class _CreateTaskPageState extends State<Createtask> {
                   : null,
             ),
           ],
+        ),
+      ],
+    );
+  }
+
+  Widget _quantityInput(TextEditingController controller) {
+    return TextField(
+      controller: controller,
+      keyboardType: TextInputType.number,
+      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+      onChanged: (_) => setState(() {}),
+      style: Theme.of(context).textTheme.headlineMedium,
+      decoration: InputDecoration(
+        hintText: "Enter quantity",
+        hintStyle: TextStyle(
+          color: Colors.grey.shade500,
+          fontWeight: FontWeight.w500,
+        ),
+        isDense: true,
+        contentPadding: const EdgeInsets.symmetric(
+          vertical: 12,
+          horizontal: 12,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color.fromARGB(255, 25, 77, 38)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color.fromARGB(255, 25, 77, 38)),
+        ),
+      ),
+    );
+  }
+
+  Widget _quantitySummary() {
+    final target = int.tryParse(goalQuantityController.text.trim());
+    final hasTarget = target != null && target > 0;
+    final split = _subGoals.fold<int>(0, (total, goal) {
+      return total + (int.tryParse(goal.quantityController.text.trim()) ?? 0);
+    });
+    final left = hasTarget ? target - split : null;
+    final remaining = left ?? 0;
+    final over = left != null && left < 0;
+    final fraction = hasTarget ? (split / target).clamp(0.0, 1.0) : 0.0;
+    final brand = Theme.of(context).colorScheme.secondary;
+    final barColor = over ? Theme.of(context).colorScheme.error : brand;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: _softFill(),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: _summaryFigure(
+                  "Target",
+                  hasTarget ? formatGoalQty(target) : "â€”",
+                ),
+              ),
+              Expanded(
+                child: _summaryFigure("Assigned", formatGoalQty(split)),
+              ),
+              Expanded(
+                child: _summaryFigure(
+                  over ? "Over" : "Left",
+                  left == null
+                      ? "â€”"
+                      : formatGoalQty(over ? remaining.abs() : remaining),
+                  emphasize: over,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(6),
+            child: LinearProgressIndicator(
+              minHeight: 6,
+              value: hasTarget ? fraction : 0,
+              backgroundColor: Colors.grey.shade300,
+              color: barColor,
+            ),
+          ),
+          if (hasTarget) ...[
+            const SizedBox(height: 6),
+            Text(
+              over
+                  ? "Monthly quantities are ${formatGoalQty(remaining.abs())} over the yearly target."
+                  : remaining == 0
+                      ? "The full yearly quantity is split across the months."
+                      : "${formatGoalQty(remaining)} is still not assigned to a month.",
+              style: TextStyle(
+                fontSize: 12,
+                height: 1.3,
+                color: over
+                    ? Theme.of(context).colorScheme.error
+                    : Colors.grey.shade700,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _summaryFigure(String label, String value, {bool emphasize = false}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+            color: emphasize ? Theme.of(context).colorScheme.error : null,
+          ),
         ),
       ],
     );
@@ -1441,7 +1825,7 @@ class _CreateTaskPageState extends State<Createtask> {
               ),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 6),
-                child: Text('–', style: TextStyle(color: Colors.grey.shade600)),
+                child: Text('â€“', style: TextStyle(color: Colors.grey.shade600)),
               ),
               Expanded(
                 child: _miniDate(
@@ -1451,6 +1835,68 @@ class _CreateTaskPageState extends State<Createtask> {
               ),
             ],
           ),
+          const SizedBox(height: 10),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Text.rich(
+              TextSpan(
+                text: "Quantity",
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey.shade600,
+                ),
+                children: [
+                  TextSpan(
+                    text: "  Optional",
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.grey.shade500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 6),
+          TextField(
+            controller: goal.quantityController,
+            keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            onChanged: (_) => setState(() {}),
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+            decoration: InputDecoration(
+              hintText: "Enter quantity",
+              hintStyle: TextStyle(
+                color: Colors.grey.shade500,
+                fontWeight: FontWeight.w500,
+              ),
+              isDense: true,
+              filled: true,
+              fillColor: _softFill(),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 10,
+                vertical: 10,
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide.none,
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide.none,
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide(
+                  color: Theme.of(context).colorScheme.secondary,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          _monthPriority(goal),
           const SizedBox(height: 10),
           _assignedStaffBox(
             ids: goal.assignedUserIds,
@@ -1463,6 +1909,56 @@ class _CreateTaskPageState extends State<Createtask> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _monthPriority(_MonthlySubGoal goal) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Month priority',
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: Colors.grey.shade700,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          decoration: BoxDecoration(
+            color: _softFill(),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: goal.priority,
+              isExpanded: true,
+              isDense: true,
+              items: const ["Normal", "Medium", "High"]
+                  .map(
+                    (item) => DropdownMenuItem(
+                      value: item,
+                      child: Text(
+                        item,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black
+                        ),
+                      ),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (value) {
+                if (value == null) return;
+                setState(() => goal.priority = value);
+              },
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -1624,12 +2120,13 @@ String _monthName(int month) {
   return months[month - 1];
 }
 
-String _initials(String name) {
-  final parts = name.trim().split(RegExp(r'\s+'));
-  if (parts.isEmpty || parts.first.isEmpty) return '?';
-  if (parts.length == 1) return parts.first[0].toUpperCase();
-  final last = parts.last.isEmpty ? parts.first[0] : parts.last[0];
-  return (parts.first[0] + last).toUpperCase();
+class _QuantityShare {
+  final TextEditingController quantityController = TextEditingController();
+  final Set<int> memberIds = {};
+
+  void dispose() {
+    quantityController.dispose();
+  }
 }
 
 class _MonthlySubGoal {
@@ -1653,238 +2150,18 @@ class _MonthlySubGoal {
   }
 
   final TextEditingController titleController = TextEditingController();
+  final TextEditingController quantityController = TextEditingController();
   final TextEditingController startController = TextEditingController();
   final TextEditingController dueController = TextEditingController();
   DateTime? startDate;
   DateTime? dueDate;
+  String priority = 'Normal';
   final Set<int> assignedUserIds;
 
   void dispose() {
     titleController.dispose();
+    quantityController.dispose();
     startController.dispose();
     dueController.dispose();
-  }
-}
-
-class _StaffPicker extends StatefulWidget {
-  final List<UserModel> users;
-  final Set<int> selectedIds;
-  final String title;
-
-  const _StaffPicker({
-    required this.users,
-    required this.selectedIds,
-    required this.title,
-  });
-
-  @override
-  State<_StaffPicker> createState() => _StaffPickerState();
-}
-
-class _StaffPickerState extends State<_StaffPicker> {
-  late final Set<int> _selected;
-  final TextEditingController _search = TextEditingController();
-
-  @override
-  void initState() {
-    super.initState();
-    _selected = {...widget.selectedIds};
-  }
-
-  @override
-  void dispose() {
-    _search.dispose();
-    super.dispose();
-  }
-
-  UserModel? _userById(int id) {
-    for (final user in widget.users) {
-      if (user.userId == id) return user;
-    }
-    return null;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final query = _search.text.trim().toLowerCase();
-    final filtered = widget.users.where((user) {
-      if (query.isEmpty) return true;
-      return user.name.toLowerCase().contains(query) ||
-          user.email.toLowerCase().contains(query) ||
-          user.department.toLowerCase().contains(query);
-    }).toList();
-    final brand = Theme.of(context).colorScheme.secondary;
-    const fieldBorder = Color.fromARGB(255, 25, 77, 38);
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  widget.title,
-                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                ),
-              ),
-              IconButton(
-                onPressed: () => Navigator.pop(context),
-                icon: const Icon(Icons.close),
-              ),
-            ],
-          ),
-          Text(
-            _selected.isEmpty
-                ? 'Select the people for this goal'
-                : '${_selected.length} selected',
-            style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _search,
-            onChanged: (_) => setState(() {}),
-            style: Theme.of(context).textTheme.titleLarge,
-            decoration: InputDecoration(
-              hintText: 'Search name',
-              hintStyle: Theme.of(context).textTheme.headlineSmall,
-              prefixIcon: const Icon(Icons.search),
-              isDense: true,
-              contentPadding: const EdgeInsets.symmetric(
-                vertical: 12,
-                horizontal: 12,
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: fieldBorder),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: fieldBorder),
-              ),
-            ),
-          ),
-          if (_selected.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: _selected.map((id) {
-                final name = _userById(id)?.name ?? 'User $id';
-                return InputChip(
-                  label: Text(
-                    name,
-                    style: const TextStyle(
-                      color: Colors.black,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  onDeleted: () => setState(() => _selected.remove(id)),
-                  deleteIcon: const Icon(Icons.close, size: 16, color: Colors.black54),
-                  backgroundColor: brand.withValues(alpha: 0.08),
-                  side: BorderSide(color: brand.withValues(alpha: 0.3)),
-                );
-              }).toList(),
-            ),
-          ],
-          const SizedBox(height: 8),
-          Expanded(
-            child: filtered.isEmpty
-                ? Center(
-                    child: Text(
-                      widget.users.isEmpty
-                          ? 'No staff in this department'
-                          : 'No matching staff',
-                      style: TextStyle(color: Colors.grey.shade600),
-                    ),
-                  )
-                : ListView.separated(
-                    itemCount: filtered.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 8),
-                    itemBuilder: (context, index) {
-                      final user = filtered[index];
-                      final checked = _selected.contains(user.userId);
-                      return Material(
-                        color: checked
-                            ? brand.withValues(alpha: 0.1)
-                            : Theme.of(context).cardColor,
-                        borderRadius: BorderRadius.circular(12),
-                        child: InkWell(
-                          borderRadius: BorderRadius.circular(12),
-                          onTap: () {
-                            setState(() {
-                              if (checked) {
-                                _selected.remove(user.userId);
-                              } else {
-                                _selected.add(user.userId);
-                              }
-                            });
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 10,
-                            ),
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: checked ? brand : fieldBorder,
-                                width: checked ? 1.6 : 1,
-                              ),
-                            ),
-                            child: Row(
-                              children: [
-                                CircleAvatar(
-                                  radius: 18,
-                                  backgroundColor: checked
-                                      ? brand.withValues(alpha: 0.18)
-                                      : brand.withValues(alpha: 0.12),
-                                  child: Text(
-                                    _initials(user.name),
-                                    style: const TextStyle(
-                                      color: Colors.black,
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Text(
-                                    user.name,
-                                    style: const TextStyle(
-                                      color: Colors.black,
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 15,
-                                    ),
-                                  ),
-                                ),
-                                Icon(
-                                  checked
-                                      ? Icons.check_circle
-                                      : Icons.circle_outlined,
-                                  color: checked ? brand : Colors.grey.shade400,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-          ),
-          const SizedBox(height: 10),
-          AppButton(
-            text: "Done",
-            onPressed: () => Navigator.pop(context, _selected),
-            color: Theme.of(context).colorScheme.secondary,
-            txtcolor: Theme.of(context).colorScheme.onPrimary,
-          ),
-        ],
-      ),
-    );
   }
 }

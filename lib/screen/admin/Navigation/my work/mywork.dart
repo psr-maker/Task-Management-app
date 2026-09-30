@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:jwt_decoder/jwt_decoder.dart';
+import 'package:staff_work_track/core/responsive/app_layout.dart';
+import 'package:staff_work_track/core/widgets/form_popup.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
 import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
+import 'package:staff_work_track/core/widgets/web_ui.dart';
 import 'package:staff_work_track/screen/admin/Navigation/my%20work/Task%20status%20tab/allgoals.dart';
 import 'package:staff_work_track/screen/admin/Navigation/my%20work/Task%20status%20tab/completedtask.dart';
 import 'package:staff_work_track/screen/admin/Navigation/my%20work/Task%20status%20tab/pendingtask.dart';
@@ -21,6 +24,8 @@ class _MyworkState extends State<Mywork> {
   int? adminId;
   bool isLoading = true;
   bool isSearching = false;
+  bool _filterOpen = false;
+  String _goalType = "All";
   final TextEditingController searchController = TextEditingController();
   String? _topMessage;
   bool _isErrorMessage = true;
@@ -60,6 +65,36 @@ class _MyworkState extends State<Mywork> {
     return int.parse(decodedToken['UserId'].toString());
   }
 
+  Widget _goalTypeChip(String label) {
+    final selected = _goalType == label;
+    final brand = Theme.of(context).colorScheme.secondary;
+    return Padding(
+      padding: const EdgeInsets.only(right: 4),
+      child: Material(
+        color: selected ? brand : brand.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(20),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(20),
+          onTap: () => setState(() {
+            _goalType = label;
+            _filterOpen = false;
+          }),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            child: Text(
+              label,
+              style: TextStyle(
+                color: selected ? Colors.white : brand,
+                fontWeight: FontWeight.w600,
+                fontSize: 12,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   void showTopMessage(String message, {bool isError = true}) {
     if (!mounted) return;
     setState(() {
@@ -80,38 +115,72 @@ class _MyworkState extends State<Mywork> {
       return const Center(child: RotatingFlower());
     }
 
+    final isWeb = !AppLayout.isMobile(context);
+
     return DefaultTabController(
       length: 4,
       child: Stack(
         children: [
-          Column(
-            children: [
-              const SizedBox(height: 50),
-
-              TabBar(
-                indicatorSize: TabBarIndicatorSize.tab,
-                indicatorPadding: const EdgeInsets.all(10),
-                indicator: BoxDecoration(
-                  color: Theme.of(context).colorScheme.secondary,
-                  borderRadius: BorderRadius.circular(30),
-                ),
-                labelColor: Theme.of(context).colorScheme.onPrimary,
-                unselectedLabelColor: Theme.of(context).colorScheme.background,
-                labelStyle: Theme.of(context).textTheme.headlineMedium,
-                tabs: const [
-                  Tab(text: 'ALL'),
-                  Tab(text: 'Pending/Pause'),
-                  Tab(text: 'In Process'),
-                  Tab(text: 'Completed'),
+          Padding(
+            padding: isWeb ? AppLayout.pagePadding(context) : EdgeInsets.zero,
+            child: Column(
+              children: [
+                if (isWeb) ...[
+                  const Align(
+                    alignment: Alignment.centerLeft,
+                    child: WebPageHeader(
+                      title: 'My Works',
+                      subtitle: 'Goals and tasks by status',
+                    ),
+                  ),
+                  const SizedBox(height: 12),
                 ],
+
+              Container(
+                width: double.infinity,
+                color: Theme.of(context).colorScheme.secondary,
+                child: SafeArea(
+                  bottom: false,
+                  top: !isWeb,
+                  child: TabBar(
+                    isScrollable: true,
+                    tabAlignment: TabAlignment.start,
+                    indicatorSize: TabBarIndicatorSize.label,
+                    indicator: const UnderlineTabIndicator(
+                      borderSide: BorderSide(color: Colors.white, width: 3),
+                    ),
+                    indicatorColor: Colors.white,
+                    dividerColor: Colors.white,
+                    labelColor: Colors.white,
+                    unselectedLabelColor: Colors.white70,
+                    labelStyle: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
+                    unselectedLabelStyle:
+                        Theme.of(context).textTheme.headlineMedium?.copyWith(
+                      color: Colors.white70,
+                    ),
+                    overlayColor: WidgetStateProperty.all(
+                      Colors.white.withValues(alpha: 0.12),
+                    ),
+                    tabs: const [
+                      Tab(text: 'ALL'),
+                      Tab(text: 'Pending/Pause'),
+                      Tab(text: 'In Process'),
+                      Tab(text: 'Completed'),
+                    ],
+                  ),
+                ),
               ),
 
               Expanded(
                 child: TabBarView(
                   children: [
                     Padding(
-                      padding: const EdgeInsets.all(15),
+                      padding: EdgeInsets.all(isWeb ? 20 : 15),
                       child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Row(
                             children: [
@@ -122,17 +191,21 @@ class _MyworkState extends State<Mywork> {
                                         decoration: const InputDecoration(
                                           hintText: "Search Goal",
                                           border: InputBorder.none,
+                                          isDense: true,
                                         ),
                                         onChanged: (_) => setState(() {}),
                                       )
                                     : Text(
                                         "My Goals",
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
                                         style: Theme.of(
                                           context,
                                         ).textTheme.displaySmall,
                                       ),
                               ),
                               IconButton(
+                                visualDensity: VisualDensity.compact,
                                 icon: Icon(
                                   isSearching ? Icons.close : Icons.search,
                                 ),
@@ -143,14 +216,24 @@ class _MyworkState extends State<Mywork> {
                                   });
                                 },
                               ),
+                              IconButton(
+                                tooltip: _filterOpen
+                                    ? "Close filter"
+                                    : "Filter: $_goalType",
+                                visualDensity: VisualDensity.compact,
+                                icon: Icon(
+                                  _filterOpen ? Icons.close : Icons.filter_list,
+                                ),
+                                onPressed: () {
+                                  setState(() => _filterOpen = !_filterOpen);
+                                },
+                              ),
                               GestureDetector(
                                 onTap: () async {
-                                  final result = await Navigator.push(
+                                  final result = await openFormPage(
                                     context,
-                                    MaterialPageRoute(
-                                      builder: (_) =>
-                                          Createtask(assignedToIds: [adminId!]),
-                                    ),
+                                    Createtask(assignedToIds: [adminId!]),
+                                    maxWidth: 880,
                                   );
                                   if (result == true) {
                                     if (!mounted) return;
@@ -163,20 +246,35 @@ class _MyworkState extends State<Mywork> {
                                   backgroundColor: Theme.of(
                                     context,
                                   ).colorScheme.secondary,
-                                  label: Text(
+                                  label: const Text(
                                     "Add Goal/Task",
-                                    style: Theme.of(
-                                      context,
-                                    ).textTheme.titleMedium,
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w600,
+                                    ),
                                   ),
                                 ),
                               ),
                             ],
                           ),
+                          if (_filterOpen)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 4, bottom: 4),
+                              child: Wrap(
+                                spacing: 6,
+                                runSpacing: 6,
+                                children: [
+                                  _goalTypeChip("All"),
+                                  _goalTypeChip("Yearly"),
+                                  _goalTypeChip("Monthly"),
+                                ],
+                              ),
+                            ),
                           Expanded(
                             child: Allgoals(
                               key: ValueKey(_goalsRefreshKey),
                               searchQuery: searchController.text,
+                              goalType: _goalType,
                               onDelete: (msg, isError) {
                                 showTopMessage(msg, isError: isError);
                               },
@@ -192,6 +290,7 @@ class _MyworkState extends State<Mywork> {
                 ),
               ),
             ],
+          ),
           ),
 
           /// ✅ GLOBAL TOP MESSAGE (FIXED)

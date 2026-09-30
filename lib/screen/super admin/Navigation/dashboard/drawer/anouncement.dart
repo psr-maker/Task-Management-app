@@ -1,12 +1,17 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:staff_work_track/core/widgets/load_error.dart';
 import 'package:staff_work_track/Models/announcement.dart';
 import 'package:staff_work_track/core/constant/apiurl.dart';
+import 'package:staff_work_track/core/responsive/app_layout.dart';
+import 'package:staff_work_track/core/theme/web_theme.dart';
+import 'package:staff_work_track/core/widgets/empty_state.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
 import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
 import 'package:staff_work_track/screen/staff/navigation/fullimg.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/drawer/postanounce.dart';
 import 'package:staff_work_track/services/announ_service.dart';
+import 'package:staff_work_track/utils/time_utils.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class Anounce extends StatefulWidget {
@@ -57,6 +62,7 @@ class _AnounceState extends State<Anounce> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: WebTheme.canvasOf(context),
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios),
@@ -94,24 +100,30 @@ class _AnounceState extends State<Anounce> {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return const Center(child: RotatingFlower());
                   }
-                  if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                    return const Center(
-                      child: Text("No Anouncement available"),
-                    );
-                  }
                   if (snapshot.hasError) {
-                    return Center(child: Text("Error: ${snapshot.error}"));
+                    return const Expanded(child: AppLoadError());
+                  }
+                  if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                    return const Expanded(
+                      child: AppEmptyState(
+                        icon: Icons.campaign_outlined,
+                        title: 'No announcements',
+                        message: 'New notices will appear here.',
+                      ),
+                    );
                   }
 
                   final announcements = snapshot.data ?? [];
 
                   return Expanded(
-                    child: ListView.builder(
+                    child: ListView.separated(
+                      padding: AppLayout.pagePadding(context),
                       itemCount: announcements.length,
+                      separatorBuilder: (_, _) => const SizedBox(height: 12),
                       itemBuilder: (context, index) {
                         final item = announcements[index];
-
-                        return GestureDetector(
+                        return _announcementCard(
+                          item,
                           onLongPress: () async {
                             final confirmed = await showConfirmDialog(
                               context,
@@ -122,153 +134,6 @@ class _AnounceState extends State<Anounce> {
                               deleteAnnouncement(item.id);
                             }
                           },
-                          child: Container(
-                            margin: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 14,
-                            ),
-
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Column(
-                                  children: [
-                                    Container(
-                                      width: 14,
-                                      height: 14,
-                                      decoration: BoxDecoration(
-                                        shape: BoxShape.circle,
-                                        gradient: LinearGradient(
-                                          colors: [
-                                            Theme.of(
-                                              context,
-                                            ).colorScheme.secondary,
-                                            Theme.of(
-                                              context,
-                                            ).colorScheme.background,
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                    Container(
-                                      width: 2,
-                                      height: 120,
-                                      color: Colors.grey,
-                                    ),
-                                  ],
-                                ),
-
-                                const SizedBox(width: 14),
-
-                                Expanded(
-                                  child: Container(
-                                    padding: const EdgeInsets.all(18),
-                                    decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(20),
-                                      border: Border.all(
-                                        color: Theme.of(
-                                          context,
-                                        ).colorScheme.secondary,
-                                      ),
-                                    ),
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Row(
-                                          children: [
-                                            Expanded(
-                                              child: Text(
-                                                item.title,
-                                                style: Theme.of(
-                                                  context,
-                                                ).textTheme.headlineLarge,
-                                              ),
-                                            ),
-
-                                            Container(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                    horizontal: 6,
-                                                    vertical: 2,
-                                                  ),
-                                              decoration: BoxDecoration(
-                                                color: _getTypeColor(
-                                                  item.fileType,
-                                                  // ignore: deprecated_member_use
-                                                ).withOpacity(0.15),
-                                                borderRadius:
-                                                    BorderRadius.circular(20),
-                                              ),
-                                              child: Text(
-                                                item.fileType.toUpperCase(),
-                                                style: TextStyle(
-                                                  color: _getTypeColor(
-                                                    item.fileType,
-                                                  ),
-                                                  fontWeight: FontWeight.w600,
-                                                  fontSize: 10,
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-
-                                        const SizedBox(height: 6),
-
-                                        Row(
-                                          children: [
-                                            Icon(
-                                              Icons.schedule,
-                                              size: 14,
-                                              color: Colors.grey.shade600,
-                                            ),
-                                            const SizedBox(width: 4),
-                                            Text(
-                                              "${item.createdDate.toLocal()}"
-                                                  .split(' ')[0],
-                                              style: const TextStyle(
-                                                fontSize: 12,
-                                                color: Colors.grey,
-                                              ),
-                                            ),
-                                            const SizedBox(width: 10),
-                                            Icon(
-                                              Icons.person,
-                                              size: 14,
-                                              color: Colors.grey.shade600,
-                                            ),
-                                            const SizedBox(width: 4),
-                                            Text(
-                                              item.createdBy,
-                                              style: const TextStyle(
-                                                fontSize: 12,
-                                                color: Colors.grey,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-
-                                        const SizedBox(height: 12),
-
-                                        if (item.description != null)
-                                          Text(
-                                            item.description!,
-                                            style: Theme.of(
-                                              context,
-                                            ).textTheme.labelMedium,
-                                          ),
-
-                                        const SizedBox(height: 14),
-
-                                        _buildMediaSection(item),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
                         );
                       },
                     ),
@@ -290,6 +155,88 @@ class _AnounceState extends State<Anounce> {
               ),
             ),
         ],
+      ),
+    );
+  }
+
+  Widget _announcementCard(
+    Announcement item, {
+    required VoidCallback onLongPress,
+  }) {
+    final typeColor = _getTypeColor(item.fileType);
+    return Material(
+      color: WebTheme.surfaceOf(context),
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onLongPress: onLongPress,
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: WebTheme.lineOf(context)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      item.title,
+                      style: TextStyle(
+                        color: WebTheme.inkOf(context),
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: typeColor.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      item.fileType.toUpperCase(),
+                      style: TextStyle(
+                        color: typeColor,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 10,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '${TimeUtils.formatDateValue(item.createdDate)}  •  ${item.createdBy}',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: WebTheme.mutedOf(context),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              if (item.description != null &&
+                  item.description!.trim().isNotEmpty) ...[
+                const SizedBox(height: 10),
+                Text(
+                  item.description!,
+                  style: TextStyle(
+                    fontSize: 14,
+                    height: 1.4,
+                    color: WebTheme.inkOf(context),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 12),
+              _buildMediaSection(item),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -352,24 +299,25 @@ class _AnounceState extends State<Anounce> {
         child: Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: Colors.red.shade50,
+            color: WebTheme.brandSoftOf(context),
             borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: WebTheme.lineOf(context)),
           ),
           child: Row(
             children: [
-              Icon(Icons.picture_as_pdf, color: Colors.red.shade600),
+              const Icon(Icons.picture_as_pdf, color: WebTheme.danger),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
                   item.fileName ?? item.filePath!.split('/').last,
                   style: TextStyle(
-                    color: Colors.red.shade700,
+                    color: WebTheme.inkOf(context),
                     fontWeight: FontWeight.w600,
-                    fontSize: 12,
+                    fontSize: 13,
                   ),
                 ),
               ),
-              Icon(Icons.open_in_new, color: Colors.red.shade600),
+              Icon(Icons.open_in_new, color: WebTheme.mutedOf(context)),
             ],
           ),
         ),
@@ -380,8 +328,9 @@ class _AnounceState extends State<Anounce> {
       return Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: Colors.green.shade50,
+          color: WebTheme.brandSoftOf(context),
           borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: WebTheme.lineOf(context)),
         ),
         child: _buildSimpleList(item.jsonData!),
       );

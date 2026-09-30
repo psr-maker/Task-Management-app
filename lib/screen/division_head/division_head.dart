@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:jwt_decoder/jwt_decoder.dart';
-import 'package:staff_work_track/core/widgets/curved_bottom_nav.dart';
+import 'package:staff_work_track/core/widgets/adaptive_app_shell.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
 import 'package:staff_work_track/screen/admin/Navigation/my%20work/mywork.dart';
 import 'package:staff_work_track/screen/division_head/div_dashboard.dart';
@@ -80,16 +80,11 @@ class _DivisionHeadState extends State<DivisionHead> {
       const Worklog(),
     ];
 
-    return Scaffold(
-      body: pages[_currentIndex],
-      bottomNavigationBar: SafeArea(
-        top: false,
-        child: CurvedBottomNav(
-          currentIndex: _currentIndex,
-          onTap: (i) => setState(() => _currentIndex = i),
-          role: UserRole.divisionHead,
-        ),
-      ),
+    return AdaptiveAppShell(
+      currentIndex: _currentIndex,
+      onTap: (i) => setState(() => _currentIndex = i),
+      role: UserRole.divisionHead,
+      pages: pages,
     );
   }
 }

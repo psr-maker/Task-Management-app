@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:staff_work_track/core/widgets/load_error.dart';
 import 'package:staff_work_track/services/admin_service.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/Task/taskdetail.dart';
 import 'package:staff_work_track/utils/app_helper.dart';
+import 'package:staff_work_track/utils/goal_quantity.dart';
 import 'package:staff_work_track/widgets/StatCard.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
+import 'package:staff_work_track/widgets/adaptive_goal_cards.dart';
 
 class InProcessTab extends StatefulWidget {
   final int adminId;
@@ -33,7 +36,7 @@ class _InProcessTabState extends State<InProcessTab> {
         }
 
         if (snapshot.hasError) {
-          return Center(child: Text(snapshot.error.toString()));
+          return const AppLoadError();
         }
 
         if (!snapshot.hasData || snapshot.data!.isEmpty) {
@@ -41,31 +44,36 @@ class _InProcessTabState extends State<InProcessTab> {
         }
 
         final tasks = snapshot.data!.where((task) {
-          final normalizedStatus = AppHelpers.normalize(task["status"]);
-          return normalizedStatus == "in progress" || normalizedStatus == "inprogress";
+          final normalizedStatus = AppHelpers.normalize(
+            viewerTaskStatus(task, widget.adminId),
+          );
+          return normalizedStatus == "in progress" ||
+              normalizedStatus == "inprogress";
         }).toList();
 
         if (tasks.isEmpty) {
           return const Center(child: Text("No In Progress Tasks"));
         }
 
-        return ListView.builder(
+        return Padding(
           padding: const EdgeInsets.all(15),
-          itemCount: tasks.length,
-          itemBuilder: (context, index) {
-            final task = tasks[index];
-             return Taskstatus(
-              task: task,
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => TaskDetails(taskCode: task["taskCode"]),
-                  ),
-                );
-              },
-            );
-          },
+          child: AdaptiveGoalCards(
+            itemCount: tasks.length,
+            itemBuilder: (context, index) {
+              final task = tasks[index];
+              return Taskstatus(
+                task: task,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => TaskDetails(taskCode: task["taskCode"]),
+                    ),
+                  );
+                },
+              );
+            },
+          ),
         );
       },
     );

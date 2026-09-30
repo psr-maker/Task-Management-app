@@ -1,4 +1,4 @@
-import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -7,6 +7,7 @@ import 'package:staff_work_track/core/providers/data_refresh_provider.dart';
 import 'package:staff_work_track/firebase_options.dart';
 import 'package:staff_work_track/screen/splashscreen.dart';
 import 'package:staff_work_track/services/firebase_noti_service.dart';
+import 'package:firebase_core/firebase_core.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -16,7 +17,7 @@ Future<void> main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  // Initialize notifications
+  // Initialize notifications 
   await NotificationService.initialize();
 
   // Initialize SharedPreferences
@@ -38,16 +39,24 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(
           create: (_) => DataRefreshNotifier(),
         ),
-      ],
+      ], 
       child: Consumer<ThemeProvider>(
         builder: (context, themeProvider, _) {
           return MaterialApp(
+            title: 'WorkPulse',
             debugShowCheckedModeBanner: false,
             theme: themeProvider.lightTheme,
             darkTheme: themeProvider.darkTheme,
             themeMode: themeProvider.isDarkMode
                 ? ThemeMode.dark
                 : ThemeMode.light,
+            scrollBehavior: const MaterialScrollBehavior().copyWith(
+              dragDevices: {
+                PointerDeviceKind.touch,
+                PointerDeviceKind.mouse,
+                PointerDeviceKind.trackpad,
+              },
+            ),
             home: const SplashScreen(),
           );
         },

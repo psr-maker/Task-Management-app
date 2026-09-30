@@ -1,3 +1,5 @@
+import 'package:staff_work_track/utils/time_utils.dart';
+
 class AppHelpers {
   static String normalize(String value) {
     return value
@@ -9,7 +11,7 @@ class AppHelpers {
 
   static String formatDate(String? date) {
     if (date == null || date.isEmpty) return "N/A";
-    return date.split('T').first;
+    return TimeUtils.formatDateValue(date, empty: "N/A");
   }
 
   static String extractName(String? value) {

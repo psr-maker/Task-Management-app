@@ -1,5 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:staff_work_track/core/responsive/app_layout.dart';
+import 'package:staff_work_track/core/theme/web_theme.dart';
+import 'package:staff_work_track/core/widgets/auth_page_frame.dart';
 import 'package:staff_work_track/screen/authen/login_selection.dart';
 import 'package:staff_work_track/services/firebase_noti_service.dart';
 import 'package:staff_work_track/utils/jwt_helper.dart';
@@ -193,28 +196,32 @@ class _OtpverifyState extends State<Otpverify> {
 
   @override
   Widget build(BuildContext context) {
+    final isDesktop = AppLayout.isDesktop(context);
+
     return Scaffold(
-      backgroundColor: const Color.fromARGB(255, 50, 99, 49),
-
-      appBar: AppBar(
-        backgroundColor: const Color.fromARGB(255, 50, 99, 49),
-        elevation: 0,
-        leading: IconButton(
-          onPressed: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const LoginSelection()),
-            );
-          },
-          icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
-        ),
-      ),
-
+      backgroundColor: isDesktop
+          ? const Color(0xFFF4F7F5)
+          : const Color.fromARGB(255, 50, 99, 49),
+      appBar: isDesktop
+          ? null
+          : AppBar(
+              backgroundColor: const Color.fromARGB(255, 50, 99, 49),
+              elevation: 0,
+              leading: IconButton(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const LoginSelection()),
+                  );
+                },
+                icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
+              ),
+            ),
       body: Stack(
         children: [
-          // --------------------------------------------------
-          // TOP MESSAGE
-          // --------------------------------------------------
+          AuthPageFrame(
+            form: _otpBody(context),
+          ),
           if (_topMessage != null)
             AnimatedPositioned(
               top: _showTopMessage ? 5 : -120,
@@ -232,52 +239,90 @@ class _OtpverifyState extends State<Otpverify> {
                 iconColor: Theme.of(context).colorScheme.secondary,
               ),
             ),
+        ],
+      ),
+    );
+  }
 
-          // --------------------------------------------------
-          // RESPONSIVE CONTENT
-          // --------------------------------------------------
-          SafeArea(
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final screenWidth = constraints.maxWidth;
-                final screenHeight = constraints.maxHeight;
+  Widget _otpBody(BuildContext context) {
+    return SafeArea(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final screenWidth = constraints.maxWidth;
+          final screenHeight = constraints.maxHeight;
+          final bool isMobile = screenWidth < 600;
+          final bool isDesktop = AppLayout.isDesktop(context);
+          final onColor = isDesktop ? WebTheme.ink : Colors.white;
+          final mutedColor = isDesktop
+              ? WebTheme.muted
+              : const Color.fromARGB(255, 235, 233, 233);
+          final fieldFill = isDesktop
+              ? WebTheme.canvas
+              : WebTheme.dark;
+          final fieldBorder = isDesktop ? WebTheme.line : Colors.white;
+          final double contentWidth = isMobile
+              ? screenWidth
+              : isDesktop
+              ? 440
+              : 520;
+          final double horizontalPadding = isMobile ? 16 : 24;
 
-                final bool isMobile = screenWidth < 600;
-                final bool isTablet = screenWidth >= 600 && screenWidth < 1000;
-
-                // Responsive content width
-                final double contentWidth = isMobile
-                    ? screenWidth
-                    : isTablet
-                    ? 520
-                    : 550;
-
-                // Responsive horizontal padding
-                final double horizontalPadding = isMobile ? 16 : 24;
-
-                return SingleChildScrollView(
-                  physics: const BouncingScrollPhysics(),
-                  padding: EdgeInsets.symmetric(
-                    horizontal: horizontalPadding,
-                    vertical: isMobile ? 20 : 30,
-                  ),
-
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(minHeight: screenHeight - 40),
-
-                    child: Center(
-                      child: SizedBox(
-                        width: contentWidth,
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
+          return SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            padding: EdgeInsets.symmetric(
+              horizontal: horizontalPadding,
+              vertical: isMobile ? 20 : 30,
+            ),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: screenHeight - 40),
+              child: Center(
+                child: Container(
+                  width: contentWidth,
+                  padding: isDesktop
+                      ? const EdgeInsets.fromLTRB(28, 24, 28, 28)
+                      : EdgeInsets.zero,
+                  decoration: isDesktop
+                      ? BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: WebTheme.line),
+                          boxShadow: const [
+                            BoxShadow(
+                              color: Color(0x0D000000),
+                              blurRadius: 30,
+                              offset: Offset(0, 12),
+                            ),
+                          ],
+                        )
+                      : null,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      if (isDesktop)
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: IconButton(
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const LoginSelection(),
+                                ),
+                              );
+                            },
+                            icon: Icon(
+                              Icons.arrow_back_ios,
+                              color: onColor,
+                            ),
+                          ),
+                        ),
                             // --------------------------------------------------
                             // SECURITY ICON
                             // --------------------------------------------------
                             Icon(
                               Icons.security,
                               size: isMobile ? 58 : 65,
-                              color: Colors.white,
+                              color: onColor,
                             ),
 
                             SizedBox(height: isMobile ? 4 : 8),
@@ -290,7 +335,7 @@ class _OtpverifyState extends State<Otpverify> {
                               textAlign: TextAlign.center,
                               style: TextStyle(
                                 fontSize: isMobile ? 22 : 25,
-                                color: Colors.white,
+                                color: onColor,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
@@ -305,12 +350,7 @@ class _OtpverifyState extends State<Otpverify> {
                               text: TextSpan(
                                 style: TextStyle(
                                   fontSize: isMobile ? 11 : 12,
-                                  color: const Color.fromARGB(
-                                    255,
-                                    235,
-                                    233,
-                                    233,
-                                  ),
+                                  color: mutedColor,
                                   height: 1.5,
                                 ),
                                 children: [
@@ -326,7 +366,7 @@ class _OtpverifyState extends State<Otpverify> {
                                     style: TextStyle(
                                       fontSize: isMobile ? 12 : 13,
                                       fontWeight: FontWeight.bold,
-                                      color: Colors.white,
+                                      color: onColor,
                                     ),
                                   ),
                                 ],
@@ -375,7 +415,7 @@ class _OtpverifyState extends State<Otpverify> {
                                           style: TextStyle(
                                             fontSize: isMobile ? 15 : 16,
                                             fontWeight: FontWeight.bold,
-                                            color: Colors.white,
+                                            color: onColor,
                                           ),
 
                                           decoration: InputDecoration(
@@ -383,12 +423,7 @@ class _OtpverifyState extends State<Otpverify> {
 
                                             filled: true,
 
-                                            fillColor: const Color.fromARGB(
-                                              255,
-                                              25,
-                                              77,
-                                              38,
-                                            ),
+                                            fillColor: fieldFill,
 
                                             contentPadding: EdgeInsets.zero,
 
@@ -400,16 +435,18 @@ class _OtpverifyState extends State<Otpverify> {
                                             enabledBorder: OutlineInputBorder(
                                               borderRadius:
                                                   BorderRadius.circular(8),
-                                              borderSide: const BorderSide(
-                                                color: Colors.white,
+                                              borderSide: BorderSide(
+                                                color: fieldBorder,
                                               ),
                                             ),
 
                                             focusedBorder: OutlineInputBorder(
                                               borderRadius:
                                                   BorderRadius.circular(10),
-                                              borderSide: const BorderSide(
-                                                color: Colors.white,
+                                              borderSide: BorderSide(
+                                                color: isDesktop
+                                                    ? WebTheme.brand
+                                                    : Colors.white,
                                                 width: 2,
                                               ),
                                             ),
@@ -433,11 +470,11 @@ class _OtpverifyState extends State<Otpverify> {
                             _canResend
                                 ? GestureDetector(
                                     onTap: _resendOtp,
-                                    child: const Text(
+                                    child: Text(
                                       "Resend OTP",
                                       style: TextStyle(
                                         fontSize: 12,
-                                        color: Colors.white,
+                                        color: onColor,
                                         fontWeight: FontWeight.bold,
                                         decoration: TextDecoration.underline,
                                       ),
@@ -448,7 +485,7 @@ class _OtpverifyState extends State<Otpverify> {
                                     text: TextSpan(
                                       style: TextStyle(
                                         fontSize: isMobile ? 11 : 12,
-                                        color: Colors.white,
+                                        color: mutedColor,
                                       ),
                                       children: [
                                         const TextSpan(
@@ -456,9 +493,9 @@ class _OtpverifyState extends State<Otpverify> {
                                         ),
                                         TextSpan(
                                           text: formattedTime,
-                                          style: const TextStyle(
+                                          style: TextStyle(
                                             fontWeight: FontWeight.bold,
-                                            color: Colors.white,
+                                            color: onColor,
                                           ),
                                         ),
                                       ],
@@ -476,8 +513,12 @@ class _OtpverifyState extends State<Otpverify> {
                                 text: "Verify OTP",
                                 isLoading: _isLoading,
                                 onPressed: _isLoading ? null : _verifyOtp,
-                                txtcolor: const Color.fromARGB(255, 50, 99, 49),
-                                color: Colors.white,
+                                txtcolor: isDesktop
+                                    ? Colors.white
+                                    : const Color.fromARGB(255, 50, 99, 49),
+                                color: isDesktop
+                                    ? WebTheme.brand
+                                    : Colors.white,
                               ),
                             ),
 
@@ -490,9 +531,6 @@ class _OtpverifyState extends State<Otpverify> {
                 );
               },
             ),
-          ),
-        ],
-      ),
-    );
+          );
   }
 }

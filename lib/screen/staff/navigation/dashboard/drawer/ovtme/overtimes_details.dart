@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
 import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
 import 'package:staff_work_track/services/overtime_service.dart';
+import 'package:staff_work_track/utils/time_utils.dart';
 
 class Myovertime extends StatefulWidget {
   const Myovertime({super.key});
@@ -84,35 +85,11 @@ class _MyovertimeState extends State<Myovertime> {
   }
 
   String formatTime(String? time) {
-    if (time == null || time.isEmpty) {
-      return "";
-    }
-
-    try {
-      final parsed = DateFormat("HH:mm:ss").parse(time);
-
-      return DateFormat("h:mm a").format(parsed);
-    } catch (_) {
-      try {
-        final parsed = DateFormat("HH:mm").parse(time);
-
-        return DateFormat("h:mm a").format(parsed);
-      } catch (_) {
-        return time;
-      }
-    }
+    return TimeUtils.formatTime12(time, empty: "");
   }
 
   String formatDate(dynamic date) {
-    if (date == null) {
-      return "-";
-    }
-
-    try {
-      return DateFormat("dd MMM yyyy").format(DateTime.parse(date.toString()));
-    } catch (_) {
-      return date.toString();
-    }
+    return TimeUtils.formatDateValue(date, empty: "-");
   }
 
   String formatTotalHours(dynamic value) {

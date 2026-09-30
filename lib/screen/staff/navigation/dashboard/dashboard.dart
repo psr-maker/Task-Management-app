@@ -1,7 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:staff_work_track/Models/warning_model.dart';
 import 'package:staff_work_track/core/constant/division_config.dart';
+import 'package:staff_work_track/utils/role_hierarchy.dart';
+import 'package:staff_work_track/core/responsive/app_layout.dart';
+import 'package:staff_work_track/core/responsive/web_shell_controller.dart';
+import 'package:staff_work_track/core/theme/web_theme.dart';
+import 'package:staff_work_track/core/widgets/app_menu_drawer.dart';
+import 'package:staff_work_track/core/widgets/load_error.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
+import 'package:staff_work_track/core/widgets/web_ui.dart';
+import 'package:staff_work_track/screen/dashboard/dashboard_lists.dart';
 import 'package:staff_work_track/screen/staff/navigation/dashboard/drawer/extrawork/Compensation.dart';
 import 'package:staff_work_track/screen/staff/navigation/dashboard/drawer/leave/leavelist.dart';
 import 'package:staff_work_track/screen/staff/navigation/dashboard/drawer/ovtme/overtime.dart';
@@ -14,6 +22,7 @@ import 'package:staff_work_track/services/reports_service.dart';
 import 'package:staff_work_track/services/superadmin_service.dart';
 import 'package:staff_work_track/widgets/StatCard.dart';
 import 'package:staff_work_track/widgets/monthlytrend.dart';
+import 'package:staff_work_track/utils/work_performance.dart';
 import 'package:staff_work_track/widgets/kpicard.dart';
 
 class StaffDashboard extends StatefulWidget {
@@ -36,6 +45,7 @@ class StaffDashboard extends StatefulWidget {
 class _StaffDashboardState extends State<StaffDashboard> {
   Map<String, dynamic>? data;
   bool isLoading = true;
+  bool loadFailed = false;
   int overdueTaskCount = 0;
   int overdueGoalCount = 0;
 
@@ -47,49 +57,40 @@ class _StaffDashboardState extends State<StaffDashboard> {
   DateTime selectedYear = DateTime.now();
   List<dynamic> monthlyData = [];
   late bool _hideOvertime;
+  TaskTiming taskTiming = TaskTiming.empty;
+
+  void _openList(
+    DashboardListKind kind,
+    String title, {
+    WorkStatusFilter filter = WorkStatusFilter.all,
+  }) {
+    openDashboardList(
+      context,
+      kind: kind,
+      filter: filter,
+      title: title,
+      userId: widget.userid,
+    );
+  }
 
   @override
   void initState() {
     super.initState();
-    _hideOvertime = AppRoles.shouldHideOvertime(widget.role);
+    _hideOvertime = false;
     _resolveOvertimeVisibility();
     fetchAllData();
+    _loadTaskTiming();
     //_fetchNotifications();
     _fetchWarnings();
   }
 
   Future<void> _resolveOvertimeVisibility() async {
-    if (_hideOvertime) return;
     try {
       final roles = await SuperAdminService.getRoles();
-      final roleId = int.tryParse(widget.role.trim());
-      for (final role in roles) {
-        final matchesId = roleId != null && role.id == roleId;
-        final matchesName =
-            role.name.toLowerCase() == widget.role.trim().toLowerCase();
-        if (!matchesId && !matchesName) continue;
-        if (AppRoles.shouldHideOvertime(role.name) ||
-            AppRoles.shouldHideOvertime(role.id.toString())) {
-          if (mounted) setState(() => _hideOvertime = true);
-        }
-        break;
-      }
+      final hide = skipsOvertime(roles, widget.role);
+      if (mounted) setState(() => _hideOvertime = hide);
     } catch (_) {}
   }
-
-  // void _fetchNotifications() async {
-  //   try {
-  //     final data = await NotificationService.getMyNotifications();
-
-  //     if (!mounted) return;
-
-  //     setState(() {
-  //       notificationCount = data.where((n) => n["isRead"] == false).length;
-  //     });
-  //   } catch (e) {
-  //     print("Notification fetch error: $e");
-  //   }
-  // }
 
   void _fetchWarnings() async {
     try {
@@ -106,38 +107,68 @@ class _StaffDashboardState extends State<StaffDashboard> {
     }
   }
 
+  Future<void> _loadTaskTiming() async {
+    final timing = await TaskTiming.load(
+      userId: widget.userid,
+      year: selectedYear.year,
+    );
+    if (!mounted) return;
+    setState(() => taskTiming = timing);
+  }
+
   Future<void> fetchAllData() async {
     try {
       final report = await ReportsService.getEmployeeReport(
         widget.userid,
         selectedYear.year,
       );
-      final monthly = await ReportsService.getMonthlyProductivity(
-        widget.userid,
-        selectedYear.year,
-      );
+      List<dynamic> monthly = [];
+      try {
+        monthly = await ReportsService.getMonthlyProductivity(
+          widget.userid,
+          selectedYear.year,
+        );
+      } catch (e) {
+        debugPrint("Monthly productivity: $e");
+      }
 
+      if (!mounted) return;
       setState(() {
         data = report;
         monthlyData = monthly;
         isLoading = false;
-        overdueTaskCount = report["overdueTasks"] ?? 0;
-        overdueGoalCount = report["overdueGoals"] ?? 0;
-
-        overdueTaskList = List<Map<String, dynamic>>.from(
-          report["overdueTaskList"] ?? [],
-        );
-
-        overdueGoalList = List<Map<String, dynamic>>.from(
-          report["overdueGoalList"] ?? [],
-        );
+        loadFailed = false;
+        overdueTaskCount = _asInt(report["overdueTasks"]);
+        overdueGoalCount = _asInt(report["overdueGoals"]);
+        overdueTaskList = _mapList(report["overdueTaskList"]);
+        overdueGoalList = _mapList(report["overdueGoalList"]);
       });
     } catch (e) {
+      debugPrint("Staff dashboard: $e");
+      if (!mounted) return;
       setState(() {
         isLoading = false;
+        loadFailed = true;
       });
-      print(e);
     }
+  }
+
+  int _asInt(dynamic value) {
+    if (value is num) return value.round();
+    return int.tryParse(value?.toString() ?? "") ?? 0;
+  }
+
+  double _asDouble(dynamic value) {
+    if (value is num) return value.toDouble();
+    return double.tryParse(value?.toString() ?? "") ?? 0;
+  }
+
+  List<Map<String, dynamic>> _mapList(dynamic value) {
+    if (value is! List) return [];
+    return [
+      for (final item in value)
+        if (item is Map) Map<String, dynamic>.from(item),
+    ];
   }
 
   @override
@@ -158,24 +189,63 @@ class _StaffDashboardState extends State<StaffDashboard> {
       "Dec",
     ];
 
-    final Map<String, dynamic> attendanceMap = {
-      for (var item in list)
-        months[(item["month"] ?? 1) - 1]: {
-          "leave": item["leave"] ?? 0,
-          "permission": item["permission"] ?? 0,
-        },
-    };
+    final Map<String, dynamic> attendanceMap = {};
+    for (final item in list) {
+      if (item is! Map) continue;
+      final rawMonth = item["month"];
+      final month = rawMonth is num
+          ? rawMonth.toInt()
+          : int.tryParse(rawMonth?.toString() ?? "") ?? 0;
+      if (month < 1 || month > 12) continue;
+      attendanceMap[months[month - 1]] = {
+        "leave": _asDouble(item["leave"]),
+        "permission": _asDouble(item["permission"]),
+      };
+    }
     if (isLoading) {
       return const Scaffold(body: Center(child: RotatingFlower()));
     }
 
-    double completionPercentage = (data?["goalCompletionPercent"] ?? 0)
-        .toDouble();
-    double onTimePercentage = (data?["goalOnTimePercent"] ?? 0).toDouble();
-    double delayedGoalPercent = (data?["delayedGoalPercent"] ?? 0).toDouble();
+    double completionPercentage = _asDouble(data?["goalCompletionPercent"]);
+    double onTimePercentage = _asDouble(data?["goalOnTimePercent"]);
+    double delayedGoalPercent = _asDouble(data?["delayedGoalPercent"]);
+    final isWeb = !AppLayout.isMobile(context);
+    bindWebHeader(
+      context,
+      overdueCount: overdueTaskCount + overdueGoalCount + apiWarningCount,
+      onOverdue: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => Warning(
+              overdueTasks: overdueTaskList,
+              overdueGoals: overdueGoalList,
+            ),
+          ),
+        );
+      },
+      onReports: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ReportsTable(userId: widget.userid),
+          ),
+        );
+      },
+      onSettings: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const UsersSettings()),
+        );
+      },
+      menuItems: _sidebarMenu(),
+    );
+
     return Scaffold(
-      drawer: _buildDrawer(context),
-      appBar: AppBar(
+      drawer: isWeb ? null : _buildDrawer(context),
+      appBar: isWeb
+          ? null
+          : AppBar(
         title: Text("Dashboard"),
         actions: [
           if ((overdueTaskCount + overdueGoalCount) > 0 || apiWarningCount > 0)
@@ -288,12 +358,14 @@ class _StaffDashboardState extends State<StaffDashboard> {
         ],
       ),
 
-      body: SingleChildScrollView(
+      body: loadFailed
+          ? const AppLoadError()
+          : SingleChildScrollView(
         scrollDirection: Axis.vertical,
         child: Stack(
           children: [
             Padding(
-              padding: const EdgeInsets.all(15),
+              padding: AppLayout.pagePadding(context),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -302,54 +374,115 @@ class _StaffDashboardState extends State<StaffDashboard> {
                     style: Theme.of(context).textTheme.displaySmall,
                   ),
                   SizedBox(height: 10),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: SmallStatCard(
-                          title: "Total Goals",
-                          value: (data?["totalGoals"] ?? 0).toString(),
-                          icon: Icons.emoji_events_outlined,
-                          color: Colors.deepPurple,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: SmallStatCard(
-                          title: "Total Tasks",
-                          value: (data?["totalTasks"] ?? 0).toString(),
-                          icon: Icons.task_outlined,
-                          color: Colors.blue,
-                        ),
-                      ),
-                    ],
+                  WebResponsiveRow(
+                    minChildWidth: 180,
+                    children: AppLayout.isMobile(context)
+                        ? [
+                            SmallStatCard(
+                              title: "Total Goals",
+                              value: (data?["totalGoals"] ?? 0).toString(),
+                              icon: Icons.emoji_events_outlined,
+                              color: Colors.deepPurple,
+                              onTap: () => _openList(
+                                DashboardListKind.goals,
+                                "Total Goals",
+                              ),
+                            ),
+                            SmallStatCard(
+                              title: "Total Tasks",
+                              value: (data?["totalTasks"] ?? 0).toString(),
+                              icon: Icons.task_outlined,
+                              color: Colors.blue,
+                              onTap: () => _openList(
+                                DashboardListKind.tasks,
+                                "Total Tasks",
+                              ),
+                            ),
+                          ]
+                        : [
+                            SmallStatCard(
+                              title: "Productivity Score",
+                              value:
+                                  "${completionPercentage.toStringAsFixed(0)}%",
+                              icon: Icons.insights_outlined,
+                              color: WebTheme.brand,
+                              onTap: () => _openList(
+                                DashboardListKind.goals,
+                                "Completed Goals",
+                                filter: WorkStatusFilter.completed,
+                              ),
+                            ),
+                            SmallStatCard(
+                              title: "Tasks Completed",
+                              value: (data?["completedTasks"] ?? 0).toString(),
+                              icon: Icons.task_alt_rounded,
+                              color: WebTheme.success,
+                              onTap: () => _openList(
+                                DashboardListKind.tasks,
+                                "Completed Tasks",
+                                filter: WorkStatusFilter.completed,
+                              ),
+                            ),
+                            SmallStatCard(
+                              title: "Pending Tasks",
+                              value: (data?["pendingTasks"] ?? 0).toString(),
+                              icon: Icons.pending_actions_outlined,
+                              color: WebTheme.warning,
+                              onTap: () => _openList(
+                                DashboardListKind.tasks,
+                                "Pending Tasks",
+                                filter: WorkStatusFilter.pending,
+                              ),
+                            ),
+                            SmallStatCard(
+                              title: "Goals Progress",
+                              value:
+                                  "${(data?["completedGoals"] ?? 0)}/${(data?["totalGoals"] ?? 0)}",
+                              icon: Icons.flag_outlined,
+                              color: WebTheme.dark,
+                              onTap: () => _openList(
+                                DashboardListKind.goals,
+                                "Completed Goals",
+                                filter: WorkStatusFilter.completed,
+                              ),
+                            ),
+                          ],
                   ),
                   const SizedBox(height: 10),
-                  Row(
+                  WebResponsiveRow(
+                    minChildWidth: 160,
                     children: [
-                      Expanded(
-                        child: SmallStatCard(
-                          title: "Goals Completed",
-                          value: (data?["completedGoals"] ?? 0).toString(),
-                          icon: Icons.check_circle_outline,
-                          color: Colors.green,
+                      SmallStatCard(
+                        title: "Goals Completed",
+                        value: (data?["completedGoals"] ?? 0).toString(),
+                        icon: Icons.check_circle_outline,
+                        color: Colors.green,
+                        onTap: () => _openList(
+                          DashboardListKind.goals,
+                          "Completed Goals",
+                          filter: WorkStatusFilter.completed,
                         ),
                       ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: SmallStatCard(
-                          title: "Goals Pending",
-                          value: (data?["pendingGoals"] ?? 0).toString(),
-                          icon: Icons.pending_actions,
-                          color: Colors.orange,
+                      SmallStatCard(
+                        title: "Goals Pending",
+                        value: (data?["pendingGoals"] ?? 0).toString(),
+                        icon: Icons.pending_actions,
+                        color: Colors.orange,
+                        onTap: () => _openList(
+                          DashboardListKind.goals,
+                          "Pending Goals",
+                          filter: WorkStatusFilter.pending,
                         ),
                       ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: SmallStatCard(
-                          title: "Goals Overdue",
-                          value: (data?["overdueGoals"] ?? 0).toString(),
-                          icon: Icons.warning_amber_outlined,
-                          color: Colors.red,
+                      SmallStatCard(
+                        title: "Goals Overdue",
+                        value: (data?["overdueGoals"] ?? 0).toString(),
+                        icon: Icons.warning_amber_outlined,
+                        color: Colors.red,
+                        onTap: () => _openList(
+                          DashboardListKind.goals,
+                          "Overdue Goals",
+                          filter: WorkStatusFilter.overdue,
                         ),
                       ),
                     ],
@@ -357,32 +490,40 @@ class _StaffDashboardState extends State<StaffDashboard> {
                   const SizedBox(height: 10),
 
                   // Task Status
-                  Row(
+                  WebResponsiveRow(
+                    minChildWidth: 160,
                     children: [
-                      Expanded(
-                        child: SmallStatCard(
-                          title: "Tasks Completed",
-                          value: (data?["completedTasks"] ?? 0).toString(),
-                          icon: Icons.check_circle_outline,
-                          color: Colors.teal,
+                      SmallStatCard(
+                        title: "Tasks Completed",
+                        value: (data?["completedTasks"] ?? 0).toString(),
+                        icon: Icons.check_circle_outline,
+                        color: Colors.teal,
+                        onTap: () => _openList(
+                          DashboardListKind.tasks,
+                          "Completed Tasks",
+                          filter: WorkStatusFilter.completed,
                         ),
                       ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: SmallStatCard(
-                          title: "Tasks Pending",
-                          value: (data?["pendingTasks"] ?? 0).toString(),
-                          icon: Icons.pending_actions,
-                          color: const Color.fromARGB(255, 235, 211, 0),
+                      SmallStatCard(
+                        title: "Tasks Pending",
+                        value: (data?["pendingTasks"] ?? 0).toString(),
+                        icon: Icons.pending_actions,
+                        color: const Color.fromARGB(255, 235, 211, 0),
+                        onTap: () => _openList(
+                          DashboardListKind.tasks,
+                          "Pending Tasks",
+                          filter: WorkStatusFilter.pending,
                         ),
                       ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: SmallStatCard(
-                          title: "Tasks Overdue",
-                          value: (data?["overdueTasks"] ?? 0).toString(),
-                          icon: Icons.warning_amber_outlined,
-                          color: Colors.redAccent,
+                      SmallStatCard(
+                        title: "Tasks Overdue",
+                        value: (data?["overdueTasks"] ?? 0).toString(),
+                        icon: Icons.warning_amber_outlined,
+                        color: Colors.redAccent,
+                        onTap: () => _openList(
+                          DashboardListKind.tasks,
+                          "Overdue Tasks",
+                          filter: WorkStatusFilter.overdue,
                         ),
                       ),
                     ],
@@ -395,45 +536,77 @@ class _StaffDashboardState extends State<StaffDashboard> {
                     style: Theme.of(context).textTheme.displaySmall,
                   ),
                   const SizedBox(height: 15),
-                  Row(
+                  WebResponsiveRow(
+                    minChildWidth: 180,
                     children: [
-                      Expanded(
-                        child: KpiCircleCard(
-                          title: "Goal Completion %",
-                          value: completionPercentage,
-                          icon: Icons.verified_outlined,
-                          isPercentage: true,
+                      KpiCircleCard(
+                        title: "Goal Completion %",
+                        goalPercent: ringPercent(
+                          data?["totalGoals"],
+                          completionPercentage,
+                        ),
+                        taskPercent: ringPercent(
+                          data?["totalTasks"],
+                          completionPercent(
+                            data?["completedTasks"],
+                            data?["totalTasks"],
+                          ),
+                        ),
+                        onTap: () => _openList(
+                          DashboardListKind.goals,
+                          "Completed Goals",
+                          filter: WorkStatusFilter.completed,
                         ),
                       ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: KpiCircleCard(
-                          title: "On-Time Completion %",
-                          value: onTimePercentage,
-                          icon: Icons.verified_outlined,
-                          isPercentage: true,
+                      KpiCircleCard(
+                        title: "On-Time Completion %",
+                        goalPercent: ringPercent(
+                          data?["totalGoals"],
+                          onTimePercentage,
+                        ),
+                        taskPercent: ringPercent(
+                          data?["totalTasks"],
+                          taskTiming.onTime,
+                        ),
+                        onTap: () => _openList(
+                          DashboardListKind.goals,
+                          "On-Time Completed Goals",
+                          filter: WorkStatusFilter.onTime,
                         ),
                       ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: KpiCircleCard(
-                          title: "Delayed %",
-                          value: delayedGoalPercent,
-                          icon: Icons.verified_outlined,
-                          isPercentage: false,
+                      KpiCircleCard(
+                        title: "Delayed %",
+                        goalPercent: ringPercent(
+                          data?["totalGoals"],
+                          delayedGoalPercent,
+                        ),
+                        taskPercent: ringPercent(
+                          data?["totalTasks"],
+                          taskTiming.delayed,
+                        ),
+                        onTap: () => _openList(
+                          DashboardListKind.goals,
+                          "Delayed Completed Goals",
+                          filter: WorkStatusFilter.delayed,
                         ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 20),
-                  CapsuleBarChart(data: monthlyData),
+                  WebPanel.wrap(context, CapsuleBarChart(data: monthlyData)),
                   const SizedBox(height: 20),
-                  LeavePermissionChart(attendance: attendanceMap),
+                  WebPanel.wrap(
+                    context,
+                    LeavePermissionChart(attendance: attendanceMap),
+                  ),
                   const SizedBox(height: 20),
-                  MonthlyTrendChart(
-                    monthlyData: (data?["monthlyTrend"] as List? ?? [])
-                        .map((e) => Map<String, dynamic>.from(e))
-                        .toList(),
+                  WebPanel.wrap(
+                    context,
+                    MonthlyTrendChart(
+                      monthlyData: (data?["monthlyTrend"] as List? ?? [])
+                          .map((e) => Map<String, dynamic>.from(e))
+                          .toList(),
+                    ),
                   ),
                 ],
               ),
@@ -444,141 +617,55 @@ class _StaffDashboardState extends State<StaffDashboard> {
     );
   }
 
-  Widget _buildDrawerItem(
-    BuildContext context, {
-    required IconData icon,
-    required String title,
-    required VoidCallback onTap,
-  }) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      child: Material(
-        borderRadius: BorderRadius.circular(12),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(12),
-          onTap: onTap,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            decoration: BoxDecoration(
-              color: isDark ? Theme.of(context).colorScheme.onSecondary : null,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              children: [
-                Icon(icon),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Text(
-                    title,
-                    style: Theme.of(context).textTheme.headlineMedium,
-                  ),
-                ),
-                Icon(Icons.arrow_forward_ios),
-              ],
-            ),
-          ),
+  List<WebMenuItem> _sidebarMenu() {
+    void open(Widget page) {
+      Navigator.push(context, MaterialPageRoute(builder: (_) => page));
+    }
+
+    return [
+      if (widget.onBackToManager != null)
+        WebMenuItem(
+          icon: Icons.dashboard_customize_rounded,
+          label: widget.backToLabel,
+          group: 'Profile',
+          onTap: widget.onBackToManager!,
         ),
+      WebMenuItem(
+        icon: Icons.event_available_rounded,
+        label: 'Leave / Permission',
+        group: 'Requests',
+        onTap: () => open(const Leavelist()),
       ),
-    );
+      if (!AppRoles.isDivisionHead(widget.role)) ...[
+        WebMenuItem(
+          icon: Icons.event_repeat_rounded,
+          label: 'Compensation work',
+          group: 'Requests',
+          onTap: () => open(const MyExtraWorkPage()),
+        ),
+        if (!_hideOvertime)
+          WebMenuItem(
+            icon: Icons.more_time_rounded,
+            label: 'Overtime',
+            group: 'Requests',
+            onTap: () => open(const OvertimeListttt()),
+          ),
+        WebMenuItem(
+          icon: Icons.edit_calendar_rounded,
+          label: 'Attendance Correction',
+          group: 'Requests',
+          onTap: () => open(const PunchCorrectionList()),
+        ),
+      ],
+    ];
   }
 
   Widget _buildDrawer(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Drawer(
-      backgroundColor: theme.colorScheme.onPrimary,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          /// 🔹 HEADER
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
-            decoration: BoxDecoration(color: theme.colorScheme.secondary),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(
-                  Icons.dashboard_rounded,
-                  color: theme.colorScheme.onPrimary,
-                  size: 32,
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  "Staff Panel",
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 10),
-
-          if (widget.onBackToManager != null)
-            _buildDrawerItem(
-              context,
-              icon: Icons.dashboard_customize_rounded,
-              title: widget.backToLabel,
-              onTap: () {
-                Navigator.pop(context);
-                widget.onBackToManager!();
-              },
-            ),
-
-          _buildDrawerItem(
-            context,
-            icon: Icons.event_available_rounded,
-            title: "Leave Request",
-            onTap: () {
-              Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => Leavelist()),
-              );
-            },
-          ),
-          if (!AppRoles.isDivisionHead(widget.role)) ...[
-            _buildDrawerItem(
-              context,
-              icon: Icons.event_repeat_rounded,
-              title: "Compensation Leave",
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => MyExtraWorkPage()),
-                );
-              },
-            ),
-            if (!_hideOvertime)
-              _buildDrawerItem(
-                context,
-                icon: Icons.more_time_rounded,
-                title: "Overtime",
-                onTap: () {
-                  Navigator.pop(context);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => OvertimeListttt()),
-                  );
-                },
-              ),
-            _buildDrawerItem(
-              context,
-              icon: Icons.edit_calendar_rounded,
-              title: "Punch Correction",
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => PunchCorrectionList()),
-                );
-              },
-            ),
-          ],
-        ],
-      ),
+    return AppMenuDrawer(
+      title: 'Staff',
+      subtitle: 'My menu',
+      icon: Icons.person_rounded,
+      items: _sidebarMenu(),
     );
   }
 }

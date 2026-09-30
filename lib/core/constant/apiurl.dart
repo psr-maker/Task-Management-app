@@ -1,8 +1,8 @@
 class ApiConstants {
   //publish api iis
 
-  // static const String apiurl = "http://192.168.1.166:8090/api";
-  // static const String Uploaded = "http://192.168.1.166:8090/";
+  // static const String apiurl = "http://192.168.1.51:8090/api";
+  // static const String Uploaded = "http://192.168.1.51:8090/";
 
   // local
 
@@ -16,6 +16,6 @@ class ApiConstants {
 
   static const String apiurl = "https://staff.poornasreecloud.com/api";
   static const String Uploaded = "https://staff.poornasreecloud.com";
-  //
+
 }
  

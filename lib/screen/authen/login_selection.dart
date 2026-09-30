@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:staff_work_track/core/responsive/app_layout.dart';
+import 'package:staff_work_track/core/widgets/auth_page_frame.dart';
 import 'package:staff_work_track/screen/authen/oto_verify.dart';
 import 'package:staff_work_track/services/auth_service.dart';
 
@@ -91,45 +92,50 @@ class _LoginSelectionState extends State<LoginSelection> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF2C6737),
-      body: SafeArea(
-        child: Stack(
-          children: [
-            // Top message
-            if (_topMessage != null)
-              AnimatedPositioned(
-                top: _showTopMessage ? 24 : -120,
-                left: 16,
-                right: 16,
-                duration: const Duration(milliseconds: 300),
-                child: Msgsnackbar(
-                  context,
-                  message: _topMessage!,
-                  isError: _isErrorMessage,
-                ),
-              ),
+    final isDesktop = AppLayout.isDesktop(context);
 
-            // Responsive content
-            LayoutBuilder(
-              builder: (context, constraints) {
-                return SingleChildScrollView(
-                  physics: const BouncingScrollPhysics(),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 24,
-                  ),
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                      minHeight: constraints.maxHeight - 48,
+    return Scaffold(
+      backgroundColor: isDesktop
+          ? const Color(0xFFF4F7F5)
+          : const Color(0xFF2C6737),
+      body: Stack(
+        children: [
+          AuthPageFrame(
+            form: isDesktop
+                ? _webLoginCard(440)
+                : SafeArea(
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        return SingleChildScrollView(
+                          physics: const BouncingScrollPhysics(),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 24,
+                          ),
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(
+                              minHeight: constraints.maxHeight - 48,
+                            ),
+                            child: Center(child: _buildLoginCard(context)),
+                          ),
+                        );
+                      },
                     ),
-                    child: Center(child: _buildLoginCard(context)),
                   ),
-                );
-              },
+          ),
+          if (_topMessage != null)
+            AnimatedPositioned(
+              top: _showTopMessage ? 24 : -120,
+              left: 16,
+              right: 16,
+              duration: const Duration(milliseconds: 300),
+              child: Msgsnackbar(
+                context,
+                message: _topMessage!,
+                isError: _isErrorMessage,
+              ),
             ),
-          ],
-        ),
+        ],
       ),
     );
   }
@@ -138,16 +144,18 @@ class _LoginSelectionState extends State<LoginSelection> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final screenWidth = MediaQuery.of(context).size.width;
-
-        // Responsive values
         final bool isMobile = screenWidth < 600;
-        final bool isTablet = screenWidth >= 600 && screenWidth < 1000;
+        final bool isDesktop = AppLayout.isDesktop(context);
 
         final double cardWidth = isMobile
             ? screenWidth
-            : isTablet
-            ? 480
-            : 500;
+            : isDesktop
+            ? 440
+            : 480;
+
+        if (isDesktop) {
+          return _webLoginCard(cardWidth);
+        }
 
         final double horizontalPadding = isMobile ? 18 : 24;
         final double verticalPadding = isMobile ? 22 : 28;
@@ -173,7 +181,7 @@ class _LoginSelectionState extends State<LoginSelection> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(
+              const Text(
                 "Welcome Back !",
                 style: TextStyle(
                   fontSize: 23,
@@ -182,12 +190,12 @@ class _LoginSelectionState extends State<LoginSelection> {
                 ),
               ),
               const SizedBox(height: 5),
-              Text(
+              const Text(
                 "Login to your account",
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w400,
-                  color: const Color.fromARGB(255, 226, 224, 224),
+                  color: Color.fromARGB(255, 226, 224, 224),
                 ),
               ),
               const SizedBox(height: 15),
@@ -202,138 +210,18 @@ class _LoginSelectionState extends State<LoginSelection> {
                 ),
               ),
               const SizedBox(height: 40),
-
-              Container(
-                width: MediaQuery.of(context).size.width,
-                padding: const EdgeInsets.only(
-                  left: 20,
-                  right: 20,
-                  top: 30,
-                  bottom: 30,
-                ),
-                decoration: BoxDecoration(
-                  color: const Color.fromARGB(255, 25, 77, 38),
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Colors.black,
-                      blurRadius: 8,
-                      offset: Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      "Enter Email or Username",
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    TextField(
-                      onChanged: (value) async {
-                        if (value.contains("@") && value.contains(".")) {
-                          setState(() {
-                            isCheckingRole = true;
-                            emailRoleMessage = null;
-                          });
-
-                          try {
-                            final role = await AuthService.checkEmailRole(
-                              value.trim(),
-                            );
-
-                            setState(() {
-                              isCheckingRole = false;
-                              if (role != null) {
-                                emailRoleMessage = "This email role is $role";
-                              }
-                            });
-                          } catch (e) {
-                            setState(() {
-                              isCheckingRole = false;
-                            });
-                          }
-                        } else {
-                          setState(() {
-                            emailRoleMessage = null;
-                          });
-                        }
-                      },
-
-                      controller: emailController,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
-                        color: Colors.white,
-                      ),
-                      decoration: InputDecoration(
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(color: Colors.white),
-                        ),
-
-                        isDense: true,
-                        contentPadding: const EdgeInsets.symmetric(
-                          vertical: 10,
-                          horizontal: 10,
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                    ),
-
-                    // if (isCheckingRole)
-                    //   const Padding(
-                    //     padding: EdgeInsets.only(top: 8),
-                    //     child: LinearProgressIndicator(
-                    //       minHeight: 2,
-                    //     ),
-                    //   ),
-                    if (emailRoleMessage != null)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 8),
-                        child: Text(
-                          emailRoleMessage!,
-                          style: const TextStyle(
-                            color: Colors.yellow,
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-
-                    const SizedBox(height: 20),
-
-                    Center(
-                      child: AppButton(
-                        text: "Send OTP",
-                        isLoading: _isLoading,
-                        onPressed: _isLoading ? null : _sendOtp,
-                        txtcolor: const Color.fromARGB(255, 50, 99, 49),
-                        color: Colors.white,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              SizedBox(height: 50),
+              _loginFields(isWebStyle: false),
+              const SizedBox(height: 50),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Image.asset("assets/flower.png", height: 15, width: 15),
-                  Text(
+                  const Text(
                     "  Poornasree Equipments",
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w400,
-                      color: const Color.fromARGB(255, 245, 243, 243),
+                      color: Color.fromARGB(255, 245, 243, 243),
                     ),
                   ),
                 ],
@@ -342,6 +230,178 @@ class _LoginSelectionState extends State<LoginSelection> {
           ),
         );
       },
+    );
+  }
+
+  Widget _webLoginCard(double cardWidth) {
+    return Container(
+      width: cardWidth,
+      padding: const EdgeInsets.fromLTRB(32, 36, 32, 32),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0D000000),
+            blurRadius: 30,
+            offset: Offset(0, 12),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Welcome back',
+            style: TextStyle(
+              fontSize: 28,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF163824),
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Sign in with your email to continue',
+            style: TextStyle(fontSize: 14, color: Color(0xFF5B6B60)),
+          ),
+          const SizedBox(height: 28),
+          _loginFields(isWebStyle: true),
+        ],
+      ),
+    );
+  }
+
+  Widget _loginFields({required bool isWebStyle}) {
+    final labelColor = isWebStyle ? const Color(0xFF163824) : Colors.white;
+    final fieldFill = isWebStyle ? const Color(0xFFF4F7F5) : null;
+
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.only(
+        left: isWebStyle ? 0 : 20,
+        right: isWebStyle ? 0 : 20,
+        top: isWebStyle ? 0 : 30,
+        bottom: isWebStyle ? 0 : 30,
+      ),
+      decoration: isWebStyle
+          ? null
+          : BoxDecoration(
+              color: const Color.fromARGB(255, 25, 77, 38),
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: const [
+                BoxShadow(
+                  color: Colors.black,
+                  blurRadius: 8,
+                  offset: Offset(0, 4),
+                ),
+              ],
+            ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            "Email or Username",
+            style: TextStyle(
+              fontSize: isWebStyle ? 13 : 12,
+              fontWeight: FontWeight.bold,
+              color: labelColor,
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            onChanged: (value) async {
+              if (value.contains("@") && value.contains(".")) {
+                setState(() {
+                  isCheckingRole = true;
+                  emailRoleMessage = null;
+                });
+
+                try {
+                  final role = await AuthService.checkEmailRole(value.trim());
+
+                  setState(() {
+                    isCheckingRole = false;
+                    if (role != null) {
+                      emailRoleMessage = "This email role is $role";
+                    }
+                  });
+                } catch (e) {
+                  setState(() {
+                    isCheckingRole = false;
+                  });
+                }
+              } else {
+                setState(() {
+                  emailRoleMessage = null;
+                });
+              }
+            },
+            controller: emailController,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              color: isWebStyle ? const Color(0xFF163824) : Colors.white,
+            ),
+            decoration: InputDecoration(
+              hintText: 'name@company.com',
+              hintStyle: TextStyle(
+                color: isWebStyle ? Colors.grey.shade500 : Colors.white54,
+              ),
+              filled: isWebStyle,
+              fillColor: fieldFill,
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(
+                  color: isWebStyle
+                      ? const Color(0xFF2C6737)
+                      : Colors.white,
+                ),
+              ),
+              isDense: true,
+              contentPadding: const EdgeInsets.symmetric(
+                vertical: 14,
+                horizontal: 12,
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+          if (emailRoleMessage != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                emailRoleMessage!,
+                style: TextStyle(
+                  color: isWebStyle
+                      ? const Color(0xFF2C6737)
+                      : Colors.yellow,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          const SizedBox(height: 24),
+          SizedBox(
+            width: isWebStyle ? double.infinity : null,
+            child: Center(
+              child: AppButton(
+                text: "Send OTP",
+                isLoading: _isLoading,
+                onPressed: _isLoading ? null : _sendOtp,
+                txtcolor: isWebStyle
+                    ? Colors.white
+                    : const Color.fromARGB(255, 50, 99, 49),
+                color: isWebStyle
+                    ? const Color(0xFF2C6737)
+                    : Colors.white,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

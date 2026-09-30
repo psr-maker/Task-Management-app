@@ -383,7 +383,8 @@ class EmployeeReportPdfGenerator {
 
                     _buildCell(
                       AppHelpers.formatDate(
-                        goal["completed_Date"]?.toString() ?? "-",
+                        (goal["completedDate"] ?? goal["completed_Date"])
+                            ?.toString(),
                       ),
                       null,
                     ),
@@ -452,13 +453,14 @@ class EmployeeReportPdfGenerator {
                         _buildCell(task["priority"]?.toString() ?? "-", null),
                         _buildCell(
                           AppHelpers.formatDate(
-                            task["due_Date"]?.toString() ?? "-",
+                            (task["dueDate"] ?? task["due_Date"])?.toString(),
                           ),
                           null,
                         ),
                         _buildCell(
                           AppHelpers.formatDate(
-                            task["completed_Date"]?.toString() ?? "-",
+                            (task["completedDate"] ?? task["completed_Date"])
+                                ?.toString(),
                           ),
                           null,
                         ),
@@ -625,12 +627,16 @@ class EmployeeReportPdfGenerator {
                           null,
                         ),
                         _buildCell(
-                          permission["totalhours"]?.toString() ?? "-",
+                          (permission["totalHours"] ?? permission["totalhours"])
+                                  ?.toString() ??
+                              "-",
                           null,
                         ),
                         _buildCell(
                           AppHelpers.formatDate(
-                            permission["submdate"]?.toString() ?? "-",
+                            (permission["submittedDate"] ??
+                                    permission["submdate"])
+                                ?.toString(),
                           ),
                           null,
                         ),

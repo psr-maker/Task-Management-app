@@ -8,6 +8,7 @@ import 'package:staff_work_track/services/admin_service.dart';
 import 'package:staff_work_track/services/auth_service.dart';
 import 'package:staff_work_track/services/superadmin_service.dart';
 import 'package:staff_work_track/utils/app_helper.dart';
+import 'package:staff_work_track/utils/time_utils.dart';
 import 'package:staff_work_track/utils/jwt_helper.dart';
 
 class StaffLeaves extends StatefulWidget {
@@ -154,9 +155,7 @@ class _StaffLeavesState extends State<StaffLeaves>
             ? await SuperAdminService.getLeaveList()
             : await AdminService.getDepartmentLeaves();
       } else if (activeTab == "Permission") {
-        data = widget.isDirectorView
-            ? await SuperAdminService.getPermissionList()
-            : await AdminService.getDepartmentPermissions();
+        data = await SuperAdminService.getPermissionList();
         if (widget.isDirectorView) {
           try {
             final users = await SuperAdminService.getAllUsers();
@@ -268,23 +267,11 @@ class _StaffLeavesState extends State<StaffLeaves>
 
   static String formatDate(String? date) {
     if (date == null || date.isEmpty) return "";
-    return DateFormat("EEE, dd MMMM").format(DateTime.parse(date));
+    return TimeUtils.formatDateValue(date, empty: "");
   }
 
   String formatTime(String? time) {
-    if (time == null || time.isEmpty) return "-";
-
-    try {
-      List<String> parts = time.split(":");
-
-      if (parts.length >= 2) {
-        return "${parts[0]}:${parts[1]}";
-      }
-
-      return time;
-    } catch (e) {
-      return time;
-    }
+    return TimeUtils.formatTime12(time, empty: "-");
   }
 
   @override

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:staff_work_track/core/widgets/load_error.dart';
 import 'package:provider/provider.dart';
 import 'package:staff_work_track/core/constant/apiurl.dart';
 import 'package:staff_work_track/core/theme/theme_provider.dart';
@@ -62,7 +63,7 @@ class _SettingsState extends State<Profile> {
             }
 
             if (snapshot.hasError) {
-              return const Center(child: Text("Error loading profile"));
+              return const AppLoadError();
             }
 
             final data = snapshot.data ?? {};

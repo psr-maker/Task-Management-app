@@ -3,10 +3,252 @@ import 'package:http/http.dart' as http;
 import 'package:staff_work_track/Models/getusers.dart';
 import 'package:staff_work_track/utils/enum.dart';
 import 'package:staff_work_track/services/auth_service.dart';
+import 'package:staff_work_track/services/superadmin_service.dart';
+import 'package:staff_work_track/utils/goal_quantity.dart';
 import 'package:staff_work_track/core/constant/apiurl.dart';
+import 'package:staff_work_track/core/constant/division_config.dart';
 
 class AdminService {
   static const String baseUrl = ApiConstants.apiurl;
+
+  static Future<List<String>> getMySubDepartments({
+    String? headDepartment,
+  }) async {
+    final token = await AuthService.getToken();
+    if (token == null) return [];
+
+    for (final path in [
+      "/Manager/my-department-access",
+      "/Director/my-department-access",
+    ]) {
+      final response = await http.get(
+        Uri.parse("$baseUrl$path"),
+        headers: {
+          "Authorization": "Bearer $token",
+          "Content-Type": "application/json",
+        },
+      );
+      if (response.statusCode == 404 ||
+          response.statusCode == 401 ||
+          response.statusCode == 403) {
+        continue;
+      }
+      if (response.statusCode != 200) return [];
+
+      final decoded = jsonDecode(response.body);
+      if (decoded is! Map) return [];
+      final heads = decoded["headDepartments"] ?? decoded["HeadDepartments"];
+      if (heads is! List) return [];
+
+      final names = <String>[];
+      final parent = headDepartment?.trim() ?? "";
+      for (final group in heads) {
+        if (group is! Map) continue;
+        if (parent.isNotEmpty && !_isHeadGroup(group, parent, heads.length)) {
+          continue;
+        }
+        final subs = group["subDepartments"] ?? group["SubDepartments"];
+        if (subs is! List) continue;
+        for (final sub in subs) {
+          if (sub is! Map) continue;
+          final name = (sub["name"] ?? sub["Name"] ?? "").toString().trim();
+          if (name.isEmpty) continue;
+          if (parent.isNotEmpty &&
+              DivisionConfig.isAllowedDepartment(name, [parent])) {
+            continue;
+          }
+          if (names.any((item) => DivisionConfig.isAllowedDepartment(name, [item]))) {
+            continue;
+          }
+          names.add(name);
+        }
+      }
+      if (names.isNotEmpty || parent.isEmpty) return names;
+    }
+    return [];
+  }
+
+  static bool _isHeadGroup(Map group, String headDepartment, int groupCount) {
+    final headName = (group["headDepartmentName"] ??
+            group["HeadDepartmentName"] ??
+            group["departmentName"] ??
+            group["DepartmentName"] ??
+            group["name"] ??
+            group["Name"] ??
+            "")
+        .toString()
+        .trim();
+    if (headName.isEmpty) return groupCount == 1;
+    return DivisionConfig.isAllowedDepartment(headName, [headDepartment]);
+  }
+
+  static Future<List<String>> getDivisionHeadDepartments(
+    List<UserModel> users,
+  ) async {
+    final token = await AuthService.getToken();
+    final divisionHeads = users
+        .where((user) => AppRoles.isDivisionHead(user.role))
+        .toList();
+    final owned = <String>[];
+
+    void addName(String name) {
+      final value = name.trim();
+      if (value.isEmpty) return;
+      if (owned.any(
+        (item) => DivisionConfig.isAllowedDepartment(value, [item]),
+      )) {
+        return;
+      }
+      owned.add(value);
+    }
+
+    for (final head in divisionHeads) {
+      addName(head.department);
+    }
+
+    final departmentNamesById = <int, String>{};
+    try {
+      final departments = await SuperAdminService().getDepartments();
+      for (final department in departments) {
+        final id = department.id;
+        final name = department.departmentName.trim();
+        if (id != null && name.isNotEmpty) {
+          departmentNamesById[id] = name;
+        }
+        final parentOwned = divisionHeads.any(
+          (head) => DivisionConfig.isAllowedDepartment(
+            head.department,
+            [department.departmentName],
+          ),
+        );
+        if (!parentOwned) continue;
+        addName(department.departmentName);
+        addName(department.subDepartment ?? "");
+      }
+    } catch (_) {}
+
+    if (token == null) return owned;
+
+    final paths = [
+      "/Director/department-access",
+      "/Director/get-department-access",
+      "/Director/my-department-access",
+      "/Manager/my-department-access",
+    ];
+
+    for (final path in paths) {
+      final response = await http.get(
+        Uri.parse("$baseUrl$path"),
+        headers: {
+          "Authorization": "Bearer $token",
+          "Content-Type": "application/json",
+        },
+      );
+      if (response.statusCode == 404 || response.statusCode != 200) continue;
+      _collectDivisionDepartments(
+        jsonDecode(response.body),
+        divisionHeads,
+        departmentNamesById,
+        addName,
+      );
+    }
+
+    return owned;
+  }
+
+  static void _collectDivisionDepartments(
+    dynamic decoded,
+    List<UserModel> divisionHeads,
+    Map<int, String> departmentNamesById,
+    void Function(String name) addName,
+  ) {
+    if (decoded is List) {
+      for (final item in decoded) {
+        _collectDivisionDepartments(
+          item,
+          divisionHeads,
+          departmentNamesById,
+          addName,
+        );
+      }
+      return;
+    }
+    if (decoded is! Map) return;
+
+    final nested =
+        decoded["headDepartments"] ??
+        decoded["HeadDepartments"] ??
+        decoded["departmentAccess"] ??
+        decoded["DepartmentAccess"] ??
+        decoded["data"] ??
+        decoded["Data"];
+    if (nested is List) {
+      for (final item in nested) {
+        _collectDivisionDepartments(
+          item,
+          divisionHeads,
+          departmentNamesById,
+          addName,
+        );
+      }
+    }
+
+    void addDepartmentId(dynamic rawId) {
+      final id = int.tryParse("${rawId ?? ""}");
+      if (id == null || id <= 0) return;
+      addName(departmentNamesById[id] ?? "");
+    }
+
+    final role = (decoded["role"] ??
+            decoded["Role"] ??
+            decoded["roleId"] ??
+            decoded["RoleId"] ??
+            "")
+        .toString();
+    final userId = int.tryParse(
+      "${decoded["userId"] ?? decoded["UserId"] ?? ""}",
+    );
+    final headName = (decoded["headDepartmentName"] ??
+            decoded["HeadDepartmentName"] ??
+            decoded["headName"] ??
+            decoded["name"] ??
+            decoded["Name"] ??
+            decoded["departmentName"] ??
+            decoded["DepartmentName"] ??
+            "")
+        .toString();
+    final isDivisionGroup = AppRoles.isDivisionHead(role) ||
+        (userId != null &&
+            divisionHeads.any((head) => head.userId == userId)) ||
+        divisionHeads.any(
+          (head) => DivisionConfig.isAllowedDepartment(head.department, [
+            headName,
+          ]),
+        );
+    if (!isDivisionGroup) return;
+
+    addDepartmentId(decoded["subDepartmentId"] ?? decoded["SubDepartmentId"]);
+    addName(headName);
+    final subName = (decoded["subDepartmentName"] ??
+            decoded["SubDepartmentName"] ??
+            decoded["subDepartment"] ??
+            decoded["SubDepartment"] ??
+            "")
+        .toString();
+    addName(subName);
+
+    final subs = decoded["subDepartments"] ?? decoded["SubDepartments"];
+    if (subs is List) {
+      for (final sub in subs) {
+        if (sub is Map) {
+          addName((sub["name"] ?? sub["Name"] ?? sub["departmentName"] ?? "")
+              .toString());
+        } else {
+          addName(sub.toString());
+        }
+      }
+    }
+  }
 
   static Future<List<UserModel>> getEmployeesByDepartment(
     String department,
@@ -59,17 +301,23 @@ class AdminService {
 
   static Future<List<dynamic>> getGoalsByDepartment(String department) async {
     try {
-      final url = Uri.parse("$baseUrl/Manager/allStaffGoals/$department");
+      final token = await AuthService.getToken();
+      final encoded = Uri.encodeComponent(department.trim());
+      final url = Uri.parse("$baseUrl/Manager/allStaffGoals/$encoded");
 
-      final response = await http.get(url);
+      final response = await http.get(
+        url,
+        headers: {
+          "Content-Type": "application/json",
+          if (token != null && token.isNotEmpty)
+            "Authorization": "Bearer $token",
+        },
+      );
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-
-        // ✅ API structure:
-        // { department, totalGoals, goals: [] }
-
-        return data["goals"] ?? [];
+        if (data is List) return data;
+        return data["goals"] ?? data["data"] ?? [];
       } else {
         throw Exception("Failed to load goals: ${response.statusCode}");
       }
@@ -89,7 +337,20 @@ class AdminService {
       final list = decoded is List
           ? decoded
           : (decoded["result"] ?? decoded["tasks"] ?? decoded["data"] ?? []);
-      return List<Map<String, dynamic>>.from(list);
+      final tasks = List<Map<String, dynamic>>.from(list);
+      for (final task in tasks) {
+        if (memberUserStatus(task, adminId) != null) continue;
+        final code = (task["taskCode"] ?? task["TaskCode"] ?? "").toString();
+        if (code.isEmpty) continue;
+        try {
+          final details = await SuperAdminService.getTaskByCode(code);
+          final people = details["assignedTo"] ?? details["AssignedTo"];
+          if (people is List) task["assignedTo"] = people;
+          final splits = details["quantitySplits"] ?? details["QuantitySplits"];
+          if (splits is List) task["quantitySplits"] = splits;
+        } catch (_) {}
+      }
+      return tasks;
     } else {
       throw Exception("Failed to load admin tasks");
     }
@@ -98,6 +359,7 @@ class AdminService {
   static Future<void> updateTaskStatus({
     required String taskCode,
     required TaskStatus status,
+    int? achievedQuantity,
   }) async {
     final token = await AuthService.getToken();
     if (token == null) throw Exception("User not logged in");
@@ -108,18 +370,30 @@ class AdminService {
         "Content-Type": "application/json",
         "Authorization": "Bearer $token",
       },
-      body: jsonEncode({"taskCode": taskCode, "status": status.name}),
+      body: jsonEncode({
+        "taskCode": taskCode,
+        "status": status.name,
+        if (achievedQuantity != null) "completedQuantity": achievedQuantity,
+      }),
     );
 
     if (response.statusCode != 200) {
-      throw Exception(
-        "Status update failed (${response.statusCode}): ${response.body}",
-      );
+      var message = "Status update failed";
+      try {
+        final decoded = jsonDecode(response.body);
+        if (decoded is Map && decoded["message"] != null) {
+          message = decoded["message"].toString();
+        } else if (decoded is String && decoded.trim().isNotEmpty) {
+          message = decoded;
+        }
+      } catch (_) {}
+      throw Exception(message);
     }
   }
 
   static Future<List<dynamic>> getTasksByDepartment(String department) async {
-    final url = Uri.parse("$baseUrl/Manager/allStafftask/$department");
+    final encoded = Uri.encodeComponent(department.trim());
+    final url = Uri.parse("$baseUrl/Manager/allStafftask/$encoded");
 
     try {
       final response = await http.get(
@@ -237,8 +511,16 @@ class AdminService {
       );
 
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        return data;
+        final decoded = jsonDecode(response.body);
+        if (decoded is List) return decoded;
+        if (decoded is Map) {
+          return decoded['goals'] ??
+              decoded['data'] ??
+              decoded['result'] ??
+              decoded['Goals'] ??
+              [];
+        }
+        return [];
       } else {
         throw Exception("Failed to load manager tasks");
       }
@@ -597,6 +879,28 @@ class AdminService {
     }
   }
 
+  static Map<String, dynamic> _normalizePermission(Map raw) {
+    final item = Map<String, dynamic>.from(raw);
+    item["id"] ??= item["Id"];
+    item["senderId"] ??= item["SenderId"];
+    item["receiverId"] ??= item["ReceiverId"];
+    item["name"] ??= item["Name"];
+    item["designation"] ??= item["Designation"];
+    item["reason"] ??= item["Reason"];
+    item["date"] ??= item["Date"] ?? item["fromDate"] ?? item["FromDate"];
+    item["fromTime"] ??= item["FromTime"];
+    item["toTime"] ??= item["ToTime"];
+    item["totalHours"] ??= item["TotalHours"] ?? item["totalhours"];
+    item["status"] ??= item["Status"];
+    item["submittedDate"] ??= item["SubmittedDate"];
+    item["department"] ??=
+        item["senderDepartment"] ??
+        item["SenderDepartment"] ??
+        item["dept"] ??
+        item["departmentName"];
+    return item;
+  }
+
   static Future<List<dynamic>> getPermissions() async {
     try {
       final token = await AuthService.getToken();
@@ -610,7 +914,10 @@ class AdminService {
       );
 
       if (response.statusCode == 200) {
-        return jsonDecode(response.body);
+        return _decodeList(response.body)
+            .whereType<Map>()
+            .map(_normalizePermission)
+            .toList();
       } else {
         print("Error: ${response.body}");
         return [];
@@ -634,7 +941,10 @@ class AdminService {
       );
 
       if (response.statusCode == 200) {
-        return _decodeList(response.body);
+        return _decodeList(response.body)
+            .whereType<Map>()
+            .map(_normalizePermission)
+            .toList();
       } else {
         print("Error: ${response.body}");
         return [];
@@ -1098,29 +1408,64 @@ class AdminService {
     required int punctuality,
     required int integrity,
     required DateTime date,
+    bool asDirector = false,
   }) async {
     try {
-      final response = await http.post(
-        Uri.parse('$baseUrl/Manager/add-attitude-behaviour-score'),
-        headers: {"Content-Type": "application/json"},
-        body: jsonEncode({
-          "staffId": staffId,
-          "communication": communication,
-          "punctuality": punctuality,
-          "integrity": integrity,
-          "date": date.toIso8601String(),
-        }),
-      );
+      final body = jsonEncode({
+        "staffId": staffId,
+        "communication": communication,
+        "punctuality": punctuality,
+        "integrity": integrity,
+        "date": date.toIso8601String(),
+      });
 
-      if (response.statusCode == 200) {
-        return true;
-      } else {
+      if (!asDirector) {
+        final response = await http.post(
+          Uri.parse('$baseUrl/Manager/add-attitude-behaviour-score'),
+          headers: {"Content-Type": "application/json"},
+          body: body,
+        );
+
+        if (response.statusCode == 200 || response.statusCode == 201) {
+          return true;
+        }
+
         print(
           "Add Attitude Behaviour Score Error: "
           "${response.statusCode} - ${response.body}",
         );
         return false;
       }
+
+      final token = await AuthService.getToken();
+      final paths = [
+        "/Director/add-attitude-behaviour-score",
+        "/Manager/add-attitude-behaviour-score",
+      ];
+
+      http.Response? last;
+      for (final path in paths) {
+        final response = await http.post(
+          Uri.parse("$baseUrl$path"),
+          headers: {
+            "Content-Type": "application/json",
+            if (token != null && token.isNotEmpty)
+              "Authorization": "Bearer $token",
+          },
+          body: body,
+        );
+        last = response;
+        if (response.statusCode == 200 || response.statusCode == 201) {
+          return true;
+        }
+        if (response.statusCode != 404) break;
+      }
+
+      print(
+        "Add Attitude Behaviour Score Error: "
+        "${last?.statusCode} - ${last?.body}",
+      );
+      return false;
     } catch (e) {
       print("Add Attitude Behaviour Score Exception: $e");
       return false;
@@ -1160,5 +1505,58 @@ class AdminService {
 
       rethrow;
     }
+  }
+
+  static List<Map<String, dynamic>> _parseAttitudeScores(String body) {
+    final decoded = jsonDecode(body);
+    final dynamic raw = decoded is List
+        ? decoded
+        : decoded is Map
+        ? decoded["scores"] ??
+              decoded["Scores"] ??
+              decoded["data"] ??
+              decoded["result"]
+        : null;
+    final List scores = raw is List ? raw : [];
+
+    return scores
+        .whereType<Map>()
+        .map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e))
+        .toList();
+  }
+
+  static Future<List<Map<String, dynamic>>>
+  getDirectorAttitudeBehaviourScores() async {
+    final token = await AuthService.getToken();
+    final paths = [
+      "/Director/attitude-behaviour-scores",
+      "/Director/department-attitude-behaviour-scores",
+      "/Manager/department-attitude-behaviour-scores",
+    ];
+
+    http.Response? last;
+    for (final path in paths) {
+      final response = await http.get(
+        Uri.parse("$baseUrl$path"),
+        headers: {
+          "Content-Type": "application/json",
+          if (token != null && token.isNotEmpty)
+            "Authorization": "Bearer $token",
+        },
+      );
+      last = response;
+      if (response.statusCode == 200) {
+        return _parseAttitudeScores(response.body);
+      }
+      if (response.statusCode == 404 ||
+          response.statusCode == 401 ||
+          response.statusCode == 403) {
+        continue;
+      }
+    }
+
+    throw Exception(
+      "Failed to load attitude & behaviour scores: ${last?.body ?? ""}",
+    );
   }
 }

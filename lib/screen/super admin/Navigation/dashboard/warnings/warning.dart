@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:staff_work_track/Models/warning_model.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
+import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/warnings/overduetask.dart';
 import 'package:staff_work_track/services/announ_service.dart';
 
@@ -36,9 +37,7 @@ class _WarningState extends State<Warning> {
       });
     } catch (e) {
       setState(() => isLoading = false);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("Failed to load warnings")));
+      showAppMessage(context, "Failed to load warnings");
     }
   }
 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:staff_work_track/Models/warning_model.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
+import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
 import 'package:staff_work_track/services/announ_service.dart';
 
 class UsersWarning extends StatefulWidget {
@@ -29,9 +30,7 @@ class _UsersWarningState extends State<UsersWarning> {
       });
     } catch (e) {
       setState(() => isLoading = false);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("Failed to load warnings")));
+      showAppMessage(context, "Failed to load warnings");
     }
   }
 

@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:staff_work_track/Models/userstask.dart';
+import 'package:staff_work_track/core/responsive/app_layout.dart';
+import 'package:staff_work_track/core/theme/web_theme.dart';
+import 'package:staff_work_track/core/widgets/form_popup.dart';
 import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/Task/edit_task.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/drawer/auditlog.dart';
@@ -8,8 +11,10 @@ import 'package:staff_work_track/services/auth_service.dart';
 import 'package:staff_work_track/services/superadmin_service.dart';
 import 'package:staff_work_track/utils/TaskUtils.dart';
 import 'package:staff_work_track/utils/app_helper.dart';
+import 'package:staff_work_track/utils/goal_quantity.dart';
 import 'package:staff_work_track/utils/jwt_helper.dart';
 import 'package:staff_work_track/widgets/StatCard.dart';
+import 'package:staff_work_track/core/widgets/load_error.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
 
 class TaskDetails extends StatefulWidget {
@@ -23,7 +28,11 @@ class TaskDetails extends StatefulWidget {
 
 class _TaskDetailsState extends State<TaskDetails> {
   TaskModel? task;
+  Map<String, dynamic> _rawTask = {};
+  int? _userId;
+  String? _role;
   bool isLoading = true;
+  String? _loadError;
   bool _canEditTask = false;
   List<String> members = [];
   List<String> memberRoles = [];
@@ -60,6 +69,11 @@ class _TaskDetailsState extends State<TaskDetails> {
   Future<void> fetchTaskDetails() async {
     try {
       final data = await SuperAdminService.getTaskByCode(widget.taskCode);
+      final token = await AuthService.getToken();
+      final userId = token == null
+          ? null
+          : int.tryParse(JwtHelper.getuid(token) ?? "");
+      final role = token == null ? null : JwtHelper.getRole(token);
       final fetchedTask = TaskModel.fromJson(data);
 
       final assignedTo = fetchedTask.assignedTo;
@@ -83,6 +97,9 @@ class _TaskDetailsState extends State<TaskDetails> {
 
       setState(() {
         task = fetchedTask;
+        _rawTask = data;
+        _userId = userId;
+        _role = role;
         isLoading = false;
       });
       if (fetchedTask.status.toLowerCase() == "completed") {
@@ -91,8 +108,12 @@ class _TaskDetailsState extends State<TaskDetails> {
 
       await _checkTaskPermission(fetchedTask);
     } catch (e) {
-      isLoading = false;
       debugPrint("Error: $e");
+      if (!mounted) return;
+      setState(() {
+        isLoading = false;
+        _loadError = e.toString().replaceFirst("Exception: ", "");
+      });
     }
   }
 
@@ -125,69 +146,18 @@ class _TaskDetailsState extends State<TaskDetails> {
     if (token == null) return;
 
     final loginUserIdRaw = JwtHelper.getuid(token);
-    final loginUserRoleRaw = JwtHelper.getRole(token);
-    if (loginUserIdRaw == null || loginUserRoleRaw == null) return;
+    if (loginUserIdRaw == null) return;
 
     final loginUserId = loginUserIdRaw.toString().trim();
-    final loginUserRole = loginUserRoleRaw.toLowerCase().trim();
 
-    String createdById = '';
-    if (task.assignedBy!.contains('-')) {
-      createdById = task.assignedBy!.split('-')[0].trim();
-    } else {
-      createdById = task.assignedBy!.trim();
-    }
-
-    final isDirector = loginUserRole.contains("1");
-    final isManager = loginUserRole.contains("3");
-
-    // ✅ Directors can always edit
-    if (isDirector) {
-      if (mounted) {
-        setState(() {
-          _canEditTask = true;
-          permissionLoaded = true;
-        });
-      }
-      return;
-    }
-
-    // ✅ Check if login user is the creator
-    if (loginUserId == createdById) {
-      if (mounted) {
-        setState(() {
-          _canEditTask = true;
-          permissionLoaded = true;
-        });
-      }
-      return;
-    }
-
-    // ✅ Managers can always edit
-    if (isManager) {
-      if (mounted) {
-        setState(() {
-          _canEditTask = true;
-          permissionLoaded = true;
-        });
-      }
-      return;
-    }
-
-    // ✅ Check if login staff is assigned to this task
-    final assignedTo = task.assignedTo;
-    bool isStaffAssigned = false;
-    for (var staff in assignedTo) {
-      final staffUserId = (staff['userId'] as dynamic)?.toString().trim();
-      if (staffUserId == loginUserId) {
-        isStaffAssigned = true;
-        break;
-      }
-    }
+    final assignedBy = task.assignedBy ?? '';
+    final createdById = assignedBy.contains('-')
+        ? assignedBy.split('-').first.trim()
+        : assignedBy.trim();
 
     if (mounted) {
       setState(() {
-        _canEditTask = isStaffAssigned;
+        _canEditTask = createdById.isNotEmpty && loginUserId == createdById;
         permissionLoaded = true;
       });
     }
@@ -214,14 +184,20 @@ class _TaskDetailsState extends State<TaskDetails> {
     }
 
     if (task == null) {
-      return const Scaffold(body: Center(child: Text("Task not found")));
+      return Scaffold(
+        body: _loadError != null
+            ? const AppLoadError()
+            : const Center(child: Text("Task not found")),
+      );
     }
     final isCompleted = (task!.status).toLowerCase().trim() == "completed";
 
     final canEditMenu = _canEditTask && !isCompleted;
     final statusEnum = TaskUtils.parseStatus(task!.status);
 
+    final isWeb = !AppLayout.isMobile(context);
     return Scaffold(
+      backgroundColor: isWeb ? WebTheme.canvasOf(context) : null,
       appBar: AppBar(
         title: const Text("Task Summary"),
         leading: IconButton(
@@ -238,11 +214,9 @@ class _TaskDetailsState extends State<TaskDetails> {
             onSelected: canEditMenu
                 ? (value) async {
                     if (value == 'edit') {
-                      Navigator.push(
+                      openFormPage(
                         context,
-                        MaterialPageRoute(
-                          builder: (_) => EditTask(task: task!),
-                        ),
+                        EditTask(task: task!),
                       ).then((updated) {
                         if (updated == true) {
                           fetchTaskDetails();
@@ -293,56 +267,73 @@ class _TaskDetailsState extends State<TaskDetails> {
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isWeb ? 980 : double.infinity),
+          child: SingleChildScrollView(
+        padding: EdgeInsets.all(isWeb ? 28 : 16),
         child: Stack(
           children: [
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                if (isWeb)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(24),
+                    margin: const EdgeInsets.only(bottom: 20),
+                    decoration: BoxDecoration(
+                      color: WebTheme.surfaceOf(context),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: WebTheme.lineOf(context)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                task!.task,
+                                style: TextStyle(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.w700,
+                                  color: WebTheme.inkOf(context),
+                                ),
+                              ),
+                            ),
+                            if (task!.wasEdited == true)
+                              _editedBadge(),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Wrap(
+                          spacing: 10,
+                          runSpacing: 8,
+                          children: [
+                            StatusChip(
+                              icon: Icons.animation_outlined,
+                              text: task!.priority,
+                              color: TaskUtils.getPriorityColor(task!.priority),
+                            ),
+                            StatusChip(
+                              icon: Icons.circle,
+                              text: TaskUtils.getStatusText(statusEnum),
+                              color: TaskUtils.getStatusColor(statusEnum),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  )
+                else ...[
                 Row(
                   children: [
                     Text(
                       task!.task,
                       style: Theme.of(context).textTheme.displaySmall,
                     ),
-                    if (task!.wasEdited == true)
-                      GestureDetector(
-                        onTap: () async {
-                          final token = await AuthService.getToken();
-                          final role = JwtHelper.getRole(
-                            token!,
-                          )?.toLowerCase().trim();
-                          if (role == "1") {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) =>
-                                    AuditLogPage(highlightid: task!.taskCode),
-                              ),
-                            );
-                          }
-                        },
-                        child: Container(
-                          margin: const EdgeInsets.only(left: 8),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 5,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.blue.shade100,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: const Text(
-                            "Edited",
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.blue,
-                            ),
-                          ),
-                        ),
-                      ),
+                    if (task!.wasEdited == true) _editedBadge(),
                   ],
                 ),
                 const SizedBox(height: 15),
@@ -363,6 +354,7 @@ class _TaskDetailsState extends State<TaskDetails> {
                   ],
                 ),
                 const SizedBox(height: 15),
+                ],
 
                 _infoCard(),
                 const SizedBox(height: 15),
@@ -389,37 +381,38 @@ class _TaskDetailsState extends State<TaskDetails> {
 
                 const SizedBox(height: 15),
 
-                Text(
-                  "Assigned Members",
-                  style: Theme.of(context).textTheme.headlineLarge,
-                ),
-                const SizedBox(height: 10),
-
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: members.map((name) {
-                    return Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.green.withOpacity(0.08),
-                        border: Border.all(color: Colors.green, width: 1),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        name,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Colors.green,
-                          fontWeight: FontWeight.w600,
+                if (!_showShareList) ...[
+                  Text(
+                    "Assigned Members",
+                    style: Theme.of(context).textTheme.headlineLarge,
+                  ),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: members.map((name) {
+                      return Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
                         ),
-                      ),
-                    );
-                  }).toList(),
-                ),
+                        decoration: BoxDecoration(
+                          color: Colors.green.withOpacity(0.08),
+                          border: Border.all(color: Colors.green, width: 1),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          name,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Colors.green,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ],
                 const SizedBox(height: 15),
 
                 Text(
@@ -453,22 +446,160 @@ class _TaskDetailsState extends State<TaskDetails> {
           ],
         ),
       ),
+        ),
+      ),
+    );
+  }
+
+  Widget _editedBadge() {
+    return GestureDetector(
+      onTap: () async {
+        final token = await AuthService.getToken();
+        final role = JwtHelper.getRole(token!)?.toLowerCase().trim();
+        if (role == "1") {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => AuditLogPage(highlightid: task!.taskCode),
+            ),
+          );
+        }
+      },
+      child: Container(
+        margin: const EdgeInsets.only(left: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+        decoration: BoxDecoration(
+          color: Colors.blue.shade100,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: const Text(
+          "Edited",
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.bold,
+            color: Colors.blue,
+          ),
+        ),
+      ),
     );
   }
 
   Widget _infoCard() {
     final theme = Theme.of(context);
-    final isQty = task!.performanceType.toLowerCase().trim() == "qty";
+    final isWeb = !AppLayout.isMobile(context);
     return Container(
-      padding: EdgeInsets.all(16),
+      padding: EdgeInsets.all(isWeb ? 20 : 16),
       decoration: BoxDecoration(
-        color: theme.cardTheme.color, // <-- uses theme card color
-        borderRadius: theme.cardTheme.shape is RoundedRectangleBorder
-            ? (theme.cardTheme.shape as RoundedRectangleBorder).borderRadius
-            : BorderRadius.circular(14),
-        border: Border.all(color: theme.colorScheme.primary, width: 1.2),
+        color: isWeb
+            ? WebTheme.surfaceOf(context)
+            : theme.cardTheme.color,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isWeb ? WebTheme.lineOf(context) : theme.colorScheme.primary,
+          width: 1.2,
+        ),
       ),
-      child: Column(
+      child: isWeb
+          ? Column(
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: _infoRow(
+                        Icons.calendar_today,
+                        "Start Date",
+                        AppHelpers.formatDate(task!.createdAt),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: _infoRow(
+                        Icons.event,
+                        "Due Date",
+                        AppHelpers.formatDate(task!.dueDate),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _infoRow(
+                        Icons.access_time,
+                        "Start Time",
+                        task!.startTime ?? "—",
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: _infoRow(
+                        Icons.access_time_filled,
+                        "Due Time",
+                        task!.endTime ?? "—",
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _infoRow(
+                        Icons.track_changes,
+                        "Performance Type",
+                        task!.performanceType,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: _infoRow(
+                        Icons.flag_outlined,
+                        "Priority",
+                        task!.priority,
+                      ),
+                    ),
+                  ],
+                ),
+                if (_hasQuantity) ...[
+                  const SizedBox(height: 14),
+                  _quantityStrip(),
+                ],
+                if (_showShareList) ...[
+                  const SizedBox(height: 14),
+                  _shareAssignments(),
+                ],
+                if (task!.status.toLowerCase() == "completed") ...[
+                  const SizedBox(height: 14),
+                  _infoRow(
+                    Icons.event,
+                    "Completed Date",
+                    AppHelpers.formatDate(task!.completed_date),
+                  ),
+                ],
+                const Divider(height: 24),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _infoRow(
+                        Icons.person,
+                        "Assigned By",
+                        AppHelpers.extractName(task!.assignedBy),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: _infoRow(
+                        Icons.apartment,
+                        "Department",
+                        AppHelpers.extractName(task!.assignerDepartment),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            )
+          : Column(
         children: [
           _infoRow(
             Icons.calendar_today,
@@ -481,39 +612,28 @@ class _TaskDetailsState extends State<TaskDetails> {
             "Due Date",
             AppHelpers.formatDate(task!.dueDate),
           ),
-          // Performance Type
           const SizedBox(height: 14),
-
           _infoRow(
             Icons.track_changes,
             "Performance Type",
             task!.performanceType,
           ),
-
-          // Qty task only
-          if (isQty && task!.quantity != null) ...[
+          if (_hasQuantity) ...[
             const SizedBox(height: 14),
-
-            _infoRow(
-              Icons.production_quantity_limits,
-              "Quantity",
-              task!.quantity.toString(),
-            ),
+            _quantityStrip(),
           ],
-
-          // Qty task only
+          if (_showShareList) ...[
+            const SizedBox(height: 14),
+            _shareAssignments(),
+          ],
           if (task!.startTime != null) ...[
             const SizedBox(height: 14),
-
             _infoRow(Icons.access_time, "Start Time", task!.startTime!),
           ],
-
           if (task!.endTime != null) ...[
             const SizedBox(height: 14),
-
             _infoRow(Icons.access_time_filled, "End Time", task!.endTime!),
           ],
-
           if (task!.status.toLowerCase() == "completed") ...[
             const SizedBox(height: 14),
             _infoRow(
@@ -539,6 +659,217 @@ class _TaskDetailsState extends State<TaskDetails> {
     );
   }
   
+  bool get _hasQuantity => (task?.quantity ?? 0) > 0;
+
+  bool get _seesEveryShare {
+    final role = (_role ?? "").toLowerCase().trim();
+    return role == "1" ||
+        role.contains("director") ||
+        role == "3" ||
+        role.contains("manager");
+  }
+
+  List<Map<String, dynamic>> get _quantitySplits {
+    final raw = _rawTask["quantitySplits"] ?? _rawTask["QuantitySplits"];
+    if (raw is! List) return [];
+    return raw
+        .whereType<Map>()
+        .map((share) => Map<String, dynamic>.from(share))
+        .toList();
+  }
+
+  bool get _showShareList => _seesEveryShare && _quantitySplits.isNotEmpty;
+
+  List<Map<String, dynamic>> get _visibleSplits {
+    final shares = _quantitySplits;
+    if (shares.isEmpty || _seesEveryShare) return shares;
+    final userId = _userId;
+    if (userId == null) return shares;
+    final mine = shares.where((share) {
+      final members = share["members"] ?? share["memberIds"];
+      if (members is! List) return false;
+      return members.any((member) {
+        if (member is Map) {
+          return int.tryParse("${member["userId"] ?? member["UserId"]}") ==
+              userId;
+        }
+        return int.tryParse("$member") == userId;
+      });
+    }).toList();
+    return mine;
+  }
+
+  Widget _shareAssignments() {
+    final shares = _visibleSplits;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          "Quantity shares",
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: 10),
+        ...shares.map(_shareCard),
+      ],
+    );
+  }
+
+  Widget _shareCard(Map<String, dynamic> share) {
+    final target = readGoalInt(share, const ["quantity", "Quantity"]) ?? 0;
+    final done = readGoalInt(share, const [
+          "completedQuantity",
+          "CompletedQuantity",
+        ]) ??
+        0;
+    final status = (share["status"] ?? "").toString();
+    final members = share["members"];
+    final people = members is List ? members.whereType<Map>().toList() : [];
+    final statusEnum = TaskUtils.parseStatus(status);
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.withOpacity(0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  "Share ${formatGoalQty(target)}",
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              StatusChip(
+                icon: Icons.circle,
+                text: TaskUtils.getStatusText(statusEnum),
+                color: TaskUtils.getStatusColor(statusEnum),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            "Achieved ${formatGoalQty(done)} of ${formatGoalQty(target)}",
+            style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
+          ),
+          if (people.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            ...people.map((person) {
+              final name = (person["name"] ?? person["Name"] ?? "").toString();
+              final userStatus =
+                  (person["userStatus"] ?? person["UserStatus"] ?? "")
+                      .toString();
+              final personStatus = TaskUtils.parseStatus(userStatus);
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Row(
+                  children: [
+                    const Icon(Icons.person_outline, size: 16),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        name.isEmpty ? "Member" : name,
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                    Text(
+                      TaskUtils.getStatusText(personStatus),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: TaskUtils.getStatusColor(personStatus),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _quantityStrip() {
+    final userId = _userId;
+    final useShare = !_seesEveryShare && userId != null;
+    final shareTarget = useShare ? memberShareQuantity(_rawTask, userId) : null;
+    final shareDone = useShare ? memberShareCompleted(_rawTask, userId) : null;
+    final target = shareTarget ?? task!.quantity ?? 0;
+    final done = shareDone ?? task!.completedQuantity ?? 0;
+    final pending = shareTarget != null
+        ? (target - done < 0 ? 0 : target - done)
+        : task!.pendingQuantity ?? (target - done < 0 ? 0 : target - done);
+    final percent = quantityPercent(done, target);
+    final percentColor = percent >= 100
+        ? const Color(0xFF1B7A3A)
+        : percent > 0
+            ? const Color(0xFFB45309)
+            : Colors.grey.shade700;
+    final fraction = target <= 0 ? 0.0 : (done / target).clamp(0.0, 1.0);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          "Achieved ${formatGoalQty(done)} of ${formatGoalQty(target)}",
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            _quantityFigure("Target", formatGoalQty(target)),
+            _quantityFigure("Achieved", formatGoalQty(done)),
+            _quantityFigure("Pending", formatGoalQty(pending)),
+            _quantityFigure(
+              "Percent",
+              formatQuantityPercent(percent),
+              percentColor,
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(6),
+          child: LinearProgressIndicator(
+            minHeight: 8,
+            value: fraction,
+            backgroundColor: Colors.grey.shade300,
+            color: percentColor,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _quantityFigure(String label, String value, [Color? color]) {
+    return Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+          ),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _infoRow(IconData icon, String title, String value) {
     return Row(
       children: [
@@ -706,23 +1037,4 @@ class _TaskDetailsState extends State<TaskDetails> {
     );
   }
 
-  // Widget _reviewRow(String title, String value) {
-  //   return Padding(
-  //     padding: const EdgeInsets.symmetric(vertical: 4),
-  //     child: Row(
-  //       children: [
-  //         Expanded(
-  //           child: Text(
-  //             title,
-  //             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-  //           ),
-  //         ),
-  //         Text(
-  //           value,
-  //           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-  //         ),
-  //       ],
-  //     ),
-  //   );
-  // }
 }

@@ -8,7 +8,7 @@ import 'package:staff_work_track/utils/enum.dart';
 import 'package:staff_work_track/screen/admin/Navigation/dashbord/dashboard.dart';
 import 'package:staff_work_track/screen/admin/Navigation/employee/employee.dart';
 import 'package:staff_work_track/screen/admin/Navigation/my%20work/mywork.dart';
-import 'package:staff_work_track/core/widgets/curved_bottom_nav.dart';
+import 'package:staff_work_track/core/widgets/adaptive_app_shell.dart';
 
 class Admin extends StatefulWidget {
   const Admin({super.key});
@@ -79,16 +79,11 @@ class _AdminState extends State<Admin> {
       const Worklog(),
     ];
 
-    return Scaffold(
-      body: pages[_currentIndex],
-      bottomNavigationBar: SafeArea(
-        top: false,
-        child: CurvedBottomNav(
-          currentIndex: _currentIndex,
-          onTap: (i) => setState(() => _currentIndex = i),
-          role: UserRole.admin,
-        ),
-      ),
+    return AdaptiveAppShell(
+      currentIndex: _currentIndex,
+      onTap: (i) => setState(() => _currentIndex = i),
+      role: UserRole.admin,
+      pages: pages,
     );
   }
 }

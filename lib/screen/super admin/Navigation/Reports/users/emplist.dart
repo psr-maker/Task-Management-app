@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:staff_work_track/core/widgets/load_error.dart';
 import 'package:staff_work_track/Models/getusers.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
 import 'package:staff_work_track/services/superadmin_service.dart';
@@ -31,7 +32,7 @@ class _EmployeeReportsListState extends State<EmployeeReportsList> {
         }
 
         if (snapshot.hasError) {
-          return Center(child: Text(snapshot.error.toString()));
+          return const AppLoadError();
         }
 
         if (!snapshot.hasData || snapshot.data!.isEmpty) {

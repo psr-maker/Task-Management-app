@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:staff_work_track/screen/authen/login_selection.dart';
 import 'package:staff_work_track/services/auth_service.dart';
 import 'package:staff_work_track/core/widgets/buttons.dart';
+import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
 
 class Logout extends StatefulWidget {
   const Logout({super.key});
@@ -27,9 +28,7 @@ class _LogoutState extends State<Logout> {
       (route) => false,
     );
   } catch (e) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Logout failed. Please try again.")),
-    );
+    showAppMessage(context, "Logout failed. Please try again.");
   } finally {
     if (mounted) {
       setState(() => _isLoading = false);

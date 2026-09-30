@@ -48,7 +48,7 @@ class CurvedBottomNav extends StatelessWidget {
                         width: 36,
                         decoration: BoxDecoration(
                           color: isActive
-                              ? Color.fromARGB(255, 30, 45, 38)
+                              ? const Color.fromARGB(255, 30, 45, 38)
                               : Colors.transparent,
                           shape: BoxShape.circle,
                           boxShadow: isActive
@@ -96,7 +96,7 @@ class CurvedNavPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = Color.fromARGB(255, 30, 45, 38)
+      ..color = const Color.fromARGB(255, 30, 45, 38)
       ..style = PaintingStyle.fill;
 
     final path = Path();

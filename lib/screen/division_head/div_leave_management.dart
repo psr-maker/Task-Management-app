@@ -8,6 +8,7 @@ import 'package:staff_work_track/services/admin_service.dart';
 import 'package:staff_work_track/services/auth_service.dart';
 import 'package:staff_work_track/services/superadmin_service.dart';
 import 'package:staff_work_track/utils/app_helper.dart';
+import 'package:staff_work_track/utils/time_utils.dart';
 import 'package:staff_work_track/utils/jwt_helper.dart';
 
 class DivLeaveManagement extends StatefulWidget {
@@ -40,8 +41,7 @@ class _DivLeaveManagementState extends State<DivLeaveManagement> {
 
   final statusTabs = const ["All", "Pending", "Approved", "Rejected"];
 
-  List<String> get childDepartments =>
-      DivisionConfig.childDepartments(widget.department);
+  List<String> childDepartments = [];
 
   List<String> get departments {
     final parent = widget.department.trim();
@@ -80,6 +80,9 @@ class _DivLeaveManagementState extends State<DivLeaveManagement> {
 
   Future<void> _init() async {
     await _loadLoginUser();
+    try {
+      childDepartments = await AdminService.getMySubDepartments();
+    } catch (_) {}
     await _loadData();
   }
 
@@ -111,7 +114,7 @@ class _DivLeaveManagementState extends State<DivLeaveManagement> {
         (item["senderRole"] ?? item["role"] ?? item["Role"] ?? "")
             .toString()
             .trim();
-    if (senderRole == "2" || senderRole == "3") return false;
+    if (senderRole == AppRoles.divisionHead) return false;
 
     return true;
   }
@@ -235,12 +238,7 @@ class _DivLeaveManagementState extends State<DivLeaveManagement> {
           permissions,
           departmentByUserId,
         );
-        for (final item in permissions) {
-          if (_isAllowedDept(_departmentOf(item), teamAllowed) ||
-              _departmentOf(item).trim().isEmpty) {
-            loadedTeamPermissions.add(item);
-          }
-        }
+        loadedTeamPermissions.addAll(permissions);
       } catch (_) {}
 
       try {
@@ -343,18 +341,11 @@ class _DivLeaveManagementState extends State<DivLeaveManagement> {
   }
 
   String _formatDate(dynamic date) {
-    if (date == null || date.toString().isEmpty) return "-";
-    final parsed = DateTime.tryParse(date.toString());
-    if (parsed == null) return date.toString();
-    return DateFormat("EEE, dd MMMM").format(parsed);
+    return TimeUtils.formatDateValue(date, empty: "-");
   }
 
   String _formatTime(dynamic time) {
-    if (time == null || time.toString().isEmpty) return "-";
-    final value = time.toString();
-    final parts = value.split(":");
-    if (parts.length >= 2) return "${parts[0]}:${parts[1]}";
-    return value;
+    return TimeUtils.formatTime12(time, empty: "-");
   }
 
   Color _statusColor(String status) {

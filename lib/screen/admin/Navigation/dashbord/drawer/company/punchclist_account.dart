@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
+import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
+import 'package:staff_work_track/core/widgets/web_ui.dart';
 import 'package:staff_work_track/services/dashboard_service.dart';
+import 'package:staff_work_track/utils/time_utils.dart';
 
 class PunchCompany extends StatefulWidget {
   final int managerId;
@@ -61,12 +64,7 @@ class _PunchCompanyState extends State<PunchCompany> {
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(e.toString()),
-          backgroundColor: Colors.red.shade700,
-        ),
-      );
+      showAppMessage(context, e.toString());
     } finally {
       if (mounted) {
         setState(() {
@@ -210,15 +208,7 @@ class _PunchCompanyState extends State<PunchCompany> {
   }
 
   String _formatTime(String value) {
-    try {
-      final parts = value.split(":");
-
-      if (parts.length >= 2) {
-        return "${parts[0]}:${parts[1]}";
-      }
-    } catch (_) {}
-
-    return value;
+    return TimeUtils.formatTime12(value, empty: value);
   }
 
   Map<String, Map<String, List<Map<String, dynamic>>>> _groupCorrections() {
@@ -247,29 +237,36 @@ class _PunchCompanyState extends State<PunchCompany> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: WebPushedChrome.background(context),
       appBar: AppBar(
-        title: const Text("Punch Corrections"),
+        title: WebPushedChrome.isWeb(context)
+            ? null
+            : const Text("Punch Corrections"),
         leading: IconButton(
           onPressed: () => Navigator.pop(context),
           icon: const Icon(Icons.arrow_back_ios),
         ),
       ),
-
-      body: Column(
-        children: [
-          _buildHeader(),
-
-          Expanded(
-            child: isLoading
-                ? RotatingFlower()
-                : filteredCorrections.isEmpty
-                ? _emptyState()
-                : RefreshIndicator(
-                    onRefresh: _loadCorrections,
-                    child: _buildGroupedList(),
-                  ),
-          ),
-        ],
+      body: WebPushedChrome.body(
+        context,
+        title: 'Punch Corrections',
+        subtitle: 'Company attendance correction requests',
+        panel: false,
+        child: Column(
+          children: [
+            _buildHeader(),
+            Expanded(
+              child: isLoading
+                  ? const Center(child: RotatingFlower())
+                  : filteredCorrections.isEmpty
+                  ? _emptyState()
+                  : RefreshIndicator(
+                      onRefresh: _loadCorrections,
+                      child: _buildGroupedList(),
+                    ),
+            ),
+          ],
+        ),
       ),
     );
   }

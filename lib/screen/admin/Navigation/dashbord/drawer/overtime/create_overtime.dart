@@ -5,6 +5,7 @@ import 'package:staff_work_track/core/widgets/loading.dart';
 import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
 import 'package:staff_work_track/services/overtime_service.dart';
 import 'package:staff_work_track/services/superadmin_service.dart';
+import 'package:staff_work_track/utils/role_hierarchy.dart';
 import 'package:staff_work_track/widgets/customfieldwidget.dart';
 
 class ManagerOvertimeCreate extends StatefulWidget {
@@ -51,12 +52,14 @@ class _ManagerOvertimeCreateState extends State<ManagerOvertimeCreate> {
   Future<void> loadUsers() async {
     try {
       final result = await SuperAdminService.getAllUsers();
+      final eligibility = await loadOvertimeEligibility();
 
       if (!mounted) return;
 
       final departmentUsers = result.where((user) {
         return user.department.trim().toLowerCase() ==
-            widget.dept.trim().toLowerCase();
+                widget.dept.trim().toLowerCase() &&
+            !eligibility.excludesUser(user);
       }).toList();
 
       setState(() {

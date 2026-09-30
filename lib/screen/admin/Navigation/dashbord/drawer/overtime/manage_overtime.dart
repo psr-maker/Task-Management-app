@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
 import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
 import 'package:staff_work_track/screen/admin/Navigation/dashbord/drawer/overtime/create_overtime.dart';
 import 'package:staff_work_track/screen/admin/Navigation/dashbord/drawer/overtime/overtime_details.dart';
 import 'package:staff_work_track/screen/admin/Navigation/dashbord/drawer/overtime/select_staff.dart';
 import 'package:staff_work_track/services/overtime_service.dart';
+import 'package:staff_work_track/utils/role_hierarchy.dart';
+import 'package:staff_work_track/utils/time_utils.dart';
 
 class ManagerOvertime extends StatefulWidget {
   final String dept;
@@ -50,10 +51,12 @@ class _ManagerOvertimeState extends State<ManagerOvertime> {
 
     try {
       final data = await OvertimeService.getDepartmentOvertime();
+      final eligibility = await loadOvertimeEligibility();
 
       if (!mounted) return;
 
       allData = List<dynamic>.from(data).where((item) {
+        if (item is Map && eligibility.excludesRecord(item)) return false;
         final id = int.tryParse(item["id"]?.toString() ?? "");
         return id == null || !_handledIds.contains(id);
       }).toList();
@@ -69,12 +72,7 @@ class _ManagerOvertimeState extends State<ManagerOvertime> {
         filteredData = [];
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("Failed to load overtime: $e"),
-          backgroundColor: Colors.red,
-        ),
-      );
+      showAppMessage(context, "Failed to load overtime: $e");
     } finally {
       if (!mounted) return;
 
@@ -180,30 +178,11 @@ class _ManagerOvertimeState extends State<ManagerOvertime> {
       return "-";
     }
 
-    return DateFormat("dd MMM yyyy").format(date);
+    return TimeUtils.formatDate(date);
   }
 
   String _formatTime(dynamic value) {
-    if (value == null) {
-      return "-";
-    }
-
-    final text = value.toString();
-
-    try {
-      final parts = text.split(":");
-
-      if (parts.length >= 2) {
-        final hour = int.parse(parts[0]);
-        final minute = int.parse(parts[1]);
-
-        final time = TimeOfDay(hour: hour, minute: minute);
-
-        return time.format(context);
-      }
-    } catch (_) {}
-
-    return text;
+    return TimeUtils.formatTime12(value, empty: "-");
   }
 
   String formatHours(dynamic value) {
@@ -374,12 +353,7 @@ class _ManagerOvertimeState extends State<ManagerOvertime> {
     final uid = item["uid"]?.toString();
 
     if (uid == null || uid.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Staff ID not found"),
-          backgroundColor: Colors.red,
-        ),
-      );
+      showAppMessage(context, "Staff ID not found");
 
       return;
     }

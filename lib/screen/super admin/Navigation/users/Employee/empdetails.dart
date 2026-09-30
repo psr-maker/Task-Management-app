@@ -4,8 +4,12 @@ import 'package:staff_work_track/Models/getusers.dart';
 import 'package:staff_work_track/Models/rolesmodel.dart';
 import 'package:staff_work_track/common/filter_model.dart';
 import 'package:staff_work_track/common/search_filter_page.dart';
+import 'package:staff_work_track/core/responsive/app_layout.dart';
+import 'package:staff_work_track/core/theme/web_theme.dart';
+import 'package:staff_work_track/core/widgets/form_popup.dart';
 import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
 import 'package:staff_work_track/core/providers/data_refresh_provider.dart';
+import 'package:staff_work_track/screen/admin/Navigation/my%20work/Task%20status%20tab/allgoals.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/Task/goalntask_create.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/Task/taskdetail.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/drawer/auditlog.dart';
@@ -19,6 +23,7 @@ import 'package:staff_work_track/utils/app_helper.dart';
 import 'package:staff_work_track/utils/jwt_helper.dart';
 import 'package:staff_work_track/widgets/StatCard.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
+import 'package:staff_work_track/widgets/adaptive_goal_cards.dart';
 
 class EmployeeDetail extends StatefulWidget {
   final UserModel employee;
@@ -64,12 +69,22 @@ class _EmployeeDetailState extends State<EmployeeDetail> {
       filtered = filtered.where((goal) {
         final title = (goal["title"] ?? "").toString().toLowerCase();
         final code = (goal["goalCode"] ?? "").toString().toLowerCase();
+        final months = goal["monthlyGoals"];
+        final monthText = months is List
+            ? months
+                .whereType<Map>()
+                .map((month) =>
+                    "${month["title"] ?? ""} ${month["goalCode"] ?? ""}")
+                .join(" ")
+                .toLowerCase()
+            : "";
         final department = (goal["department"] ?? "").toString().toLowerCase();
         final status = (goal["status"] ?? "").toString().toLowerCase();
         final priority = (goal["priority"] ?? "").toString().toLowerCase();
 
         return title.contains(query) ||
             code.contains(query) ||
+            monthText.contains(query) ||
             department.contains(query) ||
             status.contains(query) ||
             priority.contains(query);
@@ -169,6 +184,20 @@ class _EmployeeDetailState extends State<EmployeeDetail> {
     }
 
     return filtered;
+  }
+
+  List<dynamic> _tasksOf(dynamic goal) {
+    if (goal is! Map) return [];
+    final tasks = <dynamic>[];
+    final own = goal["tasks"];
+    if (own is List) tasks.addAll(own);
+    final months = goal["monthlyGoals"] ?? goal["MonthlyGoals"];
+    if (months is List) {
+      for (final month in months) {
+        tasks.addAll(_tasksOf(month));
+      }
+    }
+    return tasks;
   }
 
   bool _isStandaloneTask(Map<String, dynamic> task) {
@@ -283,9 +312,7 @@ class _EmployeeDetailState extends State<EmployeeDetail> {
 
       final nestedCodes = <String>{};
       for (final goal in goals) {
-        final goalTasks = goal is Map ? (goal["tasks"] ?? []) : [];
-        if (goalTasks is! List) continue;
-        for (final task in goalTasks) {
+        for (final task in _tasksOf(goal)) {
           if (task is Map && task["taskCode"] != null) {
             nestedCodes.add(task["taskCode"].toString());
           }
@@ -302,12 +329,13 @@ class _EmployeeDetailState extends State<EmployeeDetail> {
 
       if (mounted) {
         setState(() {
-          staffGoals = goals.where((goal) {
+          final visible = goals.where((goal) {
             final code = (goal["goalCode"] ?? goal["GoalCode"] ?? "")
                 .toString()
                 .trim();
             return !_removedGoalCodes.contains(code);
           }).toList();
+          staffGoals = goalsForCards(visible);
           standaloneTasks = standalone;
 
           departmentsList = {
@@ -443,7 +471,10 @@ class _EmployeeDetailState extends State<EmployeeDetail> {
 
   @override
   Widget build(BuildContext context) {
+    final isWeb = !AppLayout.isMobile(context);
+
     return Scaffold(
+      backgroundColor: isWeb ? WebTheme.canvasOf(context) : null,
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios),
@@ -459,11 +490,11 @@ class _EmployeeDetailState extends State<EmployeeDetail> {
                   hintStyle: Theme.of(context).textTheme.labelLarge,
                   border: InputBorder.none,
                 ),
-                onChanged: (value) { 
+                onChanged: (value) {
                   setState(() => searchQuery = value);
                 },
               )
-            : const Text("Employee Details"),
+            : Text(isWeb ? employee.name : "Employee Details"),
         actions: [
           IconButton(
             icon: Icon(isSearching ? Icons.close : Icons.search),
@@ -491,11 +522,10 @@ class _EmployeeDetailState extends State<EmployeeDetail> {
             ),
             onSelected: (value) async {
               if (value == 'edit' && canEditDelete) {
-                final result = await Navigator.push(
+                final result = await openFormPage(
                   context,
-                  MaterialPageRoute(
-                    builder: (_) => EditUser(user: widget.employee),
-                  ),
+                  EditUser(user: widget.employee),
+                  maxWidth: 560,
                 );
 
                 if (result != null) {
@@ -546,14 +576,13 @@ class _EmployeeDetailState extends State<EmployeeDetail> {
               }
 
               if (value == 'send warning' && canSendWarning) {
-                final result = await Navigator.push(
+                final result = await openFormPage(
                   context,
-                  MaterialPageRoute(
-                    builder: (_) => SendWarningPage(
-                      receiverId: widget.employee.userId,
-                      receivername: employee.name,
-                    ),
+                  SendWarningPage(
+                    receiverId: widget.employee.userId,
+                    receivername: employee.name,
                   ),
+                  maxWidth: 560,
                 );
 
                 if (result == true) setState(() {});
@@ -596,10 +625,11 @@ class _EmployeeDetailState extends State<EmployeeDetail> {
   }
 
   Widget _buildBody() {
+    final isWeb = !AppLayout.isMobile(context);
     final filteredGoals = applyGoalSearch(staffGoals);
     final filteredTasks = applyTaskSearch(standaloneTasks);
 
-    final nestedTasks = staffGoals.expand((g) => (g["tasks"] ?? [])).toList();
+    final nestedTasks = staffGoals.expand((g) => _tasksOf(g)).toList();
     final allTasksCount = nestedTasks.length + standaloneTasks.length;
 
     final now = DateTime.now();
@@ -633,7 +663,7 @@ class _EmployeeDetailState extends State<EmployeeDetail> {
     }).length;
 
     return Padding(
-      padding: const EdgeInsets.all(15),
+      padding: EdgeInsets.all(isWeb ? 28 : 15),
       child: Stack(
         children: [
           SingleChildScrollView(
@@ -642,7 +672,7 @@ class _EmployeeDetailState extends State<EmployeeDetail> {
               children: [
                 _employeeCard(allTasksCount),
 
-                const SizedBox(height: 15),
+                const SizedBox(height: 20),
 
                 Row(
                   children: [
@@ -654,7 +684,7 @@ class _EmployeeDetailState extends State<EmployeeDetail> {
                         color: Colors.green,
                       ),
                     ),
-                    const SizedBox(width: 10),
+                    const SizedBox(width: 12),
                     Expanded(
                       child: SmallStatCard(
                         title: "Pending",
@@ -663,7 +693,7 @@ class _EmployeeDetailState extends State<EmployeeDetail> {
                         color: Colors.orange,
                       ),
                     ),
-                    const SizedBox(width: 10),
+                    const SizedBox(width: 12),
                     Expanded(
                       child: SmallStatCard(
                         title: "Overdue",
@@ -675,24 +705,27 @@ class _EmployeeDetailState extends State<EmployeeDetail> {
                   ],
                 ),
 
-                const SizedBox(height: 15),
+                const SizedBox(height: 24),
 
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
                       "Goals : ${staffGoals.length}",
-                      style: Theme.of(context).textTheme.headlineLarge,
+                      style: Theme.of(context).textTheme.headlineMedium
+                          ?.copyWith(
+                            fontSize: isWeb ? 16 : 15,
+                            fontWeight: FontWeight.w600,
+                          ),
                     ),
+                    const Spacer(),
                     GestureDetector(
                       onTap: () async {
-                        final result = await Navigator.push(
+                        final result = await openFormPage(
                           context,
-                          MaterialPageRoute(
-                            builder: (_) => Createtask(
-                              assignedToIds: [widget.employee.userId],
-                            ),
+                          Createtask(
+                            assignedToIds: [widget.employee.userId],
                           ),
+                          maxWidth: 880,
                         );
                         if (result == true) {
                           context.read<DataRefreshNotifier>().refreshGoals();
@@ -721,9 +754,8 @@ class _EmployeeDetailState extends State<EmployeeDetail> {
                     ),
                   )
                 else
-                  ListView.builder(
+                  AdaptiveGoalCards(
                     shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
                     itemCount: filteredGoals.length,
                     itemBuilder: (context, index) {
                       final goal = filteredGoals[index];
@@ -776,9 +808,8 @@ class _EmployeeDetailState extends State<EmployeeDetail> {
                     ),
                   )
                 else
-                  ListView.builder(
+                  AdaptiveGoalCards(
                     shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
                     itemCount: filteredTasks.length,
                     itemBuilder: (context, index) {
                       final task = filteredTasks[index];
@@ -861,6 +892,136 @@ class _EmployeeDetailState extends State<EmployeeDetail> {
   }
 
   Widget _employeeCard(int taskCount) {
+    final isWeb = !AppLayout.isMobile(context);
+    final initial = employee.name.isNotEmpty
+        ? employee.name[0].toUpperCase()
+        : '?';
+
+    if (isWeb) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: WebTheme.surfaceOf(context),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: WebTheme.lineOf(context)),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            CircleAvatar(
+              radius: 36,
+              backgroundColor: WebTheme.brand,
+              child: Text(
+                initial,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 26,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            const SizedBox(width: 20),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          employee.name,
+                          style: TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w700,
+                            color: WebTheme.inkOf(context),
+                          ),
+                        ),
+                      ),
+                      if (employee.wasEdited == true)
+                        IconButton(
+                          tooltip: 'Audit log',
+                          onPressed: () async {
+                            final token = await AuthService.getToken();
+                            final role = JwtHelper.getRole(
+                              token!,
+                            )?.toLowerCase().trim();
+                            if (role == "1") {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => AuditLogPage(
+                                    highlightid: employee.userId.toString(),
+                                  ),
+                                ),
+                              );
+                            }
+                          },
+                          icon: const Icon(Icons.edit_outlined),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    employee.email,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: WebTheme.mutedOf(context),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      _infoChip(Icons.business, employee.department),
+                      _infoChip(Icons.badge_outlined, getRoleName(employee.role)),
+                      _infoChip(Icons.assignment_outlined, '$taskCount tasks'),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            isActive ? "Active" : "Deactive",
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: isActive
+                                  ? Theme.of(context).colorScheme.secondary
+                                  : Colors.red,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          isUpdating
+                              ? const SizedBox(
+                                  width: 15,
+                                  height: 15,
+                                  child: RotatingFlower(size: 10),
+                                )
+                              : Transform.scale(
+                                  scale: 0.75,
+                                  child: Switch(
+                                    value: isActive,
+                                    activeThumbColor: Theme.of(
+                                      context,
+                                    ).colorScheme.secondary,
+                                    onChanged: !canEditDelete
+                                        ? null
+                                        : _onStatusChanged,
+                                  ),
+                                ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -901,7 +1062,6 @@ class _EmployeeDetailState extends State<EmployeeDetail> {
         _row(Icons.business, employee.department),
         const SizedBox(height: 10),
         _row(Icons.work, getRoleName(employee.role)),
-
         Row(
           children: [
             Text(
@@ -925,70 +1085,75 @@ class _EmployeeDetailState extends State<EmployeeDetail> {
                     scale: 0.8,
                     child: Switch(
                       value: isActive,
-                      activeColor: Theme.of(context).colorScheme.secondary,
-                      onChanged: !canEditDelete
-                          ? null
-                          : (value) async {
-                              setState(() {
-                                isActive = value;
-                                isUpdating = true;
-                              });
-
-                              try {
-                                await SuperAdminService.updateusersstatus(
-                                  employee.userId,
-                                  value ? "Active" : "Deactive",
-                                );
-
-                                if (mounted) {
-                                  context
-                                      .read<DataRefreshNotifier>()
-                                      .refreshUsers();
-                                  showTopMessage(
-                                    "Status updated successfully",
-                                    isError: false,
-                                  );
-                                }
-                              } catch (e) {
-                                if (mounted) {
-                                  setState(() {
-                                    isActive = !value;
-                                  });
-                                }
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                      "Failed to update status: $e",
-                                    ),
-                                  ),
-                                );
-                              } finally {
-                                if (mounted) {
-                                  setState(() {
-                                    isUpdating = false;
-                                  });
-                                }
-                              }
-                            },
+                      activeThumbColor: Theme.of(
+                        context,
+                      ).colorScheme.secondary,
+                      onChanged: !canEditDelete ? null : _onStatusChanged,
                     ),
                   ),
           ],
         ),
-
         Divider(height: 10, color: Theme.of(context).colorScheme.secondary),
-
-        // Row(
-        //   mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        //   children: [
-        //     Text("Created By", style: Theme.of(context).textTheme.titleLarge),
-        //     Text(
-        //       getRoleName(employee.createdBy),
-        //       style: Theme.of(context).textTheme.headlineMedium,
-        //     ),
-        //   ],
-        // ),
       ],
     );
+  }
+
+  Widget _infoChip(IconData icon, String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: WebTheme.brandSoftOf(context),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: WebTheme.brand),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: WebTheme.brand,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _onStatusChanged(bool value) async {
+    setState(() {
+      isActive = value;
+      isUpdating = true;
+    });
+
+    try {
+      await SuperAdminService.updateusersstatus(
+        employee.userId,
+        value ? "Active" : "Deactive",
+      );
+
+      if (mounted) {
+        context.read<DataRefreshNotifier>().refreshUsers();
+        showTopMessage("Status updated successfully", isError: false);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          isActive = !value;
+        });
+      }
+      if (!mounted) return;
+      showAppMessage(context, "Failed to update status: $e");
+    } finally {
+      if (mounted) {
+        setState(() {
+          isUpdating = false;
+        });
+      }
+    }
   }
 
   Widget _row(IconData icon, String value) {

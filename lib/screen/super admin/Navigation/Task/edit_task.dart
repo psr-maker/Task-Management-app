@@ -5,8 +5,10 @@ import 'package:staff_work_track/screen/super%20admin/Navigation/Task/task_assig
 import 'package:staff_work_track/screen/super%20admin/Navigation/Task/goalntask_create.dart';
 import 'package:staff_work_track/services/superadmin_service.dart';
 import 'package:staff_work_track/core/widgets/buttons.dart';
+import 'package:staff_work_track/core/widgets/form_popup.dart';
 import 'package:staff_work_track/widgets/customfieldwidget.dart';
 import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
+import 'package:staff_work_track/utils/time_utils.dart';
 
 class EditTask extends StatefulWidget {
   final TaskModel task;
@@ -27,6 +29,7 @@ class _EditTaskState extends State<EditTask> {
   final TextEditingController quantityController = TextEditingController();
   List<RemovedUser> removedUsers = [];
   String? selectedPriority;
+  String selectedPerformanceType = "Default";
   DateTime? dueDate;
   TimeOfDay? startTime;
   TimeOfDay? endTime;
@@ -37,11 +40,52 @@ class _EditTaskState extends State<EditTask> {
   bool _showTopMessage = false;
 
   List<UserModel> assignedUsers = [];
+  String? _goalTitle;
+  bool _loadingGoalTitle = false;
 
   @override
   void initState() {
     super.initState();
     _setInitialData();
+    _loadGoalTitle();
+  }
+
+  Future<void> _loadGoalTitle() async {
+    final code = widget.task.goalCode;
+    if (code == null || code.isEmpty) return;
+
+    setState(() => _loadingGoalTitle = true);
+    try {
+      List goals = [];
+      try {
+        goals = await SuperAdminService.getGoalsname();
+      } catch (_) {
+        goals = await SuperAdminService.getGoals();
+      }
+      final title = _goalTitleFor(goals, code);
+      if (!mounted) return;
+      setState(() => _goalTitle = title);
+    } catch (_) {}
+    if (mounted) setState(() => _loadingGoalTitle = false);
+  }
+
+  String? _goalTitleFor(List goals, String code) {
+    for (final item in goals) {
+      if (item is! Map) continue;
+      final itemCode = (item["goalCode"] ?? item["code"] ?? "").toString();
+      if (itemCode == code) {
+        final title = (item["title"] ?? item["goal"] ?? item["name"] ?? "")
+            .toString()
+            .trim();
+        if (title.isNotEmpty) return title;
+      }
+      final months = item["monthlyGoals"] ?? item["MonthlyGoals"];
+      if (months is List) {
+        final nested = _goalTitleFor(months, code);
+        if (nested != null && nested.isNotEmpty) return nested;
+      }
+    }
+    return null;
   }
 
   TimeOfDay? _parseTimeOfDay(String? value) {
@@ -61,22 +105,24 @@ class _EditTaskState extends State<EditTask> {
     nameController.text = widget.task.task;
     descriController.text = widget.task.description;
     selectedPriority = widget.task.priority;
+    selectedPerformanceType =
+        widget.task.performanceType.toLowerCase() == "qty" ? "Qty" : "Default";
 
-    createdDateController.text = widget.task.createdAt.split("T").first;
+    createdDateController.text = TimeUtils.formatDateValue(widget.task.createdAt);
 
     if (widget.task.dueDate != null) {
       dueDate = DateTime.tryParse(widget.task.dueDate!);
-      dueDateController.text = widget.task.dueDate!.split("T").first;
+      dueDateController.text = TimeUtils.formatDateValue(widget.task.dueDate);
     }
 
     if (widget.task.startTime != null) {
       startTime = _parseTimeOfDay(widget.task.startTime);
-      startTimeController.text = widget.task.startTime!;
+      startTimeController.text = TimeUtils.formatTime12(widget.task.startTime);
     }
 
     if (widget.task.endTime != null) {
       endTime = _parseTimeOfDay(widget.task.endTime);
-      endTimeController.text = widget.task.endTime!;
+      endTimeController.text = TimeUtils.formatTime12(widget.task.endTime);
     }
 
     // Quantity
@@ -85,10 +131,9 @@ class _EditTaskState extends State<EditTask> {
     }
 
     // SAFE assigned users parsing
-    assignedUsers = (widget.task.assignedTo)
-        .whereType<Map<String, dynamic>>()
-        .map((u) => UserModel.fromJson(u))
-        .toList();
+    assignedUsers = widget.task.assignedTo.whereType<Map>().map((user) {
+      return UserModel.fromJson(Map<String, dynamic>.from(user));
+    }).toList();
   }
 
   Future<void> _selectDueDate() async {
@@ -102,8 +147,7 @@ class _EditTaskState extends State<EditTask> {
     if (picked != null) {
       setState(() {
         dueDate = picked;
-        dueDateController.text =
-            "${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}";
+        dueDateController.text = TimeUtils.formatDate(picked);
       });
     }
   }
@@ -128,9 +172,10 @@ class _EditTaskState extends State<EditTask> {
     );
 
     if (picked != null) {
-      final formattedTime =
-          "${picked.hour.toString().padLeft(2, '0')}:"
-          "${picked.minute.toString().padLeft(2, '0')}:00";
+      final formattedTime = TimeUtils.formatTime12(
+        "${picked.hour.toString().padLeft(2, '0')}:"
+        "${picked.minute.toString().padLeft(2, '0')}",
+      );
 
       setState(() {
         if (isStart) {
@@ -246,8 +291,101 @@ class _EditTaskState extends State<EditTask> {
     );
   }
 
+  Widget _row2(Widget left, Widget right) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(child: left),
+        const SizedBox(width: 12),
+        Expanded(child: right),
+      ],
+    );
+  }
+
+  Widget _labeled(String label, Widget child, {String? hint}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            CustomFormWidgets.label(context, label),
+            if (hint != null) ...[
+              const SizedBox(width: 6),
+              Text(
+                hint,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.grey.shade600,
+                ),
+              ),
+            ],
+          ],
+        ),
+        const SizedBox(height: 8),
+        child,
+      ],
+    );
+  }
+
+  Widget _assignedMembersBox() {
+    final brand = Theme.of(context).colorScheme.secondary;
+    const border = Color.fromARGB(255, 25, 77, 38);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(10, 6, 4, 6),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: border),
+      ),
+      child: assignedUsers.isEmpty
+          ? Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Text(
+                "No staff assigned",
+                style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+              ),
+            )
+          : Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: assignedUsers.map((user) {
+                return InputChip(
+                  label: Text(
+                    user.name,
+                    style: const TextStyle(
+                      color: Colors.black,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  onDeleted: () async {
+                    final reason = await showReasonDialog();
+                    if (reason == null) return;
+                    setState(() {
+                      removedUsers.add(
+                        RemovedUser(userId: user.userId, reason: reason),
+                      );
+                      assignedUsers.removeWhere(
+                        (item) => item.userId == user.userId,
+                      );
+                    });
+                  },
+                  deleteIcon: const Icon(
+                    Icons.close,
+                    size: 16,
+                    color: Colors.black54,
+                  ),
+                  backgroundColor: brand.withValues(alpha: 0.08),
+                  side: BorderSide(color: brand.withValues(alpha: 0.3)),
+                );
+              }).toList(),
+            ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final goalCode = widget.task.goalCode;
     return Scaffold(
       appBar: AppBar(
         title: const Text("Edit Task"),
@@ -264,130 +402,148 @@ class _EditTaskState extends State<EditTask> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const SizedBox(height: 10),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      ElevatedButton.icon(
-                        onPressed: _assignUsers,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Theme.of(
-                            context,
-                          ).colorScheme.secondary,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 15,
-                            vertical: 10,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                        icon: const Icon(Icons.person_add),
-                        label: const Text("Assign Users"),
-                      ),
-                    ],
-                  ),
-                  CustomFormWidgets.label(context, "Task Name"),
-                  const SizedBox(height: 10),
-                  CustomFormWidgets.textField(context, nameController),
-
                   const SizedBox(height: 20),
-                  CustomFormWidgets.label(context, "Description"),
-                  const SizedBox(height: 10),
+                  CustomFormWidgets.label(context, "Task Name"),
+                  const SizedBox(height: 8),
                   CustomFormWidgets.textField(
                     context,
-                    descriController,
-                    maxLines: 4,
+                    nameController,
+                    hint: "Enter task name",
                   ),
-                  if (widget.task.performanceType.toLowerCase() == "qty") ...[
+                  const SizedBox(height: 20),
+                  _row2(
+                    _labeled(
+                      "Performance Type",
+                      CustomFormWidgets.dropdown(
+                        context: context,
+                        value: selectedPerformanceType,
+                        items: const ["Default", "Qty"],
+                        onChanged: (value) => setState(() {
+                          selectedPerformanceType = value ?? "Default";
+                          if (selectedPerformanceType != "Qty") {
+                            quantityController.clear();
+                          }
+                        }),
+                        hint: "Select Performance Type",
+                      ),
+                    ),
+                    _labeled(
+                      "Priority",
+                      CustomFormWidgets.dropdown(
+                        context: context,
+                        value: selectedPriority,
+                        items: const ["Normal", "Medium", "High"],
+                        onChanged: (value) =>
+                            setState(() => selectedPriority = value),
+                        hint: "Select Priority",
+                      ),
+                    ),
+                  ),
+                  if (selectedPerformanceType == "Qty") ...[
                     const SizedBox(height: 20),
-
-                    CustomFormWidgets.label(context, "Quantity"),
-
-                    const SizedBox(height: 10),
-
+                    CustomFormWidgets.label(context, "Qty"),
+                    const SizedBox(height: 8),
                     CustomFormWidgets.textField(
                       context,
                       quantityController,
+                      hint: "Enter quantity",
+                      maxLines: 1,
                       keyboardType: TextInputType.number,
                     ),
                   ],
                   const SizedBox(height: 20),
-                  CustomFormWidgets.label(context, "Priority"),
-                  const SizedBox(height: 10),
-                  CustomFormWidgets.dropdown(
-                    context: context,
-                    value: selectedPriority,
-                    items: ["Normal", "Medium", "High"],
-                    onChanged: (v) => setState(() => selectedPriority = v),
-                  ),
-                  const SizedBox(height: 20),
-                  CustomFormWidgets.label(context, "Start Date"),
-                  const SizedBox(height: 10),
-                  CustomFormWidgets.dateField(
-                    controller: createdDateController,
-                    onTap: () {},
-                    enabled: false,
-                  ),
-                  const SizedBox(height: 20),
-                  CustomFormWidgets.label(context, "Due Date"),
-                  const SizedBox(height: 10),
-                  CustomFormWidgets.dateField(
-                    controller: dueDateController,
-                    onTap: _selectDueDate,
-                  ),
-
-                  const SizedBox(height: 20),
-                  CustomFormWidgets.label(context, "Start Time"),
-                  const SizedBox(height: 10),
-                  CustomFormWidgets.timeField(
-                    controller: startTimeController,
-                    onTap: () => _selectTime(true),
-                  ),
-
-                  const SizedBox(height: 20),
-                  CustomFormWidgets.label(context, "End Time"),
-                  const SizedBox(height: 10),
-                  CustomFormWidgets.timeField(
-                    controller: endTimeController,
-                    onTap: () => _selectTime(false),
-                  ),
-
-                  const SizedBox(height: 20),
-                  CustomFormWidgets.label(context, "Assigned Members"),
-                  const SizedBox(height: 10),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: assignedUsers.map((user) {
-                      return Chip(
-                        label: Text(user.name),
-                        deleteIcon: const Icon(
-                          Icons.close,
-                          color: Colors.white,
+                  Row(
+                    children: [
+                      Expanded(
+                        child: CustomFormWidgets.label(
+                          context,
+                          "Assigned members",
                         ),
-                        onDeleted: () async {
-                          final reason = await showReasonDialog();
-
-                          if (reason == null) return;
-
-                          setState(() {
-                            removedUsers.add(
-                              RemovedUser(userId: user.userId, reason: reason),
-                            );
-
-                            assignedUsers.removeWhere(
-                              (u) => u.userId == user.userId,
-                            );
-                          });
-                        },
-                      );
-                    }).toList(),
+                      ),
+                      IconButton(
+                        tooltip: "Add members",
+                        onPressed: _assignUsers,
+                        icon: Icon(
+                          Icons.person_add_alt_1,
+                          color: Theme.of(context).colorScheme.secondary,
+                        ),
+                      ),
+                    ],
                   ),
-
+                  _assignedMembersBox(),
                   const SizedBox(height: 20),
+                  CustomFormWidgets.label(context, "Description"),
+                  const SizedBox(height: 8),
+                  CustomFormWidgets.textField(
+                    context,
+                    descriController,
+                    hint: "Enter description",
+                    maxLines: 4,
+                  ),
+                  const SizedBox(height: 20),
+                  CustomFormWidgets.label(context, "Select Goal"),
+                  const SizedBox(height: 8),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 14,
+                    ),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: const Color.fromARGB(255, 25, 77, 38),
+                      ),
+                    ),
+                    child: Text(
+                      _loadingGoalTitle
+                          ? "Loading goal..."
+                          : (_goalTitle != null && _goalTitle!.isNotEmpty)
+                              ? _goalTitle!
+                              : (goalCode == null || goalCode.isEmpty)
+                                  ? "No goal"
+                                  : "Goal",
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  _row2(
+                    _labeled(
+                      "Start Date",
+                      CustomFormWidgets.dateField(
+                        controller: createdDateController,
+                        onTap: () {},
+                        enabled: false,
+                      ),
+                    ),
+                    _labeled(
+                      "Due Date",
+                      CustomFormWidgets.dateField(
+                        controller: dueDateController,
+                        onTap: _selectDueDate,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  _row2(
+                    _labeled(
+                      "Start Time",
+                      CustomFormWidgets.timeField(
+                        controller: startTimeController,
+                        onTap: () => _selectTime(true),
+                      ),
+                      hint: "(optional)",
+                    ),
+                    _labeled(
+                      "Due Time",
+                      CustomFormWidgets.timeField(
+                        controller: endTimeController,
+                        onTap: () => _selectTime(false),
+                      ),
+                      hint: "(optional)",
+                    ),
+                  ),
+                  const SizedBox(height: 30),
                   Center(
                     child: AppButton(
                       text: "Update Task",
@@ -448,10 +604,10 @@ class _EditTaskState extends State<EditTask> {
                                 ? int.tryParse(quantityController.text.trim())
                                 : null,
                             startTime: startTimeController.text.isNotEmpty
-                                ? startTimeController.text
+                                ? TimeUtils.toApiTime(startTimeController.text)
                                 : null,
                             endTime: endTimeController.text.isNotEmpty
-                                ? endTimeController.text
+                                ? TimeUtils.toApiTime(endTimeController.text)
                                 : null,
                             assignedToIds: assignedUsers
                                 .map((u) => u.userId)
@@ -479,10 +635,9 @@ class _EditTaskState extends State<EditTask> {
                                   ) ??
                                   DateTime.now();
 
-                              await Navigator.push(
+                              await openFormPage(
                                 context,
-                                MaterialPageRoute(
-                                  builder: (_) => Createtask(
+                                Createtask(
                                     assignedToIds: assignedUsers
                                         .map((u) => u.userId)
                                         .toList(),
@@ -506,8 +661,8 @@ class _EditTaskState extends State<EditTask> {
                                         : widget.task.endTime,
                                     initialIsTask: true,
                                   ),
-                                ),
                               );
+                        
                             }
                           }
 

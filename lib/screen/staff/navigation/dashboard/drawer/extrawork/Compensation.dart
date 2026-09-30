@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 
 import 'package:staff_work_track/core/widgets/loading.dart';
 import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
 import 'package:staff_work_track/services/overtime_service.dart';
+import 'package:staff_work_track/utils/time_utils.dart';
 
 class MyExtraWorkPage extends StatefulWidget {
   const MyExtraWorkPage({super.key});
@@ -269,38 +269,14 @@ class _MyExtraWorkPageState extends State<MyExtraWorkPage>
     try {
       final date = DateTime.parse(text);
 
-      return DateFormat('dd MMM yyyy').format(date);
+      return TimeUtils.formatDate(date);
     } catch (_) {
       return text;
     }
   }
 
   String _formatTime(dynamic value) {
-    if (value == null) {
-      return '-';
-    }
-
-    final text = value.toString().trim();
-
-    if (text.isEmpty) {
-      return '-';
-    }
-
-    try {
-      final parts = text.split(':');
-
-      if (parts.length >= 2) {
-        final hour = int.parse(parts[0]);
-
-        final minute = int.parse(parts[1]);
-
-        final time = TimeOfDay(hour: hour, minute: minute);
-
-        return time.format(context);
-      }
-    } catch (_) {}
-
-    return text;
+    return TimeUtils.formatTime12(value, empty: '-');
   }
 
   String _formatHours(dynamic value) {
@@ -808,9 +784,7 @@ class _RejectExtraWorkDialogState extends State<_RejectExtraWorkDialog> {
     final reason = _reasonController.text.trim();
 
     if (reason.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Please enter a reason.')));
+      showAppMessage(context, "Please enter a reason.");
 
       return;
     }

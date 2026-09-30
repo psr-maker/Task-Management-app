@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:staff_work_track/core/widgets/load_error.dart';
 import 'package:staff_work_track/services/admin_service.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/Task/taskdetail.dart';
 import 'package:staff_work_track/utils/app_helper.dart';
+import 'package:staff_work_track/utils/goal_quantity.dart';
 import 'package:staff_work_track/widgets/StatCard.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
+import 'package:staff_work_track/widgets/adaptive_goal_cards.dart';
 
 class CompletedTab extends StatefulWidget {
   final int adminId;
@@ -33,7 +36,7 @@ class _CompletedTabState extends State<CompletedTab> {
         }
 
         if (snapshot.hasError) {
-          return Center(child: Text(snapshot.error.toString()));
+          return const AppLoadError();
         }
 
         if (!snapshot.hasData || snapshot.data!.isEmpty) {
@@ -42,7 +45,9 @@ class _CompletedTabState extends State<CompletedTab> {
 
         // Filter only completed tasks
         final tasks = snapshot.data!.where((task) {
-          final normalizedStatus = AppHelpers.normalize(task["status"]);
+          final normalizedStatus = AppHelpers.normalize(
+            viewerTaskStatus(task, widget.adminId),
+          );
           return normalizedStatus == "completed";
         }).toList();
 
@@ -50,23 +55,25 @@ class _CompletedTabState extends State<CompletedTab> {
           return const Center(child: Text("No Completed Tasks"));
         }
 
-        return ListView.builder(
+        return Padding(
           padding: const EdgeInsets.all(15),
-          itemCount: tasks.length,
-          itemBuilder: (context, index) {
-            final task = tasks[index];
-             return Taskstatus(
-              task: task,
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => TaskDetails(taskCode: task["taskCode"]),
-                  ),
-                );
-              },
-            );
-          },
+          child: AdaptiveGoalCards(
+            itemCount: tasks.length,
+            itemBuilder: (context, index) {
+              final task = tasks[index];
+              return Taskstatus(
+                task: task,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => TaskDetails(taskCode: task["taskCode"]),
+                    ),
+                  );
+                },
+              );
+            },
+          ),
         );
       },
     );

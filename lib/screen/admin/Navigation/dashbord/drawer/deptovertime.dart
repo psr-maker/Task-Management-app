@@ -4,6 +4,8 @@ import 'package:staff_work_track/core/widgets/buttons.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
 import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
 import 'package:staff_work_track/services/admin_service.dart';
+import 'package:staff_work_track/utils/role_hierarchy.dart';
+import 'package:staff_work_track/utils/time_utils.dart';
 
 class DeptOvertimeList extends StatefulWidget {
   const DeptOvertimeList({super.key});
@@ -56,9 +58,13 @@ class _DeptOvertimeListState extends State<DeptOvertimeList> {
   Future<void> loadData() async {
     try {
       final data = await AdminService.getDepartmentOverTimes();
+      final eligibility = await loadOvertimeEligibility();
+      final visible = data.where((item) {
+        return item is! Map || !eligibility.excludesRecord(item);
+      }).toList();
       setState(() {
-        allData = data;
-        filteredData = data;
+        allData = visible;
+        filteredData = visible;
         loading = false;
       });
     } catch (e) {
@@ -448,9 +454,7 @@ class _DeptOvertimeListState extends State<DeptOvertimeList> {
                           const Icon(Icons.calendar_today),
                           const SizedBox(width: 8),
                           Text(
-                            DateFormat(
-                              'dd MMM yyyy',
-                            ).format(DateTime.parse(item["date"])),
+                            TimeUtils.formatDateValue(item["date"]),
                             style: Theme.of(context).textTheme.labelMedium,
                           ),
                         ],

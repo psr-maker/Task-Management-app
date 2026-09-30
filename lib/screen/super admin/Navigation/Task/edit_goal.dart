@@ -1,10 +1,18 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
+import 'package:flutter/services.dart';
+import 'package:staff_work_track/Models/getusers.dart';
 import 'package:staff_work_track/core/widgets/buttons.dart';
 import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
+import 'package:staff_work_track/services/admin_service.dart';
+import 'package:staff_work_track/services/auth_service.dart';
 import 'package:staff_work_track/services/superadmin_service.dart';
 import 'package:staff_work_track/utils/app_helper.dart';
+import 'package:staff_work_track/utils/time_utils.dart';
+import 'package:staff_work_track/utils/jwt_helper.dart';
+import 'package:staff_work_track/utils/role_hierarchy.dart';
 import 'package:staff_work_track/widgets/customfieldwidget.dart';
+import 'package:staff_work_track/widgets/staff_picker.dart';
+import 'package:staff_work_track/core/responsive/app_layout.dart';
 
 class EditGoalPage extends StatefulWidget {
   final Map goal;
@@ -19,22 +27,145 @@ class _EditGoalPageState extends State<EditGoalPage> {
   final TextEditingController goalTitleController = TextEditingController();
   final TextEditingController goalStartController = TextEditingController();
   final TextEditingController goalDueController = TextEditingController();
+  final TextEditingController quantityController = TextEditingController();
 
   String? selectedPriority;
   bool isLoading = false;
+  bool _loadingUsers = false;
   String? _topMessage;
   bool _isErrorMessage = true;
   bool _showTopMessage = false;
+  List<UserModel> _users = [];
+  late final Set<int> _originalAssignedIds;
+  late final Set<int> _assignedIds;
+  late final bool _canEditStaff;
+
+  static const _priorities = ["Normal", "Medium", "High"];
+
   @override
   void initState() {
     super.initState();
+    final goal = widget.goal;
+    goalTitleController.text = (goal["title"] ?? "").toString();
+    goalStartController.text = AppHelpers.formatDate(
+      goal["startDate"]?.toString(),
+    );
+    goalDueController.text = AppHelpers.formatDate(goal["dueDate"]?.toString());
+    selectedPriority = _knownPriority(goal["priority"]);
 
-    goalTitleController.text = widget.goal["title"] ?? "";
+    final quantity = _readInt(goal["targetQuantity"] ?? goal["TargetQuantity"]);
+    if (quantity != null && quantity > 0) {
+      quantityController.text = quantity.toString();
+    }
 
-    goalStartController.text = AppHelpers.formatDate(widget.goal["startDate"]);
-    goalDueController.text = AppHelpers.formatDate(widget.goal["dueDate"]);
+    final goalType = (goal["goalType"] ?? goal["GoalType"] ?? "")
+        .toString()
+        .toLowerCase();
+    _canEditStaff = goalType != "yearly";
+    _originalAssignedIds = _assignedIdsFrom(goal);
+    _assignedIds = {..._originalAssignedIds};
+    if (_canEditStaff) _loadUsers();
+  }
 
-    selectedPriority = widget.goal["priority"];
+  @override
+  void dispose() {
+    goalTitleController.dispose();
+    goalStartController.dispose();
+    goalDueController.dispose();
+    quantityController.dispose();
+    super.dispose();
+  }
+
+  int? _readInt(dynamic raw) {
+    if (raw is num) return raw.round();
+    return int.tryParse("${raw ?? ""}".trim());
+  }
+
+  Set<int> _assignedIdsFrom(Map goal) {
+    final raw = goal["assignedUsers"] ??
+        goal["AssignedUsers"] ??
+        goal["assignments"] ??
+        goal["goalAssignments"] ??
+        goal["assignedTo"];
+    final ids = <int>{};
+    if (raw is! List) return ids;
+    for (final user in raw) {
+      if (user is Map) {
+        final id = _readInt(
+          user["userId"] ?? user["UserId"] ?? user["id"] ?? user["Id"],
+        );
+        if (id != null) ids.add(id);
+      } else {
+        final id = _readInt(user);
+        if (id != null) ids.add(id);
+      }
+    }
+    return ids;
+  }
+
+  String? _knownPriority(dynamic raw) {
+    final text = (raw ?? "").toString().trim();
+    if (text.isEmpty) return null;
+    for (final item in _priorities) {
+      if (item.toLowerCase() == text.toLowerCase()) return item;
+    }
+    return null;
+  }
+
+  Future<void> _loadUsers() async {
+    setState(() => _loadingUsers = true);
+    try {
+      final token = await AuthService.getToken();
+      var department =
+          (token != null ? JwtHelper.getDepartment(token) : null)?.trim();
+      final loginUserId = int.tryParse(
+        (token != null ? JwtHelper.getuid(token) : null)?.toString() ?? "",
+      );
+      if ((department == null || department.isEmpty) && loginUserId != null) {
+        try {
+          final details = await SuperAdminService.getAdminDetails(loginUserId);
+          if (details.department.trim().isNotEmpty) {
+            department = details.department.trim();
+          }
+        } catch (_) {}
+      }
+
+      final ownDepartment = department?.trim() ?? "";
+      var users = <UserModel>[];
+      if (ownDepartment.isNotEmpty) {
+        try {
+          users = await AdminService.getEmployeesByDepartments([ownDepartment]);
+        } catch (_) {}
+        final ownKey = ownDepartment.toLowerCase();
+        if (users.isEmpty) {
+          try {
+            final allUsers = await SuperAdminService.getAllUsers();
+            users = allUsers
+                .where(
+                  (user) => user.department.trim().toLowerCase() == ownKey,
+                )
+                .toList();
+          } catch (_) {}
+        } else {
+          users = users
+              .where((user) => user.department.trim().toLowerCase() == ownKey)
+              .toList();
+        }
+      }
+
+      final active = users
+          .where((user) => user.status.toLowerCase() != "inactive")
+          .toList();
+      final assignable = await keepAssignableUsers(active);
+      if (!mounted) return;
+      setState(() {
+        _users = assignable;
+        _loadingUsers = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loadingUsers = false);
+    }
   }
 
   void showTopMessage(String message, {bool isError = true}) {
@@ -50,48 +181,161 @@ class _EditGoalPageState extends State<EditGoalPage> {
     });
   }
 
-  /// ✅ Common Date Picker
   Future<void> _pickDate(TextEditingController controller) async {
-    DateTime? picked = await showDatePicker(
+    final picked = await showDatePicker(
       context: context,
-      initialDate: DateTime.tryParse(controller.text) ?? DateTime.now(),
+      initialDate: TimeUtils.tryParse(controller.text) ?? DateTime.now(),
       firstDate: DateTime(2000),
       lastDate: DateTime(2100),
     );
 
     if (picked != null) {
-      controller.text = DateFormat('yyyy-MM-dd').format(picked);
+      controller.text = TimeUtils.formatDate(picked);
       setState(() {});
     }
   }
 
-  /// ✅ Update
-  Future<void> updateGoal() async {
-    setState(() => isLoading = true);
+  bool _sameIds(Set<int> a, Set<int> b) {
+    if (a.length != b.length) return false;
+    return a.containsAll(b);
+  }
 
-    final data = {
-      "title": goalTitleController.text,
-      "dueDate": goalDueController.text,
-      "priority": selectedPriority,
-    };
-
-    bool success = await SuperAdminService.updateGoal(
-      widget.goal["goalCode"],
-      data,
-    );
-
-    setState(() => isLoading = false);
-    if (success) {
-      showTopMessage("Goal updated successfully", isError: false);
-      await Future.delayed(const Duration(seconds: 1));
-      Navigator.pop(context, {
-        "title": goalTitleController.text,
-        "dueDate": goalDueController.text,
-        "priority": selectedPriority,
-      });
-    } else {
-      showTopMessage("Failed to update goal");
+  String _userName(int id) {
+    for (final user in _users) {
+      if (user.userId == id) return user.name;
     }
+    final raw = widget.goal["assignedUsers"] ?? widget.goal["AssignedUsers"];
+    if (raw is List) {
+      for (final user in raw) {
+        if (user is! Map) continue;
+        final userId = _readInt(user["userId"] ?? user["UserId"] ?? user["id"]);
+        if (userId == id) {
+          return (user["name"] ?? user["Name"] ?? "User $id").toString();
+        }
+      }
+    }
+    return "User $id";
+  }
+
+  Future<void> _pickStaff() async {
+    final picker = StaffPicker(
+      users: _users,
+      selectedIds: _assignedIds,
+      title: "Assign staff",
+    );
+    final result = AppLayout.isMobile(context)
+        ? await showModalBottomSheet<Set<int>>(
+            context: context,
+            isScrollControlled: true,
+            showDragHandle: true,
+            builder: (ctx) => Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.viewInsetsOf(ctx).bottom,
+              ),
+              child: SizedBox(
+                height: MediaQuery.sizeOf(ctx).height * 0.78,
+                child: picker,
+              ),
+            ),
+          )
+        : await showDialog<Set<int>>(
+            context: context,
+            builder: (ctx) => Dialog(
+              insetPadding: const EdgeInsets.symmetric(
+                horizontal: 24,
+                vertical: 24,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: SizedBox(width: 520, height: 620, child: picker),
+            ),
+          );
+    if (result == null || !mounted) return;
+    setState(() {
+      _assignedIds
+        ..clear()
+        ..addAll(result);
+    });
+  }
+
+  Future<void> updateGoal() async {
+    final title = goalTitleController.text.trim();
+    if (title.isEmpty) {
+      showTopMessage("Goal title cannot be empty");
+      return;
+    }
+    final dueDate = TimeUtils.tryParse(goalDueController.text.trim());
+    if (dueDate == null) {
+      showTopMessage("Choose a valid due date");
+      return;
+    }
+
+    final quantityText = quantityController.text.trim();
+    int? targetQuantity;
+    if (quantityText.isNotEmpty) {
+      targetQuantity = int.tryParse(quantityText);
+      if (targetQuantity == null || targetQuantity <= 0) {
+        showTopMessage("Target quantity must be greater than 0");
+        return;
+      }
+    }
+
+    List<int>? assignedUserIds;
+    if (_canEditStaff && !_sameIds(_assignedIds, _originalAssignedIds)) {
+      if (_assignedIds.isEmpty) {
+        showTopMessage("At least one staff member must be assigned");
+        return;
+      }
+      assignedUserIds = _assignedIds.toList();
+    }
+
+    final goalCode = (widget.goal["goalCode"] ?? widget.goal["GoalCode"] ?? "")
+        .toString()
+        .trim();
+    if (goalCode.isEmpty) {
+      showTopMessage("Goal code is missing");
+      return;
+    }
+
+    setState(() => isLoading = true);
+    final error = await SuperAdminService.updateGoal(
+      goalCode: goalCode,
+      title: title,
+      priority: selectedPriority,
+      dueDate: dueDate,
+      targetQuantity: targetQuantity,
+      assignedUserIds: assignedUserIds,
+    );
+    if (!mounted) return;
+    setState(() => isLoading = false);
+
+    if (error != null) {
+      showTopMessage(error);
+      return;
+    }
+
+    showTopMessage("Goal updated successfully", isError: false);
+    await Future.delayed(const Duration(seconds: 1));
+    if (!mounted) return;
+    Navigator.pop(context, {
+      "title": title,
+      "dueDate": dueDate.toIso8601String(),
+      "priority": selectedPriority,
+      "targetQuantity": targetQuantity ??
+          _readInt(
+            widget.goal["targetQuantity"] ?? widget.goal["TargetQuantity"],
+          ),
+      if (assignedUserIds != null)
+        "assignedUsers": assignedUserIds
+            .map(
+              (id) => {
+                "userId": id,
+                "name": _userName(id),
+              },
+            )
+            .toList(),
+    });
   }
 
   @override
@@ -111,6 +355,7 @@ class _EditGoalPageState extends State<EditGoalPage> {
                   context,
                   goalTitleController,
                   hint: "Enter goal title",
+                  maxLines: 1,
                 ),
                 const SizedBox(height: 20),
                 CustomFormWidgets.label(context, "Start Date"),
@@ -133,18 +378,84 @@ class _EditGoalPageState extends State<EditGoalPage> {
                 CustomFormWidgets.dropdown(
                   context: context,
                   value: selectedPriority,
-                  items: ["Normal", "Medium", "High"],
+                  items: _priorities,
                   onChanged: (v) => setState(() => selectedPriority = v),
                   hint: "Select Priority",
                 ),
+                const SizedBox(height: 20),
+                CustomFormWidgets.label(context, "Target quantity"),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: quantityController,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  style: Theme.of(context).textTheme.headlineMedium,
+                  decoration: InputDecoration(
+                    hintText: "Optional. Leave blank if this goal has no quantity",
+                    hintStyle: Theme.of(context).textTheme.headlineSmall,
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(
+                      vertical: 12,
+                      horizontal: 12,
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(
+                        color: Color.fromARGB(255, 25, 77, 38),
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(
+                        color: Color.fromARGB(255, 25, 77, 38),
+                      ),
+                    ),
+                  ),
+                ),
+                if (_canEditStaff) ...[
+                  const SizedBox(height: 20),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: CustomFormWidgets.label(context, "Assigned staff"),
+                      ),
+                      TextButton.icon(
+                        onPressed: _loadingUsers ? null : _pickStaff,
+                        icon: const Icon(Icons.person_add_alt_1, size: 18),
+                        label: const Text("Add or change"),
+                      ),
+                    ],
+                  ),
+                  Text(
+                    "Tap × on a person to remove them. At least one person must stay assigned.",
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                  ),
+                  const SizedBox(height: 8),
+                  if (_loadingUsers)
+                    const LinearProgressIndicator(minHeight: 2)
+                  else if (_assignedIds.isEmpty)
+                    Text(
+                      "No staff assigned",
+                      style: TextStyle(color: Colors.grey.shade600),
+                    )
+                  else
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: _assignedIds.map((id) {
+                        return InputChip(
+                          label: Text(_userName(id)),
+                          onDeleted: () => setState(() => _assignedIds.remove(id)),
+                        );
+                      }).toList(),
+                    ),
+                ],
                 const SizedBox(height: 30),
-
                 Center(
                   child: AppButton(
                     text: "Update Goal",
                     isLoading: isLoading,
                     onPressed: isLoading ? null : updateGoal,
-
                     color: Theme.of(context).colorScheme.secondary,
                     txtcolor: Theme.of(context).colorScheme.onPrimary,
                   ),
@@ -153,9 +464,9 @@ class _EditGoalPageState extends State<EditGoalPage> {
             ),
             if (_showTopMessage && _topMessage != null)
               Positioned(
-                top: _showTopMessage ? 40 : -120,
-                left: 16,
-                right: 16,
+                top: 8,
+                left: 0,
+                right: 0,
                 child: Msgsnackbar(
                   context,
                   message: _topMessage!,

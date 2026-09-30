@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:staff_work_track/core/responsive/app_layout.dart';
+import 'package:staff_work_track/core/theme/web_theme.dart';
 import 'package:staff_work_track/core/widgets/buttons.dart';
 import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
 import 'package:staff_work_track/services/announ_service.dart';
@@ -127,6 +129,131 @@ class _SendWarningPageState extends State<SendWarningPage> {
 
   @override
   Widget build(BuildContext context) {
+    final isWeb = !AppLayout.isMobile(context);
+    final form = Stack(
+      children: [
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: isWeb
+                    ? const Color(0xFFFFF1F2)
+                    : const Color.fromARGB(255, 244, 208, 213),
+                borderRadius: BorderRadius.circular(16),
+                border: isWeb
+                    ? Border.all(color: const Color(0xFFFECACA))
+                    : null,
+              ),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 15,
+                    backgroundColor: Colors.red,
+                    child: const Icon(
+                      Icons.warning_rounded,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Text(
+                      "Send official warning to ${widget.receivername}",
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Colors.red,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 28),
+            const Text(
+              "Warning Title",
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: titleController,
+              decoration: InputDecoration(
+                hintText: "Enter warning title",
+                hintStyle: Theme.of(context).textTheme.labelSmall,
+                filled: isWeb,
+                fillColor: isWeb ? WebTheme.canvasOf(context) : null,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide(color: Colors.grey.shade300),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              "Message",
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: messageController,
+              maxLines: 4,
+              decoration: InputDecoration(
+                hintText: "Explain the reason clearly...",
+                hintStyle: Theme.of(context).textTheme.labelSmall,
+                filled: isWeb,
+                fillColor: isWeb ? WebTheme.canvasOf(context) : null,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide(color: Colors.grey.shade300),
+                ),
+              ),
+            ),
+            const SizedBox(height: 26),
+            const Text(
+              "Severity Level",
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                severityCard("Low", Icons.info_outline),
+                const SizedBox(width: 10),
+                severityCard("Medium", Icons.error_outline),
+                const SizedBox(width: 10),
+                severityCard("High", Icons.warning_amber_rounded),
+              ],
+            ),
+            const SizedBox(height: 40),
+            Center(
+              child: AppButton(
+                text: "Send",
+                isLoading: isLoading,
+                onPressed: isLoading ? null : sendWarning,
+                color: Theme.of(context).colorScheme.error,
+                txtcolor: Colors.white,
+              ),
+            ),
+          ],
+        ),
+        if (_topMessage != null)
+          AnimatedPositioned(
+            top: _showTopMessage ? 0 : -120,
+            left: 16,
+            right: 16,
+            duration: const Duration(milliseconds: 300),
+            child: Msgsnackbar(
+              context,
+              message: _topMessage!,
+              isError: _isErrorMessage,
+              backgroundColor: Theme.of(context).colorScheme.primary,
+              iconColor: Theme.of(context).colorScheme.onPrimary,
+              textColor: Theme.of(context).colorScheme.onPrimary,
+            ),
+          ),
+      ],
+    );
+
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
@@ -135,131 +262,23 @@ class _SendWarningPageState extends State<SendWarningPage> {
         ),
         title: const Text("Send Warning"),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Stack(
-          children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(18),
-                  decoration: BoxDecoration(
-                    color: const Color.fromARGB(255, 244, 208, 213),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Row(
-                    children: [
-                      CircleAvatar(
-                        radius: 15,
-                        backgroundColor: Colors.red,
-                        child: const Icon(
-                          Icons.warning_rounded,
-                          color: Colors.white,
-                        ),
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Text(
-                          "Send official warning to ${widget.receivername}",
-                          style: const TextStyle(
-                            fontSize: 14,
-                            color: Colors.red,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 28),
-
-                const Text(
-                  "Warning Title",
-                  style: TextStyle(fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: titleController,
-                  decoration: InputDecoration(
-                    hintText: "Enter warning title",
-                    hintStyle: Theme.of(context,).textTheme.labelSmall,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14),
-                      borderSide: BorderSide(color: Colors.grey.shade300),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isWeb ? 640 : double.infinity),
+          child: SingleChildScrollView(
+            padding: EdgeInsets.all(isWeb ? 28 : 20),
+            child: isWeb
+                ? Container(
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: WebTheme.surfaceOf(context),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: WebTheme.lineOf(context)),
                     ),
-                  ),
-                ),
-
-                const SizedBox(height: 20),
-
-                /// Message
-                const Text(
-                  "Message",
-                  style: TextStyle(fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: messageController,
-                  maxLines: 4,
-                  decoration: InputDecoration(
-                    hintText: "Explain the reason clearly...",
-                    hintStyle: Theme.of(context).textTheme.labelSmall,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14),
-                      borderSide: BorderSide(color: Colors.grey.shade300),
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 26),
-
-                /// Severity
-                const Text(
-                  "Severity Level",
-                  style: TextStyle(fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(height: 12),
-
-                Row(
-                  children: [
-                    severityCard("Low", Icons.info_outline),
-                    const SizedBox(width: 10),
-                    severityCard("Medium", Icons.error_outline),
-                    const SizedBox(width: 10),
-                    severityCard("High", Icons.warning_amber_rounded),
-                  ],
-                ),
-
-                const SizedBox(height: 40),
-                Center(
-                  child: AppButton(
-                    text: "Send",
-                    isLoading: isLoading,
-                    onPressed: isLoading ? null : sendWarning,
-                    color: Theme.of(context).colorScheme.error,
-                    txtcolor: Colors.white,
-                  ),
-                ),
-              ],
-            ),
-            if (_topMessage != null)
-              AnimatedPositioned(
-                top: _showTopMessage ? 0 : -120,
-                left: 16,
-                right: 16,
-                duration: const Duration(milliseconds: 300),
-                child: Msgsnackbar(
-                  context,
-                  message: _topMessage!,
-                  isError: _isErrorMessage,
-                  backgroundColor: Theme.of(context).colorScheme.primary,
-                  iconColor: Theme.of(context).colorScheme.onPrimary,
-                  textColor: Theme.of(context).colorScheme.onPrimary,
-                ),
-              ),
-          ],
+                    child: form,
+                  )
+                : form,
+          ),
         ),
       ),
     );

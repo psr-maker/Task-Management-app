@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
+import 'package:staff_work_track/core/theme/web_theme.dart';
 
 class AppButton extends StatefulWidget {
   final String text;
@@ -26,8 +27,11 @@ class _AppButtonState extends State<AppButton> {
   Widget build(BuildContext context) {
     return ElevatedButton(
       style: ElevatedButton.styleFrom(
-        backgroundColor: widget.color,
-        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 30),
+        backgroundColor: widget.color ?? WebTheme.brand,
+        foregroundColor: widget.txtcolor ?? Colors.white,
+        elevation: 0,
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 28),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
       onPressed: widget.isLoading ? null : widget.onPressed,
       child: widget.isLoading

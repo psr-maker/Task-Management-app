@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:staff_work_track/core/constant/apiurl.dart';
-import 'package:staff_work_track/core/widgets/loading.dart';
+import 'package:staff_work_track/core/responsive/app_layout.dart';
 import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
-import 'package:staff_work_track/screen/staff/navigation/fullimg.dart';
+import 'package:staff_work_track/core/widgets/web_ui.dart';
+import 'package:staff_work_track/core/widgets/worklog_session_tile.dart';
 import 'package:staff_work_track/screen/staff/navigation/worklog/addworklog.dart';
+import 'package:staff_work_track/screen/staff/navigation/worklog/checkout_worklog.dart';
 import 'package:staff_work_track/core/widgets/buttons.dart';
 import 'package:staff_work_track/screen/staff/navigation/worklog/offline_worklogs.dart';
 import 'package:staff_work_track/services/announ_service.dart';
@@ -68,7 +69,17 @@ class _WorklogState extends State<Worklog> {
   double totalDuration() {
     double total = 0;
     for (var log in logs) {
-      total += log["totalHours"] ?? 0;
+      final inRaw = log["time"];
+      final outRaw = log["outTime"];
+      if (inRaw == null || outRaw == null || outRaw.toString().isEmpty) {
+        continue;
+      }
+      try {
+        final start = TimeUtils.fromUtcIso8601(inRaw.toString());
+        final end = TimeUtils.fromUtcIso8601(outRaw.toString());
+        final minutes = end.difference(start).inMinutes;
+        if (minutes > 0) total += minutes / 60.0;
+      } catch (_) {}
     }
     return total;
   }
@@ -222,15 +233,60 @@ class _WorklogState extends State<Worklog> {
     );
   }
 
+  Future<void> _checkOut(Map<String, dynamic> log) async {
+    final rawId = log["id"];
+    if (rawId == null) return;
+    final id = rawId is int ? rawId : int.tryParse(rawId.toString());
+    if (id == null) return;
+
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => CheckoutWorklogPage(
+          workLogId: id,
+          title: (log["title"] ?? "").toString(),
+        ),
+      ),
+    );
+
+    if (result == 'local') {
+      showTopMessage('Your check out saved locally.', isError: false);
+      return;
+    }
+
+    if (result == true) {
+      await _loadLogs();
+    }
+  }
+
   Future<void> _addWorklog() async {
     final result = await Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => const AddWorklogPage()),
     );
 
-    if (result == true) {
+    if (!mounted || result == null) return;
+
+    if (result == "local") {
+      showTopMessage("Your worklog saved locally.", isError: false);
+      return;
+    }
+
+    if (result == "cloud") {
+      showTopMessage(
+        "Check in saved. Check out later from this worklog.",
+        isError: false,
+      );
       await _loadLogs();
     }
+  }
+
+  Future<void> _openLocalWorklogs() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const OfflineWorkLogs()),
+    );
+    if (mounted) await _loadLogs();
   }
 
   Future<void> _loadLogs() async {
@@ -240,15 +296,20 @@ class _WorklogState extends State<Worklog> {
       final data = await AnnouncementService.getMyWorkLogs(selectedDate);
 
       setState(() {
-        logs = data.map((item) {
+        logs = pairWorkLogs(data, singleUser: true).map((item) {
           return {
             "description": item["description"],
             "title": item["title"],
             "status": item["status"],
             "id": item["id"],
             "imageUrl": item["imageUrl"],
+            "outImageUrl": item["outImageUrl"],
             "workType": item["workType"],
             "time": item["time"],
+            "outTime": item["outTime"],
+            "locationName": item["locationName"],
+            "outLocationName": item["outLocationName"],
+            "workDate": item["workDate"],
           };
         }).toList();
       });
@@ -320,50 +381,62 @@ class _WorklogState extends State<Worklog> {
   }
 
   bool get canSubmit => logs.any((log) => log["status"] == "Draft");
-  String _formatTime(String value) {
-    try {
-      // Use TimeUtils to properly convert UTC to local
-      final localDateTime = TimeUtils.fromUtcIso8601(value);
-      return DateFormat('HH:mm:ss').format(localDateTime);
-    } catch (_) {
-      return value;
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
+    final isWeb = !AppLayout.isMobile(context);
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("Daily Worklog"),
-        actions: [
-          IconButton(
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const OfflineWorkLogs(),
+      appBar: isWeb
+          ? null
+          : AppBar(
+              title: const Text("Daily Worklog"),
+              actions: [
+                IconButton(
+                  tooltip: "Local worklogs",
+                  onPressed: _openLocalWorklogs,
+                  icon: const Icon(Icons.phone_android),
                 ),
-              );
-            },
-            icon: Icon(Icons.upload),
-          ),
-          if (logs.isNotEmpty)
-            TextButton(
-              onPressed: canSubmit ? _submitDrafts : null,
-              child: Text(
-                appBarButtonText,
-                style: Theme.of(context).textTheme.labelLarge,
-              ),
+                if (logs.isNotEmpty)
+                  TextButton(
+                    onPressed: canSubmit ? _submitDrafts : null,
+                    child: Text(
+                      appBarButtonText,
+                      style: Theme.of(context).textTheme.labelLarge,
+                    ),
+                  ),
+              ],
             ),
-        ],
-      ),
       body: Padding(
-        padding: const EdgeInsets.all(15),
+        padding: isWeb
+            ? AppLayout.pagePadding(context)
+            : const EdgeInsets.all(15),
         child: Stack(
           children: [
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                if (isWeb) ...[
+                  Row(
+                    children: [
+                      const WebPageHeader(
+                        title: 'Worklog',
+                        subtitle: 'Daily hours and timeline',
+                      ),
+                      const Spacer(),
+                      IconButton(
+                        tooltip: 'Local worklogs',
+                        onPressed: _openLocalWorklogs,
+                        icon: const Icon(Icons.phone_android),
+                      ),
+                      if (logs.isNotEmpty)
+                        TextButton(
+                          onPressed: canSubmit ? _submitDrafts : null,
+                          child: Text(appBarButtonText),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                ],
                 _weekHeader(),
                 SizedBox(height: 10),
                 _totalHours(),
@@ -415,7 +488,7 @@ class _WorklogState extends State<Worklog> {
                   ),
                   SizedBox(height: 5),
                   Text(
-                    DateFormat('dd MMM yyyy').format(selectedDate),
+                    TimeUtils.formatDate(selectedDate),
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                 ],
@@ -493,193 +566,19 @@ class _WorklogState extends State<Worklog> {
 
   Widget _timelineLogs() {
     if (logs.isEmpty) {
-      return const Center(child: Text("No worklogs yet."));
+      return const Center(child: Text('No worklogs yet.'));
     }
 
     return ListView.builder(
-      padding: const EdgeInsets.only(bottom: 20),
+      padding: const EdgeInsets.only(bottom: 80),
       itemCount: logs.length,
       itemBuilder: (context, index) {
         final log = logs[index];
-
-        final String workType = (log["workType"] ?? "")
-            .toString()
-            .toUpperCase();
-
-        final String time = log["time"] != null
-            ? _formatTime(log["time"].toString())
-            : "--:--";
-
-        final String workTitle = (log["workTitle"] ?? log["title"] ?? "")
-            .toString();
-
-        final String description = (log["description"] ?? "").toString();
-
-        final String? imageUrl = log["imageUrl"]?.toString();
-
-        final bool isIn = workType == "IN";
-
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // ==============================
-            // TIME + IN / OUT
-            // ==============================
-            SizedBox(
-              width: 60,
-              child: Column(
-                children: [
-                  Text(
-                    time,
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.titleSmall,
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(width: 8),
-
-            // ==============================
-            // TIMELINE
-            // ==============================
-            SizedBox(
-              width: 10,
-              child: Column(
-                children: [
-                  Container(
-                    width: 10,
-                    height: 10,
-                    decoration: BoxDecoration(
-                      color: isIn
-                          ? Theme.of(context).colorScheme.secondary
-                          : Colors.orange,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-
-                  if (index != logs.length - 1)
-                    Container(
-                      width: 2,
-                      height: 150,
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.primary.withOpacity(.25),
-                    ),
-                ],
-              ),
-            ),
-
-            const SizedBox(width: 10),
-
-            // ==============================
-            // WORKLOG CARD
-            // ==============================
-            Expanded(
-              child: Card(
-                margin: const EdgeInsets.only(bottom: 15),
-                color: Theme.of(context).colorScheme.background,
-                elevation: 1,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(15),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // WORK TYPE + TIME
-                      Row(
-                        children: [
-                          Icon(
-                            isIn ? Icons.login_rounded : Icons.logout_rounded,
-                            size: 20,
-                            color: isIn
-                                ? Theme.of(context).colorScheme.primary
-                                : Colors.orange,
-                          ),
-
-                          const SizedBox(width: 8),
-
-                          Text(
-                            isIn ? "Check In" : "Check Out",
-                            style: Theme.of(context).textTheme.titleMedium
-                                ?.copyWith(fontWeight: FontWeight.bold),
-                          ),
-                        ],
-                      ),
-
-                      const SizedBox(height: 12),
-
-                      // WORK TITLE
-                      if (workTitle.isNotEmpty)
-                        Text(
-                          workTitle,
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
-
-                      // DESCRIPTION
-                      if (description.isNotEmpty) ...[
-                        const SizedBox(height: 6),
-
-                        Text(
-                          description,
-                          style: Theme.of(context).textTheme.labelMedium,
-                        ),
-                      ],
-
-                      // IMAGE
-                      if (imageUrl != null && imageUrl.isNotEmpty) ...[
-                        const SizedBox(height: 12),
-
-                        GestureDetector(
-                          onTap: () {
-                            final fullUrl = "${ApiConstants.Uploaded}$imageUrl";
-
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) =>
-                                    FullScreenImageViewer(imageUrl: fullUrl),
-                              ),
-                            );
-                          },
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(10),
-                            child: SizedBox(
-                              height: 150,
-                              width: double.infinity,
-                              child: Image.network(
-                                "${ApiConstants.Uploaded}$imageUrl",
-                                fit: BoxFit.cover,
-
-                                loadingBuilder:
-                                    (context, child, loadingProgress) {
-                                      if (loadingProgress == null) {
-                                        return child;
-                                      }
-
-                                      return const Center(
-                                        child: RotatingFlower(),
-                                      );
-                                    },
-
-                                errorBuilder: (context, error, stackTrace) {
-                                  return const Center(
-                                    child: Icon(Icons.broken_image, size: 40),
-                                  );
-                                },
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ],
+        final hasOut = (log['outImageUrl'] ?? '').toString().isNotEmpty ||
+            (log['outTime'] ?? '').toString().isNotEmpty;
+        return WorklogSessionTile(
+          log: log,
+          onCheckOut: hasOut ? null : () => _checkOut(log),
         );
       },
     );

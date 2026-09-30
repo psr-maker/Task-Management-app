@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:staff_work_track/core/widgets/load_error.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
 import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
 import 'package:staff_work_track/utils/app_helper.dart';
@@ -100,9 +101,7 @@ class _NotificationPageState extends State<NotificationPage> {
                       }
 
                       if (snapshot.hasError) {
-                        return const Center(
-                          child: Text("Error loading notifications"),
-                        );
+                        return const AppLoadError();
                       }
 
                       if (!snapshot.hasData || snapshot.data!.isEmpty) {

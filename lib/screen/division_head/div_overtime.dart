@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
-import 'package:staff_work_track/core/constant/division_config.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
+import 'package:staff_work_track/core/widgets/web_ui.dart';
+import 'package:staff_work_track/services/admin_service.dart';
 import 'package:staff_work_track/services/overtime_service.dart';
+import 'package:staff_work_track/utils/role_hierarchy.dart';
+import 'package:staff_work_track/utils/time_utils.dart';
 
 class DivOvertime extends StatefulWidget {
   final String department;
@@ -14,29 +16,27 @@ class DivOvertime extends StatefulWidget {
 
 class _DivOvertimeState extends State<DivOvertime> {
   bool isLoading = true;
-  late String selectedDepartment;
+  String selectedDepartment = "";
+  List<String> departments = [];
   List<Map<String, dynamic>> overtimes = [];
-
-  List<String> get departments =>
-      DivisionConfig.childDepartments(widget.department);
 
   @override
   void initState() {
     super.initState();
-    selectedDepartment = _defaultDepartment();
-    _loadData();
+    _loadDepartments();
   }
 
-  String _defaultDepartment() {
-    final children = departments;
-    final purchase = children.where(
-      (dept) => DivisionConfig.isAllowedDepartment(dept, [
-        "Purchase Department",
-      ]),
-    );
-    if (purchase.isNotEmpty) return purchase.first;
-    if (children.isNotEmpty) return children.first;
-    return widget.department;
+  Future<void> _loadDepartments() async {
+    List<String> names = [];
+    try {
+      names = await AdminService.getMySubDepartments();
+    } catch (_) {}
+    if (!mounted) return;
+    setState(() {
+      departments = names;
+      selectedDepartment = names.isNotEmpty ? names.first : widget.department;
+    });
+    await _loadData();
   }
 
   dynamic _field(Map<String, dynamic> item, List<String> keys) {
@@ -55,13 +55,34 @@ class _DivOvertimeState extends State<DivOvertime> {
   }
 
   String _statusOf(Map<String, dynamic> item) {
+    final managerStatus = (_field(item, ["managerStatus"]) ?? "")
+        .toString()
+        .trim()
+        .toLowerCase();
+    if (managerStatus == "approved") return "Approved";
+    if (managerStatus == "rejected") return "Rejected";
+
+    final staffStatus = (_field(item, ["staffStatus"]) ?? "")
+        .toString()
+        .trim()
+        .toLowerCase();
+    if (staffStatus == "accepted" && managerStatus == "pending") {
+      return "Waiting for Manager";
+    }
+    if (staffStatus == "rejected") return "Rejected";
+
     final status = (_field(item, ["status"]) ?? "").toString().trim();
-    if (status.isNotEmpty) return status;
+    if (status.isNotEmpty && status.toLowerCase() != "pending") return status;
+
     final approved = _field(item, ["isApproved", "approved"]);
     if (approved == true || approved.toString().toLowerCase() == "true") {
       return "Approved";
     }
     return "Pending";
+  }
+
+  bool _isApproved(Map<String, dynamic> item) {
+    return _statusOf(item).toLowerCase() == "approved";
   }
 
   Future<void> _selectDepartment(String department) async {
@@ -77,10 +98,16 @@ class _DivOvertimeState extends State<DivOvertime> {
       final result = await OvertimeService.getOvertimeByDepartments([
         selectedDepartment,
       ]);
+      final eligibility = await loadOvertimeEligibility();
 
       if (!mounted) return;
       setState(() {
-        overtimes = result;
+        overtimes = result
+            .where(
+              (item) =>
+                  !eligibility.excludesRecord(item) && _isApproved(item),
+            )
+            .toList();
         isLoading = false;
       });
     } catch (_) {
@@ -136,28 +163,11 @@ class _DivOvertimeState extends State<DivOvertime> {
   }
 
   String _formatDate(dynamic value) {
-    if (value == null) return "-";
-    final parsed = DateTime.tryParse(value.toString());
-    if (parsed == null) return value.toString();
-    return DateFormat("dd MMM yyyy").format(parsed);
+    return TimeUtils.formatDateValue(value, empty: "-");
   }
 
   String _formatTime(dynamic value) {
-    if (value == null || value.toString().isEmpty) return "--:--";
-    final text = value.toString();
-    try {
-      if (text.contains("T") || text.contains("-")) {
-        final parsed = DateTime.tryParse(text);
-        if (parsed != null) {
-          return DateFormat("HH:mm").format(parsed.toLocal());
-        }
-      }
-      final parsed = DateFormat("HH:mm:ss").parse(text);
-      return DateFormat("HH:mm").format(parsed);
-    } catch (_) {}
-    final parts = text.split(":");
-    if (parts.length >= 2) return "${parts[0]}:${parts[1]}";
-    return text;
+    return TimeUtils.formatTime12(value, empty: "--:--");
   }
 
   String _formatHours(dynamic value) {
@@ -178,47 +188,54 @@ class _DivOvertimeState extends State<DivOvertime> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: WebPushedChrome.background(context),
       appBar: AppBar(
-        title: const Text("Overtime"),
+        title: WebPushedChrome.isWeb(context) ? null : const Text("Overtime"),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios),
           onPressed: () => Navigator.pop(context),
         ),
       ),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(10, 12, 10, 0),
-            child: SizedBox(
-              height: 34,
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                children: departments.map(_buildDeptChip).toList(),
+      body: WebPushedChrome.body(
+        context,
+        title: 'Overtime',
+        subtitle: 'Division overtime by department',
+        panel: false,
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(10, 12, 10, 0),
+              child: SizedBox(
+                height: 34,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  children: departments.map(_buildDeptChip).toList(),
+                ),
               ),
             ),
-          ),
-          const SizedBox(height: 8),
-          Expanded(
-            child: isLoading
-                ? const Center(child: RotatingFlower())
-                : overtimes.isEmpty
-                ? Center(
-                    child: Text(
-                      "No overtime found for $selectedDepartment",
-                      textAlign: TextAlign.center,
+            const SizedBox(height: 8),
+            Expanded(
+              child: isLoading
+                  ? const Center(child: RotatingFlower())
+                  : overtimes.isEmpty
+                  ? Center(
+                      child: Text(
+                        "No approved overtime for $selectedDepartment",
+                        textAlign: TextAlign.center,
+                      ),
+                    )
+                  : RefreshIndicator(
+                      onRefresh: _loadData,
+                      child: ListView.builder(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: const EdgeInsets.all(15),
+                        itemCount: overtimes.length,
+                        itemBuilder: (context, index) => _card(overtimes[index]),
+                      ),
                     ),
-                  )
-                : RefreshIndicator(
-                    onRefresh: _loadData,
-                    child: ListView.builder(
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      padding: const EdgeInsets.all(15),
-                      itemCount: overtimes.length,
-                      itemBuilder: (context, index) => _card(overtimes[index]),
-                    ),
-                  ),
-          ),
-        ],
+            ),
+          ],
+        ),
       ),
     );
   }

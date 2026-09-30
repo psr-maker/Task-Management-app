@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
+import 'package:staff_work_track/core/responsive/app_layout.dart';
+import 'package:staff_work_track/core/theme/web_theme.dart';
+import 'package:staff_work_track/core/widgets/empty_state.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
 import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
 import 'package:staff_work_track/services/superadmin_service.dart';
+import 'package:staff_work_track/utils/time_utils.dart';
 
 class TaskRemovalRequest extends StatefulWidget {
   const TaskRemovalRequest({super.key});
@@ -108,6 +111,7 @@ class _TaskRemovalRequestState extends State<TaskRemovalRequest> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: WebTheme.canvasOf(context),
       appBar: AppBar(
         leading: IconButton(
           onPressed: () {
@@ -120,210 +124,183 @@ class _TaskRemovalRequestState extends State<TaskRemovalRequest> {
       body: loading
           ? const Center(child: RotatingFlower())
           : Padding(
-              padding: const EdgeInsets.all(15),
+              padding: AppLayout.pagePadding(context),
               child: Stack(
                 children: [
                   Column(
                     children: [
                       Container(
-                        padding: const EdgeInsets.all(12),
+                        padding: const EdgeInsets.all(14),
                         decoration: BoxDecoration(
-                          color: Colors.orange.shade50,
-                          borderRadius: BorderRadius.circular(12),
+                          color: const Color(0xFFFFF7ED),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: const Color(0xFFFED7AA)),
                         ),
-                        child: Row(
+                        child: const Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Icon(
+                            Icon(
                               Icons.warning_amber_rounded,
-                              color: Colors.orange,
-                              size: 24,
+                              color: Color(0xFFC2410C),
+                              size: 22,
                             ),
-                            const SizedBox(width: 10),
+                            SizedBox(width: 10),
                             Expanded(
                               child: Text(
-                                "Approving this request will apply penalty points to the user. This action cannot be undone.",
+                                'Approving a request applies penalty points. That action cannot be undone.',
                                 style: TextStyle(
-                                  color: Colors.orange.shade800,
+                                  color: Color(0xFF9A3412),
                                   fontWeight: FontWeight.w600,
-                                  fontSize: 12,
+                                  fontSize: 13,
+                                  height: 1.35,
                                 ),
                               ),
                             ),
                           ],
                         ),
                       ),
-                      SizedBox(height: 15),
+                      const SizedBox(height: 14),
                       Expanded(
-                        child: ListView.builder(
+                        child: data.isEmpty
+                            ? const AppEmptyState(
+                                icon: Icons.assignment_turned_in_outlined,
+                                title: 'No removal requests',
+                                message: 'Pending task removals will show here.',
+                              )
+                            : ListView.separated(
                           itemCount: data.length,
+                          separatorBuilder: (_, _) => const SizedBox(height: 12),
                           itemBuilder: (context, index) {
                             final item = data[index];
+                            final name = (item['userName'] ?? 'Staff').toString();
+                            final initial = name.trim().isEmpty
+                                ? '?'
+                                : name.trim()[0].toUpperCase();
 
-                            return Card(
-                              elevation: 4,
-                              shape: RoundedRectangleBorder(
-                                side: BorderSide(
-                                  color: Color.fromARGB(255, 15, 35, 20),
-                                  width: 1,
-                                ),
+                            return Container(
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: WebTheme.surfaceOf(context),
                                 borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: WebTheme.lineOf(context)),
                               ),
-                              child: Padding(
-                                padding: const EdgeInsets.all(16),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        CircleAvatar(
-                                          radius: 15,
-                                          child: Text(
-                                            item["userName"][0].toUpperCase(),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      CircleAvatar(
+                                        radius: 18,
+                                        backgroundColor: WebTheme.brandSoftOf(context),
+                                        child: Text(
+                                          initial,
+                                          style: const TextStyle(
+                                            color: WebTheme.brand,
+                                            fontWeight: FontWeight.w800,
                                           ),
                                         ),
-                                        const SizedBox(width: 12),
-                                        Expanded(
-                                          child: Text(
-                                            item["userName"],
-                                            style: Theme.of(
-                                              context,
-                                            ).textTheme.displaySmall,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-
-                                    const SizedBox(height: 12),
-                                    Text(
-                                      item["taskName"],
-                                      style: Theme.of(
-                                        context,
-                                      ).textTheme.bodyMedium,
-                                    ),
-                                    const SizedBox(height: 12),
-                                    Row(
-                                      children: [
-                                        const Icon(Icons.person, size: 18),
-                                        const SizedBox(width: 8),
-                                        Expanded(
-                                          child: Text(
-                                            "Removed By: ${item["removedByName"]}",
-                                            style: Theme.of(
-                                              context,
-                                            ).textTheme.labelMedium,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-
-                                    const SizedBox(height: 8),
-
-                                    Row(
-                                      children: [
-                                        const Icon(
-                                          Icons.calendar_month,
-                                          size: 18,
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Expanded(
-                                          child: Text(
-                                            DateFormat('yyyy-MM-dd').format(
-                                              DateTime.parse(
-                                                item["removedDate"],
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              name,
+                                              style: TextStyle(
+                                                color: WebTheme.inkOf(context),
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.w700,
                                               ),
                                             ),
-                                            style: Theme.of(
-                                              context,
-                                            ).textTheme.labelMedium,
-                                          ),
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              TimeUtils.formatDateValue(item['removedDate']),
+                                              style: TextStyle(
+                                                color: WebTheme.mutedOf(context),
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                          ],
                                         ),
-                                      ],
-                                    ),
-
-                                    const SizedBox(height: 15),
-                                    Text(
-                                      "Removal Reason",
-                                      style: Theme.of(
-                                        context,
-                                      ).textTheme.labelMedium,
-                                    ),
-                                    const SizedBox(height: 5),
-                                    Container(
-                                      width: double.infinity,
-                                      padding: const EdgeInsets.all(12),
-                                      decoration: BoxDecoration(
-                                        color: Theme.of(context).colorScheme.background,
-                                        borderRadius: BorderRadius.circular(12),
                                       ),
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            item["reason"] ?? "-",
-                                            style: Theme.of(
-                                              context,
-                                            ).textTheme.labelMedium,
-                                          ),
-                                        ],
+                                    ],
+                                  ),
+                                  const SizedBox(height: 14),
+                                  Text(
+                                    (item['taskName'] ?? '-').toString(),
+                                    style: TextStyle(
+                                      color: WebTheme.inkOf(context),
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Removed by ${(item['removedByName'] ?? '-').toString()}',
+                                    style: TextStyle(
+                                      color: WebTheme.mutedOf(context),
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  Container(
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                      color: WebTheme.brandSoftOf(context),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Text(
+                                      (item['reason'] ?? '-').toString(),
+                                      style: TextStyle(
+                                        color: WebTheme.inkOf(context),
+                                        fontSize: 13,
+                                        height: 1.4,
                                       ),
                                     ),
-
-                                    const SizedBox(height: 10),
-                                    Row(
-                                      children: [
-                                        Expanded(
-                                          child: OutlinedButton.icon(
-                                            onPressed: () async {
-                                              final confirm =
-                                                  await _showConfirmDialog(
-                                                    context,
-                                                    title: "No",
-                                                    message:
-                                                        "This will remove task without applying penalty. Continue?",
-                                                  );
-
-                                              if (confirm != true) return;
-
-                                              await _processRequest(
-                                                item,
-                                                applyPenalty: false,
-                                              );
-                                            },
-                                            icon: const Icon(Icons.close),
-                                            label: const Text("No"),
-                                          ),
+                                  ),
+                                  const SizedBox(height: 14),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: OutlinedButton(
+                                          onPressed: () async {
+                                            final confirm = await _showConfirmDialog(
+                                              context,
+                                              title: 'Remove without penalty',
+                                              message: 'This removes the person from the task and does not apply penalty points. Continue?',
+                                            );
+                                            if (confirm != true) return;
+                                            await _processRequest(item, applyPenalty: false);
+                                          },
+                                          child: const Text('No penalty'),
                                         ),
-
-                                        const SizedBox(width: 12),
-
-                                        Expanded(
-                                          child: ElevatedButton.icon(
-                                            onPressed: () async {
-                                              final confirm =
-                                                  await _showConfirmDialog(
-                                                    context,
-                                                    title: "Apply",
-                                                    message:
-                                                        "Penalty points will be applied based on task priority. Continue?",
-                                                  );
-
-                                              if (confirm != true) return;
-
-                                              await _processRequest(
-                                                item,
-                                                applyPenalty: true,
-                                              );
-                                            },
-                                            icon: const Icon(Icons.gavel),
-                                            label: const Text("Apply"),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: ElevatedButton(
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: WebTheme.brand,
+                                            foregroundColor: Colors.white,
                                           ),
+                                          onPressed: () async {
+                                            final confirm = await _showConfirmDialog(
+                                              context,
+                                              title: 'Apply penalty',
+                                              message: 'Penalty points will be applied based on task priority. Continue?',
+                                            );
+                                            if (confirm != true) return;
+                                            await _processRequest(item, applyPenalty: true);
+                                          },
+                                          child: const Text('Apply penalty'),
                                         ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
                               ),
                             );
                           },

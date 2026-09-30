@@ -120,7 +120,7 @@ class AnnouncementService {
     }
   }
 
- static Future<void> addWorkLog({
+ static Future<int> addWorkLog({
   required String title,
   required String workType, // IN / OUT
   required String description,
@@ -200,7 +200,61 @@ class AnnouncementService {
   }
 
   print("WORKLOG SUCCESS: ${response.body}");
+
+  final decoded = jsonDecode(response.body);
+  final rawId = decoded is Map ? decoded['id'] : null;
+  if (rawId == null) {
+    throw Exception("Worklog saved but id was missing");
+  }
+  return rawId is int ? rawId : int.parse(rawId.toString());
 }
+
+  static Future<void> checkOutWorkLog({
+    required int workLogId,
+    required double latitude,
+    required double longitude,
+    required String locationName,
+    required XFile image,
+  }) async {
+    final token = await AuthService.getToken();
+
+    final request = http.MultipartRequest(
+      'POST',
+      Uri.parse("$baseUrl/Announcement/checkout/$workLogId"),
+    );
+
+    request.headers['Authorization'] = 'Bearer $token';
+    request.fields['Latitude'] = latitude.toString();
+    request.fields['Longitude'] = longitude.toString();
+    request.fields['LocationName'] = locationName;
+
+    if (kIsWeb) {
+      request.files.add(
+        http.MultipartFile.fromBytes(
+          'Image',
+          await image.readAsBytes(),
+          filename: image.name,
+        ),
+      );
+    } else {
+      request.files.add(
+        await http.MultipartFile.fromPath(
+          'Image',
+          image.path,
+          filename: image.name,
+        ),
+      );
+    }
+
+    final streamedResponse = await request.send();
+    final response = await http.Response.fromStream(streamedResponse);
+
+    if (response.statusCode != 200) {
+      throw Exception(
+        response.body.isNotEmpty ? response.body : "Check out failed",
+      );
+    }
+  }
 
   static Future<List<Map<String, dynamic>>> getMyWorkLogs(DateTime date) async {
     final token = await AuthService.getToken();

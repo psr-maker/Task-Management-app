@@ -1,25 +1,33 @@
 import 'package:flutter/material.dart';
+import 'package:staff_work_track/core/theme/web_theme.dart';
+import 'package:staff_work_track/core/widgets/web_ui.dart';
 
 class ProductivityCalculationPage extends StatelessWidget {
   const ProductivityCalculationPage({super.key});
 
-  static const Color card = Color.fromARGB(255, 13, 40, 22);
-  static const Color cardLight = Color.fromARGB(255, 19, 52, 29);
-  static const Color primary = Color.fromARGB(255, 25, 77, 38);
-  static const Color border = Color.fromARGB(255, 42, 72, 48);
+  static const Color card = Color(0xFFFFFFFF);
+  static const Color cardLight = Color(0xFFF4F7F5);
+  static const Color primary = Color(0xFF166534);
+  static const Color border = Color(0xFFE5E7EB);
+  static const Color ink = Color(0xFF111827);
+  static const Color muted = Color(0xFF6B7280);
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color.fromARGB(255, 217, 247, 215),
+      backgroundColor: WebTheme.canvasOf(context),
 
       appBar: AppBar(
-        backgroundColor: const Color.fromARGB(255, 26, 53, 24),
+        backgroundColor: WebPushedChrome.isWeb(context)
+            ? WebTheme.canvasOf(context)
+            : const Color.fromARGB(255, 26, 53, 24),
          leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Column(
+        title: WebPushedChrome.isWeb(context)
+            ? null
+            : const Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
@@ -29,19 +37,24 @@ class ProductivityCalculationPage extends StatelessWidget {
             SizedBox(height: 3),
             Text(
               'How monthly productivity is calculated',
-              style: TextStyle(fontSize: 12, color: Colors.white54),
+              style: TextStyle(fontSize: 12, color: Colors.white70),
             ),
           ],
         ),
       ),
 
-      body: LayoutBuilder(
+      body: WebPushedChrome.body(
+        context,
+        title: 'Score Calculation',
+        subtitle: 'How monthly productivity is calculated',
+        panel: false,
+        child: LayoutBuilder(
         builder: (context, constraints) {
-          final wide = constraints.maxWidth >= 900;
+          final wide = constraints.maxWidth >= 720;
 
           return SingleChildScrollView(
             padding: EdgeInsets.symmetric(
-              horizontal: wide ? 40 : 16,
+              horizontal: wide ? 24 : 12,
               vertical: 10,
             ),
             child: Center(
@@ -70,19 +83,23 @@ class ProductivityCalculationPage extends StatelessWidget {
 
                     const SizedBox(height: 10),
 
-                    _taskCalculation(),
+                    WebResponsiveRow(
+                      minChildWidth: 420,
+                      children: [
+                        _taskCalculation(),
+                        _taskPriority(),
+                      ],
+                    ),
 
                     const SizedBox(height: 12),
 
-                    _taskPriority(),
-
-                    const SizedBox(height: 12),
-
-                    _taskTime(),
-
-                    const SizedBox(height: 12),
-
-                    _taskPenalty(),
+                    WebResponsiveRow(
+                      minChildWidth: 420,
+                      children: [
+                        _taskTime(),
+                        _taskPenalty(),
+                      ],
+                    ),
 
                     const SizedBox(height: 12),
 
@@ -94,11 +111,13 @@ class ProductivityCalculationPage extends StatelessWidget {
 
                     const SizedBox(height: 10),
 
-                    _goalCalculation(),
-
-                    const SizedBox(height: 12),
-
-                    _goalPriority(),
+                    WebResponsiveRow(
+                      minChildWidth: 420,
+                      children: [
+                        _goalCalculation(),
+                        _goalPriority(),
+                      ],
+                    ),
 
                     const SizedBox(height: 12),
 
@@ -134,35 +153,31 @@ class ProductivityCalculationPage extends StatelessWidget {
 
                     const SizedBox(height: 25),
 
-                    _subHeader('A. Department Task'),
+                    _subHeader('A–B. Department Task & Goal'),
 
                     const SizedBox(height: 10),
 
-                    _departmentTask(),
+                    WebResponsiveRow(
+                      minChildWidth: 420,
+                      children: [
+                        _departmentTask(),
+                        _departmentGoal(),
+                      ],
+                    ),
 
                     const SizedBox(height: 25),
 
-                    _subHeader('B. Department Goal'),
+                    _subHeader('C–D. Attitude, Behaviour & 5S'),
 
                     const SizedBox(height: 10),
 
-                    _departmentGoal(),
-
-                    const SizedBox(height: 25),
-
-                    _subHeader('C. Department Attitude & Behaviour'),
-
-                    const SizedBox(height: 10),
-
-                    _departmentAttitude(),
-
-                    const SizedBox(height: 25),
-
-                    _subHeader('D. Department 5S'),
-
-                    const SizedBox(height: 10),
-
-                    _department5S(),
+                    WebResponsiveRow(
+                      minChildWidth: 420,
+                      children: [
+                        _departmentAttitude(),
+                        _department5S(),
+                      ],
+                    ),
 
                     const SizedBox(height: 25),
 
@@ -182,6 +197,7 @@ class ProductivityCalculationPage extends StatelessWidget {
             ),
           );
         },
+        ),
       ),
     );
   }
@@ -212,7 +228,7 @@ class ProductivityCalculationPage extends StatelessWidget {
                   'MONTHLY PERFORMANCE SCORE',
                   style: TextStyle(
                     fontSize: 10,
-                    color: Colors.white60,
+                    color: Colors.white70,
                     fontWeight: FontWeight.bold,
                     letterSpacing: 1,
                   ),
@@ -229,7 +245,7 @@ class ProductivityCalculationPage extends StatelessWidget {
                 SizedBox(height: 3),
                 Text(
                   'Maximum monthly score',
-                  style: TextStyle(fontSize: 12, color: Colors.white54),
+                  style: TextStyle(fontSize: 12, color: Colors.white70),
                 ),
               ],
             ),
@@ -252,23 +268,32 @@ class ProductivityCalculationPage extends StatelessWidget {
           ),
           child: Text(
             number,
-            style: const TextStyle(fontWeight: FontWeight.bold),
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ),
         const SizedBox(width: 12),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              title,
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 3),
-            Text(
-              subtitle,
-              style: const TextStyle(fontSize: 12, color: Colors.black),
-            ),
-          ],
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: ink,
+                ),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                subtitle,
+                style: const TextStyle(fontSize: 13, color: muted),
+              ),
+            ],
+          ),
         ),
       ],
     );
@@ -281,14 +306,18 @@ class ProductivityCalculationPage extends StatelessWidget {
           width: 4,
           height: 18,
           decoration: BoxDecoration(
-            color: Colors.white70,
+            color: primary,
             borderRadius: BorderRadius.circular(4),
           ),
         ),
         const SizedBox(width: 9),
         Text(
           text,
-          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+            color: ink,
+          ),
         ),
       ],
     );
@@ -306,7 +335,7 @@ class ProductivityCalculationPage extends StatelessWidget {
           const Text(
             'The weightage changes depending on whether the staff member '
             'has tasks, goals, or both.',
-            style: TextStyle(fontSize: 12, color: Colors.white54, height: 1.5),
+            style: TextStyle(fontSize: 12, color: muted, height: 1.5),
           ),
 
           const SizedBox(height: 18),
@@ -370,7 +399,7 @@ class ProductivityCalculationPage extends StatelessWidget {
             title,
             style: const TextStyle(
               fontSize: 10,
-              color: Colors.white54,
+              color: muted,
               fontWeight: FontWeight.bold,
               letterSpacing: .8,
             ),
@@ -391,7 +420,7 @@ class ProductivityCalculationPage extends StatelessWidget {
             const SizedBox(height: 12),
             const Text(
               'The available Task/Goal component receives the full 85 points.',
-              style: TextStyle(fontSize: 11, color: Colors.white54),
+              style: TextStyle(fontSize: 11, color: muted),
             ),
           ],
         ],
@@ -403,14 +432,14 @@ class ProductivityCalculationPage extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(title, style: const TextStyle(fontSize: 9, color: Colors.white38)),
+        Text(title, style: const TextStyle(fontSize: 9, color: muted)),
         const SizedBox(height: 3),
         Text(
           value,
           style: const TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.bold,
-            color: Colors.white,
+            color: ink,
           ),
         ),
       ],
@@ -843,7 +872,7 @@ class ProductivityCalculationPage extends StatelessWidget {
       text,
       style: const TextStyle(
         fontSize: 10,
-        color: Colors.white54,
+        color: muted,
         fontWeight: FontWeight.bold,
         letterSpacing: 1,
       ),
@@ -857,7 +886,7 @@ class ProductivityCalculationPage extends StatelessWidget {
 
         const SizedBox(height: 4),
 
-        const Text('÷', style: TextStyle(fontSize: 18, color: Colors.white38)),
+        const Text('÷', style: TextStyle(fontSize: 18, color: muted)),
 
         const SizedBox(height: 4),
 
@@ -865,7 +894,7 @@ class ProductivityCalculationPage extends StatelessWidget {
 
         const SizedBox(height: 8),
 
-        const Icon(Icons.arrow_downward, size: 17, color: Colors.white38),
+        const Icon(Icons.arrow_downward, size: 17, color: muted),
 
         const SizedBox(height: 7),
 
@@ -882,7 +911,7 @@ class ProductivityCalculationPage extends StatelessWidget {
             style: const TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.bold,
-              color: Colors.white,
+              color: ink,
             ),
           ),
         ),
@@ -903,7 +932,7 @@ class ProductivityCalculationPage extends StatelessWidget {
         textAlign: TextAlign.center,
         style: TextStyle(
           fontSize: 12,
-          color: dark ? Colors.white54 : Colors.white70,
+          color: ink,
           fontWeight: FontWeight.w600,
         ),
       ),
@@ -915,13 +944,13 @@ class ProductivityCalculationPage extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 10),
       child: Row(
         children: [
-          const Icon(Icons.circle, size: 6, color: Colors.white54),
+          const Icon(Icons.circle, size: 6, color: muted),
           const SizedBox(width: 10),
 
           Expanded(
             child: Text(
               title,
-              style: const TextStyle(fontSize: 13, color: Colors.white70),
+              style: const TextStyle(fontSize: 13, color: muted),
             ),
           ),
 
@@ -961,14 +990,14 @@ class ProductivityCalculationPage extends StatelessWidget {
             textAlign: TextAlign.center,
             style: const TextStyle(
               fontSize: 12,
-              color: Colors.white70,
+              color: muted,
               height: 1.4,
             ),
           ),
 
           const SizedBox(height: 8),
 
-          const Icon(Icons.arrow_downward, size: 16, color: Colors.white38),
+          const Icon(Icons.arrow_downward, size: 16, color: muted),
 
           const SizedBox(height: 5),
 
@@ -977,7 +1006,7 @@ class ProductivityCalculationPage extends StatelessWidget {
             style: const TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.bold,
-              color: Colors.white,
+              color: ink,
             ),
           ),
         ],
@@ -1008,6 +1037,7 @@ class ProductivityCalculationPage extends StatelessWidget {
           Text(
             formula,
             style: const TextStyle(
+              color: ink,
               fontSize: 13,
               fontWeight: FontWeight.w600,
               height: 1.5,
@@ -1018,7 +1048,7 @@ class ProductivityCalculationPage extends StatelessWidget {
 
           Text(
             result,
-            style: const TextStyle(fontSize: 11, color: Colors.white54),
+            style: const TextStyle(fontSize: 11, color: muted),
           ),
         ],
       ),
@@ -1043,7 +1073,7 @@ class ProductivityCalculationPage extends StatelessWidget {
               text,
               style: const TextStyle(
                 fontSize: 11,
-                color: Colors.white54,
+                color: muted,
                 height: 1.4,
               ),
             ),
@@ -1066,14 +1096,14 @@ class ProductivityCalculationPage extends StatelessWidget {
         children: [
           Text(
             title,
-            style: const TextStyle(fontSize: 12, color: Colors.white70),
+            style: const TextStyle(fontSize: 12, color: muted),
           ),
           Text(
             value,
             style: const TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.bold,
-              color: Colors.white,
+              color: ink,
             ),
           ),
         ],
@@ -1104,7 +1134,7 @@ class ProductivityCalculationPage extends StatelessWidget {
             title,
             style: const TextStyle(
               fontSize: 10,
-              color: Colors.white54,
+              color: muted,
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -1113,14 +1143,14 @@ class ProductivityCalculationPage extends StatelessWidget {
 
           Text(
             line1,
-            style: const TextStyle(fontSize: 12, color: Colors.white70),
+            style: const TextStyle(fontSize: 12, color: muted),
           ),
 
           const SizedBox(height: 5),
 
           Text(
             line2,
-            style: const TextStyle(fontSize: 12, color: Colors.white70),
+            style: const TextStyle(fontSize: 12, color: muted),
           ),
         ],
       ),
@@ -1141,7 +1171,7 @@ class ProductivityCalculationPage extends StatelessWidget {
             title,
             style: const TextStyle(
               fontSize: 10,
-              color: Colors.white60,
+              color: Colors.white70,
               fontWeight: FontWeight.bold,
               letterSpacing: 1,
             ),
@@ -1154,14 +1184,14 @@ class ProductivityCalculationPage extends StatelessWidget {
             textAlign: TextAlign.center,
             style: const TextStyle(
               fontSize: 12,
-              color: Colors.white70,
+              color: Colors.white,
               height: 1.5,
             ),
           ),
 
           const SizedBox(height: 10),
 
-          const Divider(color: Colors.white24),
+          const Divider(color: border),
 
           const SizedBox(height: 8),
 
@@ -1188,7 +1218,7 @@ class ProductivityCalculationPage extends StatelessWidget {
               title,
               style: TextStyle(
                 fontSize: 13,
-                color: Colors.white70,
+                color: muted,
                 fontWeight: bold ? FontWeight.bold : FontWeight.normal,
               ),
             ),
@@ -1198,7 +1228,7 @@ class ProductivityCalculationPage extends StatelessWidget {
             style: TextStyle(
               fontSize: 13,
               fontWeight: bold ? FontWeight.bold : FontWeight.w600,
-              color: Colors.white,
+              color: primary,
             ),
           ),
         ],
@@ -1206,37 +1236,4 @@ class ProductivityCalculationPage extends StatelessWidget {
     );
   }
 
-  // Widget _bottomNote() {
-  //   return Container(
-  //     width: double.infinity,
-  //     padding: const EdgeInsets.all(16),
-  //     decoration: BoxDecoration(
-  //       color: Colors.yellow.withOpacity(.06),
-  //       borderRadius: BorderRadius.circular(14),
-  //       border: Border.all(color: Colors.yellow),
-  //     ),
-  //     child: const Row(
-  //       crossAxisAlignment: CrossAxisAlignment.start,
-  //       children: [
-  //         Icon(Icons.info_outline, size: 19, color: Colors.yellow),
-  //         SizedBox(width: 10),
-  //         Expanded(
-  //           child: Text(
-  //             'Important: Staff productivity always includes '
-  //             'Attitude & Behaviour (15 points). If both Task and Goal '
-  //             'exist, they use 45 + 40 points. If only one exists, '
-  //             'that component receives 85 points. Department 5S is '
-  //             'calculated separately and contributes 10 points to the '
-  //             'department score.',
-  //             style: TextStyle(
-  //               fontSize: 11,
-  //               color: Colors.black87,
-  //               height: 1.5,
-  //             ),
-  //           ),
-  //         ),
-  //       ],
-  //     ),
-  //   );
-  // }
 }

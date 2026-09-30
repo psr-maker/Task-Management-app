@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
+import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
 import 'package:staff_work_track/screen/admin/Navigation/dashbord/drawer/overtime/overtime_details.dart';
 import 'package:staff_work_track/services/overtime_service.dart';
+import 'package:staff_work_track/utils/role_hierarchy.dart';
 
 class ManagerOvertimeHistory extends StatefulWidget {
   final String dept;
@@ -45,10 +47,13 @@ class _ManagerOvertimeHistoryState extends State<ManagerOvertimeHistory> {
 
     try {
       final data = await OvertimeService.getDepartmentOvertime();
+      final eligibility = await loadOvertimeEligibility();
 
       if (!mounted) return;
 
-      allData = List<dynamic>.from(data);
+      allData = List<dynamic>.from(data).where((item) {
+        return item is! Map || !eligibility.excludesRecord(item);
+      }).toList();
 
       _buildStaffList();
     } catch (e) {
@@ -59,12 +64,7 @@ class _ManagerOvertimeHistoryState extends State<ManagerOvertimeHistory> {
         filteredStaff = [];
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("Failed to load overtime history: $e"),
-          backgroundColor: Colors.red,
-        ),
-      );
+      showAppMessage(context, "Failed to load overtime history: $e");
     } finally {
       if (!mounted) return;
 

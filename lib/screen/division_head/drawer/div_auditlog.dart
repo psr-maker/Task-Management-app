@@ -4,6 +4,7 @@ import 'package:staff_work_track/Models/department.dart';
 import 'package:staff_work_track/Models/getusers.dart';
 import 'package:staff_work_track/Models/rolesmodel.dart';
 import 'package:staff_work_track/core/constant/division_config.dart';
+import 'package:staff_work_track/core/widgets/load_error.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
 import 'package:staff_work_track/services/admin_service.dart';
 import 'package:staff_work_track/services/superadmin_service.dart';
@@ -29,9 +30,7 @@ class _DivAuditLogState extends State<DivAuditLog> {
   Map<String, String> goalNamesByCode = {};
   List<Role> roles = [];
   String? errorMessage;
-
-  List<String> get childDepartments =>
-      DivisionConfig.childDepartments(widget.department);
+  List<String> childDepartments = [];
 
   List<String> get departmentChips {
     final chips = <String>["All"];
@@ -58,6 +57,7 @@ class _DivAuditLogState extends State<DivAuditLog> {
     });
 
     try {
+      childDepartments = await AdminService.getMySubDepartments();
       final logs = await SuperAdminService.getMyDepartmentAuditLogs();
       var departments = <Department>[];
       try {
@@ -511,15 +511,7 @@ class _DivAuditLogState extends State<DivAuditLog> {
             child: isLoading
                 ? const Center(child: RotatingFlower())
                 : errorMessage != null
-                ? Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(20),
-                      child: Text(
-                        errorMessage!,
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                  )
+                ? const AppLoadError()
                 : RefreshIndicator(
                     onRefresh: _loadLogs,
                     child: groupedLogs.isEmpty

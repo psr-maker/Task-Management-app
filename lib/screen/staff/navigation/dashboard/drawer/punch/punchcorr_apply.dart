@@ -67,9 +67,7 @@ class _PunchCorrectionState extends State<PunchCorrection> {
   }
 
   void showMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
-    );
+    showAppMessage(context, message);
   }
 
   String formatDate(DateTime date) {

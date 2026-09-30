@@ -1,13 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:staff_work_track/Models/getusers.dart';
+import 'package:staff_work_track/core/constant/division_config.dart';
 import 'package:staff_work_track/core/widgets/buttons.dart';
 import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
 import 'package:staff_work_track/services/admin_service.dart';
+import 'package:staff_work_track/services/auth_service.dart';
+import 'package:staff_work_track/services/superadmin_service.dart';
+import 'package:staff_work_track/utils/jwt_helper.dart';
 
 class AddBehaviourScore extends StatefulWidget {
   final String department;
+  final bool scoreLeaders;
 
-  const AddBehaviourScore({super.key, required this.department});
+  const AddBehaviourScore({
+    super.key,
+    required this.department,
+    this.scoreLeaders = false,
+  });
 
   @override
   State<AddBehaviourScore> createState() => _AddBehaviourScoreState();
@@ -24,6 +33,7 @@ class _AddBehaviourScoreState extends State<AddBehaviourScore> {
   DateTime selectedMonth = DateTime.now();
 
   List<UserModel> employees = [];
+  bool scoreDivisionManagers = false;
 
   bool isLoadingEmployees = true;
   bool isSubmitting = false;
@@ -39,14 +49,38 @@ class _AddBehaviourScoreState extends State<AddBehaviourScore> {
   }
 
   Future<void> loadEmployees() async {
+    final token = await AuthService.getToken();
+    final role = token == null ? "" : (JwtHelper.getRole(token) ?? "");
+    final forDivisionHead =
+        !widget.scoreLeaders && AppRoles.isDivisionHead(role);
+
     try {
-      final result = await AdminService.getEmployeesByDepartment(
-        widget.department,
-      );
+      final List<UserModel> result;
+      if (widget.scoreLeaders) {
+        final users = await SuperAdminService.getAllUsers();
+        result = users.where((user) {
+          if (!AppRoles.isScoreLeader(user.role)) return false;
+          return user.status.trim().toLowerCase() != "inactive";
+        }).toList()
+          ..sort((a, b) {
+            final roleCompare = AppRoles.leaderLabel(
+              a.role,
+            ).compareTo(AppRoles.leaderLabel(b.role));
+            if (roleCompare != 0) return roleCompare;
+            return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+          });
+      } else if (forDivisionHead) {
+        result = await _managersForDivisionHead();
+      } else {
+        result = await AdminService.getEmployeesByDepartment(
+          widget.department,
+        );
+      }
 
       if (!mounted) return;
 
       setState(() {
+        scoreDivisionManagers = forDivisionHead;
         employees = result;
         isLoadingEmployees = false;
       });
@@ -57,10 +91,53 @@ class _AddBehaviourScoreState extends State<AddBehaviourScore> {
         isLoadingEmployees = false;
       });
 
-      ScaffoldMessenger.of(
+      showAppMessage(
         context,
-      ).showSnackBar(SnackBar(content: Text("Failed to load employees: $e")));
+        widget.scoreLeaders
+            ? "Failed to load managers and division heads: $e"
+            : forDivisionHead
+            ? "Failed to load managers: $e"
+            : "Failed to load employees: $e",
+      );
     }
+  }
+
+  Future<List<UserModel>> _managersForDivisionHead() async {
+    final departments = <String>[];
+
+    void addDepartment(String name) {
+      final value = name.trim();
+      if (value.isEmpty) return;
+      if (departments.any(
+        (item) => DivisionConfig.isAllowedDepartment(value, [item]),
+      )) {
+        return;
+      }
+      departments.add(value);
+    }
+
+    addDepartment(widget.department);
+    final subs = await AdminService.getMySubDepartments();
+    for (final name in subs) {
+      addDepartment(name);
+    }
+
+    List<UserModel> users;
+    try {
+      users = await SuperAdminService.getAllUsers();
+    } catch (_) {
+      users = await AdminService.getEmployeesByDepartments(departments);
+    }
+
+    final managers = users.where((user) {
+      if (!AppRoles.isManager(user.role)) return false;
+      if (user.status.trim().toLowerCase() == "inactive") return false;
+      return DivisionConfig.isAllowedDepartment(user.department, departments);
+    }).toList()
+      ..sort(
+        (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
+      );
+    return managers;
   }
 
   Future<void> selectMonth() async {
@@ -117,7 +194,14 @@ class _AddBehaviourScoreState extends State<AddBehaviourScore> {
 
   Future<void> submitScore() async {
     if (selectedStaffId == null) {
-      showTopMessage("Please select a staff", isError: true);
+      showTopMessage(
+        widget.scoreLeaders
+            ? "Please select a department manager or division head"
+            : scoreDivisionManagers
+            ? "Please select a manager"
+            : "Please select a staff",
+        isError: true,
+      );
       return;
     }
 
@@ -137,6 +221,7 @@ class _AddBehaviourScoreState extends State<AddBehaviourScore> {
         punctuality: punctuality,
         integrity: integrity,
         date: selectedMonth,
+        asDirector: widget.scoreLeaders,
       );
 
       if (!mounted) return;
@@ -190,9 +275,13 @@ class _AddBehaviourScoreState extends State<AddBehaviourScore> {
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  "Select Staff",
-                  style: TextStyle(
+                Text(
+                  widget.scoreLeaders
+                      ? "Select Department Manager or Division Head"
+                      : scoreDivisionManagers
+                      ? "Select Manager"
+                      : "Select Staff",
+                  style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
                     color: Colors.black54,
@@ -217,13 +306,35 @@ class _AddBehaviourScoreState extends State<AddBehaviourScore> {
                         )
                       : DropdownButtonHideUnderline(
                           child: DropdownButton<int>(
-                            value: selectedStaffId,
+                            itemHeight: widget.scoreLeaders || scoreDivisionManagers
+                                ? 72
+                                : kMinInteractiveDimension,
+                            value: employees.any(
+                              (employee) => employee.userId == selectedStaffId,
+                            )
+                                ? selectedStaffId
+                                : null,
                             isExpanded: true,
-                            hint: const Text("Select Staff"),
+                            hint: Text(
+                              widget.scoreLeaders
+                                  ? "Select manager or division head"
+                                  : scoreDivisionManagers
+                                  ? "Select manager"
+                                  : "Select Staff",
+                            ),
 
                             icon: const Icon(Icons.keyboard_arrow_down),
 
                             items: employees.map((employee) {
+                              final roleLabel = AppRoles.leaderLabel(
+                                employee.role,
+                              );
+                              final subtitle = [
+                                if (roleLabel.isNotEmpty) roleLabel,
+                                if (employee.department.trim().isNotEmpty)
+                                  employee.department.trim(),
+                              ].join(" · ");
+
                               return DropdownMenuItem<int>(
                                 value: employee.userId,
                                 child: Row(
@@ -243,11 +354,38 @@ class _AddBehaviourScoreState extends State<AddBehaviourScore> {
 
                                     const SizedBox(width: 10),
 
-                                    Text(
-                                      employee.name,
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.w600,
-                                        color: Color.fromARGB(255, 25, 77, 38),
+                                    Expanded(
+                                      child: Column(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            employee.name,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.w600,
+                                              color: Color.fromARGB(
+                                                255,
+                                                25,
+                                                77,
+                                                38,
+                                              ),
+                                            ),
+                                          ),
+                                          if ((widget.scoreLeaders ||
+                                                  scoreDivisionManagers) &&
+                                              subtitle.isNotEmpty)
+                                            Text(
+                                              subtitle,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: const TextStyle(
+                                                fontSize: 12,
+                                                color: Colors.black54,
+                                              ),
+                                            ),
+                                        ],
                                       ),
                                     ),
                                   ],

@@ -1,15 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:staff_work_track/Models/getusers.dart';
+import 'package:staff_work_track/core/constant/division_config.dart';
 import 'package:staff_work_track/core/widgets/buttons.dart';
 import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
 import 'package:staff_work_track/services/admin_service.dart';
 import 'package:staff_work_track/services/overtime_service.dart';
+import 'package:staff_work_track/services/superadmin_service.dart';
 import 'package:staff_work_track/widgets/customfieldwidget.dart';
 
 class CreateExtraWorkPage extends StatefulWidget {
   final String department;
+  final bool forLeaders;
 
-  const CreateExtraWorkPage({super.key, required this.department});
+  const CreateExtraWorkPage({
+    super.key,
+    required this.department,
+    this.forLeaders = false,
+  });
 
   @override
   State<CreateExtraWorkPage> createState() => _CreateExtraWorkPageState();
@@ -34,7 +42,7 @@ class _CreateExtraWorkPageState extends State<CreateExtraWorkPage> {
   bool _showTopMessage = false;
   String? selectedWorkType;
 
-  List<dynamic> staffList = [];
+  List<UserModel> staffList = [];
 
   bool isLoadingStaff = false;
   bool isLoadingTasks = false;
@@ -64,9 +72,25 @@ class _CreateExtraWorkPageState extends State<CreateExtraWorkPage> {
     });
 
     try {
-      final result = await AdminService.getEmployeesByDepartment(
-        widget.department,
-      );
+      final List<UserModel> result;
+      if (widget.forLeaders) {
+        final users = await SuperAdminService.getAllUsers();
+        result = users.where((user) {
+          if (!AppRoles.isScoreLeader(user.role)) return false;
+          return user.status.trim().toLowerCase() != "inactive";
+        }).toList()
+          ..sort((a, b) {
+            final roleCompare = AppRoles.leaderLabel(
+              a.role,
+            ).compareTo(AppRoles.leaderLabel(b.role));
+            if (roleCompare != 0) return roleCompare;
+            return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+          });
+      } else {
+        result = await AdminService.getEmployeesByDepartment(
+          widget.department,
+        );
+      }
 
       if (!mounted) return;
 
@@ -79,7 +103,12 @@ class _CreateExtraWorkPageState extends State<CreateExtraWorkPage> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
 
-        showTopMessage("Failed to load staff: ${e.toString()}", isError: true);
+        showTopMessage(
+          widget.forLeaders
+              ? "Failed to load managers and division heads: ${e.toString()}"
+              : "Failed to load staff: ${e.toString()}",
+          isError: true,
+        );
       });
     } finally {
       if (!mounted) return;
@@ -98,7 +127,9 @@ class _CreateExtraWorkPageState extends State<CreateExtraWorkPage> {
     });
 
     try {
-      final result = await AdminService.getAdminTasks(staffId);
+      final result = widget.forLeaders
+          ? await _tasksForLeader(staffId)
+          : await AdminService.getAdminTasks(staffId);
 
       if (!mounted) return;
 
@@ -116,6 +147,44 @@ class _CreateExtraWorkPageState extends State<CreateExtraWorkPage> {
         });
       }
     }
+  }
+
+  Future<List<Map<String, dynamic>>> _tasksForLeader(int staffId) async {
+    try {
+      return await AdminService.getAdminTasks(staffId);
+    } catch (_) {}
+
+    final data = await SuperAdminService.getAllTasks();
+    final raw = data['tasks'] ??
+        data['Tasks'] ??
+        data['result'] ??
+        data['Result'] ??
+        data['data'] ??
+        data['Data'];
+    if (raw is! List) return [];
+
+    bool assignedTo(Map<String, dynamic> task) {
+      final people = task['assignedTo'] ?? task['AssignedTo'];
+      if (people is List) {
+        for (final person in people) {
+          if (person is! Map) continue;
+          final id = int.tryParse(
+            '${person['userId'] ?? person['UserId'] ?? person['id'] ?? ''}',
+          );
+          if (id == staffId) return true;
+        }
+      }
+      final direct = int.tryParse(
+        '${task['userId'] ?? task['staffId'] ?? task['employeeId'] ?? ''}',
+      );
+      return direct == staffId;
+    }
+
+    return raw
+        .whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item))
+        .where(assignedTo)
+        .toList();
   }
 
   Future<void> _selectDate() async {
@@ -231,7 +300,12 @@ class _CreateExtraWorkPageState extends State<CreateExtraWorkPage> {
     }
 
     if (selectedStaffId == null) {
-      showTopMessage("Please select task", isError: true);
+      showTopMessage(
+        widget.forLeaders
+            ? "Please select a department manager or division head"
+            : "Please select staff",
+        isError: true,
+      );
       return;
     }
     if (selectedTaskCode == null) {
@@ -298,6 +372,7 @@ class _CreateExtraWorkPageState extends State<CreateExtraWorkPage> {
         startTime: startTimeString,
         endTime: endTimeString,
         reason: reasonController.text.trim(),
+        asDirector: widget.forLeaders,
       );
 
       if (!mounted) return;
@@ -339,7 +414,9 @@ class _CreateExtraWorkPageState extends State<CreateExtraWorkPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Create Extra Work'),
+        title: Text(
+          widget.forLeaders ? 'Compensation Work' : 'Create Extra Work',
+        ),
         leading: IconButton(
           onPressed: () => Navigator.pop(context),
           icon: const Icon(Icons.arrow_back_ios),
@@ -352,7 +429,12 @@ class _CreateExtraWorkPageState extends State<CreateExtraWorkPage> {
             child: ListView(
               padding: const EdgeInsets.all(20),
               children: [
-                CustomFormWidgets.label(context, 'Staff'),
+                CustomFormWidgets.label(
+                  context,
+                  widget.forLeaders
+                      ? 'Department Manager / Division Head'
+                      : 'Staff',
+                ),
 
                 const SizedBox(height: 8),
 
@@ -360,20 +442,74 @@ class _CreateExtraWorkPageState extends State<CreateExtraWorkPage> {
                   child: DropdownButtonFormField<int>(
                     value: selectedStaffId,
                     isExpanded: true,
+                    itemHeight: widget.forLeaders ? 72 : kMinInteractiveDimension,
                     decoration: _inputDecoration(
-                      'Select Staff',
+                      widget.forLeaders
+                          ? 'Select manager or division head'
+                          : 'Select Staff',
                       Icons.person_outline_rounded,
                     ),
                     style: Theme.of(context).textTheme.headlineSmall,
+                    selectedItemBuilder: widget.forLeaders
+                        ? (context) {
+                            return staffList.map((staff) {
+                              return Align(
+                                alignment: Alignment.centerLeft,
+                                child: Text(
+                                  staff.name,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              );
+                            }).toList();
+                          }
+                        : null,
                     hint: Text(
-                      isLoadingStaff ? 'Loading staff...' : 'Select staff',
+                      isLoadingStaff
+                          ? (widget.forLeaders
+                                ? 'Loading managers and division heads...'
+                                : 'Loading staff...')
+                          : staffList.isEmpty && widget.forLeaders
+                          ? 'No department managers or division heads'
+                          : widget.forLeaders
+                          ? 'Select manager or division head'
+                          : 'Select staff',
                     ),
                     items: staffList.map((staff) {
+                      if (!widget.forLeaders) {
+                        return DropdownMenuItem<int>(
+                          value: staff.userId,
+                          child: Text(
+                            staff.name,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        );
+                      }
+
+                      final department = staff.department.trim();
+
                       return DropdownMenuItem<int>(
                         value: staff.userId,
-                        child: Text(
-                          staff.name,
-                          overflow: TextOverflow.ellipsis,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              staff.name,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontSize: 14),
+                            ),
+                            if (department.isNotEmpty)
+                              Text(
+                                department,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Colors.black,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                          ],
                         ),
                       );
                     }).toList(),
@@ -392,7 +528,9 @@ class _CreateExtraWorkPageState extends State<CreateExtraWorkPage> {
                           },
                     validator: (value) {
                       if (value == null) {
-                        return 'Select staff';
+                        return widget.forLeaders
+                            ? 'Select manager or division head'
+                            : 'Select staff';
                       }
 
                       return null;

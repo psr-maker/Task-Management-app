@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:staff_work_track/core/widgets/load_error.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/Reports/department/dept.dart';
 import 'package:staff_work_track/services/reports_service.dart';
@@ -33,7 +34,7 @@ class _DepartmentListPageState extends State<DepartmentListPage> {
         }
 
         if (snapshot.hasError) {
-          return Center(child: Text("Error: ${snapshot.error}"));
+          return const AppLoadError();
         }
 
         // Filter based on search text
