@@ -171,28 +171,57 @@ class _AssignUsersPageState extends State<AssignUsersPage> {
 
   Future<List<UserModel>> _loadDepartmentUsers() async {
     final department = loginDepartment?.trim() ?? '';
-    if (department.isEmpty) return [];
-
     List<UserModel> users = [];
+    Map<int, String> names = {};
     try {
-      users = await AdminService.getEmployeesByDepartment(department);
+      final allUsers = await SuperAdminService.getAllUsers();
+      for (final user in allUsers) {
+        final name = user.displayName;
+        if (user.userId > 0 && name.isNotEmpty) names[user.userId] = name;
+      }
+      if (department.isEmpty) users = allUsers;
     } catch (_) {}
 
-    if (users.isEmpty) {
+    if (department.isNotEmpty) {
       try {
-        users = await SuperAdminService.getAllUsers();
-      } catch (_) {
-        users = List.from(widget.users);
+        users = await AdminService.getEmployeesByDepartment(department);
+      } catch (_) {}
+
+      if (users.isEmpty) {
+        users = names.isEmpty ? List<UserModel>.from(widget.users) : users;
+        if (users.isEmpty) {
+          try {
+            users = await SuperAdminService.getAllUsers();
+          } catch (_) {
+            users = List.from(widget.users);
+          }
+        }
+        users = users
+            .where(
+              (user) =>
+                  user.department.trim().isEmpty ||
+                  DivisionConfig.isAllowedDepartment(user.department, [
+                    department,
+                  ]),
+            )
+            .toList();
       }
     }
 
-    return users
-        .where(
-          (user) => DivisionConfig.isAllowedDepartment(user.department, [
-            department,
-          ]),
-        )
-        .toList();
+    return users.map((user) {
+      final known = names[user.userId];
+      if (user.displayName.isNotEmpty || known == null) return user;
+      return UserModel(
+        userId: user.userId,
+        name: known,
+        email: user.email,
+        department: user.department,
+        role: user.role,
+        status: user.status,
+        createdBy: user.createdBy,
+        wasEdited: user.wasEdited,
+      );
+    }).toList();
   }
 
   List<UserModel> _uniqueUsers(List<UserModel> users) {

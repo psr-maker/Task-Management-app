@@ -265,7 +265,18 @@ class AdminService {
 
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
-      final List employeesJson = data['employees'] ?? data['data'] ?? [];
+      final raw = data is Map
+          ? (data['employees'] ??
+              data['Employees'] ??
+              data['users'] ??
+              data['Users'] ??
+              data['staff'] ??
+              data['Staff'] ??
+              data['data'] ??
+              data['Data'] ??
+              [])
+          : data;
+      final List employeesJson = raw is List ? raw : [];
       return employeesJson
           .whereType<Map>()
           .map((e) => UserModel.fromJson(Map<String, dynamic>.from(e)))

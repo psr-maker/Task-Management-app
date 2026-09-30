@@ -51,7 +51,15 @@ String memberUserId(Map user) {
 String? memberDisplayName(Map user) {
   final nested = user["user"] ?? user["User"];
   final source = nested is Map ? nested : user;
-  final name = (source["name"] ?? source["Name"] ?? source["userName"] ?? "")
+  final name = (source["name"] ??
+          source["Name"] ??
+          source["staffName"] ??
+          source["StaffName"] ??
+          source["userName"] ??
+          source["UserName"] ??
+          source["fullName"] ??
+          source["FullName"] ??
+          "")
       .toString()
       .trim();
   if (!_missingMemberName(name)) return name;
@@ -1693,12 +1701,16 @@ class _GoalCardState extends State<GoalCard> {
     if (users is List) {
       for (final user in users) {
         if (user is Map) {
-          addName(
-            (user["name"] ?? user["Name"] ?? "").toString(),
-            (user["userId"] ?? user["id"] ?? "").toString(),
-          );
+          final named = memberDisplayName(Map<String, dynamic>.from(user));
+          if (named != null) {
+            addName(
+              named,
+              (user["userId"] ?? user["UserId"] ?? user["id"] ?? "").toString(),
+            );
+          }
         } else {
-          addName(user.toString());
+          final text = user.toString().trim();
+          if (text.contains('-')) addName(text);
         }
       }
     }
@@ -1713,10 +1725,17 @@ class _GoalCardState extends State<GoalCard> {
         if (assigned is List) {
           for (final user in assigned) {
             if (user is Map) {
-              addName(
-                (user["name"] ?? user["Name"] ?? "").toString(),
-                (user["userId"] ?? user["id"] ?? "").toString(),
-              );
+              final named = memberDisplayName(Map<String, dynamic>.from(user));
+              if (named != null) {
+                addName(
+                  named,
+                  (user["userId"] ?? user["UserId"] ?? user["id"] ?? "")
+                      .toString(),
+                );
+              }
+            } else {
+              final text = user.toString().trim();
+              if (text.contains('-')) addName(text);
             }
           }
         }

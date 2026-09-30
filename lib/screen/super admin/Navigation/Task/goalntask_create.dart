@@ -2,6 +2,7 @@
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:staff_work_track/Models/getusers.dart';
+import 'package:staff_work_track/core/constant/division_config.dart';
 import 'package:staff_work_track/core/responsive/app_layout.dart';
 import 'package:staff_work_track/services/admin_service.dart';
 import 'package:staff_work_track/services/auth_service.dart';
@@ -88,6 +89,7 @@ class _CreateTaskPageState extends State<Createtask> {
   String _goalType = 'Monthly';
   bool _loadingUsers = true;
   List<UserModel> _assignableUsers = [];
+  final Map<int, String> _namesById = {};
   final Set<int> _monthlyAssignedIds = {};
   final Set<int> _taskAssignedIds = {};
   final List<_QuantityShare> _quantityShares = [];
@@ -203,27 +205,56 @@ class _CreateTaskPageState extends State<Createtask> {
 
       final ownDepartment = department?.trim() ?? "";
       List<UserModel> users = [];
+      Map<int, String> names = {};
+      try {
+        final allUsers = await SuperAdminService.getAllUsers();
+        for (final user in allUsers) {
+          final name = user.displayName;
+          if (user.userId > 0 && name.isNotEmpty) {
+            names[user.userId] = name;
+          }
+        }
+        if (ownDepartment.isEmpty) {
+          users = allUsers;
+        }
+      } catch (_) {}
+
       if (ownDepartment.isNotEmpty) {
         try {
           users = await AdminService.getEmployeesByDepartments([ownDepartment]);
         } catch (_) {}
 
-        final ownKey = ownDepartment.toLowerCase();
-        if (users.isEmpty) {
+        if (users.isEmpty && names.isNotEmpty) {
+          final ownKey = ownDepartment.toLowerCase();
           try {
             final allUsers = await SuperAdminService.getAllUsers();
             users = allUsers
                 .where(
-                  (user) => user.department.trim().toLowerCase() == ownKey,
+                  (user) =>
+                      DivisionConfig.isAllowedDepartment(user.department, [
+                        ownDepartment,
+                      ]) ||
+                      user.department.trim().toLowerCase() == ownKey,
                 )
                 .toList();
           } catch (_) {}
-        } else {
-          users = users
-              .where((user) => user.department.trim().toLowerCase() == ownKey)
-              .toList();
         }
       }
+
+      users = users.map((user) {
+        final known = names[user.userId];
+        if (user.displayName.isNotEmpty || known == null) return user;
+        return UserModel(
+          userId: user.userId,
+          name: known,
+          email: user.email,
+          department: user.department,
+          role: user.role,
+          status: user.status,
+          createdBy: user.createdBy,
+          wasEdited: user.wasEdited,
+        );
+      }).toList();
 
       final active = users
           .where((user) => user.status.toLowerCase() != 'inactive')
@@ -231,6 +262,15 @@ class _CreateTaskPageState extends State<Createtask> {
       final assignable = await keepAssignableUsers(active);
       if (!mounted) return;
       setState(() {
+        _namesById
+          ..clear()
+          ..addAll(names);
+        for (final user in assignable) {
+          final name = user.displayName;
+          if (user.userId > 0 && name.isNotEmpty) {
+            _namesById[user.userId] = name;
+          }
+        }
         _assignableUsers = assignable;
         _loadingUsers = false;
       });
@@ -243,8 +283,11 @@ class _CreateTaskPageState extends State<Createtask> {
 
   String _userLabel(int id) {
     for (final user in _assignableUsers) {
-      if (user.userId == id) return user.name;
+      final name = user.displayName;
+      if (user.userId == id && name.isNotEmpty) return name;
     }
+    final known = _namesById[id]?.trim() ?? '';
+    if (known.isNotEmpty && known != '$id') return known;
     return 'User $id';
   }
 

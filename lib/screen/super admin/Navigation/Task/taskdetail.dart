@@ -78,19 +78,29 @@ class _TaskDetailsState extends State<TaskDetails> {
 
       final assignedTo = fetchedTask.assignedTo;
 
-      members = assignedTo
-          .map((u) => u['name']?.toString() ?? "")
-          .where((e) => e.isNotEmpty)
-          .toList();
+      members = assignedTo.map((u) {
+        if (u is! Map) {
+          final text = u.toString().trim();
+          if (text.contains('-')) {
+            final name = text.split('-').skip(1).join('-').trim();
+            if (name.isNotEmpty) return name;
+          }
+          return '';
+        }
+        return memberDisplayName(Map<String, dynamic>.from(u)) ??
+            (u['name'] ?? u['Name'] ?? '').toString();
+      }).where((e) => e.trim().isNotEmpty).toList();
 
       memberRoles = assignedTo
-          .map((u) => u['role']?.toString() ?? "")
+          .whereType<Map>()
+          .map((u) => (u['role'] ?? u['Role'])?.toString() ?? "")
           .where((e) => e.isNotEmpty)
           .toSet()
           .toList();
 
       departments = assignedTo
-          .map((u) => u['department']?.toString() ?? "")
+          .whereType<Map>()
+          .map((u) => (u['department'] ?? u['Department'])?.toString() ?? "")
           .where((e) => e.isNotEmpty)
           .toSet()
           .toList();

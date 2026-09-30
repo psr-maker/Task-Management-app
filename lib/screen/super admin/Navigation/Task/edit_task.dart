@@ -352,7 +352,7 @@ class _EditTaskState extends State<EditTask> {
               children: assignedUsers.map((user) {
                 return InputChip(
                   label: Text(
-                    user.name,
+                    user.displayName.isEmpty ? user.name : user.displayName,
                     style: const TextStyle(
                       color: Colors.black,
                       fontWeight: FontWeight.w600,

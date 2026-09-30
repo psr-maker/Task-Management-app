@@ -36,6 +36,7 @@ class _EditGoalPageState extends State<EditGoalPage> {
   bool _isErrorMessage = true;
   bool _showTopMessage = false;
   List<UserModel> _users = [];
+  final Map<int, String> _namesById = {};
   late final Set<int> _originalAssignedIds;
   late final Set<int> _assignedIds;
   late final bool _canEditStaff;
@@ -132,12 +133,22 @@ class _EditGoalPageState extends State<EditGoalPage> {
 
       final ownDepartment = department?.trim() ?? "";
       var users = <UserModel>[];
+      final names = <int, String>{};
+      try {
+        final allUsers = await SuperAdminService.getAllUsers();
+        for (final user in allUsers) {
+          final name = user.displayName;
+          if (user.userId > 0 && name.isNotEmpty) names[user.userId] = name;
+        }
+        if (ownDepartment.isEmpty) users = allUsers;
+      } catch (_) {}
+
       if (ownDepartment.isNotEmpty) {
         try {
           users = await AdminService.getEmployeesByDepartments([ownDepartment]);
         } catch (_) {}
-        final ownKey = ownDepartment.toLowerCase();
         if (users.isEmpty) {
+          final ownKey = ownDepartment.toLowerCase();
           try {
             final allUsers = await SuperAdminService.getAllUsers();
             users = allUsers
@@ -146,12 +157,23 @@ class _EditGoalPageState extends State<EditGoalPage> {
                 )
                 .toList();
           } catch (_) {}
-        } else {
-          users = users
-              .where((user) => user.department.trim().toLowerCase() == ownKey)
-              .toList();
         }
       }
+
+      users = users.map((user) {
+        final known = names[user.userId];
+        if (user.displayName.isNotEmpty || known == null) return user;
+        return UserModel(
+          userId: user.userId,
+          name: known,
+          email: user.email,
+          department: user.department,
+          role: user.role,
+          status: user.status,
+          createdBy: user.createdBy,
+          wasEdited: user.wasEdited,
+        );
+      }).toList();
 
       final active = users
           .where((user) => user.status.toLowerCase() != "inactive")
@@ -159,6 +181,13 @@ class _EditGoalPageState extends State<EditGoalPage> {
       final assignable = await keepAssignableUsers(active);
       if (!mounted) return;
       setState(() {
+        _namesById
+          ..clear()
+          ..addAll(names);
+        for (final user in assignable) {
+          final name = user.displayName;
+          if (user.userId > 0 && name.isNotEmpty) _namesById[user.userId] = name;
+        }
         _users = assignable;
         _loadingUsers = false;
       });
@@ -202,15 +231,27 @@ class _EditGoalPageState extends State<EditGoalPage> {
 
   String _userName(int id) {
     for (final user in _users) {
-      if (user.userId == id) return user.name;
+      final name = user.displayName;
+      if (user.userId == id && name.isNotEmpty) return name;
     }
+    final known = _namesById[id]?.trim() ?? '';
+    if (known.isNotEmpty && known != '$id') return known;
     final raw = widget.goal["assignedUsers"] ?? widget.goal["AssignedUsers"];
     if (raw is List) {
       for (final user in raw) {
         if (user is! Map) continue;
         final userId = _readInt(user["userId"] ?? user["UserId"] ?? user["id"]);
         if (userId == id) {
-          return (user["name"] ?? user["Name"] ?? "User $id").toString();
+          final named = (user["name"] ??
+                  user["Name"] ??
+                  user["staffName"] ??
+                  user["StaffName"] ??
+                  user["userName"] ??
+                  user["UserName"] ??
+                  "")
+              .toString()
+              .trim();
+          if (named.isNotEmpty && named != '$id') return named;
         }
       }
     }

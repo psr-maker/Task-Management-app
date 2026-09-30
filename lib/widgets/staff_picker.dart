@@ -120,10 +120,11 @@ class _StaffPickerState extends State<StaffPicker> {
               spacing: 8,
               runSpacing: 8,
               children: _selected.map((id) {
-                final name = _userById(id)?.name ?? 'User $id';
+                final name = _userById(id)?.displayName ?? '';
+                final label = name.isEmpty ? 'User $id' : name;
                 return InputChip(
                   label: Text(
-                    name,
+                    label,
                     style: const TextStyle(
                       color: Colors.black,
                       fontWeight: FontWeight.w600,
@@ -192,7 +193,11 @@ class _StaffPickerState extends State<StaffPicker> {
                                   radius: 18,
                                   backgroundColor: brand.withValues(alpha: 0.12),
                                   child: Text(
-                                    staffInitials(user.name),
+                                    staffInitials(
+                                      user.displayName.isEmpty
+                                          ? user.name
+                                          : user.displayName,
+                                    ),
                                     style: const TextStyle(
                                       color: Colors.black,
                                       fontWeight: FontWeight.w700,
@@ -203,7 +208,9 @@ class _StaffPickerState extends State<StaffPicker> {
                                 const SizedBox(width: 12),
                                 Expanded(
                                   child: Text(
-                                    user.name,
+                                    user.displayName.isEmpty
+                                        ? user.name
+                                        : user.displayName,
                                     style: const TextStyle(
                                       color: Colors.black,
                                       fontWeight: FontWeight.w600,

@@ -26,10 +26,19 @@ class SuperAdminService {
 
       if (response.statusCode == 200) {
         final decoded = jsonDecode(response.body);
+        final raw = decoded is Map
+            ? (decoded['users'] ??
+                decoded['Users'] ??
+                decoded['data'] ??
+                decoded['Data'] ??
+                [])
+            : decoded;
+        final List list = raw is List ? raw : [];
 
-        final List list = decoded['users'];
-
-        return list.map((e) => UserModel.fromJson(e)).toList();
+        return list
+            .whereType<Map>()
+            .map((e) => UserModel.fromJson(Map<String, dynamic>.from(e)))
+            .toList();
       } else {
         throw Exception("Failed to load users");
       }
