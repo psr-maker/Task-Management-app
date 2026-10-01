@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:staff_work_track/core/widgets/buttons.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
 import 'package:staff_work_track/services/admin_service.dart';
+import 'package:staff_work_track/utils/task_score.dart';
 
 class TaskPointDetail extends StatefulWidget {
   final String taskName;
@@ -164,7 +165,7 @@ class _TaskPointDetailState extends State<TaskPointDetail> {
                   ),
                 ),
                 Text(
-                  "$systemPoints / 100",
+                  "$systemPoints / $taskScoreMax",
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 18,

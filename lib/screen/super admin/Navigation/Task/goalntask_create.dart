@@ -1715,7 +1715,7 @@ class _CreateTaskPageState extends State<Createtask> {
               Expanded(
                 child: _summaryFigure(
                   "Target",
-                  hasTarget ? formatGoalQty(target) : "â€”",
+                  hasTarget ? formatGoalQty(target) : "0",
                 ),
               ),
               Expanded(
@@ -1725,7 +1725,7 @@ class _CreateTaskPageState extends State<Createtask> {
                 child: _summaryFigure(
                   over ? "Over" : "Left",
                   left == null
-                      ? "â€”"
+                      ? "0"
                       : formatGoalQty(over ? remaining.abs() : remaining),
                   emphasize: over,
                 ),
@@ -1868,7 +1868,7 @@ class _CreateTaskPageState extends State<Createtask> {
               ),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 6),
-                child: Text('â€“', style: TextStyle(color: Colors.grey.shade600)),
+                child: Text('-', style: TextStyle(color: Colors.grey.shade600)),
               ),
               Expanded(
                 child: _miniDate(

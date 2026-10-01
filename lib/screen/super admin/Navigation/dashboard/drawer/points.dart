@@ -103,6 +103,10 @@ class ProductivityCalculationPage extends StatelessWidget {
 
                     const SizedBox(height: 12),
 
+                    _taskQuantity(),
+
+                    const SizedBox(height: 12),
+
                     _monthlyTaskScore(),
 
                     const SizedBox(height: 25),
@@ -464,7 +468,7 @@ class ProductivityCalculationPage extends StatelessWidget {
           const SizedBox(height: 14),
 
           _info(
-            'Each task score is calculated using its time score and priority score.',
+            'Each task starts from its time score and priority score. When the task has a target quantity, that score is then reduced by the completed quantity.',
           ),
         ],
       ),
@@ -503,16 +507,21 @@ class ProductivityCalculationPage extends StatelessWidget {
 
           const SizedBox(height: 14),
 
-          _scoreRow('Before due date', '100'),
-          _scoreRow('On due date', '95'),
-          _scoreRow('1 day late', '90'),
-          _scoreRow('2 days late', '85'),
-          _scoreRow('3 days late', '80'),
-          _scoreRow('Each additional late day', '-5'),
+          _scoreRow('Before due date', '90'),
+          _scoreRow('On due date', '85'),
+          _scoreRow('1 day late', '80'),
+          _scoreRow('2 days late', '75'),
+          _scoreRow('3 days late', '70'),
+          _scoreRow('4 days late', '65'),
+          _scoreRow('5 days late', '60'),
+          _scoreRow('6 days late', '55'),
+          _scoreRow('7 or more days late', '50'),
 
           const SizedBox(height: 7),
 
-          _info('Minimum time score is 50 points.'),
+          _info(
+            'A task with an end time uses hours instead of days: 90 before the end time, 85 at the end time, then minus 5 for each late hour. The time score stays between 50 and 90.',
+          ),
         ],
       ),
     );
@@ -535,6 +544,38 @@ class ProductivityCalculationPage extends StatelessWidget {
 
           _info(
             'Removal penalties are deducted from the monthly task average.',
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _taskQuantity() {
+    return _card(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _label('TASK QUANTITY SCORE'),
+
+          const SizedBox(height: 14),
+
+          _scoreRow('No target quantity', 'Time + Priority'),
+          _scoreRow('Completed quantity missing', '0'),
+          _scoreRow('Completed at or above target', 'Full task score'),
+          _scoreRow('Completed below target', 'Task score × completed ÷ target'),
+
+          const SizedBox(height: 14),
+
+          _formulaBox(
+            'Task score × Completed quantity',
+            'Target quantity',
+            'Quantity score',
+          ),
+
+          const SizedBox(height: 14),
+
+          _info(
+            'Example: task score 90, target 10, completed 6. The score is 90 × 6 ÷ 10 = 54. The result is rounded and stays between 0 and 90.',
           ),
         ],
       ),

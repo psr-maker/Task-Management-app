@@ -13,6 +13,7 @@ import 'package:staff_work_track/services/superadmin_service.dart';
 import 'package:staff_work_track/utils/app_helper.dart';
 import 'package:staff_work_track/utils/goal_quantity.dart';
 import 'package:staff_work_track/utils/jwt_helper.dart';
+import 'package:staff_work_track/utils/task_score.dart';
 
 class Taskpoints extends StatefulWidget {
   const Taskpoints({super.key});
@@ -567,6 +568,7 @@ class _TaskpointsState extends State<Taskpoints> {
                         "Completed",
                         AppHelpers.formatDate(_completedDate(task)),
                       ),
+                      ("Score", "${_systemPoints(task, staffId)} / $taskScoreMax"),
                       ("Members", _memberCount(task)),
                       if (department.isNotEmpty)
                         (
@@ -596,7 +598,7 @@ class _TaskpointsState extends State<Taskpoints> {
                     assignedTo: name,
                     taskId: task["taskCode"].toString(),
                     staffId: staffId,
-                    systemPoints: task["systemPoints"] ?? 0,
+                    systemPoints: _systemPoints(task, staffId),
                     finalPoints: task["finalPoints"],
                     isReviewed: reviewed,
                     delayJustified: task["isDelayJustified"] ?? false,
@@ -612,6 +614,14 @@ class _TaskpointsState extends State<Taskpoints> {
         ),
       ],
     );
+  }
+
+  int _systemPoints(Map<String, dynamic> task, int staffId) {
+    final calculated = taskSystemScore(task, userId: staffId);
+    if (calculated != null) return calculated;
+    final stored = task["systemPoints"];
+    if (stored is num) return stored.round();
+    return int.tryParse("$stored") ?? 0;
   }
 
   String? _completedDate(Map<String, dynamic> task) {

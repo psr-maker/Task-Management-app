@@ -116,10 +116,74 @@ class ReportsService {
     final response = await http.get(uri);
 
     if (response.statusCode == 200) {
-      return json.decode(response.body);
+      final decoded = json.decode(response.body);
+      if (decoded is Map<String, dynamic>) {
+        return _withSummaryCounts(decoded);
+      }
+      if (decoded is Map) {
+        return _withSummaryCounts(Map<String, dynamic>.from(decoded));
+      }
+      throw Exception("Failed to load department report");
     } else {
       throw Exception("Failed to load department report");
     }
+  }
+
+  static Map<String, dynamic> _withSummaryCounts(Map<String, dynamic> raw) {
+    var data = raw;
+    final wrapped = raw["data"] ?? raw["Data"] ?? raw["result"] ?? raw["Result"];
+    if (wrapped is Map &&
+        (wrapped.containsKey("tasks") ||
+            wrapped.containsKey("Tasks") ||
+            wrapped.containsKey("totalTasks") ||
+            wrapped.containsKey("TotalTasks") ||
+            wrapped.containsKey("totalGoals") ||
+            wrapped.containsKey("TotalGoals"))) {
+      data = Map<String, dynamic>.from(wrapped);
+    }
+
+    int nested(String group, String field) {
+      final section = data[group] ?? data[_pascal(group)];
+      if (section is! Map) return 0;
+      return _asInt(section[field] ?? section[_pascal(field)]);
+    }
+
+    int flat(String key) => _asInt(data[key] ?? data[_pascal(key)]);
+
+    int pick(String key, String group, String field) {
+      final direct = flat(key);
+      if (direct > 0) return direct;
+      final fromGroup = nested(group, field);
+      if (fromGroup > 0) return fromGroup;
+      return direct;
+    }
+
+    final completedTasks = pick("completedTasks", "tasks", "completed");
+    final pendingTasks = pick("pendingTasks", "tasks", "pending");
+    final overdueTasks = pick("overdueTasks", "tasks", "overdue");
+    final inProgressTasks = pick("inProgressTasks", "tasks", "inProgress");
+    var totalTasks = pick("totalTasks", "tasks", "total");
+    var summedTasks = completedTasks + pendingTasks + inProgressTasks;
+    if (summedTasks <= 0) summedTasks = overdueTasks;
+    if (totalTasks <= 0 && summedTasks > 0) totalTasks = summedTasks;
+
+    return {
+      ...data,
+      "totalTasks": totalTasks,
+      "completedTasks": completedTasks,
+      "pendingTasks": pendingTasks,
+      "overdueTasks": overdueTasks,
+      "totalGoals": pick("totalGoals", "goals", "total"),
+      "completedGoals": pick("completedGoals", "goals", "completed"),
+      "pendingGoals": pick("pendingGoals", "goals", "pending"),
+      "overdueGoals": pick("overdueGoals", "goals", "overdue"),
+      "totalUsers": pick("totalUsers", "users", "total"),
+    };
+  }
+
+  static String _pascal(String key) {
+    if (key.isEmpty) return key;
+    return key[0].toUpperCase() + key.substring(1);
   }
 
   static Future<Map<String, dynamic>> getEmployeeReport(

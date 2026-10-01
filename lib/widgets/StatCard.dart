@@ -1018,7 +1018,7 @@ class _CompletedQuantityDialogState extends State<_CompletedQuantityDialog> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              "Target quantity is ${formatGoalQty(widget.target)}. Enter what was completed. A number above the target is allowed.",
+              "Target quantity is ${formatGoalQty(widget.target)}. Enter what was completed.",
             ),
             const SizedBox(height: 12),
             TextField(
