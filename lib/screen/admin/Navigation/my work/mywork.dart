@@ -275,6 +275,7 @@ class _MyworkState extends State<Mywork> {
                               key: ValueKey(_goalsRefreshKey),
                               searchQuery: searchController.text,
                               goalType: _goalType,
+                              onlyMine: true,
                               onDelete: (msg, isError) {
                                 showTopMessage(msg, isError: isError);
                               },

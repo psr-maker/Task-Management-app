@@ -14,6 +14,7 @@ class Allgoals extends StatefulWidget {
   final String searchQuery;
   final TaskFilterModel? filter;
   final String goalType;
+  final bool onlyMine;
   final Function(String, bool)? onDelete;
 
   const Allgoals({
@@ -21,6 +22,7 @@ class Allgoals extends StatefulWidget {
     required this.searchQuery,
     this.filter,
     this.goalType = "All",
+    this.onlyMine = false,
     this.onDelete,
   });
 
@@ -39,6 +41,7 @@ class _AllgoalsState extends State<Allgoals> {
   }
 
   Future<List<dynamic>> _fetchGoals() async {
+    if (widget.onlyMine) return _fetchMyGoals();
     final chunks = <List<dynamic>>[];
 
     List<dynamic> withTasks = [];
@@ -83,6 +86,34 @@ class _AllgoalsState extends State<Allgoals> {
     final merged = _mergeGoalLists(chunks);
     _applySavedQuantities(merged, _quantityByCode(withTasks));
     return merged;
+  }
+
+  Future<List<dynamic>> _fetchMyGoals() async {
+    final token = await AuthService.getToken();
+    if (token == null) return [];
+    final userId = int.tryParse(JwtHelper.getuid(token)?.toString() ?? "");
+    if (userId == null) return [];
+
+    List<dynamic> mine = [];
+    try {
+      mine = await AdminService.getusergoalbyid(userId);
+    } catch (e) {
+      debugPrint(e.toString());
+    }
+
+    List<dynamic> detailed = [];
+    try {
+      detailed = await SuperAdminService.getGoals();
+    } catch (e) {
+      debugPrint(e.toString());
+    }
+
+    final byCode = _quantityByCode(detailed);
+    return mine.map((raw) {
+      final goal = _normalizeGoal(raw);
+      _keepLoginUserTasks(goal, byCode, userId);
+      return goal;
+    }).where((goal) => goal.isNotEmpty).toList();
   }
 
   Future<void> loadGoals({bool showLoader = false}) async {
@@ -312,6 +343,52 @@ Map<String, dynamic> _withMonths(
   final copy = Map<String, dynamic>.from(yearly);
   copy["monthlyGoals"] = months.map(_asMonthlyGoal).toList();
   return copy;
+}
+
+bool _taskIsForUser(Map task, int userId) {
+  final people = taskAssignees(task);
+  if (people.isEmpty) return true;
+  return people.any(
+    (person) => int.tryParse(memberUserId(person)) == userId,
+  );
+}
+
+void _keepLoginUserTasks(
+  Map<String, dynamic> goal,
+  Map<String, Map<String, dynamic>> detailed,
+  int userId,
+) {
+  final source = detailed[_goalCode(goal)];
+  var tasks = goal["tasks"];
+  if ((tasks is! List || tasks.isEmpty) && source != null) {
+    tasks = source["tasks"];
+  }
+  if (tasks is List) {
+    goal["tasks"] = tasks
+        .whereType<Map>()
+        .map((task) => Map<String, dynamic>.from(task))
+        .where((task) => _taskIsForUser(task, userId))
+        .toList();
+  } else {
+    goal["tasks"] = <Map<String, dynamic>>[];
+  }
+
+  if (source != null && goalTarget(goal) <= 0) {
+    final target = readGoalInt(source, const [
+      "targetQuantity",
+      "TargetQuantity",
+    ]);
+    if (target != null) goal["targetQuantity"] = target;
+  }
+
+  final months = goal["monthlyGoals"];
+  if (months is List) {
+    for (final month in months) {
+      if (month is Map<String, dynamic>) {
+        _keepLoginUserTasks(month, detailed, userId);
+      }
+    }
+  }
 }
 
 String _goalCode(Map<String, dynamic> goal) {

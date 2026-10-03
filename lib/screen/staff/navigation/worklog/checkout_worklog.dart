@@ -200,12 +200,7 @@ class _CheckoutWorklogPageState extends State<CheckoutWorklogPage> {
                   fontWeight: FontWeight.w700,
                 ),
               ),
-              const SizedBox(height: 6),
-              Text(
-                'Take the OUT photo. Without internet it stays on this phone until you sync.',
-                style: Theme.of(context).textTheme.labelMedium,
-              ),
-              const SizedBox(height: 16),
+           
               if (_isImageLoading)
                 const SizedBox(height: 220, child: Center(child: RotatingFlower()))
               else if (_image != null)

@@ -16,7 +16,7 @@ String? worklogImageUrl(dynamic path) {
 }
 
 String formatWorklogTime(dynamic value) {
-  return TimeUtils.formatTime12(value, empty: '--:--');
+  return TimeUtils.formatWorklogTime(value, empty: '--:--');
 }
 
 /// Turns separate IN and OUT rows into one session.

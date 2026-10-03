@@ -144,21 +144,23 @@ class AnnouncementService {
   request.fields['Title'] = title;
   request.fields['WorkType'] = workType;
   request.fields['Description'] = description;
-  
-  // Send workDate as UTC ISO8601 string
-  final workDateUtc = workDate.toUtc().toIso8601String();
-  request.fields['WorkDate'] = workDateUtc;
-  
+
+  // The API stores DateTime.Now with no time zone. A Z suffix makes
+  // SQL Server reject the save with a 500.
+  request.fields['WorkDate'] = DateFormat('yyyy-MM-dd').format(
+    workDate.isUtc ? workDate.toLocal() : workDate,
+  );
+
   request.fields['IsSubmit'] = isSubmit.toString();
   request.fields['Latitude'] = latitude.toString();
   request.fields['Longitude'] = longitude.toString();
   request.fields['LocationName'] = locationName;
-  
-  // Add submission timestamp for offline worklogs
+
   if (submittedAt != null) {
-    // Send as UTC ISO8601 string so backend stores correct time
-    final utcTime = submittedAt.toUtc().toIso8601String();
-    request.fields['SubmittedAt'] = utcTime;
+    final localSubmitted =
+        submittedAt.isUtc ? submittedAt.toLocal() : submittedAt;
+    request.fields['SubmittedAt'] =
+        DateFormat("yyyy-MM-dd'T'HH:mm:ss").format(localSubmitted);
   }
 
   // ==========================================

@@ -452,6 +452,22 @@ class _TaskCardState extends State<Taskstatus> {
     return taskAchievedQty(widget.task);
   }
 
+  String get _memberLabel {
+    final userId = _userId;
+    if (userId == null) return taskMemberLabel(widget.task);
+    final ids = quantityShareMemberIds(widget.task, userId);
+    if (ids == null || ids.isEmpty) return taskMemberLabel(widget.task);
+    final names = <String>[];
+    for (final user in taskAssignees(widget.task)) {
+      final id = int.tryParse(memberUserId(user));
+      if (id == null || !ids.contains(id)) continue;
+      final name = memberDisplayName(user);
+      if (name != null) names.add(name);
+    }
+    if (names.isEmpty) return taskMemberLabel(widget.task);
+    return names.join(", ");
+  }
+
   Future<void> _checkPermissions() async {
     try {
       final token = await AuthService.getToken();
@@ -671,14 +687,13 @@ class _TaskCardState extends State<Taskstatus> {
   }
 
   Future<int?> _askAchievedQuantity(int target) {
-    final existing = taskAchievedQty(widget.task);
     return showDialog<int>(
       context: context,
       useRootNavigator: true,
       barrierDismissible: false,
       builder: (_) => _CompletedQuantityDialog(
         target: target,
-        initialValue: existing > 0 ? existing.toString() : "",
+        initialValue: "",
       ),
     );
   }
@@ -767,7 +782,7 @@ class _TaskCardState extends State<Taskstatus> {
                       const SizedBox(width: 4),
                       Expanded(
                         child: Text(
-                          taskMemberLabel(widget.task),
+                          _memberLabel,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(fontSize: 12),

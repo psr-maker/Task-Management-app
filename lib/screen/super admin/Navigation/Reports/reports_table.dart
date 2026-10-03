@@ -53,11 +53,35 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
 
   bool isLoading = true;
   String? loadError;
+  final ScrollController _headerX = ScrollController();
+  final ScrollController _bodyX = ScrollController();
+  final ScrollController _bodyY = ScrollController();
+  var _lockScroll = false;
 
   @override
   void initState() {
     super.initState();
+    _headerX.addListener(() => _mirrorScroll(_headerX, _bodyX));
+    _bodyX.addListener(() => _mirrorScroll(_bodyX, _headerX));
     fetchTasks();
+  }
+
+  void _mirrorScroll(ScrollController from, ScrollController to) {
+    if (_lockScroll || !from.hasClients || !to.hasClients) return;
+    final max = to.position.maxScrollExtent;
+    final next = from.offset.clamp(0.0, max);
+    if ((to.offset - next).abs() < 0.5) return;
+    _lockScroll = true;
+    to.jumpTo(next);
+    _lockScroll = false;
+  }
+
+  @override
+  void dispose() {
+    _headerX.dispose();
+    _bodyX.dispose();
+    _bodyY.dispose();
+    super.dispose();
   }
 
   Future<void> fetchTasks() async {
@@ -390,12 +414,7 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
     return goalTarget(map).toString();
   }
 
-  String? _qtyCaption(dynamic item) {
-    if (!_isQuantityTask(item)) return null;
-    return "Target ${_qtyText(item, completed: false)}  ·  Completed ${_qtyText(item, completed: true)}";
-  }
-
-  List<({String name, String? caption})> _goalTaskEntries(dynamic goal) {
+  List<({String name, dynamic item})> _goalTaskEntries(dynamic goal) {
     final items = <dynamic>[];
     void add(dynamic raw) {
       if (raw is List) items.addAll(raw);
@@ -410,7 +429,7 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
       }
     }
 
-    final lines = <({String name, String? caption})>[];
+    final lines = <({String name, dynamic item})>[];
     final seen = <String>{};
     for (final item in items) {
       final name = item is String
@@ -419,36 +438,48 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
           ? (item["task"] ?? item["title"] ?? "").toString()
           : item.toString();
       if (name.trim().isEmpty) continue;
-      final caption = item is Map ? _qtyCaption(item) : null;
-      final key = "$name|${caption ?? ""}".toLowerCase();
+      final key = name.toLowerCase();
       if (!seen.add(key)) continue;
-      lines.add((name: "${lines.length + 1}. $name", caption: caption));
+      lines.add((name: "${lines.length + 1}. $name", item: item));
     }
     return lines;
   }
 
   List<String> _goalTaskLines(dynamic goal) {
-    return [
-      for (final entry in _goalTaskEntries(goal))
-        entry.caption == null ? entry.name : "${entry.name}\n${entry.caption}",
-    ];
+    return [for (final entry in _goalTaskEntries(goal)) entry.name];
   }
 
-  Widget _nameWithQty(String name, String? caption) {
+  List<String> _qtyLines(dynamic goal, {required bool completed}) {
+    final tasks = _goalTaskEntries(goal);
+    final lines = <String>[];
+    if (_isQuantityTask(goal) || tasks.isEmpty) {
+      lines.add(_qtyText(goal, completed: completed));
+    }
+    for (final entry in tasks) {
+      lines.add(_qtyText(entry.item, completed: completed));
+    }
+    return lines;
+  }
+
+  Widget _lineStack(List<String> lines, {bool firstIsGoal = false}) {
+    final style = Theme.of(context).textTheme.labelMedium;
+    if (lines.isEmpty) {
+      return Text("-", style: style);
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(name, style: Theme.of(context).textTheme.labelMedium),
-        if (caption != null)
-          Padding(
-            padding: const EdgeInsets.only(top: 2),
-            child: Text(
-              caption,
-              style: const TextStyle(
-                color: WebTheme.brand,
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
+        for (var i = 0; i < lines.length; i++)
+          SizedBox(
+            height: 22,
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                lines[i],
+                style: firstIsGoal && i == 0
+                    ? style?.copyWith(fontWeight: FontWeight.w700)
+                    : style,
               ),
             ),
           ),
@@ -470,6 +501,14 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
         selectedView = "Leave";
         selectedLeaveView = type;
       }
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _lockScroll = true;
+      for (final controller in [_headerX, _bodyX, _bodyY]) {
+        if (controller.hasClients) controller.jumpTo(0);
+      }
+      _lockScroll = false;
     });
   }
 
@@ -546,14 +585,27 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
                       "Permission",
                     ])
                       ChoiceChip(
-                        label: Text(type),
+                        label: Text(
+                          type,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                          ),
+                        ),
                         selected: _activeTable == type,
-                        selectedColor: WebTheme.brandSoft,
-                        labelStyle: TextStyle(
+                        showCheckmark: false,
+                        backgroundColor: WebTheme.brand,
+                        selectedColor: const Color(0xFF14532D),
+                        side: BorderSide(
                           color: _activeTable == type
-                              ? WebTheme.brand
-                              : WebTheme.inkOf(context),
-                          fontWeight: FontWeight.w600,
+                              ? Colors.white
+                              : Colors.transparent,
+                          width: 1.4,
+                        ),
+                        labelStyle: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
                           fontSize: 13,
                         ),
                         onSelected: (_) => _selectTable(type),
@@ -686,10 +738,7 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
                         ),
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(12),
-                          child: SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
-                            child: SingleChildScrollView(child: table),
-                          ),
+                          child: table,
                         ),
                       );
                     },
@@ -701,14 +750,73 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
     );
   }
 
+  Widget _pinnedTable({
+    required List<DataColumn> columns,
+    required List<DataRow> rows,
+    double dataRowMinHeight = 48,
+    double dataRowMaxHeight = double.infinity,
+  }) {
+    const headingHeight = 56.0;
+    Widget sheet({required bool header}) {
+      return DataTable(
+        showCheckboxColumn: false,
+        headingRowHeight: header ? headingHeight : 0,
+        headingRowColor: WidgetStateProperty.all(WebTheme.brandSoftOf(context)),
+        headingTextStyle: const TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w700,
+          color: WebTheme.brand,
+        ),
+        dataRowMinHeight: header ? 0 : dataRowMinHeight,
+        dataRowMaxHeight: header ? 0 : dataRowMaxHeight,
+        horizontalMargin: 16,
+        columnSpacing: 28,
+        columns: columns,
+        rows: rows,
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SingleChildScrollView(
+          controller: _headerX,
+          scrollDirection: Axis.horizontal,
+          child: sheet(header: true),
+        ),
+        Expanded(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              return Scrollbar(
+                controller: _bodyX,
+                thumbVisibility: true,
+                notificationPredicate: (notice) =>
+                    notice.metrics.axis == Axis.horizontal,
+                child: SingleChildScrollView(
+                  controller: _bodyX,
+                  scrollDirection: Axis.horizontal,
+                  child: SizedBox(
+                    height: constraints.maxHeight,
+                    child: Scrollbar(
+                      controller: _bodyY,
+                      thumbVisibility: true,
+                      child: SingleChildScrollView(
+                        controller: _bodyY,
+                        child: sheet(header: false),
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildLeaveTable() {
-    return DataTable(
-      headingRowColor: WidgetStateProperty.all(WebTheme.brandSoftOf(context)),
-      headingTextStyle: const TextStyle(
-        fontSize: 13,
-        fontWeight: FontWeight.w700,
-        color: WebTheme.brand,
-      ),
+    return _pinnedTable(
       columns: const [
         DataColumn(label: Text("Leave Category")),
         DataColumn(label: Text("Leave Type")),
@@ -787,13 +895,7 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
   }
 
   Widget _buildPermissionTable() {
-    return DataTable(
-      headingRowColor: WidgetStateProperty.all(WebTheme.brandSoftOf(context)),
-      headingTextStyle: const TextStyle(
-        fontSize: 13,
-        fontWeight: FontWeight.w700,
-        color: WebTheme.brand,
-      ),
+    return _pinnedTable(
       columns: const [
         DataColumn(label: Text("Reason")),
         DataColumn(label: Text("Date")),
@@ -863,14 +965,7 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
   }
 
   Widget _buildTaskTable() {
-    return DataTable(
-      showCheckboxColumn: false,
-      headingRowColor: WidgetStateProperty.all(WebTheme.brandSoftOf(context)),
-      headingTextStyle: const TextStyle(
-        fontSize: 13,
-        fontWeight: FontWeight.w700,
-        color: WebTheme.brand,
-      ),
+    return _pinnedTable(
       columns: const [
         DataColumn(label: Text("Sl.No")),
         DataColumn(label: Text("Task")),
@@ -878,6 +973,8 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
         DataColumn(label: Text("Status")),
         DataColumn(label: Text("Priority")),
         DataColumn(label: Text("Points")),
+        DataColumn(label: Text("Target Qty")),
+        DataColumn(label: Text("Completed Qty")),
         DataColumn(label: Text("Due Date")),
         DataColumn(label: Text("Completed Date")),
         DataColumn(label: Text("Overdue")),
@@ -902,7 +999,10 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
           Text("${index + 1}", style: Theme.of(context).textTheme.labelMedium),
         ),
         DataCell(
-          _nameWithQty((task["task"] ?? "-").toString(), _qtyCaption(task)),
+          Text(
+            (task["task"] ?? "-").toString(),
+            style: Theme.of(context).textTheme.labelMedium,
+          ),
         ),
         DataCell(
           Text(
@@ -939,6 +1039,18 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
           ),
         ),
         DataCell(
+          Text(
+            _qtyText(task, completed: false),
+            style: Theme.of(context).textTheme.labelMedium,
+          ),
+        ),
+        DataCell(
+          Text(
+            _qtyText(task, completed: true),
+            style: Theme.of(context).textTheme.labelMedium,
+          ),
+        ),
+        DataCell(
           Text(dueDate, style: Theme.of(context).textTheme.labelMedium),
         ),
         DataCell(
@@ -962,40 +1074,29 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
   }
 
   Widget _buildGoalTable() {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: DataTable(
-        showCheckboxColumn: false,
-        dataRowMinHeight: 60,
-        dataRowMaxHeight: double.infinity,
-
-        headingRowColor: WidgetStateProperty.all(WebTheme.brandSoftOf(context)),
-        headingTextStyle: const TextStyle(
-          fontSize: 13,
-          fontWeight: FontWeight.w700,
-          color: WebTheme.brand,
-        ),
-
-        columns: const [
-          DataColumn(label: Text("Sl.No")),
-          DataColumn(label: Text("Goal")),
-          DataColumn(label: Text("Goal Type")),
-          DataColumn(label: Text("Assigned To")),
-          DataColumn(label: Text("Tasks")),
-          DataColumn(label: Text("Status")),
-          DataColumn(label: Text("Priority")),
-          DataColumn(label: Text("Due Date")),
-          DataColumn(label: Text("Completed Date")),
-          DataColumn(label: Text("Progress")),
-          DataColumn(label: Text("Points")),
-          DataColumn(label: Text("Overdue")),
-        ],
-
-        rows: [
-          for (var index = 0; index < filteredGoals.length; index++)
-            _goalRow(filteredGoals[index], index),
-        ],
-      ),
+    return _pinnedTable(
+      dataRowMinHeight: 60,
+      dataRowMaxHeight: double.infinity,
+      columns: const [
+        DataColumn(label: Text("Sl.No")),
+        DataColumn(label: Text("Goal")),
+        DataColumn(label: Text("Goal Type")),
+        DataColumn(label: Text("Assigned To")),
+        DataColumn(label: Text("Tasks")),
+        DataColumn(label: Text("Target Qty")),
+        DataColumn(label: Text("Completed Qty")),
+        DataColumn(label: Text("Status")),
+        DataColumn(label: Text("Priority")),
+        DataColumn(label: Text("Due Date")),
+        DataColumn(label: Text("Completed Date")),
+        DataColumn(label: Text("Progress")),
+        DataColumn(label: Text("Points")),
+        DataColumn(label: Text("Overdue")),
+      ],
+      rows: [
+        for (var index = 0; index < filteredGoals.length; index++)
+          _goalRow(filteredGoals[index], index),
+      ],
     );
   }
 
@@ -1010,7 +1111,13 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
           Text("${index + 1}", style: Theme.of(context).textTheme.labelMedium),
         ),
         DataCell(
-          _nameWithQty((goal["title"] ?? "").toString(), _qtyCaption(goal)),
+          Align(
+            alignment: Alignment.topLeft,
+            child: Text(
+              (goal["title"] ?? "").toString(),
+              style: Theme.of(context).textTheme.labelMedium,
+            ),
+          ),
         ),
         DataCell(
           Text(
@@ -1027,19 +1134,26 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
         DataCell(
           ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 360),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: tasksList.isNotEmpty
-                  ? [
-                      for (final entry in tasksList)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 3, bottom: 3),
-                          child: _nameWithQty(entry.name, entry.caption),
-                        ),
-                    ]
-                  : [const Text("-")],
+            child: _lineStack(
+              tasksList.isEmpty
+                  ? const ["-"]
+                  : [
+                      if (_isQuantityTask(goal)) "",
+                      for (final entry in tasksList) entry.name,
+                    ],
             ),
+          ),
+        ),
+        DataCell(
+          _lineStack(
+            _qtyLines(goal, completed: false),
+            firstIsGoal: _isQuantityTask(goal),
+          ),
+        ),
+        DataCell(
+          _lineStack(
+            _qtyLines(goal, completed: true),
+            firstIsGoal: _isQuantityTask(goal),
           ),
         ),
         DataCell(
@@ -1438,6 +1552,8 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
           "Goal Type",
           "Assigned To",
           "Tasks",
+          "Target Qty",
+          "Completed Qty",
           "Status",
           "Priority",
           "Due Date",
@@ -1513,6 +1629,8 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
                   .toString(),
               _assigneeLabel(filteredGoals[index]),
               _goalTaskLines(filteredGoals[index]).join("\n"),
+              _qtyLines(filteredGoals[index], completed: false).join("\n"),
+              _qtyLines(filteredGoals[index], completed: true).join("\n"),
               (filteredGoals[index]["status"] ?? "-").toString(),
               (filteredGoals[index]["priority"] ?? "").toString(),
               _cellDate(

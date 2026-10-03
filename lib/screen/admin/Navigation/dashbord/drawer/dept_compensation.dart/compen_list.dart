@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:jwt_decoder/jwt_decoder.dart';
+import 'package:staff_work_track/core/theme/web_theme.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
 import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
+import 'package:staff_work_track/core/widgets/web_ui.dart';
 import 'package:staff_work_track/screen/admin/Navigation/dashbord/drawer/dept_compensation.dart/add_compen.dart';
 import 'package:staff_work_track/services/auth_service.dart';
 import 'package:staff_work_track/services/overtime_service.dart';
@@ -372,11 +374,23 @@ class _ExtraWorkPageState extends State<ExtraWorkPage>
     });
   }
 
+  List<String> _tabLabels() {
+    return [
+      'All (${extraWorks.length})',
+      'Pending (${getFilteredWorks(1).length})',
+      'Approved (${getFilteredWorks(2).length})',
+      'Rejected (${getFilteredWorks(3).length})',
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
     final secondaryColor = Theme.of(context).colorScheme.secondary;
+    final web = WebPushedChrome.isWeb(context);
+    final labels = _tabLabels();
 
     return Scaffold(
+      backgroundColor: WebPushedChrome.background(context),
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios),
@@ -385,7 +399,7 @@ class _ExtraWorkPageState extends State<ExtraWorkPage>
           },
         ),
 
-        title: const Text('Compensation Work'),
+        title: web ? null : const Text('Compensation Work'),
 
         actions: [
           IconButton(
@@ -407,7 +421,9 @@ class _ExtraWorkPageState extends State<ExtraWorkPage>
           const SizedBox(width: 8),
         ],
 
-        bottom: PreferredSize(
+        bottom: web
+            ? null
+            : PreferredSize(
           preferredSize: const Size.fromHeight(55),
 
           child: Container(
@@ -423,20 +439,39 @@ class _ExtraWorkPageState extends State<ExtraWorkPage>
               dividerColor: Colors.transparent,
 
               tabs: [
-                Tab(text: 'All (${extraWorks.length})'),
-
-                Tab(text: 'Pending (${getFilteredWorks(1).length})'),
-
-                Tab(text: 'Approved (${getFilteredWorks(2).length})'),
-
-                Tab(text: 'Rejected (${getFilteredWorks(3).length})'),
+                for (final label in labels) Tab(text: label),
               ],
             ),
           ),
         ),
       ),
 
-      body: Stack(
+      body: WebPushedChrome.body(
+        context,
+        title: 'Compensation Work',
+        subtitle: 'Department compensation requests',
+        panel: false,
+        child: Column(
+          children: [
+            if (web)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: AnimatedBuilder(
+                  animation: _tabController,
+                  builder: (context, _) {
+                    final index = _tabController.index.clamp(0, labels.length - 1);
+                    return WebChoiceBar(
+                      options: labels,
+                      selected: labels[index],
+                      onSelected: (value) {
+                        _tabController.animateTo(labels.indexOf(value));
+                      },
+                    );
+                  },
+                ),
+              ),
+            Expanded(
+              child: Stack(
         children: [
           isLoading
               ? const Center(child: RotatingFlower())
@@ -487,6 +522,10 @@ class _ExtraWorkPageState extends State<ExtraWorkPage>
             ),
         ],
       ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -522,7 +561,9 @@ class _ExtraWorkPageState extends State<ExtraWorkPage>
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
 
-      decoration: BoxDecoration(
+      decoration: WebPushedChrome.isWeb(context)
+          ? WebTheme.card(context)
+          : BoxDecoration(
         borderRadius: BorderRadius.circular(18),
 
         border: Border.all(

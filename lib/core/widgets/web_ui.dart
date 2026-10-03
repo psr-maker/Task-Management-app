@@ -161,6 +161,88 @@ class WebPillTabs extends StatelessWidget {
   }
 }
 
+class WebChoiceBar extends StatelessWidget {
+  final List<String> options;
+  final String selected;
+  final ValueChanged<String> onSelected;
+
+  const WebChoiceBar({
+    super.key,
+    required this.options,
+    required this.selected,
+    required this.onSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          for (final option in options)
+            InkWell(
+              borderRadius: BorderRadius.circular(999),
+              onTap: () => onSelected(option),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 160),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: option == selected
+                      ? WebTheme.brand
+                      : WebTheme.surfaceOf(context),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(
+                    color: option == selected
+                        ? WebTheme.brand
+                        : WebTheme.lineOf(context),
+                  ),
+                ),
+                child: Text(
+                  option,
+                  style: TextStyle(
+                    color: option == selected
+                        ? Colors.white
+                        : WebTheme.inkOf(context),
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class WebFormFrame extends StatelessWidget {
+  final Widget child;
+  final double maxWidth;
+
+  const WebFormFrame({super.key, required this.child, this.maxWidth = 880});
+
+  @override
+  Widget build(BuildContext context) {
+    if (!WebPushedChrome.isWeb(context)) return child;
+    return Align(
+      alignment: Alignment.topCenter,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: maxWidth),
+        child: Container(
+          decoration: WebTheme.card(context),
+          clipBehavior: Clip.antiAlias,
+          child: child,
+        ),
+      ),
+    );
+  }
+}
+
 class WebPanel {
   static Widget wrap(BuildContext context, Widget child) {
     if (!WebPushedChrome.isWeb(context)) return child;

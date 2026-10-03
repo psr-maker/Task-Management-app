@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:staff_work_track/core/constant/division_config.dart';
+import 'package:staff_work_track/core/theme/web_theme.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
 import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
 import 'package:staff_work_track/core/widgets/web_ui.dart';
@@ -461,7 +462,9 @@ class _DivCompensationState extends State<DivCompensation> {
 
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
-      decoration: BoxDecoration(
+      decoration: WebPushedChrome.isWeb(context)
+          ? WebTheme.card(context)
+          : BoxDecoration(
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
           color: Theme.of(context).colorScheme.secondary.withValues(alpha: 0.45),

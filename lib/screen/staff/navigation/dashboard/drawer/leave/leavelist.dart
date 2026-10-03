@@ -1,7 +1,10 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:staff_work_track/core/theme/web_theme.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
 import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
+import 'package:staff_work_track/core/widgets/status_badge.dart';
+import 'package:staff_work_track/core/widgets/web_ui.dart';
 import 'package:staff_work_track/services/admin_service.dart';
 import 'package:staff_work_track/screen/staff/navigation/dashboard/drawer/leave/leaveapply.dart';
 import 'package:staff_work_track/utils/app_helper.dart';
@@ -235,16 +238,52 @@ class _LeavelistState extends State<Leavelist>
     return TimeUtils.formatTime12(time, empty: "-");
   }
 
+  Widget _webFilters() {
+    final labels = activeTab == "Leave" ? tabs : permissionTabs;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        WebChoiceBar(
+          options: const ["Leave", "Permission"],
+          selected: activeTab,
+          onSelected: (value) {
+            if (value == activeTab) return;
+            setState(() => activeTab = value);
+            _tabController.index = 0;
+            loadItems();
+          },
+        ),
+        const SizedBox(height: 12),
+        AnimatedBuilder(
+          animation: _tabController,
+          builder: (context, _) {
+            final index = _tabController.index.clamp(0, labels.length - 1);
+            return WebChoiceBar(
+              options: labels,
+              selected: labels[index],
+              onSelected: (value) {
+                _tabController.animateTo(labels.indexOf(value));
+              },
+            );
+          },
+        ),
+        const SizedBox(height: 12),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final groupedData = groupByMonth(filteredItems);
+    final web = WebPushedChrome.isWeb(context);
     return Scaffold(
+      backgroundColor: WebPushedChrome.background(context),
       appBar: AppBar(
         leading: IconButton(
           onPressed: () => Navigator.pop(context),
           icon: const Icon(Icons.arrow_back_ios),
         ),
-        title: Text(activeTab),
+        title: web ? null : Text(activeTab),
         actions: [
           if (activeTab == "Leave")
             IconButton(
@@ -262,7 +301,9 @@ class _LeavelistState extends State<Leavelist>
               },
             ),
         ],
-        bottom: PreferredSize(
+        bottom: web
+            ? null
+            : PreferredSize(
           preferredSize: Size.fromHeight(120),
           child: Column(
             children: [
@@ -358,7 +399,17 @@ class _LeavelistState extends State<Leavelist>
           ),
         ),
       ),
-      body: isLoading
+      body: WebPushedChrome.body(
+        context,
+        title: 'Leave & Permission',
+        subtitle: 'Your leave and permission requests',
+        panel: false,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (web) _webFilters(),
+            Expanded(
+              child: isLoading
           ? const Center(child: RotatingFlower())
           : filteredItems.isEmpty
           ? Center(
@@ -414,6 +465,10 @@ class _LeavelistState extends State<Leavelist>
                   ),
               ],
             ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -423,12 +478,15 @@ class _LeavelistState extends State<Leavelist>
     final status = (e["status"] ?? "").toString().toLowerCase();
     final isExpanded = expandedItems.contains(index);
 
+    final web = WebPushedChrome.isWeb(context);
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        border: Border.all(color: Theme.of(context).colorScheme.secondary),
-        borderRadius: BorderRadius.circular(10),
-      ),
+      decoration: web
+          ? WebTheme.card(context)
+          : BoxDecoration(
+              border: Border.all(color: Theme.of(context).colorScheme.secondary),
+              borderRadius: BorderRadius.circular(10),
+            ),
       child: Column(
         children: [
           InkWell(
@@ -548,24 +606,26 @@ class _LeavelistState extends State<Leavelist>
                       ],
                     ),
                   ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 3,
-                    ),
-                    decoration: BoxDecoration(
-                      color: statusColor(status).withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      status.toUpperCase(),
-                      style: TextStyle(
-                        color: statusColor(status),
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
+                  web
+                      ? StatusBadge(status)
+                      : Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: statusColor(status).withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            status.toUpperCase(),
+                            style: TextStyle(
+                              color: statusColor(status),
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
                 ],
               ),
             ),

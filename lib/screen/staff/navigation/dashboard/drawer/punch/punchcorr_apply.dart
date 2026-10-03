@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:staff_work_track/core/widgets/buttons.dart';
 import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
+import 'package:staff_work_track/core/widgets/web_ui.dart';
 import 'package:staff_work_track/services/admin_service.dart';
 
 class PunchCorrection extends StatefulWidget {
@@ -134,18 +135,26 @@ class _PunchCorrectionState extends State<PunchCorrection> {
 
   @override
   Widget build(BuildContext context) {
+    final web = WebPushedChrome.isWeb(context);
     return Scaffold(
+      backgroundColor: WebPushedChrome.background(context),
       appBar: AppBar(
         leading: IconButton(
           onPressed: () => Navigator.pop(context),
           icon: const Icon(Icons.arrow_back_ios),
         ),
-        title: const Text("Punch Correction"),
+        title: web ? null : const Text("Attendance Correction"),
       ),
 
-      body: SafeArea(
+      body: WebPushedChrome.body(
+        context,
+        title: 'Attendance Correction',
+        subtitle: 'Request a missed punch in or punch out',
+        panel: false,
+        child: WebFormFrame(
+        child: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(15),
+          padding: EdgeInsets.all(web ? 24 : 15),
           child: Stack(
             children: [
               Column(
@@ -346,6 +355,8 @@ class _PunchCorrectionState extends State<PunchCorrection> {
                 ),
             ],
           ),
+        ),
+        ),
         ),
       ),
     );

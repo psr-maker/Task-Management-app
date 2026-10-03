@@ -76,7 +76,12 @@ class _TaskDetailsState extends State<TaskDetails> {
       final role = token == null ? null : JwtHelper.getRole(token);
       final fetchedTask = TaskModel.fromJson(data);
 
-      final assignedTo = fetchedTask.assignedTo;
+      final assignedTo = _assigneesForViewer(
+        fetchedTask.assignedTo,
+        data,
+        userId,
+        role,
+      );
 
       members = assignedTo.map((u) {
         if (u is! Map) {
@@ -671,12 +676,32 @@ class _TaskDetailsState extends State<TaskDetails> {
   
   bool get _hasQuantity => (task?.quantity ?? 0) > 0;
 
-  bool get _seesEveryShare {
-    final role = (_role ?? "").toLowerCase().trim();
-    return role == "1" ||
-        role.contains("director") ||
-        role == "3" ||
-        role.contains("manager");
+  bool _seesEveryShareFor(String? role) {
+    final value = (role ?? "").toLowerCase().trim();
+    return value == "1" ||
+        value.contains("director") ||
+        value == "3" ||
+        value.contains("manager");
+  }
+
+  bool get _seesEveryShare => _seesEveryShareFor(_role);
+
+  List _assigneesForViewer(
+    List assignedTo,
+    Map<String, dynamic> data,
+    int? userId,
+    String? role,
+  ) {
+    if (_seesEveryShareFor(role) || userId == null) return assignedTo;
+    final ids = quantityShareMemberIds(data, userId);
+    if (ids == null || ids.isEmpty) return assignedTo;
+    final mine = assignedTo.where((person) {
+      final id = person is Map
+          ? int.tryParse(memberUserId(Map<String, dynamic>.from(person)))
+          : shareMemberId(person);
+      return id != null && ids.contains(id);
+    }).toList();
+    return mine.isEmpty ? assignedTo : mine;
   }
 
   List<Map<String, dynamic>> get _quantitySplits {

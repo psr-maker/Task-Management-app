@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:staff_work_track/core/theme/web_theme.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
+import 'package:staff_work_track/core/widgets/status_badge.dart';
+import 'package:staff_work_track/core/widgets/web_ui.dart';
 import 'package:staff_work_track/screen/staff/navigation/dashboard/drawer/punch/punchcorr_apply.dart';
 import 'package:staff_work_track/services/admin_service.dart';
 import 'package:staff_work_track/utils/app_helper.dart';
@@ -34,13 +37,15 @@ class _PunchCorrectionListState extends State<PunchCorrectionList> {
 
   @override
   Widget build(BuildContext context) {
+    final web = WebPushedChrome.isWeb(context);
     return Scaffold(
+      backgroundColor: WebPushedChrome.background(context),
       appBar: AppBar(
         leading: IconButton(
           onPressed: () => Navigator.pop(context),
           icon: const Icon(Icons.arrow_back_ios),
         ),
-        title: const Text("Punch Corrections"),
+        title: web ? null : const Text("Attendance Corrections"),
         actions: [
           IconButton(
             onPressed: () async {
@@ -59,19 +64,48 @@ class _PunchCorrectionListState extends State<PunchCorrectionList> {
         ],
       ),
 
-      body: isLoading
+      body: WebPushedChrome.body(
+        context,
+        title: 'Attendance Corrections',
+        subtitle: 'Your punch correction requests',
+        panel: false,
+        child: isLoading
           ? const Center(child: RotatingFlower())
           : corrections.isEmpty
           ? const Center(
               child: Text(
-                "No punch corrections found",
+                "No attendance corrections found",
                 style: TextStyle(fontSize: 15, color: Colors.grey),
               ),
             )
           : RefreshIndicator(
               onRefresh: loadPunchCorrections,
               color: const Color(0xff194d26),
-              child: ListView.builder(
+              child: web
+                  ? GridView.builder(
+                      padding: const EdgeInsets.fromLTRB(4, 4, 4, 24),
+                      gridDelegate:
+                          const SliverGridDelegateWithMaxCrossAxisExtent(
+                            maxCrossAxisExtent: 460,
+                            mainAxisExtent: 196,
+                            crossAxisSpacing: 12,
+                            mainAxisSpacing: 12,
+                          ),
+                      itemCount: corrections.length,
+                      itemBuilder: (context, index) {
+                        final item = corrections[index];
+                        return _PunchTimelineItem(
+                          date: AppHelpers.formatDate(item["date"] ?? ""),
+                          type: item["correctionType"] ?? "",
+                          time: item["punchTime"] ?? "",
+                          reason: item["reason"] ?? "",
+                          status: item["status"] ?? "",
+                          isLast: true,
+                          showRail: false,
+                        );
+                      },
+                    )
+                  : ListView.builder(
                 padding: const EdgeInsets.fromLTRB(16, 22, 16, 30),
                 itemCount: corrections.length,
                 itemBuilder: (context, index) {
@@ -88,6 +122,7 @@ class _PunchCorrectionListState extends State<PunchCorrectionList> {
                 },
               ),
             ),
+      ),
     );
   }
 }
@@ -99,6 +134,7 @@ class _PunchTimelineItem extends StatelessWidget {
   final String reason;
   final String status;
   final bool isLast;
+  final bool showRail;
 
   const _PunchTimelineItem({
     required this.date,
@@ -107,6 +143,7 @@ class _PunchTimelineItem extends StatelessWidget {
     required this.reason,
     required this.status,
     required this.isLast,
+    this.showRail = true,
   });
 
   Color getStatusColor() {
@@ -124,45 +161,13 @@ class _PunchTimelineItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final statusColor = getStatusColor();
 
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Timeline
-        SizedBox(
-          width: 28,
-          child: Column(
-            children: [
-              Container(
-                width: 14,
-                height: 14,
-                decoration: BoxDecoration(
-                  color: statusColor,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white, width: 2),
-                  boxShadow: [
-                    BoxShadow(
-                      color: statusColor.withOpacity(0.25),
-                      blurRadius: 5,
-                    ),
-                  ],
-                ),
-              ),
-
-              if (!isLast)
-                Container(width: 2, height: 190, color: Colors.grey.shade300),
-            ],
-          ),
-        ),
-
-        const SizedBox(width: 8),
-
-        // Card
-        Expanded(
-          child: Container(
-            margin: const EdgeInsets.only(bottom: 20),
+    final card = Container(
+            margin: EdgeInsets.only(bottom: showRail ? 20 : 0),
             padding: const EdgeInsets.all(16),
 
-            decoration: BoxDecoration(
+            decoration: WebPushedChrome.isWeb(context)
+                ? WebTheme.card(context)
+                : BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(16),
 
@@ -180,7 +185,6 @@ class _PunchTimelineItem extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Date + Status
                 Row(
                   children: [
                     const Icon(
@@ -191,7 +195,8 @@ class _PunchTimelineItem extends StatelessWidget {
 
                     const SizedBox(width: 7),
 
-                    Text(
+                    Expanded(
+                      child: Text(
                       date,
                       style: const TextStyle(
                         fontSize: 13,
@@ -199,10 +204,13 @@ class _PunchTimelineItem extends StatelessWidget {
                         color: Colors.black87,
                       ),
                     ),
+                    ),
 
-                    const Spacer(),
+                    const SizedBox(width: 8),
 
-                    Container(
+                    WebPushedChrome.isWeb(context)
+                        ? StatusBadge(status)
+                        : Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 9,
                         vertical: 5,
@@ -225,7 +233,6 @@ class _PunchTimelineItem extends StatelessWidget {
 
                 const SizedBox(height: 15),
 
-                // Punch type
                 Row(
                   children: [
                     Container(
@@ -287,7 +294,6 @@ class _PunchTimelineItem extends StatelessWidget {
 
                 const SizedBox(height: 15),
 
-                // Reason
                 Text(
                   "Reason",
                   style: TextStyle(
@@ -301,6 +307,8 @@ class _PunchTimelineItem extends StatelessWidget {
 
                 Text(
                   reason,
+                  maxLines: showRail ? null : 2,
+                  overflow: showRail ? null : TextOverflow.ellipsis,
                   style: const TextStyle(
                     fontSize: 13,
                     height: 1.4,
@@ -309,8 +317,43 @@ class _PunchTimelineItem extends StatelessWidget {
                 ),
               ],
             ),
+          );
+
+    if (!showRail) return card;
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Timeline
+        SizedBox(
+          width: 28,
+          child: Column(
+            children: [
+              Container(
+                width: 14,
+                height: 14,
+                decoration: BoxDecoration(
+                  color: statusColor,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white, width: 2),
+                  boxShadow: [
+                    BoxShadow(
+                      color: statusColor.withOpacity(0.25),
+                      blurRadius: 5,
+                    ),
+                  ],
+                ),
+              ),
+
+              if (!isLast)
+                Container(width: 2, height: 190, color: Colors.grey.shade300),
+            ],
           ),
         ),
+
+        const SizedBox(width: 8),
+
+        Expanded(child: card),
       ],
     );
   }

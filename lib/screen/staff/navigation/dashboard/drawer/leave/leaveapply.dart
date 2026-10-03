@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:staff_work_track/core/theme/web_theme.dart';
 import 'package:staff_work_track/core/widgets/buttons.dart';
 import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
+import 'package:staff_work_track/core/widgets/web_ui.dart';
 import 'package:staff_work_track/services/admin_service.dart';
 import 'package:staff_work_track/services/auth_service.dart';
 import 'package:staff_work_track/utils/jwt_helper.dart';
@@ -356,19 +358,36 @@ class _LeaveapplyState extends State<Leaveapply> {
 
   @override
   Widget build(BuildContext context) {
+    final web = WebPushedChrome.isWeb(context);
     return Scaffold(
+      backgroundColor: WebPushedChrome.background(context),
       appBar: AppBar(
         leading: IconButton(
           onPressed: () => Navigator.pop(context),
           icon: Icon(Icons.arrow_back_ios),
         ),
-        title: const Text("Leave Application"),
+        title: web ? null : const Text("Leave Application"),
       ),
-      body: Stack(
+      body: WebPushedChrome.body(
+        context,
+        title: 'Leave & Permission',
+        subtitle: applicationType == "Leave"
+            ? 'Apply for leave'
+            : 'Apply for a short permission',
+        panel: false,
+        child: WebFormFrame(
+          child: Stack(
         children: [
           ListView(
-            padding: const EdgeInsets.only(left: 15, right: 15),
+            padding: EdgeInsets.fromLTRB(web ? 24 : 15, web ? 20 : 0, web ? 24 : 15, 24),
             children: [
+              if (web)
+                WebChoiceBar(
+                  options: const ["Leave", "Permission"],
+                  selected: applicationType,
+                  onSelected: (value) => setState(() => applicationType = value),
+                )
+              else
               Row(
                 children: [
                   Expanded(
@@ -407,17 +426,45 @@ class _LeaveapplyState extends State<Leaveapply> {
               if (applicationType == "Leave") ...[
                 sectionTitle("Employee Details"),
                 const SizedBox(height: 20),
+                if (web)
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(child: inputField("Name", nameController)),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: inputField("Designation", designationController),
+                      ),
+                    ],
+                  )
+                else ...[
                 inputField("Name", nameController),
                 const SizedBox(height: 5),
                 inputField("Designation", designationController),
+                ],
                 const SizedBox(height: 5),
                 inputField("Leave Reason", reasonController),
                 const SizedBox(height: 15),
                 sectionTitle("Leave Period"),
                 const SizedBox(height: 20),
+                if (web)
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: dateTile("Select From Date", fromDate, pickFromDate),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: dateTile("Select To Date", toDate, pickToDate),
+                      ),
+                    ],
+                  )
+                else ...[
                 dateTile("Select From Date", fromDate, pickFromDate),
                 const SizedBox(height: 5),
                 dateTile("Select To Date", toDate, pickToDate),
+                ],
                 const SizedBox(height: 20),
                 if (leaveDays.isNotEmpty) ...[
                   sectionTitle("Leave Type Per Day"),
@@ -698,8 +745,21 @@ class _LeaveapplyState extends State<Leaveapply> {
                 sectionTitle("Permission Details"),
                 const SizedBox(height: 20),
 
+                if (web)
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(child: inputField("Name", nameController)),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: inputField("Designation", designationController),
+                      ),
+                    ],
+                  )
+                else ...[
                 inputField("Name", nameController),
                 inputField("Designation", designationController),
+                ],
                 inputField("Reason", reasonController),
 
                 const SizedBox(height: 10),
@@ -851,6 +911,8 @@ class _LeaveapplyState extends State<Leaveapply> {
             ),
         ],
       ),
+        ),
+      ),
     );
   }
 
@@ -865,7 +927,20 @@ class _LeaveapplyState extends State<Leaveapply> {
         controller: controller,
         decoration: InputDecoration(
           labelText: label,
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+          filled: WebPushedChrome.isWeb(context),
+          fillColor: WebTheme.canvasOf(context),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: BorderSide(color: WebTheme.lineOf(context)),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: BorderSide(color: WebTheme.lineOf(context)),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: const BorderSide(color: WebTheme.brand, width: 1.4),
+          ),
         ),
       ),
     );

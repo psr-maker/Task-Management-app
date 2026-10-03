@@ -86,6 +86,79 @@ int taskAchievedQty(Map task) {
   return fromShares > stored ? fromShares : stored;
 }
 
+List<dynamic> _shareMemberList(Map share) {
+  final members = share["memberIds"] ??
+      share["MemberIds"] ??
+      share["assignedTo"] ??
+      share["AssignedTo"] ??
+      share["members"] ??
+      share["Members"];
+  if (members is List) return members;
+  return const [];
+}
+
+int? shareMemberId(dynamic member) {
+  if (member is Map) {
+    final nested = member["user"] ?? member["User"];
+    final source = nested is Map ? nested : member;
+    return shareMemberId(
+      source["userId"] ?? source["UserId"] ?? source["id"] ?? source["Id"],
+    );
+  }
+  if (member == null) return null;
+  final text = member.toString().trim();
+  if (text.isEmpty || text == "null") return null;
+  if (text.contains("-")) {
+    return int.tryParse(text.split("-").first.trim());
+  }
+  return int.tryParse(text);
+}
+
+bool shareContainsUser(dynamic member, int userId) {
+  return shareMemberId(member) == userId;
+}
+
+/// People on the same quantity share as [userId].
+/// Null when this task is not split, or this user is not on a share.
+Set<int>? quantityShareMemberIds(Map task, int userId) {
+  final shares = task["quantitySplits"] ??
+      task["QuantitySplits"] ??
+      task["splits"];
+  if (shares is List) {
+    for (final share in shares) {
+      if (share is! Map) continue;
+      final members = _shareMemberList(share);
+      if (!members.any((member) => shareContainsUser(member, userId))) {
+        continue;
+      }
+      final ids = <int>{};
+      for (final member in members) {
+        final id = shareMemberId(member);
+        if (id != null) ids.add(id);
+      }
+      if (ids.isNotEmpty) return ids;
+    }
+  }
+
+  final people = task["assignedTo"] ?? task["AssignedTo"];
+  if (people is! List) return null;
+  Object? splitId;
+  for (final person in people) {
+    if (person is! Map || !shareContainsUser(person, userId)) continue;
+    splitId = person["splitId"] ?? person["SplitId"];
+    break;
+  }
+  if (splitId == null) return null;
+  final ids = <int>{};
+  for (final person in people) {
+    if (person is! Map) continue;
+    if ((person["splitId"] ?? person["SplitId"]) != splitId) continue;
+    final id = shareMemberId(person);
+    if (id != null) ids.add(id);
+  }
+  return ids.isEmpty ? null : ids;
+}
+
 int? memberShareQuantity(Map task, int userId) {
   final shares = task["quantitySplits"] ??
       task["QuantitySplits"] ??
@@ -93,19 +166,8 @@ int? memberShareQuantity(Map task, int userId) {
   if (shares is! List) return null;
   for (final share in shares) {
     if (share is! Map) continue;
-    final members = share["memberIds"] ??
-        share["MemberIds"] ??
-        share["assignedTo"] ??
-        share["members"];
-    if (members is! List) continue;
-    final mine = members.any((member) {
-      if (member is Map) {
-        return int.tryParse("${member["userId"] ?? member["UserId"]}") ==
-            userId;
-      }
-      return int.tryParse("$member") == userId;
-    });
-    if (!mine) continue;
+    final members = _shareMemberList(share);
+    if (!members.any((member) => shareContainsUser(member, userId))) continue;
     return readGoalInt(share, const ["quantity", "Quantity"]);
   }
   return null;
@@ -167,19 +229,8 @@ int? memberShareCompleted(Map task, int userId) {
   if (shares is! List) return null;
   for (final share in shares) {
     if (share is! Map) continue;
-    final members = share["memberIds"] ??
-        share["MemberIds"] ??
-        share["assignedTo"] ??
-        share["members"];
-    if (members is! List) continue;
-    final mine = members.any((member) {
-      if (member is Map) {
-        return int.tryParse("${member["userId"] ?? member["UserId"]}") ==
-            userId;
-      }
-      return int.tryParse("$member") == userId;
-    });
-    if (!mine) continue;
+    final members = _shareMemberList(share);
+    if (!members.any((member) => shareContainsUser(member, userId))) continue;
     return readGoalInt(share, const [
           "completedQuantity",
           "CompletedQuantity",

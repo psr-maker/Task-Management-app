@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
 import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
+import 'package:staff_work_track/core/widgets/web_ui.dart';
 import 'package:staff_work_track/services/admin_service.dart';
 import 'package:staff_work_track/utils/app_helper.dart';
 
@@ -91,14 +92,16 @@ class _PunchCorrdeptlistState extends State<PunchCorrdeptlist> {
 
   @override
   Widget build(BuildContext context) {
+    final web = WebPushedChrome.isWeb(context);
     return Scaffold(
+      backgroundColor: WebPushedChrome.background(context),
       appBar: AppBar(
         leading: IconButton(
           onPressed: () => Navigator.pop(context),
           icon: const Icon(Icons.arrow_back_ios),
         ),
-        title: const Text("Attendance Corrections"),
-        bottom: PreferredSize(
+        title: web ? null : const Text("Attendance Corrections"),
+        bottom: web ? null : PreferredSize(
           preferredSize: const Size.fromHeight(50),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -139,10 +142,27 @@ class _PunchCorrdeptlistState extends State<PunchCorrdeptlist> {
         ),
       ),
 
-      body: Stack(
+      body: WebPushedChrome.body(
+        context,
+        title: 'Attendance Corrections',
+        subtitle: 'Review punch correction requests',
+        panel: false,
+        child: Stack(
         children: [
           Column(
             children: [
+              if (web)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: WebChoiceBar(
+                    options: filters,
+                    selected: activeFilter,
+                    onSelected: (value) {
+                      setState(() => activeFilter = value);
+                      applyFilter();
+                    },
+                  ),
+                ),
               Expanded(
                 child: isLoading
                     ? const Center(child: RotatingFlower())
@@ -200,6 +220,7 @@ class _PunchCorrdeptlistState extends State<PunchCorrdeptlist> {
               ),
             ),
         ],
+      ),
       ),
     );
   }

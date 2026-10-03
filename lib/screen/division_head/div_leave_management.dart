@@ -4,6 +4,7 @@ import 'package:staff_work_track/core/constant/division_config.dart';
 import 'package:staff_work_track/core/widgets/buttons.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
 import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
+import 'package:staff_work_track/core/widgets/web_ui.dart';
 import 'package:staff_work_track/services/admin_service.dart';
 import 'package:staff_work_track/services/auth_service.dart';
 import 'package:staff_work_track/services/superadmin_service.dart';
@@ -611,14 +612,16 @@ class _DivLeaveManagementState extends State<DivLeaveManagement> {
     final grouped = _groupByMonth(items);
     final isPermission = activeTab == "Permission";
 
+    final web = WebPushedChrome.isWeb(context);
     return Scaffold(
+      backgroundColor: WebPushedChrome.background(context),
       appBar: AppBar(
-        title: Text(isPermission ? "Permissions" : "Leaves"),
+        title: web ? null : Text(isPermission ? "Permissions" : "Leaves"),
         leading: IconButton(
           onPressed: () => Navigator.pop(context),
           icon: const Icon(Icons.arrow_back_ios),
         ),
-        bottom: PreferredSize(
+        bottom: web ? null : PreferredSize(
           preferredSize: const Size.fromHeight(52),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(8, 0, 8, 10),
@@ -632,10 +635,30 @@ class _DivLeaveManagementState extends State<DivLeaveManagement> {
           ),
         ),
       ),
-      body: Stack(
+      body: WebPushedChrome.body(
+        context,
+        title: 'Leave & Permission',
+        subtitle: 'Requests for the departments you can access',
+        panel: false,
+        child: Stack(
         children: [
           Column(
             children: [
+              if (web)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(10, 4, 10, 8),
+                  child: WebChoiceBar(
+                    options: const ["Leave", "Permission"],
+                    selected: activeTab,
+                    onSelected: (value) {
+                      setState(() {
+                        activeTab = value;
+                        expandedItems.clear();
+                        _rejecting.clear();
+                      });
+                    },
+                  ),
+                ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(10, 12, 10, 0),
                 child: SizedBox(
@@ -708,6 +731,7 @@ class _DivLeaveManagementState extends State<DivLeaveManagement> {
               ),
             ),
         ],
+      ),
       ),
     );
   }

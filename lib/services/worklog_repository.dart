@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 
 import 'announ_service.dart';
@@ -19,10 +22,6 @@ class WorkLogRepository {
   }) async {
     final hasNetwork = await NetworkService.hasInternet();
 
-    // =====================================================
-    // TRY CLOUD FIRST
-    // =====================================================
-
     if (hasNetwork) {
       try {
         await AnnouncementService.addWorkLog(
@@ -30,7 +29,6 @@ class WorkLogRepository {
           workType: workType,
           description: description,
           workDate: workDate,
-        
           isSubmit: isSubmit,
           latitude: latitude,
           longitude: longitude,
@@ -40,18 +38,15 @@ class WorkLogRepository {
         );
 
         print("✅ WorkLog saved to CLOUD");
-
         return false;
-      } catch (e) {
-        print(
-          "⚠️ Cloud save failed. Saving locally: $e",
-        );
+      } on http.ClientException catch (e) {
+        print("⚠️ Network unreachable. Saving locally: $e");
+      } on TimeoutException catch (e) {
+        print("⚠️ Network timeout. Saving locally: $e");
       }
     }
 
-    // =====================================================
-    // OFFLINE OR CLOUD FAILED
-    // =====================================================
+    // Offline, or the request never reached the server.
 
     await LocalWorkLogDB.insertWorkLog({
       'title': title,

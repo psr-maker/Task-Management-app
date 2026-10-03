@@ -14,6 +14,16 @@ class VersionService {
   static bool get shouldCheckUpdate =>
       !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
 
+  static Future<Map<String, String>> getAppInfo() async {
+    final packageInfo = await PackageInfo.fromPlatform();
+    return {
+      'appName': packageInfo.appName.trim(),
+      'version': packageInfo.version.trim(),
+      'buildNumber': packageInfo.buildNumber.trim(),
+      'packageName': packageInfo.packageName.trim(),
+    };
+  }
+
   static Future<Map<String, dynamic>?> checkVersion() async {
     if (!shouldCheckUpdate) return null;
 

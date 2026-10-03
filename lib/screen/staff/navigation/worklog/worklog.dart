@@ -394,7 +394,7 @@ class _WorklogState extends State<Worklog> {
                 IconButton(
                   tooltip: "Local worklogs",
                   onPressed: _openLocalWorklogs,
-                  icon: const Icon(Icons.phone_android),
+                  icon: const Icon(Icons.cloud_off_outlined),
                 ),
                 if (logs.isNotEmpty)
                   TextButton(
@@ -426,7 +426,7 @@ class _WorklogState extends State<Worklog> {
                       IconButton(
                         tooltip: 'Local worklogs',
                         onPressed: _openLocalWorklogs,
-                        icon: const Icon(Icons.phone_android),
+                        icon: const Icon(Icons.cloud_off_outlined),
                       ),
                       if (logs.isNotEmpty)
                         TextButton(

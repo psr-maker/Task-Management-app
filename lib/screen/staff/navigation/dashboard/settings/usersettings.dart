@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:staff_work_track/core/theme/theme_provider.dart';
+import 'package:staff_work_track/core/widgets/app_version_card.dart';
 import 'package:staff_work_track/core/widgets/buttons.dart';
 import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
 import 'package:staff_work_track/screen/authen/login_selection.dart';
@@ -134,6 +135,10 @@ class _UsersSettingsState extends State<UsersSettings> {
             ),
           ),
 
+          const SizedBox(height: 30),
+          UsersSettings._sectionTitle("About"),
+          const SizedBox(height: 10),
+          const AppVersionCard(),
           const SizedBox(height: 40),
 
           Center(

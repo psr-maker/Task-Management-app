@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
+import 'package:staff_work_track/core/theme/web_theme.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
 import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
+import 'package:staff_work_track/core/widgets/web_ui.dart';
 import 'package:staff_work_track/services/overtime_service.dart';
 import 'package:staff_work_track/utils/time_utils.dart';
 
@@ -315,10 +317,12 @@ class _MyExtraWorkPageState extends State<MyExtraWorkPage>
   @override
   Widget build(BuildContext context) {
     final secondaryColor = Theme.of(context).colorScheme.secondary;
+    final web = WebPushedChrome.isWeb(context);
 
     return Scaffold(
+      backgroundColor: WebPushedChrome.background(context),
       appBar: AppBar(
-        title: const Text('Compensation Work'),
+        title: web ? null : const Text('Compensation Work'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios),
           onPressed: () {
@@ -326,7 +330,9 @@ class _MyExtraWorkPageState extends State<MyExtraWorkPage>
           },
         ),
 
-        bottom: TabBar(
+        bottom: web
+            ? null
+            : TabBar(
           controller: _tabController,
 
           indicatorColor: secondaryColor,
@@ -338,7 +344,32 @@ class _MyExtraWorkPageState extends State<MyExtraWorkPage>
         ),
       ),
 
-      body: Stack(
+      body: WebPushedChrome.body(
+        context,
+        title: 'Compensation Work',
+        subtitle: 'Your compensation requests',
+        panel: false,
+        child: Column(
+          children: [
+            if (web)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: AnimatedBuilder(
+                  animation: _tabController,
+                  builder: (context, _) {
+                    final index = _tabController.index.clamp(0, tabs.length - 1);
+                    return WebChoiceBar(
+                      options: tabs,
+                      selected: tabs[index],
+                      onSelected: (value) {
+                        _tabController.animateTo(tabs.indexOf(value));
+                      },
+                    );
+                  },
+                ),
+              ),
+            Expanded(
+              child: Stack(
         children: [
           isLoading
               ? const Center(child: RotatingFlower())
@@ -368,6 +399,10 @@ class _MyExtraWorkPageState extends State<MyExtraWorkPage>
               ),
             ),
         ],
+      ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -443,7 +478,9 @@ class _MyExtraWorkPageState extends State<MyExtraWorkPage>
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
 
-      decoration: BoxDecoration(
+      decoration: WebPushedChrome.isWeb(context)
+          ? WebTheme.card(context)
+          : BoxDecoration(
         borderRadius: BorderRadius.circular(18),
 
         border: Border.all(

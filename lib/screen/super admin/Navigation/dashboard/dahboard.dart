@@ -148,6 +148,69 @@ class _OverallReportsTabState extends State<SuperAdminDashboard> {
     return _map(raw);
   }
 
+  Widget _departmentCountCard(Map<String, dynamic> dept) {
+    final name = (dept["department"] ?? "Department").toString();
+    final goals = _map(dept["goals"]);
+    final tasks = _map(dept["tasks"]);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: WebTheme.card(context),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            name,
+            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 10),
+          _countLine("Goals", goals, Colors.deepPurple),
+          const SizedBox(height: 8),
+          _countLine("Tasks", tasks, Colors.blue),
+        ],
+      ),
+    );
+  }
+
+  Widget _countLine(String label, Map<String, dynamic> data, Color color) {
+    Widget figure(String title, String key) {
+      return Padding(
+        padding: const EdgeInsets.only(right: 14, bottom: 4),
+        child: Text(
+          "$title ${_count(data[key])}",
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: WebTheme.inkOf(context),
+          ),
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: color,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Wrap(
+          children: [
+            figure("Total", "total"),
+            figure("Completed", "completed"),
+            figure("Pending", "pending"),
+            figure("Overdue", "overdue"),
+          ],
+        ),
+      ],
+    );
+  }
+
   Future<Map<String, dynamic>> loadDashboard() async {
     final raw = _unwrapSummary(await _service.getDashboardSummary());
     var userCount = _int(raw["totalUsers"] ?? raw["TotalUsers"]);
@@ -524,6 +587,18 @@ class _OverallReportsTabState extends State<SuperAdminDashboard> {
                     ),
                   ],
                 ),
+                if (departments.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  Text(
+                    "Department Goal & Task",
+                    style: Theme.of(context).textTheme.displaySmall,
+                  ),
+                  const SizedBox(height: 10),
+                  for (final dept in departments) ...[
+                    _departmentCountCard(dept),
+                    const SizedBox(height: 10),
+                  ],
+                ],
                 const SizedBox(height: 20),
                 Text(
                   "Performance Overview",
