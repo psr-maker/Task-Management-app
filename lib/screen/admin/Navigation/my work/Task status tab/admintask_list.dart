@@ -7,12 +7,14 @@ class Alltasklist extends StatelessWidget {
   final List tasks;
   final String searchQuery;
   final Future<void> Function(Map<String, dynamic> task)? onStatusSaved;
+  final VoidCallback? onTaskDataUpdated;
 
   const Alltasklist({
     super.key,
     required this.tasks,
     required this.searchQuery,
     this.onStatusSaved,
+    this.onTaskDataUpdated,
   });
 
   @override
@@ -48,6 +50,7 @@ class Alltasklist extends StatelessWidget {
           return Taskstatus(
             task: task,
             onStatusSaved: onStatusSaved,
+            onTaskDataUpdated: onTaskDataUpdated,
             onTap: () {
               Navigator.push(
                 context,

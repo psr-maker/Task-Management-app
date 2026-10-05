@@ -317,6 +317,120 @@ GoalQuantityView? goalQuantityView(
   );
 }
 
+bool _taskStatusCompleted(dynamic task) {
+  if (task is! Map) return false;
+  final status = (task["status"] ?? task["Status"] ?? "")
+      .toString()
+      .trim()
+      .toLowerCase()
+      .replaceAll(" ", "")
+      .replaceAll("_", "");
+  return status == "completed";
+}
+
+int tasksCompletedCount(Iterable tasks) {
+  var count = 0;
+  for (final task in tasks) {
+    if (_taskStatusCompleted(task)) count++;
+  }
+  return count;
+}
+
+/// Progress % from quantity first, else completed tasks / total tasks, else stored progress.
+int goalProgressPercent(
+  Map goal, {
+  Iterable<Map>? months,
+  Iterable? tasks,
+  bool preferMonthTotals = false,
+}) {
+  final quantity = goalQuantityView(
+    goal,
+    months: months,
+    tasks: tasks,
+    preferMonthTotals: preferMonthTotals,
+  );
+  if (quantity != null) return quantity.percent;
+
+  final taskList = tasks ?? goal["tasks"] ?? goal["Tasks"];
+  if (taskList is Iterable && taskList.isNotEmpty) {
+    final total = taskList.length;
+    if (total > 0) {
+      return ((tasksCompletedCount(taskList) * 100) / total).round();
+    }
+  }
+
+  if (preferMonthTotals && months != null && months.isNotEmpty) {
+    var totalTasks = 0;
+    var doneTasks = 0;
+    for (final month in months) {
+      final nested = month["tasks"] ?? month["Tasks"];
+      if (nested is! Iterable || nested.isEmpty) continue;
+      totalTasks += nested.length;
+      doneTasks += tasksCompletedCount(nested);
+    }
+    if (totalTasks > 0) {
+      return ((doneTasks * 100) / totalTasks).round();
+    }
+  }
+
+  final stored = goal["progress"] ?? goal["Progress"] ?? 0;
+  if (stored is num) return stored.round().clamp(0, 100);
+  return (int.tryParse("$stored") ?? 0).clamp(0, 100);
+}
+
+/// Writes computed progress / completedQuantity onto [goal] from nested tasks/months.
+void syncGoalProgress(
+  Map goal, {
+  Iterable<Map>? months,
+  Iterable? tasks,
+  bool preferMonthTotals = false,
+}) {
+  final Iterable monthSource;
+  if (months != null) {
+    monthSource = months;
+  } else {
+    final raw = goal["monthlyGoals"] ?? goal["MonthlyGoals"];
+    if (raw is Iterable) {
+      monthSource = raw;
+    } else {
+      monthSource = const [];
+    }
+  }
+  final maps = <Map>[];
+  for (final month in monthSource) {
+    if (month is Map) {
+      syncGoalProgress(month);
+      maps.add(month);
+    }
+  }
+
+  final taskList = tasks ?? goal["tasks"] ?? goal["Tasks"];
+  final quantity = goalQuantityView(
+    goal,
+    months: maps.isEmpty ? null : maps,
+    tasks: taskList is Iterable ? taskList : null,
+    preferMonthTotals: preferMonthTotals || maps.isNotEmpty,
+  );
+  if (quantity != null) {
+    goal["completedQuantity"] = quantity.done;
+    if (goalTarget(goal) <= 0 && quantity.target > 0) {
+      goal["targetQuantity"] = quantity.target;
+    }
+  } else if (taskList is Iterable) {
+    final fromTasks = tasksAchievedTotal(taskList);
+    if (fromTasks > goalDone(goal)) {
+      goal["completedQuantity"] = fromTasks;
+    }
+  }
+
+  goal["progress"] = goalProgressPercent(
+    goal,
+    months: maps.isEmpty ? null : maps,
+    tasks: taskList is Iterable ? taskList : null,
+    preferMonthTotals: preferMonthTotals || maps.isNotEmpty,
+  );
+}
+
 String formatGoalQty(int value) {
   final negative = value < 0;
   final text = value.abs().toString();

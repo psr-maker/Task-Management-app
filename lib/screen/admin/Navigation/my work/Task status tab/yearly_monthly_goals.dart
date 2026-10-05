@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:staff_work_track/core/responsive/app_layout.dart';
+import 'package:staff_work_track/core/widgets/loading.dart';
 import 'package:staff_work_track/core/widgets/web_ui.dart';
+import 'package:staff_work_track/utils/goal_task_enrich.dart';
 import 'package:staff_work_track/widgets/StatCard.dart';
-import 'package:staff_work_track/utils/goal_quantity.dart';
 import 'package:staff_work_track/widgets/adaptive_goal_cards.dart';
 
 class YearlyMonthlyGoalsPage extends StatefulWidget {
@@ -26,11 +27,46 @@ class YearlyMonthlyGoalsPage extends StatefulWidget {
 class _YearlyMonthlyGoalsPageState extends State<YearlyMonthlyGoalsPage> {
   final TextEditingController _searchController = TextEditingController();
   bool _isSearching = false;
+  bool _loadingProgress = true;
+  late List<Map<String, dynamic>> _months;
+
+  @override
+  void initState() {
+    super.initState();
+    _months = widget.monthlyGoals.map(_prepareMonth).toList();
+    _loadProgress();
+  }
+
+  @override
+  void didUpdateWidget(covariant YearlyMonthlyGoalsPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.monthlyGoals, widget.monthlyGoals)) {
+      _months = widget.monthlyGoals.map(_prepareMonth).toList();
+      _loadProgress();
+    }
+  }
 
   @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  Map<String, dynamic> _prepareMonth(Map<String, dynamic> month) {
+    month["goalType"] = "Monthly";
+    if (month["monthlyGoals"] is! List) {
+      month["monthlyGoals"] = <Map<String, dynamic>>[];
+    }
+    if (month["tasks"] is! List) month["tasks"] = [];
+    return month;
+  }
+
+  Future<void> _loadProgress() async {
+    if (mounted) setState(() => _loadingProgress = true);
+    await Future.wait(_months.map(enrichGoalTaskQuantities));
+    syncGoalTreeProgress(widget.yearlyGoal);
+    if (!mounted) return;
+    setState(() => _loadingProgress = false);
   }
 
   bool _matchesSearch(Map<String, dynamic> month) {
@@ -42,30 +78,11 @@ class _YearlyMonthlyGoalsPageState extends State<YearlyMonthlyGoalsPage> {
         code.toLowerCase().contains(query);
   }
 
-
-
-  Map<String, dynamic> _monthlyCard(Map<String, dynamic> month) {
-    final copy = Map<String, dynamic>.from(month);
-    copy["goalType"] = "Monthly";
-    copy["monthlyGoals"] = <Map<String, dynamic>>[];
-    if (copy["tasks"] is! List) copy["tasks"] = [];
-    return copy;
-  }
-
   @override
   Widget build(BuildContext context) {
     final title = (widget.yearlyGoal["title"] ?? "Yearly goal").toString();
     final isWeb = !AppLayout.isMobile(context);
-    final months = widget.monthlyGoals
-        .where(_matchesSearch)
-        .map(_monthlyCard)
-        .toList();
-    goalQuantityView(
-      widget.yearlyGoal,
-      months: widget.monthlyGoals,
-      preferMonthTotals: true,
-    );
-    monthTargetTotal(widget.monthlyGoals);
+    final months = _months.where(_matchesSearch).toList();
 
     return Scaffold(
       backgroundColor: WebPushedChrome.background(context),
@@ -107,56 +124,63 @@ class _YearlyMonthlyGoalsPageState extends State<YearlyMonthlyGoalsPage> {
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
               ),
             )
-          : Padding(
-              padding: isWeb
-                  ? AppLayout.pagePadding(context)
-                  : const EdgeInsets.all(15),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // if (quantity != null) ...[
-                  //   _quantityHeader(context, quantity, assigned),
-                  //   const SizedBox(height: 16),
-                  // ],
-                  Text(
-                    "Monthly goals (${months.length})",
-                    style: Theme.of(context).textTheme.displaySmall,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    "Tap a monthly goal to see its tasks",
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Colors.grey.shade600,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Expanded(
-                    child: months.isEmpty
-                        ? Center(
-                            child: Text(
-                              "No monthly goal matches \"${_searchController.text.trim()}\"",
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w500,
+          : _loadingProgress
+              ? const Center(child: RotatingFlower())
+              : Padding(
+                  padding: isWeb
+                      ? AppLayout.pagePadding(context)
+                      : const EdgeInsets.all(15),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "Monthly goals (${months.length})",
+                        style: Theme.of(context).textTheme.displaySmall,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        "Tap a monthly goal to see its tasks",
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Expanded(
+                        child: months.isEmpty
+                            ? Center(
+                                child: Text(
+                                  "No monthly goal matches \"${_searchController.text.trim()}\"",
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              )
+                            : AdaptiveGoalCards(
+                                itemCount: months.length,
+                                itemBuilder: (context, index) {
+                                  final month = months[index];
+                                  final code =
+                                      (month["goalCode"] ?? month["GoalCode"] ?? "")
+                                          .toString();
+                                  return GoalCard(
+                                    key: ValueKey(
+                                      code.isEmpty ? 'month-$index' : code,
+                                    ),
+                                    goal: month,
+                                    onDelete: widget.onDelete,
+                                    onRefresh: () async {
+                                      widget.onRefresh?.call();
+                                      await _loadProgress();
+                                    },
+                                  );
+                                },
                               ),
-                            ),
-                          )
-                        : AdaptiveGoalCards(
-                            itemCount: months.length,
-                            itemBuilder: (context, index) {
-                              final month = months[index];
-                              return GoalCard(
-                                goal: month,
-                                onDelete: widget.onDelete,
-                                onRefresh: widget.onRefresh,
-                              );
-                            },
-                          ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-            ),
+                ),
     );
   }
 }

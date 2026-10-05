@@ -200,13 +200,6 @@ class _EmployeeDetailState extends State<EmployeeDetail> {
     return tasks;
   }
 
-  bool _isStandaloneTask(Map<String, dynamic> task) {
-    final goalCode = (task["goalCode"] ?? task["goal_code"] ?? "")
-        .toString()
-        .trim();
-    return goalCode.isEmpty || goalCode.toLowerCase() == "null";
-  }
-
   @override
   void initState() {
     super.initState();
@@ -310,32 +303,68 @@ class _EmployeeDetailState extends State<EmployeeDetail> {
         debugPrint("Task load error: $e");
       }
 
-      final nestedCodes = <String>{};
-      for (final goal in goals) {
-        for (final task in _tasksOf(goal)) {
-          if (task is Map && task["taskCode"] != null) {
-            nestedCodes.add(task["taskCode"].toString());
+      List<dynamic> detailed = [];
+      try {
+        detailed = await SuperAdminService.getGoals();
+      } catch (e) {
+        debugPrint("Detailed goals load error: $e");
+      }
+
+      final visible = goals.where((goal) {
+        final code = (goal["goalCode"] ?? goal["GoalCode"] ?? "")
+            .toString()
+            .trim();
+        return !_removedGoalCodes.contains(code);
+      }).toList();
+
+      final cards = goalsForCards(visible);
+      final employeeGoalCodes = <String>{};
+      void collectGoalCodes(dynamic raw) {
+        if (raw is! Map) return;
+        final code = (raw["goalCode"] ?? raw["GoalCode"] ?? "")
+            .toString()
+            .trim()
+            .toLowerCase();
+        if (code.isNotEmpty && code != "null") employeeGoalCodes.add(code);
+        final months = raw["monthlyGoals"] ?? raw["MonthlyGoals"];
+        if (months is List) {
+          for (final month in months) {
+            collectGoalCodes(month);
           }
         }
       }
+      for (final goal in cards) {
+        collectGoalCodes(goal);
+      }
 
-      final standalone = tasks.where((task) {
-        final taskCode = (task["taskCode"] ?? "").toString();
-        if (taskCode.isNotEmpty && nestedCodes.contains(taskCode)) {
-          return false;
+      final fromDetailed = <Map<String, dynamic>>[];
+      void collectDetailed(dynamic raw) {
+        if (raw is! Map) return;
+        final nested = raw["tasks"] ?? raw["Tasks"];
+        if (nested is List) {
+          for (final task in nested) {
+            if (task is! Map) continue;
+            final goalCode = taskGoalCode(task).toLowerCase();
+            if (!employeeGoalCodes.contains(goalCode)) continue;
+            fromDetailed.add(Map<String, dynamic>.from(task));
+          }
         }
-        return _isStandaloneTask(task);
-      }).toList();
+        final months = raw["monthlyGoals"] ?? raw["MonthlyGoals"];
+        if (months is List) {
+          for (final month in months) {
+            collectDetailed(month);
+          }
+        }
+      }
+      for (final goal in detailed) {
+        collectDetailed(goal);
+      }
+
+      final standalone = attachTasksToGoals(cards, [...fromDetailed, ...tasks]);
 
       if (mounted) {
         setState(() {
-          final visible = goals.where((goal) {
-            final code = (goal["goalCode"] ?? goal["GoalCode"] ?? "")
-                .toString()
-                .trim();
-            return !_removedGoalCodes.contains(code);
-          }).toList();
-          staffGoals = goalsForCards(visible);
+          staffGoals = cards;
           standaloneTasks = standalone;
 
           departmentsList = {

@@ -918,23 +918,48 @@ class _TaskDetailsState extends State<TaskDetails> {
     );
   }
 
+  bool _hasFinalPoints(Map<String, dynamic> review) {
+    final value = review['finalPoints'] ?? review['FinalPoints'];
+    if (value == null) return false;
+    if (value is String) {
+      final text = value.trim().toLowerCase();
+      return text.isNotEmpty && text != 'null';
+    }
+    return true;
+  }
+
+  int? _asPoints(dynamic value) {
+    if (value == null) return null;
+    if (value is num) return value.round();
+    final text = value.toString().trim();
+    if (text.isEmpty || text.toLowerCase() == 'null') return null;
+    return int.tryParse(text) ?? num.tryParse(text)?.round();
+  }
+
   Widget buildReviewDetails() {
     if (isReviewLoading) {
       return const Center(child: RotatingFlower());
     }
 
-    if (reviewData.isEmpty) {
-      return const Text(
-        "No reviews available",
-        style: TextStyle(color: Colors.grey),
+    final reviewed = reviewData.where(_hasFinalPoints).toList();
+    if (reviewed.isEmpty) {
+      return Text(
+        "Review not yet",
+        style: TextStyle(
+          color: Colors.grey.shade600,
+          fontSize: 15,
+          fontWeight: FontWeight.w600,
+        ),
       );
     }
 
-    final systemPoints = reviewData.first['systemPoints'] ?? 0;
+    final systemPoints = _asPoints(
+          reviewed.first['systemPoints'] ?? reviewed.first['SystemPoints'],
+        ) ??
+        0;
 
-    final reviewedBy = reviewData.first['reviewedBy']?.toString() ?? '';
-
-    final reviewedAt = reviewData.first['reviewedAt']?.toString() ?? '';
+    final reviewedBy = reviewed.first['reviewedBy']?.toString() ?? '';
+    final reviewedAt = reviewed.first['reviewedAt']?.toString() ?? '';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -943,7 +968,6 @@ class _TaskDetailsState extends State<TaskDetails> {
           "Review Details",
           style: Theme.of(context).textTheme.headlineLarge,
         ),
-
         const SizedBox(height: 15),
         Padding(
           padding: const EdgeInsets.only(bottom: 10),
@@ -969,10 +993,8 @@ class _TaskDetailsState extends State<TaskDetails> {
             ],
           ),
         ),
-
         _reviewRow("Reviewed By", reviewedBy.isEmpty ? "—" : reviewedBy),
         _reviewRow("Date", reviewedAt.isEmpty ? "—" : _formatDate(reviewedAt)),
-
         const SizedBox(height: 20),
         Text(
           "Member Reviews",
@@ -980,18 +1002,16 @@ class _TaskDetailsState extends State<TaskDetails> {
             context,
           ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
         ),
-
         const SizedBox(height: 10),
-
         ...reviewData.map((review) {
           final staffName = review['staffName']?.toString() ?? 'Unknown Staff';
-
-          final finalPoints = review['finalPoints'] ?? 0;
-
+          final hasFinal = _hasFinalPoints(review);
+          final finalPoints = _asPoints(
+                review['finalPoints'] ?? review['FinalPoints'],
+              ) ??
+              0;
           final delayJustified = review['isDelayJustified'] == true;
-
           final reason = review['delayReason']?.toString() ?? '';
-
           final comment = review['comment']?.toString() ?? '';
 
           return Container(
@@ -1017,24 +1037,27 @@ class _TaskDetailsState extends State<TaskDetails> {
                         ),
                       ),
                     ),
-
                     Text(
-                      "$finalPoints / 100",
-                      style: const TextStyle(
-                        fontSize: 17,
+                      hasFinal ? "$finalPoints / 100" : "Review not yet",
+                      style: TextStyle(
+                        fontSize: 15,
                         fontWeight: FontWeight.bold,
-                        color: Colors.amber,
+                        color: hasFinal ? Colors.amber : Colors.grey.shade600,
                       ),
                     ),
                   ],
                 ),
-
-                const SizedBox(height: 12),
-                _reviewRow("Delay Justified", delayJustified ? "Yes" : "No"),
-                if (delayJustified)
-                  _reviewRow("Justify Reason", reason.isEmpty ? "—" : reason),
-                if (delayJustified)
-                  _reviewRow("Comment", comment.isEmpty ? "—" : comment),
+                if (hasFinal) ...[
+                  const SizedBox(height: 12),
+                  _reviewRow("Delay Justified", delayJustified ? "Yes" : "No"),
+                  if (delayJustified)
+                    _reviewRow(
+                      "Justify Reason",
+                      reason.isEmpty ? "—" : reason,
+                    ),
+                  if (delayJustified)
+                    _reviewRow("Comment", comment.isEmpty ? "—" : comment),
+                ],
               ],
             ),
           );

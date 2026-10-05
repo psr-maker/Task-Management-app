@@ -359,6 +359,24 @@ class AdminService {
           if (people is List) task["assignedTo"] = people;
           final splits = details["quantitySplits"] ?? details["QuantitySplits"];
           if (splits is List) task["quantitySplits"] = splits;
+          final done = details["completedQuantity"] ??
+              details["CompletedQuantity"] ??
+              details["achievedQuantity"] ??
+              details["AchievedQuantity"];
+          if (done != null) task["completedQuantity"] = done;
+          final qty = details["quantity"] ??
+              details["Quantity"] ??
+              details["taskQuantity"] ??
+              details["TaskQuantity"];
+          if (qty != null && taskAssignedQty(task) <= 0) {
+            task["quantity"] = qty;
+          }
+          final status = details["status"] ?? details["Status"];
+          if (status != null &&
+              (task["status"] == null ||
+                  task["status"].toString().trim().isEmpty)) {
+            task["status"] = status;
+          }
         } catch (_) {}
       }
       return tasks;

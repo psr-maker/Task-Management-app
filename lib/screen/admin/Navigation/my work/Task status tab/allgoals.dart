@@ -7,6 +7,7 @@ import 'package:staff_work_track/services/auth_service.dart';
 import 'package:staff_work_track/services/superadmin_service.dart';
 import 'package:staff_work_track/utils/jwt_helper.dart';
 import 'package:staff_work_track/utils/goal_quantity.dart';
+import 'package:staff_work_track/utils/goal_task_enrich.dart';
 import 'package:staff_work_track/widgets/StatCard.dart';
 import 'package:staff_work_track/widgets/adaptive_goal_cards.dart';
 
@@ -85,6 +86,11 @@ class _AllgoalsState extends State<Allgoals> {
 
     final merged = _mergeGoalLists(chunks);
     _applySavedQuantities(merged, _quantityByCode(withTasks));
+    await _attachRelatedTasks(
+      merged,
+      withTasks: withTasks,
+      fetchUserTasks: withTasks.isEmpty,
+    );
     return merged;
   }
 
@@ -109,11 +115,67 @@ class _AllgoalsState extends State<Allgoals> {
     }
 
     final byCode = _quantityByCode(detailed);
-    return mine.map((raw) {
+    final goals = mine.map((raw) {
       final goal = _normalizeGoal(raw);
       _keepLoginUserTasks(goal, byCode, userId);
       return goal;
     }).where((goal) => goal.isNotEmpty).toList();
+
+    await _attachRelatedTasks(
+      goals,
+      withTasks: detailed,
+      userId: userId,
+      fetchUserTasks: true,
+    );
+    return goals;
+  }
+
+  Future<void> _attachRelatedTasks(
+    List goals, {
+    List<dynamic> withTasks = const [],
+    int? userId,
+    bool fetchUserTasks = false,
+  }) async {
+    final flat = <Map<String, dynamic>>[];
+
+    void collect(dynamic raw) {
+      if (raw is! Map) return;
+      final nested = raw["tasks"] ?? raw["Tasks"];
+      if (nested is List) {
+        for (final task in nested) {
+          if (task is Map) flat.add(Map<String, dynamic>.from(task));
+        }
+      }
+      final months = raw["monthlyGoals"] ?? raw["MonthlyGoals"];
+      if (months is List) {
+        for (final month in months) {
+          collect(month);
+        }
+      }
+    }
+
+    for (final goal in withTasks) {
+      collect(goal);
+    }
+
+    if (fetchUserTasks) {
+      int? id = userId;
+      if (id == null) {
+        final token = await AuthService.getToken();
+        if (token != null) {
+          id = int.tryParse(JwtHelper.getuid(token)?.toString() ?? '');
+        }
+      }
+      if (id != null) {
+        try {
+          flat.addAll(await AdminService.getAdminTasks(id));
+        } catch (e) {
+          debugPrint(e.toString());
+        }
+      }
+    }
+
+    if (flat.isNotEmpty) attachTasksToGoals(goals, flat);
   }
 
   Future<void> loadGoals({bool showLoader = false}) async {
@@ -121,8 +183,11 @@ class _AllgoalsState extends State<Allgoals> {
       if (showLoader && mounted) setState(() => isLoading = true);
       final data = await _fetchGoals();
       if (!mounted) return;
+      final tree = _buildGoalTree(data);
+      await Future.wait(tree.map((node) => enrichGoalTaskQuantities(node.goal)));
+      if (!mounted) return;
       setState(() {
-        goals = _buildGoalTree(data);
+        goals = tree;
         isLoading = false;
       });
     } catch (e) {
@@ -506,6 +571,92 @@ List<dynamic> _mergeGoalLists(List<List<dynamic>> chunks) {
 
 List<Map<String, dynamic>> goalsForCards(List<dynamic> raw) {
   return _buildGoalTree(raw).map((node) => node.goal).toList();
+}
+
+String taskGoalCode(Map task) {
+  return (task["goalCode"] ?? task["GoalCode"] ?? task["goal_code"] ?? "")
+      .toString()
+      .trim();
+}
+
+String taskCodeOf(Map task) {
+  return (task["taskCode"] ?? task["TaskCode"] ?? "").toString().trim();
+}
+
+/// Nest flat tasks under matching goals (and monthly goals) by [goalCode].
+/// Returns tasks that still have no related goal.
+List<Map<String, dynamic>> attachTasksToGoals(
+  List goals,
+  List flatTasks,
+) {
+  final byGoalCode = <String, List<Map<String, dynamic>>>{};
+  final orphans = <Map<String, dynamic>>[];
+
+  for (final raw in flatTasks) {
+    if (raw is! Map) continue;
+    final task = Map<String, dynamic>.from(raw);
+    final code = taskGoalCode(task);
+    if (code.isEmpty || code.toLowerCase() == "null") {
+      orphans.add(task);
+      continue;
+    }
+    byGoalCode.putIfAbsent(code.toLowerCase(), () => []).add(task);
+  }
+
+  void mergeInto(Map<String, dynamic> goal) {
+    final code = _goalCode(goal).toLowerCase();
+    final incoming = code.isEmpty
+        ? const <Map<String, dynamic>>[]
+        : (byGoalCode.remove(code) ?? const []);
+
+    final existing = <Map<String, dynamic>>[];
+    final seen = <String>{};
+    void take(dynamic item) {
+      if (item is! Map) return;
+      final copy = Map<String, dynamic>.from(item);
+      final key = taskCodeOf(copy);
+      if (key.isNotEmpty && !seen.add(key)) return;
+      if (key.isEmpty) seen.add("row:${existing.length}");
+      existing.add(copy);
+    }
+
+    final current = goal["tasks"];
+    if (current is List) {
+      for (final item in current) {
+        take(item);
+      }
+    }
+    for (final item in incoming) {
+      take(item);
+    }
+    goal["tasks"] = existing;
+
+    final months = goal["monthlyGoals"] ?? goal["MonthlyGoals"];
+    if (months is List) {
+      for (var i = 0; i < months.length; i++) {
+        final month = months[i];
+        if (month is! Map) continue;
+        final monthMap = month is Map<String, dynamic>
+            ? month
+            : Map<String, dynamic>.from(month);
+        mergeInto(monthMap);
+        months[i] = monthMap;
+      }
+    }
+  }
+
+  for (final goal in goals) {
+    if (goal is Map<String, dynamic>) {
+      mergeInto(goal);
+    } else if (goal is Map) {
+      mergeInto(Map<String, dynamic>.from(goal));
+    }
+  }
+
+  for (final leftover in byGoalCode.values) {
+    orphans.addAll(leftover);
+  }
+  return orphans;
 }
 
 List<_GoalNode> _buildGoalTree(List<dynamic> raw) {

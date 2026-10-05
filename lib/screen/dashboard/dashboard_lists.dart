@@ -3,6 +3,7 @@ import 'package:staff_work_track/core/widgets/load_error.dart';
 import 'package:staff_work_track/core/responsive/app_layout.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
 import 'package:staff_work_track/screen/admin/Navigation/employee/employee.dart';
+import 'package:staff_work_track/screen/admin/Navigation/my%20work/Task%20status%20tab/allgoals.dart';
 import 'package:staff_work_track/screen/division_head/div_users.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/Reports/department/dept.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/Task/taskdetail.dart';
@@ -258,9 +259,24 @@ class _WorkListPageState extends State<WorkListPage> {
       if (widget.kind == DashboardListKind.goals) {
         final raw = report['goals'];
         if (raw is! List) continue;
+        final goals = <Map<String, dynamic>>[];
         for (final entry in raw) {
           if (entry is! Map) continue;
-          final goal = _normalizeGoal(entry, people);
+          goals.add(_normalizeGoal(entry, people));
+        }
+        final flatTasks = <Map<String, dynamic>>[];
+        final reportTasks = report['tasks'];
+        if (reportTasks is List) {
+          for (final entry in reportTasks) {
+            if (entry is Map) {
+              flatTasks.add(Map<String, dynamic>.from(entry));
+            }
+          }
+        }
+        if (flatTasks.isNotEmpty) {
+          attachTasksToGoals(goals, flatTasks);
+        }
+        for (final goal in goals) {
           addItem(goal);
           final months = goal['monthlyGoals'];
           if (months is List) {

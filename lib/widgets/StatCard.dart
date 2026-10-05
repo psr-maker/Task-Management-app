@@ -11,6 +11,7 @@ import 'package:staff_work_track/services/auth_service.dart';
 import 'package:staff_work_track/services/superadmin_service.dart';
 import 'package:staff_work_track/utils/app_helper.dart';
 import 'package:staff_work_track/utils/goal_quantity.dart';
+import 'package:staff_work_track/utils/goal_task_enrich.dart';
 import 'package:staff_work_track/utils/enum.dart';
 import 'package:staff_work_track/services/admin_service.dart';
 import 'package:staff_work_track/utils/TaskUtils.dart';
@@ -323,12 +324,14 @@ class Taskstatus extends StatefulWidget {
   final Map<String, dynamic> task;
   final VoidCallback onTap;
   final Future<void> Function(Map<String, dynamic> task)? onStatusSaved;
+  final VoidCallback? onTaskDataUpdated;
 
   const Taskstatus({
     super.key,
     required this.task,
     required this.onTap,
     this.onStatusSaved,
+    this.onTaskDataUpdated,
   });
 
   @override
@@ -396,6 +399,7 @@ class _TaskCardState extends State<Taskstatus> {
       if (done != null) widget.task["completedQuantity"] = done;
       _keepTaskOpenUntilEveryShareIsDone();
       if (mounted) setState(() {});
+      widget.onTaskDataUpdated?.call();
     } catch (e) {
       debugPrint("Quantity split load failed: $e");
     }
@@ -623,6 +627,7 @@ class _TaskCardState extends State<Taskstatus> {
     _quantityFetchStarted = true;
     await _loadAssignedQuantity(includeCompleted: true);
     _setStateIfMounted(() {});
+    widget.onTaskDataUpdated?.call();
   }
 
   Map<String, dynamic> _asTaskMap(Map raw) {
@@ -1109,12 +1114,50 @@ class _GoalCardState extends State<GoalCard> {
   int? adminId;
   bool isLoading = true;
   bool isSearching = false;
+  bool _enriching = false;
   late final isDark = Theme.of(context).brightness == Brightness.dark;
   final TextEditingController searchController = TextEditingController();
   @override
   void initState() {
     super.initState();
+    _syncProgress();
+    _enrichTaskQuantities();
     loadAdminId();
+  }
+
+  @override
+  void didUpdateWidget(covariant GoalCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.goal, widget.goal)) {
+      _syncProgress();
+      _enrichTaskQuantities();
+    }
+  }
+
+  void _syncProgress() {
+    syncGoalTreeProgress(widget.goal);
+  }
+
+  void _refreshProgress() {
+    if (!mounted) return;
+    setState(_syncProgress);
+  }
+
+  Future<void> _enrichTaskQuantities() async {
+    if (_enriching) return;
+    _enriching = true;
+    try {
+      final changed = await enrichGoalTaskQuantities(widget.goal);
+      if (!mounted) return;
+      if (changed) {
+        setState(_syncProgress);
+      } else {
+        _syncProgress();
+        if (mounted) setState(() {});
+      }
+    } finally {
+      _enriching = false;
+    }
   }
 
   Future<void> loadAdminId() async {
@@ -1312,11 +1355,6 @@ class _GoalCardState extends State<GoalCard> {
 
   @override
   Widget build(BuildContext context) {
-    final progressRaw = widget.goal["progress"] ?? 0;
-    final progress = progressRaw is num
-        ? progressRaw.round()
-        : int.tryParse("$progressRaw") ?? 0;
-
     final statusEnum = TaskUtils.parseStatus(
       widget.goal["status"]?.toString().trim() ?? "",
     );
@@ -1348,7 +1386,12 @@ class _GoalCardState extends State<GoalCard> {
       tasks: isYearly ? null : tasks,
       preferMonthTotals: isYearly,
     );
-    final shownProgress = quantity != null ? quantity.percent : progress;
+    final shownProgress = goalProgressPercent(
+      widget.goal,
+      months: isYearly ? monthlyGoals : null,
+      tasks: isYearly ? null : tasks,
+      preferMonthTotals: isYearly,
+    );
 
     return GestureDetector(
       onLongPress: _showGoalDialog,
@@ -1384,7 +1427,10 @@ class _GoalCardState extends State<GoalCard> {
                   widget.onRefresh?.call();
                   return;
                 }
-                setState(() => isExpanded = !isExpanded);
+                setState(() {
+                  _syncProgress();
+                  isExpanded = !isExpanded;
+                });
               },
               child: Padding(
                 padding: const EdgeInsets.all(15),
@@ -1574,7 +1620,10 @@ class _GoalCardState extends State<GoalCard> {
               Alltasklist(
                 tasks: tasks,
                 searchQuery: searchController.text,
-                onStatusSaved: (task) => _onGoalTaskStatusSaved(tasks),
+                onStatusSaved: (task) async {
+                  await _onGoalTaskStatusSaved(tasks);
+                },
+                onTaskDataUpdated: _refreshProgress,
               ),
           ],
         ),
@@ -1642,9 +1691,8 @@ class _GoalCardState extends State<GoalCard> {
           return TaskUtils.parseStatus((item["status"] ?? "").toString()) ==
               TaskStatus.completed;
         });
-    final achieved = tasksAchievedTotal(tasks);
     setState(() {
-      widget.goal["completedQuantity"] = achieved;
+      syncGoalProgress(widget.goal, tasks: tasks);
       if (allDone) widget.goal["status"] = "Completed";
     });
     _notifyGoalRefresh();
@@ -1654,20 +1702,22 @@ class _GoalCardState extends State<GoalCard> {
   List<Map<String, dynamic>> _monthlyGoalsOf(Map<String, dynamic> goal) {
     final raw = goal["monthlyGoals"] ?? goal["MonthlyGoals"];
     if (raw is! List) return [];
-    return raw.map((item) {
-      Map<String, dynamic> month;
-      if (item is Map<String, dynamic>) {
-        month = Map<String, dynamic>.from(item);
-      } else if (item is Map) {
-        month = Map<String, dynamic>.from(item);
-      } else {
-        return <String, dynamic>{};
-      }
+    final result = <Map<String, dynamic>>[];
+    for (var i = 0; i < raw.length; i++) {
+      final item = raw[i];
+      if (item is! Map) continue;
+      final month = item is Map<String, dynamic>
+          ? item
+          : Map<String, dynamic>.from(item);
+      if (!identical(item, month)) raw[i] = month;
       month["goalType"] = "Monthly";
-      month["monthlyGoals"] = <Map<String, dynamic>>[];
+      if (month["monthlyGoals"] is! List) {
+        month["monthlyGoals"] = <Map<String, dynamic>>[];
+      }
       if (month["tasks"] is! List) month["tasks"] = [];
-      return month;
-    }).where((item) => item.isNotEmpty).toList();
+      result.add(month);
+    }
+    return result;
   }
 
   String _assignedToNames(Map<String, dynamic> goal) {
