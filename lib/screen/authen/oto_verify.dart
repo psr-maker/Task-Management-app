@@ -149,7 +149,7 @@ class _OtpverifyState extends State<Otpverify> {
       if (mounted) setState(() => _isLoading = false);
     }
   }
-
+  
   Future<void> _resendOtp() async {
     setState(() => _isLoading = true);
     try {
@@ -219,9 +219,7 @@ class _OtpverifyState extends State<Otpverify> {
             ),
       body: Stack(
         children: [
-          AuthPageFrame(
-            form: _otpBody(context),
-          ),
+          AuthPageFrame(form: _otpBody(context)),
           if (_topMessage != null)
             AnimatedPositioned(
               top: _showTopMessage ? 5 : -120,
@@ -256,9 +254,7 @@ class _OtpverifyState extends State<Otpverify> {
           final mutedColor = isDesktop
               ? WebTheme.muted
               : const Color.fromARGB(255, 235, 233, 233);
-          final fieldFill = isDesktop
-              ? WebTheme.canvas
-              : WebTheme.dark;
+          final fieldFill = isDesktop ? WebTheme.canvas : WebTheme.dark;
           final fieldBorder = isDesktop ? WebTheme.line : Colors.white;
           final double contentWidth = isMobile
               ? screenWidth
@@ -310,61 +306,179 @@ class _OtpverifyState extends State<Otpverify> {
                                 ),
                               );
                             },
-                            icon: Icon(
-                              Icons.arrow_back_ios,
-                              color: onColor,
-                            ),
+                            icon: Icon(Icons.arrow_back_ios, color: onColor),
                           ),
                         ),
-                            // --------------------------------------------------
-                            // SECURITY ICON
-                            // --------------------------------------------------
-                            Icon(
-                              Icons.security,
-                              size: isMobile ? 58 : 65,
-                              color: onColor,
+                      // --------------------------------------------------
+                      // SECURITY ICON
+                      // --------------------------------------------------
+                      Icon(
+                        Icons.security,
+                        size: isMobile ? 58 : 65,
+                        color: onColor,
+                      ),
+
+                      SizedBox(height: isMobile ? 4 : 8),
+
+                      // --------------------------------------------------
+                      // TITLE
+                      // --------------------------------------------------
+                      Text(
+                        "Verification",
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: isMobile ? 22 : 25,
+                          color: onColor,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+
+                      SizedBox(height: isMobile ? 22 : 32),
+
+                      // --------------------------------------------------
+                      // DESCRIPTION
+                      // --------------------------------------------------
+                      RichText(
+                        textAlign: TextAlign.center,
+                        text: TextSpan(
+                          style: TextStyle(
+                            fontSize: isMobile ? 11 : 12,
+                            color: mutedColor,
+                            height: 1.5,
+                          ),
+                          children: [
+                            const TextSpan(
+                              text: "We've sent a 6-digit verification code\n",
                             ),
-
-                            SizedBox(height: isMobile ? 4 : 8),
-
-                            // --------------------------------------------------
-                            // TITLE
-                            // --------------------------------------------------
-                            Text(
-                              "Verification",
-                              textAlign: TextAlign.center,
+                            const TextSpan(text: "to your Registered Email\n"),
+                            TextSpan(
+                              text: widget.email,
                               style: TextStyle(
-                                fontSize: isMobile ? 22 : 25,
-                                color: onColor,
+                                fontSize: isMobile ? 12 : 13,
                                 fontWeight: FontWeight.bold,
+                                color: onColor,
                               ),
                             ),
+                          ],
+                        ),
+                      ),
 
-                            SizedBox(height: isMobile ? 22 : 32),
+                      SizedBox(height: isMobile ? 28 : 40),
 
-                            // --------------------------------------------------
-                            // DESCRIPTION
-                            // --------------------------------------------------
-                            RichText(
+                      // --------------------------------------------------
+                      // OTP BOXES
+                      // --------------------------------------------------
+                      LayoutBuilder(
+                        builder: (context, otpConstraints) {
+                          final availableWidth = otpConstraints.maxWidth;
+
+                          // Space between OTP boxes
+                          const double spacing = 8;
+
+                          // Calculate box width dynamically
+                          double boxWidth =
+                              (availableWidth - (spacing * 5)) / 6;
+
+                          // Keep boxes from becoming too large
+                          boxWidth = boxWidth.clamp(42.0, 55.0);
+
+                          return Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: List.generate(6, (index) {
+                              return Padding(
+                                padding: EdgeInsets.only(
+                                  right: index == 5 ? 0 : spacing,
+                                ),
+                                child: SizedBox(
+                                  width: boxWidth,
+                                  height: isMobile ? 52 : 56,
+                                  child: TextField(
+                                    controller: _otpcontrollers[index],
+                                    focusNode: _focusNodes[index],
+
+                                    keyboardType: TextInputType.number,
+
+                                    textAlign: TextAlign.center,
+
+                                    maxLength: 1,
+
+                                    style: TextStyle(
+                                      fontSize: isMobile ? 15 : 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: onColor,
+                                    ),
+
+                                    decoration: InputDecoration(
+                                      counterText: "",
+
+                                      filled: true,
+
+                                      fillColor: fieldFill,
+
+                                      contentPadding: EdgeInsets.zero,
+
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+
+                                      enabledBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                        borderSide: BorderSide(
+                                          color: fieldBorder,
+                                        ),
+                                      ),
+
+                                      focusedBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(10),
+                                        borderSide: BorderSide(
+                                          color: isDesktop
+                                              ? WebTheme.brand
+                                              : Colors.white,
+                                          width: 2,
+                                        ),
+                                      ),
+                                    ),
+
+                                    onChanged: (value) =>
+                                        _onOtpChanged(index, value),
+                                  ),
+                                ),
+                              );
+                            }),
+                          );
+                        },
+                      ),
+
+                      SizedBox(height: isMobile ? 18 : 20),
+
+                      // --------------------------------------------------
+                      // RESEND / TIMER
+                      // --------------------------------------------------
+                      _canResend
+                          ? GestureDetector(
+                              onTap: _resendOtp,
+                              child: Text(
+                                "Resend OTP",
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: onColor,
+                                  fontWeight: FontWeight.bold,
+                                  decoration: TextDecoration.underline,
+                                ),
+                              ),
+                            )
+                          : RichText(
                               textAlign: TextAlign.center,
                               text: TextSpan(
                                 style: TextStyle(
                                   fontSize: isMobile ? 11 : 12,
                                   color: mutedColor,
-                                  height: 1.5,
                                 ),
                                 children: [
-                                  const TextSpan(
-                                    text:
-                                        "We've sent a 6-digit verification code\n",
-                                  ),
-                                  const TextSpan(
-                                    text: "to your Registered Email\n",
-                                  ),
+                                  const TextSpan(text: "OTP expires in : "),
                                   TextSpan(
-                                    text: widget.email,
+                                    text: formattedTime,
                                     style: TextStyle(
-                                      fontSize: isMobile ? 12 : 13,
                                       fontWeight: FontWeight.bold,
                                       color: onColor,
                                     ),
@@ -373,164 +487,33 @@ class _OtpverifyState extends State<Otpverify> {
                               ),
                             ),
 
-                            SizedBox(height: isMobile ? 28 : 40),
+                      SizedBox(height: isMobile ? 28 : 40),
 
-                            // --------------------------------------------------
-                            // OTP BOXES
-                            // --------------------------------------------------
-                            LayoutBuilder(
-                              builder: (context, otpConstraints) {
-                                final availableWidth = otpConstraints.maxWidth;
-
-                                // Space between OTP boxes
-                                const double spacing = 8;
-
-                                // Calculate box width dynamically
-                                double boxWidth =
-                                    (availableWidth - (spacing * 5)) / 6;
-
-                                // Keep boxes from becoming too large
-                                boxWidth = boxWidth.clamp(42.0, 55.0);
-
-                                return Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: List.generate(6, (index) {
-                                    return Padding(
-                                      padding: EdgeInsets.only(
-                                        right: index == 5 ? 0 : spacing,
-                                      ),
-                                      child: SizedBox(
-                                        width: boxWidth,
-                                        height: isMobile ? 52 : 56,
-                                        child: TextField(
-                                          controller: _otpcontrollers[index],
-                                          focusNode: _focusNodes[index],
-
-                                          keyboardType: TextInputType.number,
-
-                                          textAlign: TextAlign.center,
-
-                                          maxLength: 1,
-
-                                          style: TextStyle(
-                                            fontSize: isMobile ? 15 : 16,
-                                            fontWeight: FontWeight.bold,
-                                            color: onColor,
-                                          ),
-
-                                          decoration: InputDecoration(
-                                            counterText: "",
-
-                                            filled: true,
-
-                                            fillColor: fieldFill,
-
-                                            contentPadding: EdgeInsets.zero,
-
-                                            border: OutlineInputBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(8),
-                                            ),
-
-                                            enabledBorder: OutlineInputBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(8),
-                                              borderSide: BorderSide(
-                                                color: fieldBorder,
-                                              ),
-                                            ),
-
-                                            focusedBorder: OutlineInputBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(10),
-                                              borderSide: BorderSide(
-                                                color: isDesktop
-                                                    ? WebTheme.brand
-                                                    : Colors.white,
-                                                width: 2,
-                                              ),
-                                            ),
-                                          ),
-
-                                          onChanged: (value) =>
-                                              _onOtpChanged(index, value),
-                                        ),
-                                      ),
-                                    );
-                                  }),
-                                );
-                              },
-                            ),
-
-                            SizedBox(height: isMobile ? 18 : 20),
-
-                            // --------------------------------------------------
-                            // RESEND / TIMER
-                            // --------------------------------------------------
-                            _canResend
-                                ? GestureDetector(
-                                    onTap: _resendOtp,
-                                    child: Text(
-                                      "Resend OTP",
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: onColor,
-                                        fontWeight: FontWeight.bold,
-                                        decoration: TextDecoration.underline,
-                                      ),
-                                    ),
-                                  )
-                                : RichText(
-                                    textAlign: TextAlign.center,
-                                    text: TextSpan(
-                                      style: TextStyle(
-                                        fontSize: isMobile ? 11 : 12,
-                                        color: mutedColor,
-                                      ),
-                                      children: [
-                                        const TextSpan(
-                                          text: "OTP expires in : ",
-                                        ),
-                                        TextSpan(
-                                          text: formattedTime,
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            color: onColor,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-
-                            SizedBox(height: isMobile ? 28 : 40),
-
-                            // --------------------------------------------------
-                            // VERIFY BUTTON
-                            // --------------------------------------------------
-                            SizedBox(
-                              width: isMobile ? double.infinity : 250,
-                              child: AppButton(
-                                text: "Verify OTP",
-                                isLoading: _isLoading,
-                                onPressed: _isLoading ? null : _verifyOtp,
-                                txtcolor: isDesktop
-                                    ? Colors.white
-                                    : const Color.fromARGB(255, 50, 99, 49),
-                                color: isDesktop
-                                    ? WebTheme.brand
-                                    : Colors.white,
-                              ),
-                            ),
-
-                            SizedBox(height: isMobile ? 20 : 30),
-                          ],
+                      // --------------------------------------------------
+                      // VERIFY BUTTON
+                      // --------------------------------------------------
+                      SizedBox(
+                        width: isMobile ? double.infinity : 250,
+                        child: AppButton(
+                          text: "Verify OTP",
+                          isLoading: _isLoading,
+                          onPressed: _isLoading ? null : _verifyOtp,
+                          txtcolor: isDesktop
+                              ? Colors.white
+                              : const Color.fromARGB(255, 50, 99, 49),
+                          color: isDesktop ? WebTheme.brand : Colors.white,
                         ),
                       ),
-                    ),
+
+                      SizedBox(height: isMobile ? 20 : 30),
+                    ],
                   ),
-                );
-              },
+                ),
+              ),
             ),
           );
+        },
+      ),
+    );
   }
 }

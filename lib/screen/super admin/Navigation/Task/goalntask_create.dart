@@ -190,6 +190,7 @@ class _CreateTaskPageState extends State<Createtask> {
       final token = await AuthService.getToken();
       var department =
           (token != null ? JwtHelper.getDepartment(token) : null)?.trim();
+      final loginRole = token != null ? JwtHelper.getRole(token) : null;
       final loginUserId = int.tryParse(
         (token != null ? JwtHelper.getuid(token) : null)?.toString() ?? '',
       );
@@ -204,6 +205,10 @@ class _CreateTaskPageState extends State<Createtask> {
       }
 
       final ownDepartment = department?.trim() ?? "";
+      final allowedDepartments = await AdminService.assignmentDepartments(
+        role: loginRole,
+        ownDepartment: ownDepartment,
+      );
       List<UserModel> users = [];
       Map<int, String> names = {};
       try {
@@ -214,27 +219,27 @@ class _CreateTaskPageState extends State<Createtask> {
             names[user.userId] = name;
           }
         }
-        if (ownDepartment.isEmpty) {
+        if (allowedDepartments.isEmpty) {
           users = allUsers;
         }
       } catch (_) {}
 
-      if (ownDepartment.isNotEmpty) {
+      if (allowedDepartments.isNotEmpty) {
         try {
-          users = await AdminService.getEmployeesByDepartments([ownDepartment]);
+          users = await AdminService.getEmployeesByDepartments(
+            allowedDepartments,
+          );
         } catch (_) {}
 
         if (users.isEmpty && names.isNotEmpty) {
-          final ownKey = ownDepartment.toLowerCase();
           try {
             final allUsers = await SuperAdminService.getAllUsers();
             users = allUsers
                 .where(
-                  (user) =>
-                      DivisionConfig.isAllowedDepartment(user.department, [
-                        ownDepartment,
-                      ]) ||
-                      user.department.trim().toLowerCase() == ownKey,
+                  (user) => DivisionConfig.isAllowedDepartment(
+                    user.department,
+                    allowedDepartments,
+                  ),
                 )
                 .toList();
           } catch (_) {}

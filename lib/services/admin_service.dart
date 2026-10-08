@@ -11,6 +11,50 @@ import 'package:staff_work_track/core/constant/division_config.dart';
 class AdminService {
   static const String baseUrl = ApiConstants.apiurl;
 
+  /// Departments a user may assign goals/tasks within.
+  /// Division heads get their own dept + all sub-depts under them
+  /// (so they can assign to dept managers and staff in those depts).
+  static Future<List<String>> assignmentDepartments({
+    String? role,
+    String? ownDepartment,
+  }) async {
+    final own = (ownDepartment ?? '').trim();
+    final names = <String>[];
+
+    void add(String name) {
+      final value = name.trim();
+      if (value.isEmpty) return;
+      if (names.any(
+        (item) => DivisionConfig.isAllowedDepartment(value, [item]),
+      )) {
+        return;
+      }
+      names.add(value);
+    }
+
+    if (AppRoles.isDivisionHead(role)) {
+      add(own);
+      try {
+        final subs = await getMySubDepartments(
+          headDepartment: own.isEmpty ? null : own,
+        );
+        for (final sub in subs) {
+          add(sub);
+        }
+        if (names.length <= (own.isEmpty ? 0 : 1)) {
+          final fallback = await getMySubDepartments();
+          for (final sub in fallback) {
+            add(sub);
+          }
+        }
+      } catch (_) {}
+      return names;
+    }
+
+    if (own.isNotEmpty) return [own];
+    return [];
+  }
+
   static Future<List<String>> getMySubDepartments({
     String? headDepartment,
   }) async {

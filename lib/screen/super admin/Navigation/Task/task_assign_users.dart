@@ -171,6 +171,10 @@ class _AssignUsersPageState extends State<AssignUsersPage> {
 
   Future<List<UserModel>> _loadDepartmentUsers() async {
     final department = loginDepartment?.trim() ?? '';
+    final allowedDepartments = await AdminService.assignmentDepartments(
+      role: loginRole,
+      ownDepartment: department,
+    );
     List<UserModel> users = [];
     Map<int, String> names = {};
     try {
@@ -179,12 +183,12 @@ class _AssignUsersPageState extends State<AssignUsersPage> {
         final name = user.displayName;
         if (user.userId > 0 && name.isNotEmpty) names[user.userId] = name;
       }
-      if (department.isEmpty) users = allUsers;
+      if (allowedDepartments.isEmpty) users = allUsers;
     } catch (_) {}
 
-    if (department.isNotEmpty) {
+    if (allowedDepartments.isNotEmpty) {
       try {
-        users = await AdminService.getEmployeesByDepartment(department);
+        users = await AdminService.getEmployeesByDepartments(allowedDepartments);
       } catch (_) {}
 
       if (users.isEmpty) {
@@ -200,9 +204,10 @@ class _AssignUsersPageState extends State<AssignUsersPage> {
             .where(
               (user) =>
                   user.department.trim().isEmpty ||
-                  DivisionConfig.isAllowedDepartment(user.department, [
-                    department,
-                  ]),
+                  DivisionConfig.isAllowedDepartment(
+                    user.department,
+                    allowedDepartments,
+                  ),
             )
             .toList();
       }

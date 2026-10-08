@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:staff_work_track/Models/getusers.dart';
+import 'package:staff_work_track/core/constant/division_config.dart';
 import 'package:staff_work_track/core/widgets/buttons.dart';
 import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
 import 'package:staff_work_track/services/admin_service.dart';
@@ -119,6 +120,7 @@ class _EditGoalPageState extends State<EditGoalPage> {
       final token = await AuthService.getToken();
       var department =
           (token != null ? JwtHelper.getDepartment(token) : null)?.trim();
+      final loginRole = token != null ? JwtHelper.getRole(token) : null;
       final loginUserId = int.tryParse(
         (token != null ? JwtHelper.getuid(token) : null)?.toString() ?? "",
       );
@@ -132,6 +134,10 @@ class _EditGoalPageState extends State<EditGoalPage> {
       }
 
       final ownDepartment = department?.trim() ?? "";
+      final allowedDepartments = await AdminService.assignmentDepartments(
+        role: loginRole,
+        ownDepartment: ownDepartment,
+      );
       var users = <UserModel>[];
       final names = <int, String>{};
       try {
@@ -140,20 +146,24 @@ class _EditGoalPageState extends State<EditGoalPage> {
           final name = user.displayName;
           if (user.userId > 0 && name.isNotEmpty) names[user.userId] = name;
         }
-        if (ownDepartment.isEmpty) users = allUsers;
+        if (allowedDepartments.isEmpty) users = allUsers;
       } catch (_) {}
 
-      if (ownDepartment.isNotEmpty) {
+      if (allowedDepartments.isNotEmpty) {
         try {
-          users = await AdminService.getEmployeesByDepartments([ownDepartment]);
+          users = await AdminService.getEmployeesByDepartments(
+            allowedDepartments,
+          );
         } catch (_) {}
         if (users.isEmpty) {
-          final ownKey = ownDepartment.toLowerCase();
           try {
             final allUsers = await SuperAdminService.getAllUsers();
             users = allUsers
                 .where(
-                  (user) => user.department.trim().toLowerCase() == ownKey,
+                  (user) => DivisionConfig.isAllowedDepartment(
+                    user.department,
+                    allowedDepartments,
+                  ),
                 )
                 .toList();
           } catch (_) {}
