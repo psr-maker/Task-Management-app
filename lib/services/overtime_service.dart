@@ -295,8 +295,19 @@ class OvertimeService {
     if (data == null) return [];
 
     return data.whereType<Map>().map<Map<String, dynamic>>((item) {
-      return Map<String, dynamic>.from(item);
+      return _withCamelCase(Map<String, dynamic>.from(item));
     }).toList();
+  }
+
+  static Map<String, dynamic> _withCamelCase(Map<String, dynamic> item) {
+    final copy = Map<String, dynamic>.from(item);
+    for (final entry in item.entries) {
+      final key = entry.key.toString();
+      if (key.isEmpty) continue;
+      final camel = key[0].toLowerCase() + key.substring(1);
+      copy.putIfAbsent(camel, () => entry.value);
+    }
+    return copy;
   }
 
   static Future<List<Map<String, dynamic>>> _getExtraWorkFrom(String path) async {
@@ -338,86 +349,19 @@ class OvertimeService {
     );
   }
 
-  static Future<List<Map<String, dynamic>>> _getStaffByDepartment(
-    String department,
-  ) async {
-    final token = await AuthService.getToken();
-    final uri = Uri.parse('$baseUrl/Manager/staffbydept/$department');
-
-    final headers = <String, String>{
-      'Content-Type': 'application/json',
-    };
-    if (token != null && token.isNotEmpty) {
-      headers['Authorization'] = 'Bearer $token';
-    }
-
-    final response = await http.get(uri, headers: headers);
-
-    print('Staffbydept $department Status: ${response.statusCode}');
-    print('Staffbydept $department Response: ${response.body}');
-
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw Exception('Failed to load staff for $department');
-    }
-
-    final decoded = jsonDecode(response.body);
-    final employees = decoded is Map
-        ? (decoded['employees'] ?? decoded['data'] ?? [])
-        : decoded;
-
-    if (employees is! List) return [];
-
-    return employees.whereType<Map>().map<Map<String, dynamic>>((item) {
-      return Map<String, dynamic>.from(item);
-    }).toList();
-  }
-
-  static Future<List<Map<String, dynamic>>> _getAvailableCompensation(
-    int userId,
-  ) async {
-    return _getExtraWorkFrom('/Manager/available-compensation/$userId');
-  }
-
   static Future<List<Map<String, dynamic>>> getDepartmentExtraWork({
     String? department,
   }) async {
-    if (department == null || department.trim().isEmpty) {
-      return _getExtraWorkFrom('/Manager/department-extra-work');
-    }
-
-    final selected = department.trim();
-    print('Selected extra-work department: $selected');
-
-    final staff = await _getStaffByDepartment(selected);
-    if (staff.isEmpty) return [];
-
-    final lists = await Future.wait(
-      staff.map((user) async {
-        final userId = int.tryParse(
-          (user['userId'] ?? user['id'] ?? '').toString(),
-        );
-        if (userId == null) return <Map<String, dynamic>>[];
-
-        try {
-          final works = await _getAvailableCompensation(userId);
-          final name = (user['name'] ?? user['staffName'] ?? '').toString();
-          return works.map((item) {
-            return {
-              ...item,
-              'staffName': (item['staffName'] ?? item['name'] ?? name)
-                  .toString(),
-              'userId': item['userId'] ?? userId,
-              'department': item['department'] ?? selected,
-            };
-          }).toList();
-        } catch (e) {
-          print('available-compensation $userId error: $e');
-          return <Map<String, dynamic>>[];
-        }
-      }),
-    );
-
-    return lists.expand((item) => item).toList();
+    final works = await _getExtraWorkFrom('/Manager/department-extra-work');
+    final selected = department?.trim() ?? '';
+    if (selected.isEmpty) return works;
+    return works.where((item) {
+      final name = (item['department'] ?? item['staffDepartment'] ?? '')
+          .toString()
+          .trim();
+      if (name.isEmpty) return true;
+      return name.toLowerCase() == selected.toLowerCase();
+    }).toList();
   }
 
   static Future<List<Map<String, dynamic>>> getMyExtraWork() async {

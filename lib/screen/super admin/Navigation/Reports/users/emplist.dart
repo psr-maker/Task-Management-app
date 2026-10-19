@@ -1,12 +1,18 @@
 import 'package:flutter/material.dart';
-import 'package:staff_work_track/core/widgets/load_error.dart';
 import 'package:staff_work_track/Models/getusers.dart';
+import 'package:staff_work_track/core/theme/web_theme.dart';
+import 'package:staff_work_track/core/widgets/load_error.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
+import 'package:staff_work_track/screen/staff/navigation/dashboard/dashboard.dart';
 import 'package:staff_work_track/services/superadmin_service.dart';
-import 'emp.dart';
 
 class EmployeeReportsList extends StatefulWidget {
-  const EmployeeReportsList({super.key});
+  final String backToLabel;
+
+  const EmployeeReportsList({
+    super.key,
+    this.backToLabel = 'Back to reports',
+  });
 
   @override
   State<EmployeeReportsList> createState() => _EmployeeReportsListState();
@@ -23,6 +29,12 @@ class _EmployeeReportsListState extends State<EmployeeReportsList> {
   }
 
   @override
+  void dispose() {
+    searchController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return FutureBuilder<List<UserModel>>(
       future: usersFuture,
@@ -36,126 +48,156 @@ class _EmployeeReportsListState extends State<EmployeeReportsList> {
         }
 
         if (!snapshot.hasData || snapshot.data!.isEmpty) {
-          return const Center(child: Text("No Users Found"));
+          return Center(
+            child: Text(
+              'No users found',
+              style: TextStyle(color: WebTheme.mutedOf(context)),
+            ),
+          );
         }
 
-        // ✅ FILTER BY ROLE
-        // final filteredByRole = snapshot.data!
-        //     // .where(
-        //     //   (user) => user.role.toLowerCase() == widget.role.toLowerCase(),
-        //     // )
-        //     .toList();
-
-        // Exclude Role 1 users
         final filteredByRole = snapshot.data!
             .where((emp) => emp.role != "1")
             .toList();
 
         final query = searchController.text.toLowerCase();
-
         final finalList = filteredByRole.where((user) {
           if (query.isEmpty) return true;
           return user.name.toLowerCase().contains(query) ||
               user.department.toLowerCase().contains(query);
         }).toList();
 
-        if (finalList.isEmpty) {
-          return Center(child: Text("No User's Found"));
-        }
-
-        return Padding(
-          padding: const EdgeInsets.all(10),
-          child: Column(
-            children: [
-              TextField(
-                controller: searchController,
-                decoration: InputDecoration(
-                  hintText: "Search Users...",
-                  hintStyle: Theme.of(context).textTheme.labelMedium,
-                  border: InputBorder.none,
-                  enabledBorder: InputBorder.none,
-                  focusedBorder: InputBorder.none,
-                ),
-                onChanged: (_) => setState(() {}),
-              ),
-
-              Expanded(
-                child: ListView.builder(
-                  itemCount: finalList.length,
-                  itemBuilder: (context, index) {
-                    final user = finalList[index];
-
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 14),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(16),
-                        color: Theme.of(context).colorScheme.background,
+        return Column(
+          children: [
+            _searchField(context),
+            const SizedBox(height: 12),
+            Expanded(
+              child: finalList.isEmpty
+                  ? Center(
+                      child: Text(
+                        'No users found',
+                        style: TextStyle(color: WebTheme.mutedOf(context)),
                       ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(10),
-                        child: Row(
-                          children: [
-                            // ✅ Existing UI
-                            CircleAvatar(
-                              radius: 18,
-                              backgroundColor: Theme.of(
+                    )
+                  : ListView.separated(
+                      itemCount: finalList.length,
+                      separatorBuilder: (_, _) => const SizedBox(height: 10),
+                      itemBuilder: (context, index) {
+                        final user = finalList[index];
+                        final initial = user.name.trim().isEmpty
+                            ? '?'
+                            : user.name.trim()[0].toUpperCase();
+                        return Material(
+                          color: WebTheme.surfaceOf(context),
+                          borderRadius: BorderRadius.circular(16),
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(16),
+                            onTap: () {
+                              Navigator.push(
                                 context,
-                              ).colorScheme.secondary,
-                              child: Text(
-                                user.name[0].toUpperCase(),
-                                style: Theme.of(context).textTheme.labelLarge,
-                              ),
-                            ),
-                            const SizedBox(width: 15),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    user.name,
-                                    style: Theme.of(
-                                      context,
-                                    ).textTheme.labelMedium,
+                                MaterialPageRoute(
+                                  builder: (_) => StaffDashboard(
+                                    userid: user.userId,
+                                    role: user.role,
+                                    backToLabel: widget.backToLabel,
+                                    replaceShellMenu: true,
+                                    onBackToManager: () => Navigator.pop(context),
                                   ),
-                                  const SizedBox(height: 3),
-                                  Text(
-                                    user.department,
-                                    style: Theme.of(
-                                      context,
-                                    ).textTheme.labelSmall,
+                                ),
+                              );
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 12,
+                              ),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: WebTheme.lineOf(context)),
+                              ),
+                              child: Row(
+                                children: [
+                                  CircleAvatar(
+                                    radius: 20,
+                                    backgroundColor: WebTheme.brandSoftOf(context),
+                                    child: Text(
+                                      initial,
+                                      style: TextStyle(
+                                        color: WebTheme.brand,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          user.name,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            color: WebTheme.inkOf(context),
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: 15,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          user.department.trim().isEmpty
+                                              ? 'Staff dashboard'
+                                              : user.department,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            color: WebTheme.mutedOf(context),
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  Icon(
+                                    Icons.chevron_right_rounded,
+                                    color: WebTheme.mutedOf(context),
                                   ),
                                 ],
                               ),
                             ),
-                            InkWell(
-                              onTap: () async {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => EmployeeReportPage(
-                                      userid: user.userId,
-                                      username: user.name,
-                                      role: user.role,
-                                    ),
-                                  ),
-                                );
-                              },
-                              child: Padding(
-                                padding: const EdgeInsets.all(8.0),
-                                child: Icon(Icons.arrow_forward_ios),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ],
         );
       },
+    );
+  }
+
+  Widget _searchField(BuildContext context) {
+    final border = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(14),
+      borderSide: BorderSide(color: WebTheme.lineOf(context)),
+    );
+    return TextField(
+      controller: searchController,
+      onChanged: (_) => setState(() {}),
+      decoration: InputDecoration(
+        isDense: true,
+        hintText: 'Search users',
+        hintStyle: TextStyle(fontSize: 13, color: WebTheme.mutedOf(context)),
+        prefixIcon: Icon(Icons.search, size: 18, color: WebTheme.mutedOf(context)),
+        filled: true,
+        fillColor: WebTheme.surfaceOf(context),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        border: border,
+        enabledBorder: border,
+        focusedBorder: border.copyWith(
+          borderSide: BorderSide(color: WebTheme.brand),
+        ),
+      ),
     );
   }
 }

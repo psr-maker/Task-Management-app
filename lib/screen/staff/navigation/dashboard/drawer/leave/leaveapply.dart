@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:staff_work_track/core/responsive/app_layout.dart';
 import 'package:staff_work_track/core/theme/web_theme.dart';
 import 'package:staff_work_track/core/widgets/buttons.dart';
 import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
@@ -359,6 +360,7 @@ class _LeaveapplyState extends State<Leaveapply> {
   @override
   Widget build(BuildContext context) {
     final web = WebPushedChrome.isWeb(context);
+    if (web) return _webApplyPage();
     return Scaffold(
       backgroundColor: WebPushedChrome.background(context),
       appBar: AppBar(
@@ -916,6 +918,495 @@ class _LeaveapplyState extends State<Leaveapply> {
     );
   }
 
+  Widget _webApplyPage() {
+    final leave = applicationType == 'Leave';
+    return Scaffold(
+      backgroundColor: WebTheme.canvasOf(context),
+      body: Stack(
+        children: [
+          Padding(
+            padding: AppLayout.pagePadding(context),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    IconButton(
+                      tooltip: 'Back',
+                      visualDensity: VisualDensity.compact,
+                      onPressed: () => Navigator.pop(context),
+                      icon: Icon(Icons.arrow_back, size: 18, color: WebTheme.brandOf(context)),
+                    ),
+                    Text(
+                      leave ? 'Apply leave' : 'Apply permission',
+                      style: TextStyle(
+                        color: WebTheme.brandOf(context),
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    _webModeSwitch(),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                Expanded(
+                  child: Align(
+                    alignment: Alignment.topCenter,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 920),
+                      child: SingleChildScrollView(
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
+                          decoration: BoxDecoration(
+                            color: WebTheme.surfaceOf(context),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: WebTheme.lineOf(context)),
+                          ),
+                          child: leave ? _webLeaveForm() : _webPermissionForm(),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (_topMessage != null)
+            AnimatedPositioned(
+              top: _showTopMessage ? 8 : -120,
+              left: 16,
+              right: 16,
+              duration: const Duration(milliseconds: 300),
+              child: Msgsnackbar(
+                context,
+                message: _topMessage!,
+                isError: _isErrorMessage,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _webModeSwitch() {
+    return Container(
+      height: 38,
+      decoration: BoxDecoration(
+        color: WebTheme.brandSoftOf(context),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _webMode('Leave', applicationType == 'Leave', () {
+            setState(() => applicationType = 'Leave');
+          }),
+          _webMode('Permission', applicationType == 'Permission', () {
+            setState(() => applicationType = 'Permission');
+          }),
+        ],
+      ),
+    );
+  }
+
+  Widget _webMode(String title, bool selected, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: selected ? WebTheme.brand : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Text(
+          title,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+            color: selected ? Colors.white : WebTheme.inkOf(context),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _webPair(Widget left, Widget right) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(child: left),
+          const SizedBox(width: 16),
+          Expanded(child: right),
+        ],
+      ),
+    );
+  }
+
+  Widget _webBox(String label, Widget child) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: WebTheme.mutedOf(context),
+          ),
+        ),
+        const SizedBox(height: 6),
+        child,
+      ],
+    );
+  }
+
+  InputDecoration _webDecoration(String hint, {IconData? icon}) {
+    final border = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(10),
+      borderSide: BorderSide(color: WebTheme.brandOf(context).withValues(alpha: 0.4)),
+    );
+    return InputDecoration(
+      hintText: hint,
+      hintStyle: TextStyle(fontSize: 14, color: WebTheme.mutedOf(context)),
+      isDense: true,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+      suffixIcon: icon == null ? null : Icon(icon, size: 18, color: WebTheme.brandOf(context)),
+      suffixIconConstraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+      enabledBorder: border,
+      focusedBorder: border.copyWith(borderSide: BorderSide(color: WebTheme.brandOf(context))),
+    );
+  }
+
+  Widget _webText(
+    TextEditingController controller,
+    String hint, {
+    int lines = 1,
+    TextInputType? keyboard,
+    int? maxLength,
+  }) {
+    return TextField(
+      controller: controller,
+      maxLines: lines,
+      keyboardType: keyboard,
+      maxLength: maxLength,
+      style: TextStyle(fontSize: 14, color: WebTheme.inkOf(context)),
+      decoration: _webDecoration(hint).copyWith(counterText: ''),
+    );
+  }
+
+  Widget _webDate(String label, DateTime? date, VoidCallback onTap) {
+    return _webBox(
+      label,
+      InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: InputDecorator(
+          decoration: _webDecoration(label, icon: Icons.calendar_today),
+          child: Text(
+            date == null ? label : TimeUtils.formatDate(date),
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: date == null ? WebTheme.mutedOf(context) : WebTheme.brandOf(context),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _webTime(String label, TimeOfDay? time, VoidCallback onTap) {
+    return _webBox(
+      label,
+      InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: InputDecorator(
+          decoration: _webDecoration(label, icon: Icons.access_time),
+          child: Text(
+            time == null ? 'Select time' : time.format(context),
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: time == null ? WebTheme.mutedOf(context) : WebTheme.brandOf(context),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _webDrop({
+    required String? value,
+    required List<String> items,
+    required ValueChanged<String?> onChanged,
+  }) {
+    return Container(
+      height: 46,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: WebTheme.brandOf(context).withValues(alpha: 0.4)),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: items.contains(value) ? value : null,
+          isExpanded: true,
+          dropdownColor: Colors.white,
+          iconEnabledColor: WebTheme.brandOf(context),
+          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: WebTheme.brandOf(context)),
+          items: [
+            for (final item in items)
+              DropdownMenuItem(
+                value: item,
+                child: Text(
+                  item,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF111827),
+                  ),
+                ),
+              ),
+          ],
+          onChanged: onChanged,
+        ),
+      ),
+    );
+  }
+
+  Widget _webLeaveForm() {
+    return Column(
+      children: [
+        _webPair(
+          _webBox('Name', _webText(nameController, 'Name')),
+          _webBox('Designation', _webText(designationController, 'Designation')),
+        ),
+        Padding(
+          padding: const EdgeInsets.only(bottom: 14),
+          child: _webBox('Reason', _webText(reasonController, 'Reason', lines: 2)),
+        ),
+        _webPair(
+          _webDate('From date', fromDate, pickFromDate),
+          _webDate('To date', toDate, pickToDate),
+        ),
+        if (leaveDays.isNotEmpty) ...[
+          for (var index = 0; index < leaveDays.length; index++) _webLeaveDay(index),
+          const SizedBox(height: 4),
+        ],
+        Padding(
+          padding: const EdgeInsets.only(bottom: 14),
+          child: Row(
+            children: [
+              Text(
+                'Total leave',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: WebTheme.mutedOf(context),
+                ),
+              ),
+              const Spacer(),
+              Text(
+                '$totalLeave days',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                  color: WebTheme.brandOf(context),
+                ),
+              ),
+            ],
+          ),
+        ),
+        _webBox(
+          'Contact',
+          _webText(
+            emergencyController,
+            'Phone number',
+            keyboard: TextInputType.phone,
+            maxLength: 10,
+          ),
+        ),
+        const SizedBox(height: 16),
+        Center(child: _webSubmit()),
+      ],
+    );
+  }
+
+  Widget _webLeaveDay(int index) {
+    final day = leaveDays[index];
+    final categories = leaveCategories
+        .where((item) => item != 'Compensation' || hasApprovedCompensation)
+        .toList();
+    final category = categories.contains(day['leavetyp']) ? day['leavetyp'] as String? : 'CL';
+    final pickedElsewhere = leaveDays
+        .asMap()
+        .entries
+        .where((entry) => entry.key != index)
+        .map((entry) => entry.value['compensationId'])
+        .where((id) => id != null)
+        .toSet();
+    final options = availableCompensation
+        .where((item) => !pickedElsewhere.contains(item['id']))
+        .toList();
+    final currentValue = options.any((item) => item['id'] == day['compensationId'])
+        ? day['compensationId'] as int?
+        : null;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            TimeUtils.formatDate(day['date']),
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: WebTheme.brandOf(context)),
+          ),
+          const SizedBox(height: 6),
+          _webPair(
+            _webBox(
+              'Day type',
+              _webDrop(
+                value: day['type'] as String?,
+                items: const ['Full Day', 'First Half', 'Second Half', 'Holiday'],
+                onChanged: (value) {
+                  setState(() {
+                    leaveDays[index]['type'] = value;
+                    calculateTotal();
+                  });
+                },
+              ),
+            ),
+            _webBox(
+              'Leave type',
+              _webDrop(
+                value: category,
+                items: categories,
+                onChanged: (value) {
+                  setState(() {
+                    leaveDays[index]['leavetyp'] = value;
+                    if (value != 'Compensation') {
+                      leaveDays[index]['compensationId'] = null;
+                    }
+                  });
+                },
+              ),
+            ),
+          ),
+          if (day['leavetyp'] == 'Compensation' && hasApprovedCompensation)
+            _webBox(
+              'Compensation day',
+              Container(
+                height: 46,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: WebTheme.brandOf(context).withValues(alpha: 0.4)),
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<int>(
+                    value: currentValue,
+                    isExpanded: true,
+                    hint: Text(
+                      'Choose a date',
+                      style: TextStyle(fontSize: 14, color: WebTheme.mutedOf(context)),
+                    ),
+                    dropdownColor: Colors.white,
+                    iconEnabledColor: WebTheme.brandOf(context),
+                    items: [
+                      for (final item in options)
+                        DropdownMenuItem<int>(
+                          value: item['id'] as int,
+                          child: Text(TimeUtils.formatDate(item['date'])),
+                        ),
+                    ],
+                    onChanged: (value) {
+                      setState(() => leaveDays[index]['compensationId'] = value);
+                    },
+                  ),
+                ),
+              ),
+            ),
+          if (day['leavetyp'] == 'Compensation' && !hasApprovedCompensation)
+            Text(
+              'No approved compensation off available',
+              style: TextStyle(color: WebTheme.danger, fontSize: 12),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _webPermissionForm() {
+    return Column(
+      children: [
+        _webPair(
+          _webBox('Name', _webText(nameController, 'Name')),
+          _webBox('Designation', _webText(designationController, 'Designation')),
+        ),
+        Padding(
+          padding: const EdgeInsets.only(bottom: 14),
+          child: _webBox('Reason', _webText(reasonController, 'Reason', lines: 2)),
+        ),
+        _webPair(
+          _webDate('Apply date', fromDate, pickFromDate),
+          _webTime('From time', fromTime, pickFromTime),
+        ),
+        _webPair(
+          _webTime('To time', toTime, pickToTime),
+          _webBox(
+            'Total hours',
+            Container(
+              height: 46,
+              alignment: Alignment.centerLeft,
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: WebTheme.brandOf(context).withValues(alpha: 0.4)),
+              ),
+              child: Text(
+                totalMinutes > 0 ? formatDuration(totalMinutes) : '—',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: WebTheme.brandOf(context),
+                ),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 6),
+        Center(child: _webSubmit()),
+      ],
+    );
+  }
+
+  Widget _webSubmit() {
+    final leave = applicationType == 'Leave';
+    return FilledButton(
+      style: FilledButton.styleFrom(
+        backgroundColor: WebTheme.brand,
+        foregroundColor: Colors.white,
+        padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 12),
+        textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+      ),
+      onPressed: _isLoading
+          ? null
+          : () {
+              if (leave) {
+                submitLeave();
+              } else {
+                submitPermission();
+              }
+            },
+      child: Text(_isLoading ? 'Saving' : 'Submit'),
+    );
+  }
+
   Widget sectionTitle(String title) {
     return Text(title, style: Theme.of(context).textTheme.displaySmall);
   }
@@ -939,7 +1430,7 @@ class _LeaveapplyState extends State<Leaveapply> {
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(10),
-            borderSide: const BorderSide(color: WebTheme.brand, width: 1.4),
+            borderSide: BorderSide(color: WebTheme.brandOf(context), width: 1.4),
           ),
         ),
       ),

@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:staff_work_track/core/widgets/load_error.dart';
 import 'package:staff_work_track/Models/getusers.dart';
+import 'package:staff_work_track/Models/rolesmodel.dart';
 import 'package:staff_work_track/core/responsive/app_layout.dart';
 import 'package:staff_work_track/core/widgets/form_popup.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
-import 'package:staff_work_track/core/widgets/web_ui.dart';
+import 'package:staff_work_track/core/widgets/users_page_bar.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/Task/goalntask_create.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/users/Employee/empdetails.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/users/user_create.dart';
@@ -22,11 +23,14 @@ class Usersview extends StatefulWidget {
 
 class _UsersviewState extends State<Usersview> {
   late Future<List<UserModel>> employeesFuture;
+  List<Role> roles = [];
 
   bool isSelectionMode = false;
   Set<int> selectedEmpIds = {};
 
   bool isSearching = false;
+  List<String> departments = const ['All'];
+  String selectedDepartment = 'All';
 
   final TextEditingController searchController = TextEditingController();
 
@@ -34,6 +38,55 @@ class _UsersviewState extends State<Usersview> {
   void initState() {
     super.initState();
     employeesFuture = SuperAdminService.getAllUsers();
+    _loadDepartments();
+    _loadRoles();
+  }
+
+  Future<void> _loadRoles() async {
+    try {
+      final rolesList = await SuperAdminService.getRoles();
+      if (!mounted) return;
+      setState(() => roles = rolesList);
+    } catch (e) {
+      debugPrint('Failed to load roles: $e');
+    }
+  }
+
+  String _roleName(String raw) {
+    final value = raw.trim();
+    if (value.isEmpty) return '-';
+    final lower = value.toLowerCase();
+    for (final role in roles) {
+      if (role.name.trim().toLowerCase() == lower) return role.name;
+    }
+    final number = int.tryParse(value);
+    if (number != null) {
+      for (final role in roles) {
+        if (role.position == number && role.name.trim().isNotEmpty) {
+          return role.name;
+        }
+      }
+      for (final role in roles) {
+        if (role.id == number && role.name.trim().isNotEmpty) return role.name;
+      }
+    }
+    return value;
+  }
+
+  Future<void> _loadDepartments() async {
+    try {
+      final list = await SuperAdminService().getDepartments();
+      if (!mounted) return;
+      final names = list
+          .map((dept) => dept.departmentName.trim())
+          .where((name) => name.isNotEmpty)
+          .toSet()
+          .toList()
+        ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+      setState(() => departments = ['All', ...names]);
+    } catch (e) {
+      debugPrint('Failed to load departments: $e');
+    }
   }
 
   @override
@@ -71,6 +124,12 @@ class _UsersviewState extends State<Usersview> {
     }
 
     return employees.where((emp) {
+      final matchesDepartment =
+          selectedDepartment == 'All' ||
+          emp.department.trim().toLowerCase() ==
+              selectedDepartment.trim().toLowerCase();
+      if (!matchesDepartment) return false;
+      if (query.isEmpty) return true;
       return emp.name.toLowerCase().contains(query) ||
           emp.email.toLowerCase().contains(query) ||
           emp.department.toLowerCase().contains(query);
@@ -90,7 +149,7 @@ class _UsersviewState extends State<Usersview> {
     final result = await openFormPage(
       context,
       const CreateUsers(),
-      maxWidth: 560,
+      maxWidth: 680,
     );
 
     if (result == true) {
@@ -161,69 +220,18 @@ class _UsersviewState extends State<Usersview> {
           children: [
             if (isWeb)
               Padding(
-                padding: const EdgeInsets.only(bottom: 16),
-                child: AppLayout.isTablet(context)
-                    ? Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const WebPageHeader(
-                            title: 'Users',
-                            subtitle: 'People, roles and departments',
-                          ),
-                          const SizedBox(height: 12),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: TextField(
-                                  controller: searchController,
-                                  onChanged: (_) => setState(() {}),
-                                  decoration: InputDecoration(
-                                    hintText: 'Search name, email or department',
-                                    hintStyle: const TextStyle(fontSize: 13),
-                                    prefixIcon: const Icon(Icons.search, size: 18),
-                                    isDense: true,
-                                    filled: true,
-                                    fillColor: Theme.of(context).cardColor,
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              _addChip(),
-                            ],
-                          ),
-                        ],
-                      )
-                    : Row(
-                        children: [
-                          const WebPageHeader(
-                            title: 'Users',
-                            subtitle: 'People, roles and departments',
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: TextField(
-                              controller: searchController,
-                              onChanged: (_) => setState(() {}),
-                              decoration: InputDecoration(
-                                hintText: 'Search name, email or department',
-                                hintStyle: const TextStyle(fontSize: 13),
-                                prefixIcon: const Icon(Icons.search, size: 18),
-                                isDense: true,
-                                filled: true,
-                                fillColor: Theme.of(context).cardColor,
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          _addChip(),
-                        ],
-                      ),
+                padding: const EdgeInsets.only(bottom: 12),
+                child: UsersPageBar(
+                  departments: departments,
+                  selectedDepartment: selectedDepartment,
+                  onDepartmentChanged: (value) {
+                    setState(() => selectedDepartment = value);
+                  },
+                  searchController: searchController,
+                  onSearchChanged: (_) => setState(() {}),
+                  onAdd: _onAddPressed,
+                  addLabel: selectedEmpIds.isNotEmpty ? 'Add Task' : 'Add users',
+                ),
               )
             else
               Row(
@@ -261,6 +269,7 @@ class _UsersviewState extends State<Usersview> {
                       users: filteredEmployees,
                       selectedIds: selectedEmpIds,
                       selectionMode: isSelectionMode,
+                      roleLabel: (emp) => _roleName(emp.role),
                       onToggle: (emp) => _toggleSelection(emp.userId),
                       onTap: (emp) async {
                         if (isSelectionMode) {
@@ -338,6 +347,15 @@ class _UsersviewState extends State<Usersview> {
                                   fontSize: 13,
                                   fontWeight: FontWeight.w500,
                                   color: Color(0xFF1C2B22),
+                                ),
+                              ),
+                              Text(
+                                _roleName(emp.role),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: Color(0xFF5C6B63),
                                 ),
                               ),
                             ],

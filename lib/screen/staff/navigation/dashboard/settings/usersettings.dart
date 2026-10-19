@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:staff_work_track/core/responsive/responsive_body.dart';
 import 'package:staff_work_track/core/theme/theme_provider.dart';
 import 'package:staff_work_track/core/widgets/app_version_card.dart';
 import 'package:staff_work_track/core/widgets/buttons.dart';
@@ -61,8 +62,9 @@ class _UsersSettingsState extends State<UsersSettings> {
       await AuthService.logout();
 
       if (!mounted) return;
+      context.read<ThemeProvider>().applyRole(null);
 
-      Navigator.of(context).pushAndRemoveUntil(
+      Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
         MaterialPageRoute(builder: (_) => const LoginSelection()),
         (route) => false,
       );
@@ -87,7 +89,9 @@ class _UsersSettingsState extends State<UsersSettings> {
         ),
         title: const Text("User Settings"),
       ),
-      body: ListView(
+      body: ResponsiveBody(
+        maxWidth: 760,
+        child: ListView(
         padding: const EdgeInsets.all(20),
         children: [
           /// ===== PROFILE CARD =====
@@ -164,6 +168,7 @@ class _UsersSettingsState extends State<UsersSettings> {
 
           const SizedBox(height: 20),
         ],
+        ),
       ),
     );
   }

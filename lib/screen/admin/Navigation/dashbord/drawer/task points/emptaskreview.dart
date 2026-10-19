@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:staff_work_track/core/constant/division_config.dart';
+import 'package:staff_work_track/core/responsive/app_layout.dart';
+import 'package:staff_work_track/core/theme/web_theme.dart';
 import 'package:staff_work_track/core/widgets/empty_state.dart';
+import 'package:staff_work_track/core/widgets/request_workspace.dart';
 import 'package:staff_work_track/core/widgets/load_error.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
 import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
@@ -29,9 +32,6 @@ class _TaskpointsState extends State<Taskpoints> {
   bool _isErrorMessage = true;
   bool _showTopMessage = false;
   String _filter = "Pending";
-  String _department = "All";
-  String _role = "";
-  List<String> _divisionDepartments = [];
   Map<int, UserModel> _usersById = {};
   bool _searchOpen = false;
   final TextEditingController _search = TextEditingController();
@@ -70,114 +70,87 @@ class _TaskpointsState extends State<Taskpoints> {
   }
 
   Future<List<Map<String, dynamic>>> _loadVisibleTasks() async {
-    final token = await AuthService.getToken();
-    final role = token == null ? "" : (JwtHelper.getRole(token) ?? "");
-    final userId = int.tryParse(
-      token == null ? "" : (JwtHelper.getuid(token) ?? ""),
-    );
-    var myDepartment = token == null
-        ? ""
-        : (JwtHelper.getDepartment(token) ?? "").trim();
-
     List<UserModel> users = [];
     try {
       users = await SuperAdminService.getAllUsers();
-    } catch (_) {}
-    if (myDepartment.isEmpty && userId != null) {
-      for (final user in users) {
-        if (user.userId == userId && user.department.trim().isNotEmpty) {
-          myDepartment = user.department.trim();
-          break;
-        }
-      }
-    }
-
-    List<String> divisionDepartments = [];
-    try {
-      if (_isDirector(role)) {
-        divisionDepartments = await _departmentsUnderDivisionHeads(users);
-      } else {
-        divisionDepartments = await AdminService.getMySubDepartments();
-      }
     } catch (_) {}
 
     final tasks = await AdminService.getCompletedTaskPoints();
     final usersById = {for (final user in users) user.userId: user};
     if (mounted) {
       setState(() {
-        _role = role;
-        _divisionDepartments = divisionDepartments;
         _usersById = usersById;
       });
     }
+
+    final token = await AuthService.getToken();
+    final role = token == null ? "" : (JwtHelper.getRole(token) ?? "");
+    if (!AppRoles.isDivisionHead(role)) return tasks;
+
+    final departments = await _divisionDepartments(token, usersById);
     return tasks
-        .where(
-          (task) => _canSeeTask(
-            task,
-            role: role,
-            userId: userId,
-            myDepartment: myDepartment,
-            divisionDepartments: divisionDepartments,
-            usersById: usersById,
-          ),
-        )
+        .where((task) => _isDivisionManager(task, usersById, departments))
         .toList();
+  }
+
+  Future<List<String>> _divisionDepartments(
+    String? token,
+    Map<int, UserModel> usersById,
+  ) async {
+    final names = <String>[];
+
+    void add(String name) {
+      final value = name.trim();
+      if (value.isEmpty) return;
+      if (names.any((item) => DivisionConfig.isAllowedDepartment(value, [item]))) {
+        return;
+      }
+      names.add(value);
+    }
+
+    final own = token == null ? "" : (JwtHelper.getDepartment(token) ?? "");
+    add(own);
+    final userId = int.tryParse(
+      token == null ? "" : (JwtHelper.getuid(token) ?? ""),
+    );
+    if (userId != null) add(usersById[userId]?.department ?? "");
+
+    try {
+      for (final name in await AdminService.getMySubDepartments()) {
+        add(name);
+      }
+      if (own.trim().isNotEmpty) {
+        for (final name in await AdminService.getMySubDepartments(
+          headDepartment: own,
+        )) {
+          add(name);
+        }
+      }
+    } catch (_) {}
+
+    return names;
+  }
+
+  bool _isDivisionManager(
+    Map<String, dynamic> task,
+    Map<int, UserModel> usersById,
+    List<String> departments,
+  ) {
+    final person = usersById[_staffIdOf(task) ?? -1];
+    final role = person != null && person.role.trim().isNotEmpty
+        ? person.role
+        : _text(task, ["staffRole", "role", "Role"]);
+    if (!AppRoles.isManager(role)) return false;
+    if (departments.isEmpty) return true;
+    final department = person != null && person.department.trim().isNotEmpty
+        ? person.department
+        : _departmentOf(task);
+    if (department.isEmpty) return true;
+    return DivisionConfig.isAllowedDepartment(department, departments);
   }
 
   int? _staffIdOf(Map<String, dynamic> task) {
     return int.tryParse("${task["staffId"] ?? ""}");
-  }
-
-  bool _canSeeTask(
-    Map<String, dynamic> task, {
-    required String role,
-    required int? userId,
-    required String myDepartment,
-    required List<String> divisionDepartments,
-    required Map<int, UserModel> usersById,
-  }) {
-    final staffId = _staffIdOf(task);
-    if (staffId != null && staffId == userId) return false;
-    final person = staffId == null ? null : usersById[staffId];
-    final profileDepartment = person?.department.trim() ?? "";
-    final department = profileDepartment.isNotEmpty
-        ? profileDepartment
-        : _departmentOf(task);
-    final personRole = (person?.role ??
-            _text(task, ["staffRole", "role", "Role"]))
-        .toString();
-
-    if (_isDirector(role)) {
-      if (AppRoles.isDivisionHead(personRole)) return true;
-      if (!AppRoles.isManager(personRole)) return false;
-      if (department.trim().isEmpty) return false;
-      return !DivisionConfig.isAllowedDepartment(
-        department,
-        divisionDepartments,
-      );
-    }
-
-    if (AppRoles.isDivisionHead(role)) {
-      if (!AppRoles.isManager(personRole)) return false;
-      return DivisionConfig.isAllowedDepartment(
-        department,
-        divisionDepartments,
-      );
-    }
-
-    if (myDepartment.isEmpty || department.isEmpty) return true;
-    return DivisionConfig.isAllowedDepartment(department, [myDepartment]);
-  }
-
-  bool _isDirector(String role) {
-    final value = role.trim().toLowerCase();
-    return value == AppRoles.director || value == "director";
-  }
-
-  Future<List<String>> _departmentsUnderDivisionHeads(
-    List<UserModel> users,
-  ) async {
-    return AdminService.getDivisionHeadDepartments(users);
   }
 
   String _text(Map<String, dynamic> task, List<String> keys) {
@@ -203,8 +176,203 @@ class _TaskpointsState extends State<Taskpoints> {
 
   bool _isReviewed(Map<String, dynamic> task) => task["finalPoints"] != null;
 
+  void _openReview(Map<String, dynamic> task) {
+    final staffId = int.tryParse('${task['staffId']}');
+    if (staffId == null) return;
+    final title = (task['task'] ?? '').toString();
+    final name = (task['staffName'] ?? 'Unknown Staff').toString();
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        final width = AppLayout.dialogMaxWidth(dialogContext, preferred: 560);
+        return Dialog(
+          backgroundColor: WebTheme.surfaceOf(dialogContext),
+          surfaceTintColor: Colors.transparent,
+          elevation: 8,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+            side: BorderSide(color: WebTheme.lineOf(dialogContext)),
+          ),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: width,
+              maxHeight: MediaQuery.sizeOf(dialogContext).height * 0.86,
+            ),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Submit review',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: WebTheme.brand,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                title.isEmpty ? 'Untitled task' : title,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w800,
+                                  color: WebTheme.inkOf(dialogContext),
+                                  height: 1.25,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                name,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: WebTheme.mutedOf(dialogContext),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'Close',
+                        onPressed: () => Navigator.pop(dialogContext),
+                        icon: Icon(
+                          Icons.close_rounded,
+                          color: WebTheme.mutedOf(dialogContext),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Divider(height: 1, color: WebTheme.lineOf(dialogContext)),
+                  const SizedBox(height: 16),
+                  TaskPointDetail(
+                    key: ValueKey('${task['taskCode']}_$staffId'),
+                    taskName: title,
+                    assignedTo: name,
+                    taskId: task['taskCode'].toString(),
+                    staffId: staffId,
+                    framed: false,
+                    systemPoints: _systemPoints(task, staffId),
+                    finalPoints: task['finalPoints'],
+                    isReviewed: _isReviewed(task),
+                    delayJustified: task['isDelayJustified'] ?? false,
+                    delayReason: task['delayReason'],
+                    comment: task['comment'],
+                    onShowMessage: (msg, {isError = true}) {
+                      showTopMessage(msg, isError: isError);
+                    },
+                    onReviewSubmitted: () {
+                      Navigator.pop(dialogContext);
+                      _refreshTasks();
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _webPerformance() {
+    return Scaffold(
+      backgroundColor: WebTheme.canvasOf(context),
+      body: FutureBuilder<List<Map<String, dynamic>>>(
+        future: tasksFuture,
+        builder: (context, snapshot) {
+          final waiting = snapshot.connectionState == ConnectionState.waiting;
+          final tasks = snapshot.data ?? [];
+          final query = _search.text.trim().toLowerCase();
+          final visible = tasks.where((task) {
+            if (_filter == 'Pending' && _isReviewed(task)) return false;
+            if (_filter == 'Submitted' && !_isReviewed(task)) return false;
+            if (query.isEmpty) return true;
+            final haystack =
+                '${task['staffName'] ?? ''} ${task['task'] ?? ''} ${_membersLabel(task)}'
+                    .toLowerCase();
+            return haystack.contains(query);
+          }).toList();
+          final pendingCount = tasks.where((task) => !_isReviewed(task)).length;
+          final showReview = _filter != 'Pending';
+          return RequestWorkspace(
+            title: 'Task Performance',
+            subtitle: 'Review completed tasks and award points',
+            loading: waiting && tasks.isEmpty,
+            scrollable: true,
+            plainStatus: true,
+            emptyTitle: snapshot.hasError ? 'Could not load tasks' : 'No tasks in this view',
+            emptyMessage: snapshot.hasError
+                ? 'Try again in a moment.'
+                : 'Completed tasks ready for review will appear here.',
+            filters: const ['Pending', 'Submitted', 'All'],
+            selectedFilter: _filter,
+            onFilter: (value) => setState(() {
+              _filter = value;
+              expandedIndex = null;
+            }),
+            stats: [
+              WorkspaceStat(label: 'Pending', value: '$pendingCount', icon: Icons.pending_actions_rounded, color: WebTheme.brand),
+              WorkspaceStat(label: 'Submitted', value: '${tasks.length - pendingCount}', icon: Icons.task_alt_rounded, color: WebTheme.brand),
+            ],
+            columns: [
+              'Name',
+              'Task',
+              'Due date',
+              'Completed date',
+              'Score',
+              'Members',
+              'Target qty',
+              'Completed qty',
+              'Pending qty',
+              if (showReview) ...const [
+                'Delay justified',
+                'Reason',
+                'Comment',
+                'Manager points',
+              ],
+            ],
+            records: [
+              for (final task in visible)
+                if (int.tryParse('${task['staffId']}') != null)
+                  WorkspaceRecord(
+                    status: _isReviewed(task) ? 'Submitted' : 'Pending',
+                    onTap: _isReviewed(task) ? null : () => _openReview(task),
+                    actions: _isReviewed(task)
+                        ? const []
+                        : [
+                            workspaceAction(
+                              'Review',
+                              () => _openReview(task),
+                              filled: true,
+                            ),
+                          ],
+                    values: _taskRow(task, includeReview: showReview),
+                  ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (!AppLayout.isMobile(context)) return _webPerformance();
     return Scaffold(
       backgroundColor: WebPushedChrome.background(context),
       appBar: AppBar(
@@ -289,20 +457,8 @@ class _TaskpointsState extends State<Taskpoints> {
         }
 
         final tasks = snapshot.data ?? [];
-        final divisionHead = AppRoles.isDivisionHead(_role);
-        final departments = divisionHead
-            ? _divisionDepartments
-            : (tasks.map(_resolvedDepartment).where((name) => name.isNotEmpty).toSet().toList()
-                ..sort());
         final query = _search.text.trim().toLowerCase();
         final visible = tasks.where((task) {
-          if (_department != "All" &&
-              !DivisionConfig.isAllowedDepartment(
-                _resolvedDepartment(task),
-                [_department],
-              )) {
-            return false;
-          }
           if (_filter == "Pending" && _isReviewed(task)) return false;
           if (_filter == "Submitted" && !_isReviewed(task)) return false;
           if (query.isEmpty) return true;
@@ -316,17 +472,6 @@ class _TaskpointsState extends State<Taskpoints> {
 
         return Column(
           children: [
-            if ((divisionHead && departments.isNotEmpty) ||
-                (!divisionHead && departments.length > 1)) ...[
-              SizedBox(
-                height: 34,
-                child: ListView(
-                  scrollDirection: Axis.horizontal,
-                  children: ["All", ...departments].map(_deptChip).toList(),
-                ),
-              ),
-              const SizedBox(height: 12),
-            ],
             Row(
               children: [
                 _countChip("Pending", pendingCount, "Pending"),
@@ -403,49 +548,59 @@ class _TaskpointsState extends State<Taskpoints> {
     );
   }
 
-  Widget _deptChip(String name) {
-    final selected = _department == name;
-    final color = Theme.of(context).colorScheme.secondary;
-    final label = name == "All" ? "All" : name.replaceAll(" Department", "");
-    return Padding(
-      padding: const EdgeInsets.only(right: 8),
-      child: GestureDetector(
-        onTap: () => setState(() {
-          _department = name;
-          expandedIndex = null;
-        }),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          height: 34,
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          decoration: BoxDecoration(
-            color: selected ? color : Theme.of(context).colorScheme.surface,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: selected ? color : const Color(0xFFD0D5D2),
-            ),
-          ),
-          alignment: Alignment.center,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (selected) ...[
-                const Icon(Icons.check, size: 16, color: Colors.white),
-                const SizedBox(width: 4),
-              ],
-              Text(
-                label,
-                style: TextStyle(
-                  color: selected ? Colors.white : color,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+  List<String> _taskRow(
+    Map<String, dynamic> task, {
+    required bool includeReview,
+  }) {
+    final staffId = int.parse('${task['staffId']}');
+    final reviewed = _isReviewed(task);
+    final qty = _hasQuantity(task, staffId);
+    String shown(dynamic value) {
+      final text = (value ?? '').toString().trim();
+      return text.isEmpty || text == 'null' ? '—' : text;
+    }
+
+    return [
+      (task['staffName'] ?? 'Unknown Staff').toString(),
+      ((task['task'] ?? '').toString().isEmpty
+          ? 'Untitled task'
+          : task['task']).toString(),
+      AppHelpers.formatDate(task['dueDate']?.toString()),
+      AppHelpers.formatDate(_completedDate(task)),
+      '${_systemPoints(task, staffId)} / $taskScoreMax',
+      _membersLabel(task),
+      qty ? '${_targetQuantity(task, staffId)}' : '—',
+      qty ? '${_completedQuantity(task, staffId)}' : '—',
+      qty ? '${_pendingQuantity(task, staffId)}' : '—',
+      if (includeReview) ...[
+        reviewed ? ((task['isDelayJustified'] == true) ? 'Yes' : 'No') : '—',
+        reviewed ? shown(task['delayReason']) : '—',
+        reviewed ? shown(task['comment']) : '—',
+        reviewed ? shown(task['finalPoints']) : '—',
+      ],
+    ];
+  }
+
+  String _membersLabel(Map<String, dynamic> task) {
+    final people = task['assignedTo'] ?? task['AssignedTo'];
+    if (people is List && people.isNotEmpty) {
+      final names = people
+          .map((person) {
+            if (person is Map) {
+              return (person['name'] ??
+                      person['staffName'] ??
+                      person['userName'] ??
+                      '')
+                  .toString();
+            }
+            return person.toString();
+          })
+          .map((name) => name.trim())
+          .where((name) => name.isNotEmpty && name.toLowerCase() != 'null')
+          .toList();
+      if (names.isNotEmpty) return names.join(', ');
+    }
+    return _memberCount(task);
   }
 
   Widget _buildTaskCard(Map<String, dynamic> task, int index) {
@@ -592,27 +747,87 @@ class _TaskpointsState extends State<Taskpoints> {
           child: expanded
               ? Padding(
                   padding: const EdgeInsets.only(bottom: 12),
-                  child: TaskPointDetail(
-                    key: ValueKey("${task["taskCode"]}_$staffId"),
-                    taskName: title,
-                    assignedTo: name,
-                    taskId: task["taskCode"].toString(),
-                    staffId: staffId,
-                    systemPoints: _systemPoints(task, staffId),
-                    finalPoints: task["finalPoints"],
-                    isReviewed: reviewed,
-                    delayJustified: task["isDelayJustified"] ?? false,
-                    delayReason: task["delayReason"],
-                    comment: task["comment"],
-                    onShowMessage: (msg, {isError = true}) {
-                      showTopMessage(msg, isError: isError);
-                    },
-                    onReviewSubmitted: _refreshTasks,
-                  ),
+                  child: reviewed
+                      ? _submittedDetails(task, ink, muted)
+                      : TaskPointDetail(
+                          key: ValueKey("${task["taskCode"]}_$staffId"),
+                          taskName: title,
+                          assignedTo: name,
+                          taskId: task["taskCode"].toString(),
+                          staffId: staffId,
+                          systemPoints: _systemPoints(task, staffId),
+                          finalPoints: task["finalPoints"],
+                          isReviewed: false,
+                          delayJustified: task["isDelayJustified"] ?? false,
+                          delayReason: task["delayReason"],
+                          comment: task["comment"],
+                          onShowMessage: (msg, {isError = true}) {
+                            showTopMessage(msg, isError: isError);
+                          },
+                          onReviewSubmitted: _refreshTasks,
+                        ),
                 )
               : const SizedBox(width: double.infinity),
         ),
       ],
+    );
+  }
+
+  Widget _submittedDetails(
+    Map<String, dynamic> task,
+    Color ink,
+    Color muted,
+  ) {
+    String shown(dynamic value) {
+      final text = (value ?? '').toString().trim();
+      return text.isEmpty || text == 'null' ? '—' : text;
+    }
+
+    final rows = [
+      ('Delay justified', task['isDelayJustified'] == true ? 'Yes' : 'No'),
+      ('Reason', shown(task['delayReason'])),
+      ('Comment', shown(task['comment'])),
+      ('Manager points', shown(task['finalPoints'])),
+    ];
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: WebTheme.brandSoftOf(context),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (final row in rows)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    width: 130,
+                    child: Text(
+                      row.$1,
+                      style: TextStyle(color: muted, fontSize: 12),
+                    ),
+                  ),
+                  Expanded(
+                    child: Text(
+                      row.$2,
+                      style: TextStyle(
+                        color: ink,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
     );
   }
 

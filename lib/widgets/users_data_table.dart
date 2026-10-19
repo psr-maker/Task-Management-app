@@ -25,10 +25,10 @@ class UsersDataTable extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final headingStyle = const TextStyle(
+    final headingStyle = TextStyle(
       fontSize: 13,
       fontWeight: FontWeight.w700,
-      color: WebTheme.brand,
+      color: WebTheme.brandOf(context),
     );
     final cellStyle = TextStyle(
       fontSize: 12,

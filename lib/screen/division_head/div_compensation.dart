@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:staff_work_track/core/constant/division_config.dart';
 import 'package:staff_work_track/core/theme/web_theme.dart';
+import 'package:staff_work_track/core/widgets/list_download_button.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
 import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
+import 'package:staff_work_track/core/widgets/request_workspace.dart';
 import 'package:staff_work_track/core/widgets/web_ui.dart';
 import 'package:staff_work_track/screen/admin/Navigation/dashbord/drawer/dept_compensation.dart/add_compen.dart';
 import 'package:staff_work_track/services/admin_service.dart';
@@ -22,6 +24,8 @@ class DivCompensation extends StatefulWidget {
 class _DivCompensationState extends State<DivCompensation> {
   bool isLoading = true;
   String selectedDepartment = "";
+  String selectedStatus = "All";
+  static const statusTabs = ["All", "Pending", "Approved", "Rejected"];
   List<String> departments = [];
   List<Map<String, dynamic>> extraWorks = [];
   List<Map<String, dynamic>> ownWorks = [];
@@ -80,6 +84,19 @@ class _DivCompensationState extends State<DivCompensation> {
     return null;
   }
 
+  String _rejectNote(Map<String, dynamic> item) {
+    final staff = (_field(item, ['staffRemarks', 'staffRemark']) ?? '')
+        .toString()
+        .trim();
+    final manager = (_field(item, ['managerRemarks', 'rejectionReason']) ?? '')
+        .toString()
+        .trim();
+    final parts = <String>[];
+    if (staff.isNotEmpty && staff != 'null') parts.add('Staff: $staff');
+    if (manager.isNotEmpty && manager != 'null') parts.add('Manager: $manager');
+    return parts.isEmpty ? '—' : parts.join(' · ');
+  }
+
   String _status(Map<String, dynamic> item) {
     return (_field(item, ["status"]) ?? "").toString().trim();
   }
@@ -91,6 +108,10 @@ class _DivCompensationState extends State<DivCompensation> {
 
   int? _staffId(Map<String, dynamic> item) {
     return _asInt(_field(item, ["staffId", "userId", "employeeId"]));
+  }
+
+  int? _managerIdOf(Map<String, dynamic> item) {
+    return _asInt(_field(item, ["managerId", "ManagerId"]));
   }
 
   int? _extraWorkId(Map<String, dynamic> item) {
@@ -110,6 +131,20 @@ class _DivCompensationState extends State<DivCompensation> {
     }
     final staffId = _staffId(item);
     return staffId != null && managerIds.contains(staffId);
+  }
+
+  bool _matchesStatus(Map<String, dynamic> item) {
+    final status = _status(item).toLowerCase();
+    switch (selectedStatus) {
+      case "Pending":
+        return status.isEmpty || status == "pending" || status == "accepted";
+      case "Approved":
+        return status == "approved";
+      case "Rejected":
+        return status.contains("reject");
+      default:
+        return true;
+    }
   }
 
   bool _needsApproval(Map<String, dynamic> item) {
@@ -139,7 +174,9 @@ class _DivCompensationState extends State<DivCompensation> {
       case "accepted":
         return (text: "Staff Accepted", color: Colors.blueAccent);
       case "staffrejected":
+        return (text: "Staff Rejected", color: Colors.redAccent);
       case "managerrejected":
+        return (text: "Manager Rejected", color: Colors.redAccent);
       case "rejected":
         return (text: "Rejected", color: Colors.redAccent);
       default:
@@ -160,13 +197,11 @@ class _DivCompensationState extends State<DivCompensation> {
       List<Map<String, dynamic>> result = [];
       Set<int> managerIds = {};
       try {
-        result = await OvertimeService.getExtraWorkByDepartments([
-          selectedDepartment,
-        ]);
+        result = await OvertimeService.getDepartmentExtraWork();
       } catch (_) {}
       try {
-        final employees = await AdminService.getEmployeesByDepartment(
-          selectedDepartment,
+        final employees = await AdminService.getEmployeesByDepartments(
+          departments.isEmpty ? [selectedDepartment] : departments,
         );
         managerIds = employees
             .where((user) => AppRoles.isManager(user.role))
@@ -215,32 +250,45 @@ class _DivCompensationState extends State<DivCompensation> {
           !DivisionConfig.isAllowedDepartment(headDepartment, [
             selectedDepartment,
           ])) {
-        try {
-          final headWorks = await OvertimeService.getExtraWorkByDepartments([
-            headDepartment,
-          ]);
-          for (final item in headWorks) {
-            addOwn(item);
-          }
-        } catch (_) {}
+        for (final item in result) {
+          addOwn(item);
+        }
       }
       for (final item in result) {
         addOwn(item);
       }
+      final departmentByStaff = <int, String>{};
+      try {
+        final people = await AdminService.getEmployeesByDepartments(
+          departments.isEmpty ? [selectedDepartment] : departments,
+        );
+        for (final user in people) {
+          if (user.userId > 0 && user.department.trim().isNotEmpty) {
+            departmentByStaff[user.userId] = user.department.trim();
+          }
+        }
+      } catch (_) {}
+      bool managedByMe(Map<String, dynamic> item) {
+        final managerId = _managerIdOf(item);
+        return myId != null && managerId != null && managerId == myId;
+      }
+      bool inSelectedDepartment(Map<String, dynamic> item) {
+        final selected = selectedDepartment.trim();
+        if (selected.isEmpty) return true;
+        final staffId = _staffId(item);
+        final fromStaff = staffId == null ? '' : (departmentByStaff[staffId] ?? '');
+        final fromItem = (_field(item, ['staffDepartment', 'department']) ?? '')
+            .toString()
+            .trim();
+        final name = fromStaff.isNotEmpty ? fromStaff : fromItem;
+        if (name.isEmpty) return true;
+        return DivisionConfig.isAllowedDepartment(name, [selected]);
+      }
       final visible = result.where((item) {
-        final status = _status(item).toLowerCase();
-        return status == "approved" ||
-            status == "pending" ||
-            status == "accepted";
+        return managedByMe(item) && inSelectedDepartment(item);
       }).toList();
       final ownIds = mine.map(_extraWorkId).whereType<int>().toSet();
-      final ownVisible = mine.where((item) {
-        final status = _status(item).toLowerCase();
-        return status == "approved" ||
-            status == "pending" ||
-            status == "accepted" ||
-            status.isEmpty;
-      }).toList();
+      final ownVisible = [...mine];
       visible.removeWhere((item) {
         final id = _extraWorkId(item);
         return id != null && ownIds.contains(id);
@@ -251,14 +299,11 @@ class _DivCompensationState extends State<DivCompensation> {
         selectedDepartment,
         [widget.department],
       );
-      final managerWorks = visible
-          .where((item) => _belongsToManager(item, managerIds))
-          .toList();
       setState(() {
         _managerIds = managerIds;
         _myId = myId;
         ownWorks = viewingOwn ? ownVisible : [];
-        extraWorks = viewingOwn ? [] : managerWorks;
+        extraWorks = visible;
         isLoading = false;
       });
     } catch (_) {
@@ -275,6 +320,7 @@ class _DivCompensationState extends State<DivCompensation> {
     final selected = selectedDepartment == dept;
     final label = dept.replaceAll(" Department", "");
     final secondary = Theme.of(context).colorScheme.secondary;
+    final dark = WebTheme.isDark(context);
 
     return Padding(
       padding: const EdgeInsets.only(right: 8),
@@ -285,10 +331,18 @@ class _DivCompensationState extends State<DivCompensation> {
           height: 34,
           padding: const EdgeInsets.symmetric(horizontal: 12),
           decoration: BoxDecoration(
-            color: selected ? secondary : Colors.white,
+            color: selected
+                ? secondary
+                : dark
+                    ? WebTheme.surfaceOf(context)
+                    : Colors.white,
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color: selected ? secondary : const Color(0xFFD0D5D2),
+              color: selected
+                  ? secondary
+                  : dark
+                      ? WebTheme.lineOf(context)
+                      : const Color(0xFFD0D5D2),
             ),
           ),
           alignment: Alignment.center,
@@ -302,7 +356,11 @@ class _DivCompensationState extends State<DivCompensation> {
               Text(
                 label,
                 style: TextStyle(
-                  color: selected ? Colors.white : secondary,
+                  color: selected
+                      ? Colors.white
+                      : dark
+                          ? WebTheme.inkOf(context)
+                          : secondary,
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
                 ),
@@ -343,8 +401,109 @@ class _DivCompensationState extends State<DivCompensation> {
     }
   }
 
+  Widget _departmentBanner() {
+    if (departments.isEmpty) return const SizedBox.shrink();
+    return SizedBox(
+      height: 34,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        children: departments.map(_buildDeptChip).toList(),
+      ),
+    );
+  }
+
+  Widget _webCompensation() {
+    final items = [...ownWorks, ...extraWorks].where(_matchesStatus).toList();
+    return Scaffold(
+      backgroundColor: WebTheme.canvasOf(context),
+      body: RequestWorkspace(
+        title: 'Compensation Work',
+        subtitle: selectedDepartment.isEmpty
+            ? 'Division compensation'
+            : selectedDepartment,
+        loading: isLoading,
+        scrollable: true,
+        plainStatus: true,
+        banner: _departmentBanner(),
+        filters: statusTabs,
+        selectedFilter: selectedStatus,
+        onFilter: (value) => setState(() => selectedStatus = value),
+        downloadTitle: 'Compensation',
+        emptyTitle: 'No compensation',
+        emptyMessage: selectedStatus == 'All'
+            ? 'No compensation found for $selectedDepartment'
+            : 'No ${selectedStatus.toLowerCase()} compensation for $selectedDepartment',
+        trailing: selectedDepartment.trim().isEmpty
+            ? null
+            : FilledButton.icon(
+                onPressed: () async {
+                  final created = await Navigator.push<bool>(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => CreateExtraWorkPage(
+                        department: selectedDepartment,
+                        scopeDepartment: widget.department,
+                      ),
+                    ),
+                  );
+                  if (!mounted || created != true) return;
+                  _loadData();
+                },
+                icon: const Icon(Icons.add, size: 18),
+                label: const Text('Add'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: WebTheme.brand,
+                  foregroundColor: Colors.white,
+                ),
+              ),
+        stats: [
+          WorkspaceStat(label: 'Records', value: '${items.length}', icon: Icons.more_time_rounded, color: WebTheme.brandOf(context)),
+        ],
+        columns: const [
+          'Work date',
+          'Task',
+          'Work type',
+          'Requested to',
+          'Time',
+          'Hours',
+          'Reason',
+          'Rejected remarks',
+        ],
+        records: [
+          for (final item in items)
+            WorkspaceRecord(
+              status: _statusInfo(item).text,
+              approvedColor: WebTheme.brandOf(context),
+              values: [
+                _formatDate(_field(item, ['workDate', 'date'])),
+                (_field(item, ['taskName', 'task', 'title']) ?? '—').toString(),
+                _formatWorkType((_field(item, ['workType']) ?? '').toString()),
+                (_field(item, ['staffName', 'name']) ?? 'Unknown').toString(),
+                '${_formatTime(_field(item, ['startTime']))} - ${_formatTime(_field(item, ['endTime']))}',
+                '${_formatHours(_field(item, ['expectedHours', 'totalHours', 'totalhours']))} hours',
+                (_field(item, ['reason']) ?? '').toString(),
+                _rejectNote(item),
+              ],
+              actions: _needsApproval(item) && !_isOwn(item)
+                  ? [
+                      workspaceAction('Reject', () => _reject(item), color: WebTheme.danger),
+                      workspaceAction('Approve', () => _approve(item), filled: true),
+                    ]
+                  : _isOwn(item) && _status(item).toLowerCase() == 'pending'
+                  ? [
+                      workspaceAction('Reject', () => _rejectOwn(item), color: WebTheme.danger),
+                      workspaceAction('Accept', () => _acceptOwn(item), filled: true),
+                    ]
+                  : const [],
+            ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (WebPushedChrome.isWeb(context)) return _webCompensation();
     return Scaffold(
       backgroundColor: WebPushedChrome.background(context),
       appBar: AppBar(
@@ -356,6 +515,35 @@ class _DivCompensationState extends State<DivCompensation> {
           onPressed: () => Navigator.pop(context),
         ),
         actions: [
+          ListDownloadButton(
+            title: 'Compensation',
+            onAppBar: true,
+            headers: const [
+              'Work date',
+              'Task',
+              'Work type',
+              'Requested to',
+              'Time',
+              'Hours',
+              'Reason',
+              'Rejected remarks',
+              'Status',
+            ],
+            rows: () => [
+              for (final item in [...ownWorks, ...extraWorks])
+                [
+                  _formatDate(_field(item, ['workDate', 'date'])),
+                  (_field(item, ['taskName', 'task', 'title']) ?? '—').toString(),
+                  _formatWorkType((_field(item, ['workType']) ?? '').toString()),
+                  (_field(item, ['staffName', 'name']) ?? 'Unknown').toString(),
+                  '${_formatTime(_field(item, ['startTime']))} - ${_formatTime(_field(item, ['endTime']))}',
+                  '${_formatHours(_field(item, ['expectedHours', 'totalHours', 'totalhours']))} hours',
+                  (_field(item, ['reason']) ?? '').toString(),
+                  _rejectNote(item),
+                  _statusInfo(item).text,
+                ],
+            ],
+          ),
           if (selectedDepartment.trim().isNotEmpty)
             IconButton(
               icon: const Icon(Icons.add_rounded),
@@ -365,6 +553,7 @@ class _DivCompensationState extends State<DivCompensation> {
                   MaterialPageRoute(
                     builder: (_) => CreateExtraWorkPage(
                       department: selectedDepartment,
+                      scopeDepartment: widget.department,
                     ),
                   ),
                 );
@@ -393,10 +582,30 @@ class _DivCompensationState extends State<DivCompensation> {
               ),
             ),
             const SizedBox(height: 8),
+            SizedBox(
+              height: 36,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                children: [
+                  for (final status in statusTabs)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: ChoiceChip(
+                        label: Text(status),
+                        selected: selectedStatus == status,
+                        onSelected: (_) => setState(() => selectedStatus = status),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
             Expanded(
               child: isLoading
                   ? const Center(child: RotatingFlower())
-                  : extraWorks.isEmpty && ownWorks.isEmpty
+                  : extraWorks.where(_matchesStatus).isEmpty &&
+                      ownWorks.where(_matchesStatus).isEmpty
                   ? Center(
                       child: Text(
                         "No compensation found for $selectedDepartment",
@@ -409,7 +618,7 @@ class _DivCompensationState extends State<DivCompensation> {
                         physics: const AlwaysScrollableScrollPhysics(),
                         padding: const EdgeInsets.all(15),
                         children: [
-                          if (ownWorks.isNotEmpty) ...[
+                          if (ownWorks.where(_matchesStatus).isNotEmpty) ...[
                             Padding(
                               padding: const EdgeInsets.only(bottom: 10),
                               child: Text(
@@ -417,10 +626,10 @@ class _DivCompensationState extends State<DivCompensation> {
                                 style: Theme.of(context).textTheme.titleMedium,
                               ),
                             ),
-                            ...ownWorks.map(_card),
+                            ...ownWorks.where(_matchesStatus).map(_card),
                             const SizedBox(height: 8),
                           ],
-                          ...extraWorks.map(_card),
+                          ...extraWorks.where(_matchesStatus).map(_card),
                         ],
                       ),
                     ),
@@ -467,7 +676,9 @@ class _DivCompensationState extends State<DivCompensation> {
           : BoxDecoration(
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: Theme.of(context).colorScheme.secondary.withValues(alpha: 0.45),
+          color: WebTheme.isDark(context)
+              ? WebTheme.lineOf(context)
+              : Theme.of(context).colorScheme.secondary.withValues(alpha: 0.45),
         ),
       ),
       child: Padding(
@@ -576,7 +787,7 @@ class _DivCompensationState extends State<DivCompensation> {
   Widget _infoRow(IconData icon, String value) {
     return Row(
       children: [
-        Icon(icon, size: 16, color: Theme.of(context).colorScheme.secondary),
+        Icon(icon, size: 16, color: WebTheme.brandOf(context)),
         const SizedBox(width: 8),
         Expanded(
           child: Text(value, style: const TextStyle(fontSize: 13)),

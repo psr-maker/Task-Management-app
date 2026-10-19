@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:staff_work_track/core/theme/web_theme.dart';
 
 class CustomTextField extends StatelessWidget {
   final TextEditingController controller;
@@ -87,25 +88,63 @@ class CustomFormWidgets {
     required ValueChanged<String?> onChanged,
     String hint = "Select",
   }) {
+    final ink = WebTheme.inkOf(context);
+    final accent = WebTheme.brandOf(context);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       decoration: BoxDecoration(
+        color: WebTheme.surfaceOf(context),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color.fromARGB(255, 25, 77, 38)),
+        border: Border.all(color: accent),
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
           value: items.contains(value) ? value : null,
           hint: Text(
             hint,
-            style: Theme.of(
-              context,
-            ).textTheme.headlineSmall,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: WebTheme.mutedOf(context),
+            ),
           ),
           isExpanded: true,
-          style: Theme.of(context).textTheme.headlineSmall,
+          dropdownColor: WebTheme.surfaceOf(context),
+          iconEnabledColor: accent,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+            color: ink,
+          ),
+          selectedItemBuilder: (context) {
+            return items.map((item) {
+              return Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  item,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: accent,
+                  ),
+                ),
+              );
+            }).toList();
+          },
           items: items
-              .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+              .map(
+                (item) => DropdownMenuItem(
+                  value: item,
+                  child: Text(
+                    item,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: ink,
+                    ),
+                  ),
+                ),
+              )
               .toList(),
           onChanged: onChanged,
         ),

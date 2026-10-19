@@ -185,12 +185,14 @@ class SuperAdminService {
     required DateTime dueDate,
     int? targetQuantity,
     List<int>? assignedUserIds,
+    List<int>? yearlyAssignedUserIds,
     List<Map<String, dynamic>>? monthlyGoals,
     int? parentGoalId,
     bool sendParentGoalId = false,
   }) async {
     final token = await AuthService.getToken();
     if (token == null) throw Exception("User not logged in");
+    final isYearly = goalType.toLowerCase() == "yearly";
     final response = await http.post(
       Uri.parse("$baseUrl/Director/CreateGoal"),
       headers: {
@@ -204,9 +206,11 @@ class SuperAdminService {
         "startDate": startDate.toIso8601String(),
         "dueDate": dueDate.toIso8601String(),
         if (targetQuantity != null) "targetQuantity": targetQuantity,
-        if (sendParentGoalId) "parentGoalId": parentGoalId,
+        if (sendParentGoalId && parentGoalId != null) "parentGoalId": parentGoalId,
         if (assignedUserIds != null) "assignedUserIds": assignedUserIds,
-        if (monthlyGoals != null && monthlyGoals.isNotEmpty)
+        if (isYearly && yearlyAssignedUserIds != null)
+          "yearlyAssignedUserIds": yearlyAssignedUserIds,
+        if (isYearly && monthlyGoals != null && monthlyGoals.isNotEmpty)
           "monthlyGoals": monthlyGoals,
       }),
     );
@@ -611,13 +615,31 @@ class SuperAdminService {
   }
 
   Future<List<Department>> getDepartments() async {
+    final token = await AuthService.getToken();
     final response = await http.get(
       Uri.parse("$baseUrl/Director/getdepartments"),
+      headers: {
+        "Content-Type": "application/json",
+        if (token != null && token.isNotEmpty) "Authorization": "Bearer $token",
+      },
     );
 
     if (response.statusCode == 200) {
-      List jsonData = json.decode(response.body);
-      return jsonData.map((e) => Department.fromJson(e)).toList();
+      final decoded = json.decode(response.body);
+      final raw = decoded is List
+          ? decoded
+          : decoded is Map
+              ? (decoded['data'] ??
+                  decoded['Data'] ??
+                  decoded['departments'] ??
+                  decoded['Departments'] ??
+                  [])
+              : [];
+      final jsonData = raw is List ? raw : [];
+      return jsonData
+          .whereType<Map>()
+          .map((e) => Department.fromJson(Map<String, dynamic>.from(e)))
+          .toList();
     } else {
       throw Exception('Failed to load departments');
     }

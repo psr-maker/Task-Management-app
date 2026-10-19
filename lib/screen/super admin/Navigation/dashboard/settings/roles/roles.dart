@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:staff_work_track/core/responsive/responsive_body.dart';
 import 'package:staff_work_track/Models/rolesmodel.dart';
 import 'package:staff_work_track/core/widgets/buttons.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
@@ -393,7 +394,8 @@ class _RolesListState extends State<RolesList> {
         ],
       ),
 
-      body: Padding(
+      body: ResponsiveBody(
+        child: Padding(
         padding: const EdgeInsets.all(15),
 
         child: Stack(
@@ -625,6 +627,7 @@ class _RolesListState extends State<RolesList> {
                 ),
               ),
           ],
+        ),
         ),
       ),
     );

@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:staff_work_track/core/theme/web_theme.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
+import 'package:staff_work_track/core/widgets/request_workspace.dart';
 import 'package:staff_work_track/core/widgets/status_badge.dart';
 import 'package:staff_work_track/core/widgets/web_ui.dart';
 import 'package:staff_work_track/screen/staff/navigation/dashboard/drawer/punch/punchcorr_apply.dart';
 import 'package:staff_work_track/services/admin_service.dart';
 import 'package:staff_work_track/utils/app_helper.dart';
+import 'package:staff_work_track/utils/time_utils.dart';
 
 class PunchCorrectionList extends StatefulWidget {
   const PunchCorrectionList({super.key});
@@ -17,6 +19,7 @@ class PunchCorrectionList extends StatefulWidget {
 class _PunchCorrectionListState extends State<PunchCorrectionList> {
   List<dynamic> corrections = [];
   bool isLoading = true;
+  String webFilter = 'All';
 
   @override
   void initState() {
@@ -35,8 +38,74 @@ class _PunchCorrectionListState extends State<PunchCorrectionList> {
     });
   }
 
+  String _punchType(dynamic value) {
+    final text = value.toString().toLowerCase();
+    if (text.contains('punch out') || text.contains('evening')) return 'Punch out';
+    if (text.contains('punch in') || text.contains('morning')) return 'Punch in';
+    final shown = value.toString().trim();
+    return shown.isEmpty ? '—' : shown;
+  }
+
+  String _punchTime(dynamic value) {
+    return TimeUtils.formatTime12(value, empty: '—');
+  }
+
+  List<dynamic> get _rows {
+    if (webFilter == 'All') return corrections;
+    return corrections.where((item) {
+      return (item['status'] ?? '').toString().toLowerCase() == webFilter.toLowerCase();
+    }).toList();
+  }
+
+  Widget _webBoard() {
+    final rows = _rows;
+    return Scaffold(
+      backgroundColor: WebTheme.canvasOf(context),
+      body: RequestWorkspace(
+        title: 'Attendance correction',
+        subtitle: 'Your punch correction requests',
+        loading: isLoading,
+        filters: const ['All', 'Pending', 'Approved', 'Rejected'],
+        selectedFilter: webFilter,
+        onFilter: (value) => setState(() => webFilter = value),
+        emptyTitle: 'No corrections',
+        emptyMessage: 'Punch correction requests will show here.',
+        trailing: FilledButton.icon(
+          onPressed: () async {
+            final result = await Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const PunchCorrection()),
+            );
+            if (result == true) loadPunchCorrections();
+          },
+          icon: const Icon(Icons.add, size: 18),
+          label: const Text('New request'),
+          style: FilledButton.styleFrom(
+            backgroundColor: WebTheme.brand,
+            foregroundColor: Colors.white,
+          ),
+        ),
+        columns: const ['Work date', 'Type', 'Time', 'Reason'],
+        records: [
+          for (final item in rows)
+            WorkspaceRecord(
+              status: (item['status'] ?? '').toString(),
+              approvedColor: WebTheme.brandOf(context),
+              values: [
+                AppHelpers.formatDate((item['date'] ?? '').toString()),
+                _punchType(item['correctionType']),
+                _punchTime(item['punchTime']),
+                (item['reason'] ?? '').toString(),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (WebPushedChrome.isWeb(context)) return _webBoard();
     final web = WebPushedChrome.isWeb(context);
     return Scaffold(
       backgroundColor: WebPushedChrome.background(context),
@@ -198,10 +267,10 @@ class _PunchTimelineItem extends StatelessWidget {
                     Expanded(
                       child: Text(
                       date,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
-                        color: Colors.black87,
+                        color: WebTheme.inkOf(context),
                       ),
                     ),
                     ),
@@ -243,9 +312,9 @@ class _PunchTimelineItem extends StatelessWidget {
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Icon(
-                        type.contains("In")
-                            ? Icons.login_rounded
-                            : Icons.logout_rounded,
+                        type.toLowerCase().contains('punch out')
+                            ? Icons.logout_rounded
+                            : Icons.login_rounded,
                         color: const Color(0xff194d26),
                         size: 21,
                       ),
@@ -309,10 +378,10 @@ class _PunchTimelineItem extends StatelessWidget {
                   reason,
                   maxLines: showRail ? null : 2,
                   overflow: showRail ? null : TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13,
                     height: 1.4,
-                    color: Colors.black87,
+                    color: WebTheme.inkOf(context),
                   ),
                 ),
               ],

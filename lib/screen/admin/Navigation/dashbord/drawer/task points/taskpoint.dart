@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:staff_work_track/core/theme/web_theme.dart';
 import 'package:staff_work_track/core/widgets/buttons.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
 import 'package:staff_work_track/services/admin_service.dart';
@@ -18,6 +19,7 @@ class TaskPointDetail extends StatefulWidget {
   final String? comment;
   final Function(String message, {bool isError})? onShowMessage;
   final VoidCallback? onReviewSubmitted;
+  final bool framed;
   const TaskPointDetail({
     super.key,
     required this.taskName,
@@ -30,7 +32,9 @@ class TaskPointDetail extends StatefulWidget {
     this.delayReason,
     this.comment,
     this.onShowMessage,
-    this.onReviewSubmitted, required this.staffId,
+    this.onReviewSubmitted,
+    required this.staffId,
+    this.framed = true,
   });
 
   @override
@@ -98,172 +102,182 @@ class _TaskPointDetailState extends State<TaskPointDetail> {
     if (isLoading) {
       return const Center(child: RotatingFlower());
     }
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    const green = Color.fromARGB(255, 25, 77, 38);
-    final ink = isDark ? Colors.white : const Color(0xFF1C2B22);
-    final muted = isDark ? const Color(0xFFB7C7BC) : const Color(0xFF66756C);
-    final fieldFill = isDark ? const Color(0xFF102018) : const Color(0xFFF4F7F5);
+    final ink = WebTheme.inkOf(context);
+    final muted = WebTheme.mutedOf(context);
+    final line = WebTheme.lineOf(context);
+    final brand = WebTheme.brand;
 
     InputDecoration fieldDecoration(String hint) {
       return InputDecoration(
         hintText: hint,
-        hintStyle: TextStyle(color: muted),
+        hintStyle: TextStyle(color: muted, fontSize: 13),
         filled: true,
-        fillColor: fieldFill,
+        fillColor: WebTheme.canvasOf(context),
         contentPadding: const EdgeInsets.all(14),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Color(0xFFE3EBE6)),
+          borderSide: BorderSide(color: line),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: green, width: 1.4),
+          borderSide: BorderSide(color: brand, width: 1.4),
         ),
         disabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Color(0xFFE3EBE6)),
+          borderSide: BorderSide(color: line),
         ),
       );
     }
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF10241A) : const Color(0xFFF7FAF8),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE3EBE6)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            "Review",
+    Widget fieldLabel(String text) {
+      return Text(
+        text,
+        style: TextStyle(
+          color: ink,
+          fontSize: 14,
+          fontWeight: FontWeight.w700,
+        ),
+      );
+    }
+
+    final form = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+          decoration: BoxDecoration(
+            color: brand,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  "System points",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              Text(
+                "$systemPoints / $taskScoreMax",
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 8),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: Text(
+            "Delay justified",
             style: TextStyle(
-              color: muted,
-              fontSize: 12,
+              color: ink,
+              fontSize: 15,
               fontWeight: FontWeight.w700,
             ),
           ),
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-            decoration: BoxDecoration(
-              color: green,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              children: [
-                const Expanded(
-                  child: Text(
-                    "System Points",
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-                Text(
-                  "$systemPoints / $taskScoreMax",
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-            ),
+          subtitle: Text(
+            "Adjust the final points when the delay is justified",
+            style: TextStyle(color: muted, fontSize: 12),
           ),
-          const SizedBox(height: 8),
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            title: Text(
-              "Justified",
-              style: TextStyle(
-                color: ink,
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
+          value: delayJustified,
+          activeThumbColor: Colors.white,
+          activeTrackColor: brand,
+          inactiveThumbColor: WebTheme.surfaceOf(context),
+          inactiveTrackColor: line,
+          onChanged: isReviewed
+              ? null
+              : (value) {
+                  setState(() {
+                    delayJustified = value;
+                    if (!delayJustified) points = systemPoints;
+                  });
+                },
+        ),
+        if (delayJustified) ...[
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              Expanded(child: fieldLabel("Final points")),
+              Text(
+                "$points / 100",
+                style: TextStyle(
+                  color: brand,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
-            ),
-            value: delayJustified,
-            activeThumbColor: Colors.white,
-            activeTrackColor: green,
-            onChanged: isReviewed
-                ? null
-                : (value) {
-                    setState(() {
-                      delayJustified = value;
-                      if (!delayJustified) points = systemPoints;
-                    });
-                  },
+            ],
           ),
-          if (delayJustified) ...[
-            Text(
-              "Final points  $points / 100",
-              style: TextStyle(
-                color: ink,
-                fontSize: 14,
+          SliderTheme(
+            data: SliderTheme.of(context).copyWith(
+              activeTrackColor: brand,
+              inactiveTrackColor: WebTheme.brandSoftOf(context),
+              thumbColor: brand,
+              overlayColor: brand.withValues(alpha: 0.12),
+              valueIndicatorColor: brand,
+              valueIndicatorTextStyle: const TextStyle(
+                color: Colors.white,
                 fontWeight: FontWeight.w700,
               ),
             ),
-            Slider(
-              value: points.toDouble(),
+            child: Slider(
+              value: points.clamp(0, 100).toDouble(),
               min: 0,
               max: 100,
               divisions: 100,
               label: "$points",
-              activeColor: green,
               onChanged: isReviewed
                   ? null
                   : (value) => setState(() => points = value.toInt()),
             ),
-            Text(
-              "Reason",
-              style: TextStyle(
-                color: ink,
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: delayReasonController,
-              enabled: !isReviewed,
-              maxLines: 2,
-              style: TextStyle(color: ink),
-              decoration: fieldDecoration("Add a reason"),
-            ),
-            const SizedBox(height: 16),
-          ],
-          Text(
-            "Comment",
-            style: TextStyle(
-              color: ink,
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-            ),
           ),
+          fieldLabel("Reason"),
           const SizedBox(height: 8),
           TextField(
-            controller: commentController,
+            controller: delayReasonController,
             enabled: !isReviewed,
-            maxLines: 3,
+            maxLines: 2,
             style: TextStyle(color: ink),
-            decoration: fieldDecoration("Add a comment"),
+            decoration: fieldDecoration("Add a reason"),
           ),
-          const SizedBox(height: 18),
-          SizedBox(
-            width: double.infinity,
-            child: AppButton(
-              text: isReviewed ? "Already Submitted" : "Submit Review",
-              color: green,
-              txtcolor: Colors.white,
-              onPressed: isReviewed ? null : submitReview,
-            ),
-          ),
+          const SizedBox(height: 16),
         ],
-      ),
+        fieldLabel("Comment"),
+        const SizedBox(height: 8),
+        TextField(
+          controller: commentController,
+          enabled: !isReviewed,
+          maxLines: 3,
+          style: TextStyle(color: ink),
+          decoration: fieldDecoration("Add a comment"),
+        ),
+        const SizedBox(height: 18),
+        SizedBox(
+          width: double.infinity,
+          child: AppButton(
+            text: isReviewed ? "Already submitted" : "Submit review",
+            color: brand,
+            txtcolor: Colors.white,
+            onPressed: isReviewed ? null : submitReview,
+          ),
+        ),
+      ],
+    );
+    if (!widget.framed) return form;
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: WebTheme.card(context, radius: 16),
+      child: form,
     );
   }
 }

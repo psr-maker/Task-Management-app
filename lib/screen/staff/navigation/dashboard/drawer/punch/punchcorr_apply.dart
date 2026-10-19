@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:staff_work_track/core/responsive/app_layout.dart';
+import 'package:staff_work_track/core/theme/web_theme.dart';
 import 'package:staff_work_track/core/widgets/buttons.dart';
 import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
 import 'package:staff_work_track/core/widgets/web_ui.dart';
@@ -46,10 +48,12 @@ class _PunchCorrectionState extends State<PunchCorrection> {
       context: context,
       initialTime: TimeOfDay.now(),
       builder: (context, child) {
+        final theme = Theme.of(context);
+        if (theme.brightness == Brightness.dark) return child!;
         return Theme(
-          data: Theme.of(context).copyWith(
+          data: theme.copyWith(
             colorScheme: ColorScheme.light(
-              primary: Theme.of(context).colorScheme.secondary,
+              primary: theme.colorScheme.secondary,
               onPrimary: Colors.white,
               surface: Colors.white,
               onSurface: Colors.black,
@@ -105,8 +109,8 @@ class _PunchCorrectionState extends State<PunchCorrection> {
 
     // Convert UI value to API value
     final String apiCorrectionType = correctionType == "morning"
-        ? "Forgot Punch In"
-        : "Forgot Punch Out";
+        ? "Missing Punch In"
+        : "Missing Punch Out";
 
     // Convert TimeOfDay to HH:mm:ss
     final String punchTime =
@@ -136,6 +140,7 @@ class _PunchCorrectionState extends State<PunchCorrection> {
   @override
   Widget build(BuildContext context) {
     final web = WebPushedChrome.isWeb(context);
+    if (web) return _webRequest();
     return Scaffold(
       backgroundColor: WebPushedChrome.background(context),
       appBar: AppBar(
@@ -174,15 +179,15 @@ class _PunchCorrectionState extends State<PunchCorrection> {
                         vertical: 17,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: WebTheme.surfaceOf(context),
                         borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: Colors.grey.shade300),
+                        border: Border.all(color: WebTheme.lineOf(context)),
                       ),
                       child: Row(
                         children: [
-                          const Icon(
+                          Icon(
                             Icons.calendar_month_outlined,
-                            color: Color(0xff194d26),
+                            color: WebTheme.brandOf(context),
                           ),
 
                           const SizedBox(width: 12),
@@ -190,9 +195,10 @@ class _PunchCorrectionState extends State<PunchCorrection> {
                           Expanded(
                             child: Text(
                               formatDate(selectedDate),
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 15,
                                 fontWeight: FontWeight.w500,
+                                color: WebTheme.inkOf(context),
                               ),
                             ),
                           ),
@@ -209,7 +215,7 @@ class _PunchCorrectionState extends State<PunchCorrection> {
                   const SizedBox(height: 24),
 
                   // Correction type
-                  _sectionTitle("What did you forget?"),
+                  _sectionTitle("What did you Missing?"),
 
                   const SizedBox(height: 12),
 
@@ -219,7 +225,7 @@ class _PunchCorrectionState extends State<PunchCorrection> {
                         child: _correctionCard(
                           type: "morning",
                           icon: Icons.wb_sunny_outlined,
-                          title: "Forgot Punch In",
+                          title: "Missing Punch In",
                           subtitle: "Morning",
                         ),
                       ),
@@ -230,7 +236,7 @@ class _PunchCorrectionState extends State<PunchCorrection> {
                         child: _correctionCard(
                           type: "evening",
                           icon: Icons.nights_stay_outlined,
-                          title: "Forgot Punch Out",
+                          title: "Missing Punch Out",
                           subtitle: "Evening",
                         ),
                       ),
@@ -253,15 +259,15 @@ class _PunchCorrectionState extends State<PunchCorrection> {
                         vertical: 17,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: WebTheme.surfaceOf(context),
                         borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: Colors.grey.shade300),
+                        border: Border.all(color: WebTheme.lineOf(context)),
                       ),
                       child: Row(
                         children: [
-                          const Icon(
+                          Icon(
                             Icons.access_time_outlined,
-                            color: Color(0xff194d26),
+                            color: WebTheme.brandOf(context),
                           ),
 
                           const SizedBox(width: 12),
@@ -274,8 +280,8 @@ class _PunchCorrectionState extends State<PunchCorrection> {
                               style: TextStyle(
                                 fontSize: 15,
                                 color: selectedTime == null
-                                    ? Colors.grey
-                                    : Colors.black87,
+                                    ? WebTheme.mutedOf(context)
+                                    : WebTheme.inkOf(context),
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
@@ -300,27 +306,28 @@ class _PunchCorrectionState extends State<PunchCorrection> {
                   TextField(
                     controller: reasonController,
                     maxLines: 4,
+                    style: TextStyle(color: WebTheme.inkOf(context)),
                     decoration: InputDecoration(
                       hintText: "Enter reason for missing punch...",
-                      hintStyle: Theme.of(context).textTheme.labelSmall,
+                      hintStyle: TextStyle(color: WebTheme.mutedOf(context)),
                       filled: true,
-                      fillColor: Colors.white,
+                      fillColor: WebTheme.surfaceOf(context),
                       contentPadding: const EdgeInsets.all(16),
 
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(14),
-                        borderSide: BorderSide(color: Colors.grey.shade300),
+                        borderSide: BorderSide(color: WebTheme.lineOf(context)),
                       ),
 
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(14),
-                        borderSide: BorderSide(color: Colors.grey.shade300),
+                        borderSide: BorderSide(color: WebTheme.lineOf(context)),
                       ),
 
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(14),
-                        borderSide: const BorderSide(
-                          color: Color(0xff194d26),
+                        borderSide: BorderSide(
+                          color: WebTheme.brandOf(context),
                           width: 1.5,
                         ),
                       ),
@@ -362,6 +369,253 @@ class _PunchCorrectionState extends State<PunchCorrection> {
     );
   }
 
+  Widget _webRequest() {
+    return Scaffold(
+      backgroundColor: WebTheme.canvasOf(context),
+      body: Stack(
+        children: [
+          Padding(
+            padding: AppLayout.pagePadding(context),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    IconButton(
+                      tooltip: 'Back',
+                      visualDensity: VisualDensity.compact,
+                      onPressed: () => Navigator.pop(context),
+                      icon: Icon(Icons.arrow_back, size: 18, color: WebTheme.brandOf(context)),
+                    ),
+                    Text(
+                      'Attendance correction',
+                      style: TextStyle(
+                        color: WebTheme.brandOf(context),
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                Expanded(
+                  child: Align(
+                    alignment: Alignment.topCenter,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 720),
+                      child: SingleChildScrollView(
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
+                          decoration: BoxDecoration(
+                            color: WebTheme.surfaceOf(context),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: WebTheme.lineOf(context)),
+                          ),
+                          child: Column(
+                            children: [
+                              _webPair(
+                                _webDate(),
+                                _webDrop(),
+                              ),
+                              _webTime(),
+                              const SizedBox(height: 14),
+                              _webReason(),
+                              const SizedBox(height: 16),
+                              Center(
+                                child: FilledButton(
+                                  style: FilledButton.styleFrom(
+                                    backgroundColor: WebTheme.brand,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 12),
+                                  ),
+                                  onPressed: submitRequest,
+                                  child: const Text('Submit'),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (_topMessage != null)
+            AnimatedPositioned(
+              top: _showTopMessage ? 8 : -120,
+              left: 16,
+              right: 16,
+              duration: const Duration(milliseconds: 300),
+              child: Msgsnackbar(
+                context,
+                message: _topMessage!,
+                isError: _isErrorMessage,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _webPair(Widget left, Widget right) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(child: left),
+          const SizedBox(width: 16),
+          Expanded(child: right),
+        ],
+      ),
+    );
+  }
+
+  Widget _webLabel(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Text(
+        text,
+        style: TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          color: WebTheme.mutedOf(context),
+        ),
+      ),
+    );
+  }
+
+  InputDecoration _webDecoration(IconData icon) {
+    final border = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(10),
+      borderSide: BorderSide(color: WebTheme.brandOf(context).withValues(alpha: 0.4)),
+    );
+    return InputDecoration(
+      isDense: true,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+      suffixIcon: Icon(icon, size: 18, color: WebTheme.brandOf(context)),
+      enabledBorder: border,
+      focusedBorder: border.copyWith(borderSide: BorderSide(color: WebTheme.brandOf(context))),
+    );
+  }
+
+  Widget _webDate() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _webLabel('Work date'),
+        InkWell(
+          onTap: selectDate,
+          borderRadius: BorderRadius.circular(10),
+          child: InputDecorator(
+            decoration: _webDecoration(Icons.calendar_today),
+            child: Text(
+              formatDate(selectedDate),
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: WebTheme.brandOf(context)),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _webDrop() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _webLabel('Type'),
+        Container(
+          height: 46,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: WebTheme.brandOf(context).withValues(alpha: 0.4)),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: correctionType,
+              isExpanded: true,
+              dropdownColor: WebTheme.surfaceOf(context),
+              iconEnabledColor: WebTheme.brandOf(context),
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: WebTheme.brandOf(context)),
+              items: [
+                DropdownMenuItem(
+                  value: 'morning',
+                  child: Text(
+                    'Punch in',
+                    style: TextStyle(fontSize: 14, color: WebTheme.inkOf(context)),
+                  ),
+                ),
+                DropdownMenuItem(
+                  value: 'evening',
+                  child: Text(
+                    'Punch out',
+                    style: TextStyle(fontSize: 14, color: WebTheme.inkOf(context)),
+                  ),
+                ),
+              ],
+              onChanged: (value) {
+                if (value == null) return;
+                setState(() => correctionType = value);
+              },
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _webTime() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _webLabel('Punch time'),
+        InkWell(
+          onTap: selectTime,
+          borderRadius: BorderRadius.circular(10),
+          child: InputDecorator(
+            decoration: _webDecoration(Icons.access_time),
+            child: Text(
+              selectedTime == null ? 'Select time' : selectedTime!.format(context),
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: selectedTime == null ? WebTheme.mutedOf(context) : WebTheme.brandOf(context),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _webReason() {
+    final border = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(10),
+      borderSide: BorderSide(color: WebTheme.brandOf(context).withValues(alpha: 0.4)),
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _webLabel('Reason'),
+        TextField(
+          controller: reasonController,
+          maxLines: 3,
+          style: TextStyle(fontSize: 14, color: WebTheme.inkOf(context)),
+          decoration: InputDecoration(
+            hintText: 'Reason',
+            isDense: true,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            enabledBorder: border,
+            focusedBorder: border.copyWith(borderSide: BorderSide(color: WebTheme.brandOf(context))),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _sectionTitle(String title) {
     return Text(title, style: Theme.of(context).textTheme.headlineLarge);
   }
@@ -387,11 +641,11 @@ class _PunchCorrectionState extends State<PunchCorrection> {
         height: 120,
         decoration: BoxDecoration(
           color: selected
-              ? const Color(0xff194d26).withOpacity(0.08)
-              : Colors.white,
+              ? WebTheme.brandSoftOf(context)
+              : WebTheme.surfaceOf(context),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: selected ? const Color(0xff194d26) : Colors.grey.shade300,
+            color: selected ? WebTheme.brandOf(context) : WebTheme.lineOf(context),
             width: selected ? 1.5 : 1,
           ),
         ),
@@ -404,15 +658,15 @@ class _PunchCorrectionState extends State<PunchCorrection> {
                 Icon(
                   icon,
                   color: selected
-                      ? const Color(0xff194d26)
-                      : Colors.grey.shade600,
+                      ? WebTheme.brandOf(context)
+                      : WebTheme.mutedOf(context),
                   size: 28,
                 ),
 
                 if (selected)
-                  const Icon(
+                  Icon(
                     Icons.check_circle,
-                    color: Color(0xff194d26),
+                    color: WebTheme.brandOf(context),
                     size: 20,
                   ),
               ],
@@ -425,7 +679,7 @@ class _PunchCorrectionState extends State<PunchCorrection> {
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w700,
-                color: selected ? const Color(0xff194d26) : Colors.black87,
+                color: selected ? WebTheme.brandOf(context) : WebTheme.inkOf(context),
               ),
             ),
 
@@ -433,7 +687,7 @@ class _PunchCorrectionState extends State<PunchCorrection> {
 
             Text(
               subtitle,
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+              style: TextStyle(fontSize: 12, color: WebTheme.mutedOf(context)),
             ),
           ],
         ),

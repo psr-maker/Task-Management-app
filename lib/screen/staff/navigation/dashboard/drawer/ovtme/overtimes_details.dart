@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:staff_work_track/core/theme/web_theme.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
 import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
+import 'package:staff_work_track/core/widgets/request_workspace.dart';
+import 'package:staff_work_track/core/widgets/web_ui.dart';
 import 'package:staff_work_track/services/overtime_service.dart';
 import 'package:staff_work_track/utils/time_utils.dart';
 
@@ -48,6 +51,12 @@ class _MyovertimeState extends State<Myovertime> {
       if (!mounted) return;
 
       showTopMessage("Unable to load overtime history", isError: true);
+
+      if (!mounted) return;
+
+      setState(() {
+        loading = false;
+      });
     }
   }
 
@@ -132,6 +141,7 @@ class _MyovertimeState extends State<Myovertime> {
 
   @override
   Widget build(BuildContext context) {
+    if (WebPushedChrome.isWeb(context)) return _webHistory();
     return WillPopScope(
       onWillPop: () async {
         Navigator.pop(context, hasChanged);
@@ -201,6 +211,58 @@ class _MyovertimeState extends State<Myovertime> {
     );
   }
 
+  Widget _webHistory() {
+    return Scaffold(
+      backgroundColor: WebTheme.canvasOf(context),
+      body: RequestWorkspace(
+        title: 'Overtime history',
+        subtitle: 'Your overtime records',
+        loading: loading,
+        emptyTitle: 'No overtime',
+        emptyMessage: 'Your overtime records will show here.',
+        scrollable: true,
+        plainStatus: true,
+        columns: const ['Work date', 'Time', 'Hours', 'Reason', 'Reject remarks'],
+        records: [
+          for (final item in staffOvertimes)
+            WorkspaceRecord(
+              status: _historyStatus(item),
+              approvedColor: WebTheme.brandOf(context),
+              values: [
+                formatDate(item['date']),
+                '${formatTime(item['fromTime']?.toString())} – ${formatTime(item['toTime']?.toString())}',
+                formatTotalHours(item['totalHours']),
+                item['reason']?.toString() ?? '—',
+                _historyRemark(item),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+
+  String _historyStatus(dynamic item) {
+    if (staffPending(item)) return 'Pending';
+    if (staffRejected(item)) return 'Staff Rejected';
+    if (managerRejected(item)) return 'Manager Rejected';
+    if (managerApproved(item)) return 'Approved';
+    return 'Accepted';
+  }
+
+  String _historyRemark(dynamic item) {
+    String text(dynamic value) {
+      final raw = (value ?? '').toString().trim();
+      return raw.isEmpty || raw == 'null' ? '' : raw;
+    }
+
+    final staff = text(item['staffResponseReason']);
+    final manager = text(item['managerResponseReason']);
+    final parts = <String>[];
+    if (staff.isNotEmpty) parts.add('Staff: $staff');
+    if (manager.isNotEmpty) parts.add('Manager: $manager');
+    return parts.isEmpty ? '—' : parts.join(' · ');
+  }
+
   Widget _buildOvertimeHistoryCard(dynamic item) {
     final date = formatDate(item["date"]);
 
@@ -261,7 +323,7 @@ class _MyovertimeState extends State<Myovertime> {
           Row(
             children: [
               Text(
-                "Overtime Request",
+                "Overtime Requirement",
                 style: Theme.of(context).textTheme.headlineLarge,
               ),
               // CIRCLE ICON

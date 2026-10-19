@@ -263,14 +263,51 @@ class _AddWorklogPageState extends State<AddWorklogPage> {
     final isWeb = !AppLayout.isMobile(context);
 
     return Scaffold(
-      appBar: AppBar(
+      backgroundColor: isWeb ? WebTheme.canvasOf(context) : null,
+      appBar: isWeb
+          ? null
+          : AppBar(
         title: const Text("Add WorkLog"),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios),
           onPressed: () => Navigator.pop(context),
         ),
       ),
-      body: Center(
+      body: Column(
+        children: [
+          if (isWeb)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(8, 8, 16, 0),
+              child: Row(
+                children: [
+                  IconButton(
+                    tooltip: 'Back',
+                    onPressed: () => Navigator.maybePop(context),
+                    icon: Icon(Icons.arrow_back, color: WebTheme.inkOf(context)),
+                  ),
+                  const SizedBox(width: 4),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Add worklog',
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                          color: WebTheme.inkOf(context),
+                        ),
+                      ),
+                      Text(
+                        'Record the work, time, and photo',
+                        style: TextStyle(fontSize: 13, color: WebTheme.mutedOf(context)),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          Expanded(
+            child: Center(
         child: ConstrainedBox(
           constraints: BoxConstraints(maxWidth: isWeb ? 960 : double.infinity),
           child: SingleChildScrollView(
@@ -294,6 +331,9 @@ class _AddWorklogPageState extends State<AddWorklogPage> {
             ),
           ),
         ),
+      ),
+          ),
+        ],
       ),
     );
   }

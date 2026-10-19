@@ -41,10 +41,7 @@ class AdaptiveGoalCards extends StatelessWidget {
             for (var i = 0; i < itemCount; i++)
               SizedBox(
                 width: itemWidth,
-                child: Align(
-                  alignment: Alignment.topLeft,
-                  child: itemBuilder(context, i),
-                ),
+                child: itemBuilder(context, i),
               ),
           ],
         );

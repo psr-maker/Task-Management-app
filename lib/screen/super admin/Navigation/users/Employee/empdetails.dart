@@ -4,14 +4,15 @@ import 'package:staff_work_track/Models/getusers.dart';
 import 'package:staff_work_track/Models/rolesmodel.dart';
 import 'package:staff_work_track/common/filter_model.dart';
 import 'package:staff_work_track/common/search_filter_page.dart';
+import 'package:staff_work_track/core/constant/division_config.dart';
 import 'package:staff_work_track/core/responsive/app_layout.dart';
 import 'package:staff_work_track/core/theme/web_theme.dart';
 import 'package:staff_work_track/core/widgets/form_popup.dart';
 import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
 import 'package:staff_work_track/core/providers/data_refresh_provider.dart';
+import 'package:staff_work_track/screen/admin/Navigation/my%20work/Task%20status%20tab/admintask_list.dart';
 import 'package:staff_work_track/screen/admin/Navigation/my%20work/Task%20status%20tab/allgoals.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/Task/goalntask_create.dart';
-import 'package:staff_work_track/screen/super%20admin/Navigation/Task/taskdetail.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/drawer/auditlog.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/warnings/craete_warnings.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/users/edit_user.dart';
@@ -19,7 +20,6 @@ import 'package:staff_work_track/services/admin_service.dart';
 import 'package:staff_work_track/services/auth_service.dart';
 import 'package:staff_work_track/services/superadmin_service.dart';
 import 'package:staff_work_track/utils/TaskUtils.dart';
-import 'package:staff_work_track/utils/app_helper.dart';
 import 'package:staff_work_track/utils/jwt_helper.dart';
 import 'package:staff_work_track/widgets/StatCard.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
@@ -317,7 +317,14 @@ class _EmployeeDetailState extends State<EmployeeDetail> {
         return !_removedGoalCodes.contains(code);
       }).toList();
 
-      final cards = goalsForCards(visible);
+      final employeeId = widget.employee.userId;
+      final cards = goalsForCards(
+        goalsVisibleToUser(
+          [...visible, ...detailed],
+          userId: employeeId,
+          listedForUser: visible,
+        ),
+      );
       final employeeGoalCodes = <String>{};
       void collectGoalCodes(dynamic raw) {
         if (raw is! Map) return;
@@ -434,7 +441,9 @@ class _EmployeeDetailState extends State<EmployeeDetail> {
         (isManager &&
             !isTargetDirector &&
             (sameDepartment || createdByMatch));
-    final allowWarning = isDirector || isManager;
+    final isHr =
+        isManager && DivisionConfig.normalize(loginDept) == "hr";
+    final allowWarning = isDirector || isHr;
 
     final showMenu = allowEditDelete || allowWarning;
 
@@ -509,7 +518,13 @@ class _EmployeeDetailState extends State<EmployeeDetail> {
           icon: const Icon(Icons.arrow_back_ios),
           onPressed: () => Navigator.pop(context),
         ),
-        title: isSearching
+        title: isWeb
+            ? Text(
+                employee.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              )
+            : isSearching
             ? TextField(
                 controller: searchController,
                 autofocus: true,
@@ -523,8 +538,10 @@ class _EmployeeDetailState extends State<EmployeeDetail> {
                   setState(() => searchQuery = value);
                 },
               )
-            : Text(isWeb ? employee.name : "Employee Details"),
-        actions: [
+            : const Text("Employee Details"),
+        actions: isWeb
+            ? [_userMenu(iconColor: Colors.white)]
+            : [
           IconButton(
             icon: Icon(isSearching ? Icons.close : Icons.search),
             onPressed: () {
@@ -543,11 +560,19 @@ class _EmployeeDetailState extends State<EmployeeDetail> {
             },
           ),
 
-          PopupMenuButton<String>(
+          _userMenu(),
+        ],
+      ),
+      body: isLoading ? const Center(child: RotatingFlower()) : _buildBody(),
+    );
+  }
+
+  Widget _userMenu({Color? iconColor}) {
+    return PopupMenuButton<String>(
             enabled: canShowMenu,
             icon: Icon(
               Icons.more_vert,
-              color: canShowMenu ? Colors.white : Colors.grey,
+              color: iconColor ?? (canShowMenu ? Colors.white : Colors.grey),
             ),
             onSelected: (value) async {
               if (value == 'edit' && canEditDelete) {
@@ -645,11 +670,174 @@ class _EmployeeDetailState extends State<EmployeeDetail> {
                   ),
                 ),
             ],
-          ),
-        ],
-      ),
+    );
+  }
 
-      body: isLoading ? const Center(child: RotatingFlower()) : _buildBody(),
+  Widget _webDetailsHeader() {
+    final border = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(10),
+      borderSide: BorderSide(color: WebTheme.lineOf(context)),
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Flexible(
+              child: _inlineFilter(
+                label: 'Status',
+                value: taskFilter.status,
+                items: droptaskutils.getAllStatuses(),
+                onChanged: (value) => setState(() => taskFilter.status = value),
+                chip: (item) => _filterChip(
+                  droptaskutils.getStatusDisplayName(item),
+                  TaskUtils.getStatusColor(TaskUtils.parseStatus(item)),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Flexible(
+              child: _inlineFilter(
+                label: 'Priority',
+                value: taskFilter.priority,
+                items: droptaskutils.getAllPriorities(),
+                onChanged: (value) =>
+                    setState(() => taskFilter.priority = value),
+                chip: (item) => _filterChip(
+                  droptaskutils.getPriorityDisplayName(item),
+                  TaskUtils.getPriorityColor(item),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Flexible(
+              child: _inlineFilter(
+                label: 'Dept',
+                value: taskFilter.department,
+                items: departmentsList
+                    .map((name) => name.trim())
+                    .where((name) => name.isNotEmpty)
+                    .toSet()
+                    .toList(),
+                onChanged: (value) =>
+                    setState(() => taskFilter.department = value),
+                chip: (item) => _filterChip(item, WebTheme.brandOf(context)),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: TextField(
+                controller: searchController,
+                onChanged: (value) => setState(() => searchQuery = value),
+                decoration: InputDecoration(
+                  isDense: true,
+                  hintText: 'Search',
+                  hintStyle: TextStyle(
+                    fontSize: 13,
+                    color: WebTheme.mutedOf(context),
+                  ),
+                  prefixIcon: Icon(
+                    Icons.search,
+                    size: 18,
+                    color: WebTheme.mutedOf(context),
+                  ),
+                  filled: true,
+                  fillColor: WebTheme.surfaceOf(context),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                  border: border,
+                  enabledBorder: border,
+                  focusedBorder: border.copyWith(
+                    borderSide: BorderSide(color: WebTheme.brandOf(context)),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _filterChip(String text, Color color) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.15),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: color.withOpacity(0.4)),
+        ),
+        child: Text(
+          text,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            color: color,
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _inlineFilter({
+    required String label,
+    required String? value,
+    required List<String> items,
+    required ValueChanged<String?> onChanged,
+    required Widget Function(String item) chip,
+  }) {
+    final selected = items.contains(value) ? value : null;
+    final labelStyle = TextStyle(
+      color: WebTheme.brandOf(context),
+      fontSize: 13,
+      fontWeight: FontWeight.w700,
+    );
+    final choices = <String?>[null, ...items];
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: WebTheme.surfaceOf(context),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: WebTheme.lineOf(context)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        child: DropdownButtonHideUnderline(
+          child: DropdownButton<String?>(
+            isExpanded: true,
+            value: selected,
+            dropdownColor: WebTheme.surfaceOf(context),
+            iconEnabledColor: WebTheme.brandOf(context),
+            hint: Text(label, style: labelStyle),
+            selectedItemBuilder: (context) => [
+              for (final item in choices)
+                item == null
+                    ? Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(label, style: labelStyle),
+                      )
+                    : chip(item),
+            ],
+            items: [
+              DropdownMenuItem<String?>(
+                value: null,
+                child: Text(label, style: labelStyle),
+              ),
+              for (final item in items)
+                DropdownMenuItem<String?>(
+                  value: item,
+                  child: chip(item),
+                ),
+            ],
+            onChanged: onChanged,
+          ),
+        ),
+      ),
     );
   }
 
@@ -661,80 +849,21 @@ class _EmployeeDetailState extends State<EmployeeDetail> {
     final nestedTasks = staffGoals.expand((g) => _tasksOf(g)).toList();
     final allTasksCount = nestedTasks.length + standaloneTasks.length;
 
-    final now = DateTime.now();
-
-    final completedGoals = staffGoals
-        .where(
-          (g) =>
-              (g["status"] ?? "").toString().toLowerCase().trim() ==
-              "completed",
-        )
-        .length;
-
-    final pendingGoals = staffGoals.where((g) {
-      final status = (g["status"] ?? "").toString().toLowerCase().trim();
-
-      return status != "completed";
-    }).length;
-
-    final overdueGoals = staffGoals.where((g) {
-      final status = (g["status"] ?? "").toString().toLowerCase().trim();
-
-      if (status == "completed") return false;
-
-      final dueDateStr = g["dueDate"];
-      if (dueDateStr == null) return false;
-
-      final dueDate = DateTime.tryParse(dueDateStr);
-      if (dueDate == null) return false;
-
-      return dueDate.isBefore(now);
-    }).length;
-
     return Padding(
-      padding: EdgeInsets.all(isWeb ? 28 : 15),
+      padding: EdgeInsets.all(isWeb ? 12 : 15),
       child: Stack(
         children: [
           SingleChildScrollView(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                if (isWeb) ...[
+                  _webDetailsHeader(),
+                  const SizedBox(height: 16),
+                ],
                 _employeeCard(allTasksCount),
 
                 const SizedBox(height: 20),
-
-                Row(
-                  children: [
-                    Expanded(
-                      child: SmallStatCard(
-                        title: "Completed",
-                        value: completedGoals.toString(),
-                        icon: Icons.task_alt,
-                        color: Colors.green,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: SmallStatCard(
-                        title: "Pending",
-                        value: pendingGoals.toString(),
-                        icon: Icons.pending_outlined,
-                        color: Colors.orange,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: SmallStatCard(
-                        title: "Overdue",
-                        value: overdueGoals.toString(),
-                        icon: Icons.warning_amber_rounded,
-                        color: Colors.red,
-                      ),
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 24),
 
                 Row(
                   children: [
@@ -837,41 +966,17 @@ class _EmployeeDetailState extends State<EmployeeDetail> {
                     ),
                   )
                 else
-                  AdaptiveGoalCards(
-                    shrinkWrap: true,
-                    itemCount: filteredTasks.length,
-                    itemBuilder: (context, index) {
-                      final task = filteredTasks[index];
-                      final statusEnum = TaskUtils.parseStatus(
-                        (task["status"] ?? "").toString().trim(),
-                      );
-                      return TaskCard(
-                        task: task,
-                        statusColor: TaskUtils.getStatusColor(statusEnum),
-                        priorityColor: TaskUtils.getPriorityColor(
-                          (task["priority"] ?? "").toString(),
-                        ),
-                        formatDate: AppHelpers.formatDate,
-                        onTap: () async {
-                          final taskCode = (task["taskCode"] ?? "").toString();
-                          if (taskCode.isEmpty) return;
-                          await Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => TaskDetails(taskCode: taskCode),
-                            ),
-                          );
-                          loadEmployeeGoals();
-                        },
-                      );
-                    },
+                  Alltasklist(
+                    tasks: filteredTasks,
+                    searchQuery: '',
+                    onTaskDataUpdated: () => loadEmployeeGoals(),
                   ),
               ],
             ),
           ),
 
           // 🔽 FILTER UI
-          if (showFilter)
+          if (showFilter && !isWeb)
             Positioned(
               top: 0,
               left: 0,
@@ -1137,14 +1242,14 @@ class _EmployeeDetailState extends State<EmployeeDetail> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 14, color: WebTheme.brand),
+          Icon(icon, size: 14, color: WebTheme.brandOf(context)),
           const SizedBox(width: 6),
           Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w600,
-              color: WebTheme.brand,
+              color: WebTheme.brandOf(context),
             ),
           ),
         ],

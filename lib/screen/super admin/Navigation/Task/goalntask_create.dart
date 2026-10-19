@@ -2,12 +2,15 @@
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:staff_work_track/Models/getusers.dart';
+import 'package:staff_work_track/Models/rolesmodel.dart';
 import 'package:staff_work_track/core/constant/division_config.dart';
 import 'package:staff_work_track/core/responsive/app_layout.dart';
 import 'package:staff_work_track/services/admin_service.dart';
 import 'package:staff_work_track/services/auth_service.dart';
 import 'package:staff_work_track/services/superadmin_service.dart';
 import 'package:staff_work_track/core/widgets/buttons.dart';
+import 'package:staff_work_track/core/theme/web_theme.dart';
+import 'package:staff_work_track/core/widgets/web_ui.dart';
 import 'package:staff_work_track/core/providers/data_refresh_provider.dart';
 import 'package:staff_work_track/utils/goal_quantity.dart';
 import 'package:staff_work_track/utils/time_utils.dart';
@@ -19,6 +22,7 @@ import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
 
 class Createtask extends StatefulWidget {
   final List<int> assignedToIds;
+  final List<UserModel> assignedUsers;
   final List<String>? assignedDepartments;
   final String? initialTaskName;
   final String? initialDescription;
@@ -35,6 +39,7 @@ class Createtask extends StatefulWidget {
   const Createtask({
     super.key,
     required this.assignedToIds,
+    this.assignedUsers = const [],
     this.assignedDepartments,
     this.initialTaskName,
     this.initialDescription,
@@ -89,8 +94,11 @@ class _CreateTaskPageState extends State<Createtask> {
   String _goalType = 'Monthly';
   bool _loadingUsers = true;
   List<UserModel> _assignableUsers = [];
+  final Map<int, UserModel> _knownById = {};
+  List<UserModel> _yearlyAssignableUsers = [];
   final Map<int, String> _namesById = {};
   final Set<int> _monthlyAssignedIds = {};
+  final Set<int> _yearlyAssignedIds = {};
   final Set<int> _taskAssignedIds = {};
   final List<_QuantityShare> _quantityShares = [];
   final List<_MonthlySubGoal> _subGoals = [];
@@ -158,7 +166,11 @@ class _CreateTaskPageState extends State<Createtask> {
     }
 
     loadGoals();
+    for (final user in widget.assignedUsers) {
+      _rememberUser(user);
+    }
     _monthlyAssignedIds.addAll(widget.assignedToIds);
+    _yearlyAssignedIds.addAll(widget.assignedToIds);
     _taskAssignedIds.addAll(widget.assignedToIds);
     _loadAssignableUsers();
   }
@@ -260,23 +272,44 @@ class _CreateTaskPageState extends State<Createtask> {
           wasEdited: user.wasEdited,
         );
       }).toList();
+      for (final user in users) {
+        _rememberUser(user);
+      }
+      users = await _withLoginName(
+        users,
+        loginUserId: loginUserId,
+        token: token,
+        department: ownDepartment,
+        role: loginRole?.toString() ?? '',
+      );
 
       final active = users
           .where((user) => user.status.toLowerCase() != 'inactive')
           .toList();
       final assignable = await keepAssignableUsers(active);
+      var roles = <Role>[];
+      try {
+        roles = await SuperAdminService.getRoles();
+      } catch (_) {}
+      final yearlyUsers = assignable
+          .where((user) => isHierarchyLevelRole(roles, user.role))
+          .toList();
+      final yearlyIds = yearlyUsers.map((user) => user.userId).toSet();
       if (!mounted) return;
       setState(() {
-        _namesById
-          ..clear()
-          ..addAll(names);
+        _namesById.addAll(names);
+        for (final user in users) {
+          _rememberUser(user);
+        }
+        for (final user in widget.assignedUsers) {
+          _rememberUser(user);
+        }
         for (final user in assignable) {
-          final name = user.displayName;
-          if (user.userId > 0 && name.isNotEmpty) {
-            _namesById[user.userId] = name;
-          }
+          _rememberUser(user);
         }
         _assignableUsers = assignable;
+        _yearlyAssignableUsers = yearlyUsers;
+        _yearlyAssignedIds.removeWhere((id) => !yearlyIds.contains(id));
         _loadingUsers = false;
       });
     } catch (e) {
@@ -286,14 +319,135 @@ class _CreateTaskPageState extends State<Createtask> {
     }
   }
 
+  String _visibleName(UserModel user) {
+    final display = user.displayName.trim();
+    if (display.isNotEmpty && display != '${user.userId}') return display;
+    final raw = user.name.trim();
+    if (raw.isEmpty || raw == '${user.userId}') return '';
+    return raw;
+  }
+
+  void _rememberUser(UserModel user) {
+    if (user.userId <= 0) return;
+    final name = _visibleName(user);
+    if (name.isEmpty) return;
+    _namesById[user.userId] = name;
+    final current = _knownById[user.userId];
+    if (current == null || _visibleName(current).isEmpty) {
+      _knownById[user.userId] = user;
+    }
+  }
+
   String _userLabel(int id) {
     for (final user in _assignableUsers) {
-      final name = user.displayName;
+      final name = _visibleName(user);
       if (user.userId == id && name.isNotEmpty) return name;
     }
-    final known = _namesById[id]?.trim() ?? '';
-    if (known.isNotEmpty && known != '$id') return known;
+    final known = _knownById[id];
+    if (known != null) {
+      final name = _visibleName(known);
+      if (name.isNotEmpty) return name;
+    }
+    final saved = _namesById[id]?.trim() ?? '';
+    if (saved.isNotEmpty && saved != '$id') return saved;
     return 'User $id';
+  }
+
+  List<UserModel> _pickerUsers(List<UserModel> users, Set<int> selected) {
+    final byId = <int, UserModel>{
+      for (final user in users)
+        if (user.userId > 0) user.userId: user,
+    };
+    for (final id in selected) {
+      if (byId.containsKey(id)) {
+        final current = byId[id]!;
+        if (_visibleName(current).isEmpty && _knownById[id] != null) {
+          byId[id] = _knownById[id]!;
+        }
+        continue;
+      }
+      final known = _knownById[id];
+      if (known != null) {
+        byId[id] = known;
+        continue;
+      }
+      final name = _namesById[id]?.trim() ?? '';
+      if (name.isEmpty || name == '$id') continue;
+      byId[id] = UserModel(
+        userId: id,
+        name: name,
+        email: '',
+        department: '',
+        role: '',
+        status: 'active',
+        createdBy: '',
+        wasEdited: false,
+      );
+    }
+    return byId.values.toList();
+  }
+
+  Future<List<UserModel>> _withLoginName(
+    List<UserModel> users, {
+    required int? loginUserId,
+    required String? token,
+    required String department,
+    required String role,
+  }) async {
+    if (loginUserId == null || loginUserId <= 0) return users;
+    var profileName = '';
+    var email = '';
+    var departmentName = department;
+    var roleName = role;
+    var status = 'active';
+    try {
+      final details = await SuperAdminService.getAdminDetails(loginUserId);
+      final candidate = details.name.trim();
+      if (candidate.isNotEmpty && candidate != '$loginUserId') {
+        profileName = candidate;
+      }
+      email = details.email.trim();
+      if (details.department.trim().isNotEmpty) {
+        departmentName = details.department.trim();
+      }
+      if (details.role.trim().isNotEmpty) roleName = details.role.trim();
+      if (details.status.trim().isNotEmpty) status = details.status.trim();
+    } catch (_) {}
+    if (profileName.isEmpty && token != null) {
+      final fromToken = JwtHelper.displayName(token).trim();
+      if (fromToken.isNotEmpty &&
+          fromToken != 'there' &&
+          fromToken != '$loginUserId') {
+        profileName = fromToken;
+      }
+    }
+    if (profileName.isEmpty) return users;
+
+    final index = users.indexWhere((user) => user.userId == loginUserId);
+    final current = index >= 0 ? users[index] : null;
+    if (current != null && current.displayName.isNotEmpty) return users;
+    final named = UserModel(
+      userId: loginUserId,
+      name: profileName,
+      email: current != null && current.email.trim().isNotEmpty
+          ? current.email
+          : email,
+      department: current != null && current.department.trim().isNotEmpty
+          ? current.department
+          : departmentName,
+      role: current != null && current.role.trim().isNotEmpty
+          ? current.role
+          : roleName,
+      status: current != null && current.status.trim().isNotEmpty
+          ? current.status
+          : status,
+      createdBy: current?.createdBy ?? '',
+      wasEdited: current?.wasEdited ?? false,
+    );
+    if (index < 0) return [...users, named];
+    final copy = [...users];
+    copy[index] = named;
+    return copy;
   }
 
   Color _softFill() {
@@ -388,10 +542,24 @@ class _CreateTaskPageState extends State<Createtask> {
     _monthsWereGenerated = true;
   }
 
-  Future<void> _pickUsers(Set<int> target, {String? title}) async {
+  void _syncShareMembers(Iterable<int> removedIds) {
+    final stillShared = _quantityShares.expand((share) => share.memberIds).toSet();
+    _taskAssignedIds.addAll(stillShared);
+    for (final id in removedIds) {
+      if (!stillShared.contains(id)) _taskAssignedIds.remove(id);
+    }
+  }
+
+  Future<void> _pickUsers(
+    Set<int> target, {
+    String? title,
+    bool mirrorOnTask = false,
+    List<UserModel>? users,
+  }) async {
     final picker = StaffPicker(
-      users: _assignableUsers,
+      users: _pickerUsers(users ?? _assignableUsers, target),
       selectedIds: target,
+      namesById: _namesById,
       title: title ?? 'Assign staff',
     );
 
@@ -400,6 +568,7 @@ class _CreateTaskPageState extends State<Createtask> {
             context: context,
             isScrollControlled: true,
             showDragHandle: true,
+            backgroundColor: WebTheme.surfaceOf(context),
             builder: (ctx) => Padding(
               padding: EdgeInsets.only(
                 bottom: MediaQuery.viewInsetsOf(ctx).bottom,
@@ -413,6 +582,7 @@ class _CreateTaskPageState extends State<Createtask> {
         : await showDialog<Set<int>>(
             context: context,
             builder: (ctx) => Dialog(
+              backgroundColor: WebTheme.surfaceOf(context),
               insetPadding: const EdgeInsets.symmetric(
                 horizontal: 24,
                 vertical: 24,
@@ -426,10 +596,133 @@ class _CreateTaskPageState extends State<Createtask> {
 
     if (result == null || !mounted) return;
     setState(() {
+      final removed = target.difference(result);
       target
         ..clear()
         ..addAll(result);
+      if (mirrorOnTask) _syncShareMembers(removed);
     });
+  }
+
+  void _applySelectedGoal(String code) {
+    selectedGoalCode = code;
+    final selectedGoal = goalsList.firstWhere(
+      (goal) => goal['goalCode'].toString() == code,
+    );
+    final start = selectedGoal['startDate'];
+    final due = selectedGoal['dueDate'];
+    if (start != null) {
+      goalStartDate = DateTime.tryParse(start.toString());
+    }
+    if (due != null) {
+      goalDueDate = DateTime.tryParse(due.toString());
+    }
+  }
+
+  Widget _goalSelectField() {
+    final border = WebTheme.brandOf(context);
+    var label = 'Choose a goal';
+    var chosen = false;
+    if (selectedGoalCode != null) {
+      for (final goal in goalsList) {
+        if (goal is! Map) continue;
+        if (goal['goalCode'].toString() != selectedGoalCode) continue;
+        final title = (goal['title'] ?? '').toString().trim();
+        label = title.isEmpty ? selectedGoalCode! : title;
+        chosen = true;
+        break;
+      }
+    } else if (!isGoalLoading && goalsList.isEmpty) {
+      label = 'No goals found for this department';
+    }
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: isGoalLoading || goalsList.isEmpty ? null : _openGoalSearch,
+        child: Container(
+          width: double.infinity,
+          padding: EdgeInsets.symmetric(
+            horizontal: 10,
+            vertical: AppLayout.isMobile(context) ? 14 : 12,
+          ),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: border),
+          ),
+          child: Row(
+            children: [
+              // const Icon(Icons.search, size: 18, color: border),
+              // const SizedBox(width: 10),
+              isGoalLoading
+                  ? const Align(
+                      alignment: Alignment.centerLeft,
+                      child: SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    )
+                  : Text(
+                      label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: chosen ? WebTheme.inkOf(context) : WebTheme.mutedOf(context),
+                      ),
+                    ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openGoalSearch() async {
+    final picker = _GoalSearchPicker(
+      goals: goalsList,
+      selectedCode: selectedGoalCode,
+    );
+    final mobile = AppLayout.isMobile(context);
+    final String? picked;
+    if (mobile) {
+      picked = await showModalBottomSheet<String>(
+        context: context,
+        isScrollControlled: true,
+        showDragHandle: true,
+        backgroundColor: WebTheme.surfaceOf(context),
+        builder: (ctx) => Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.viewInsetsOf(ctx).bottom,
+          ),
+          child: SizedBox(
+            height: MediaQuery.sizeOf(ctx).height * 0.78,
+            child: picker,
+          ),
+        ),
+      );
+    } else {
+      picked = await showDialog<String>(
+        context: context,
+        builder: (ctx) => Dialog(
+          backgroundColor: WebTheme.surfaceOf(context),
+          insetPadding: const EdgeInsets.symmetric(
+            horizontal: 24,
+            vertical: 24,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: SizedBox(width: 520, height: 620, child: picker),
+        ),
+      );
+    }
+    if (picked == null || !mounted) return;
+    final code = picked;
+    setState(() => _applySelectedGoal(code));
   }
 
   Future<void> _selectDate(
@@ -595,9 +888,9 @@ class _CreateTaskPageState extends State<Createtask> {
         );
         return;
       }
-      _taskAssignedIds
-        ..clear()
-        ..addAll(quantitySplits.expand((share) => (share["memberIds"] as List).cast<int>()));
+      _taskAssignedIds.addAll(
+        quantitySplits.expand((share) => (share["memberIds"] as List).cast<int>()),
+      );
     }
 
     if (_taskAssignedIds.isEmpty) {
@@ -724,8 +1017,19 @@ class _CreateTaskPageState extends State<Createtask> {
 
     List<Map<String, dynamic>>? monthlyGoals;
     List<int>? assignedUserIds;
+    List<int>? yearlyAssignedUserIds;
 
     if (_goalType == 'Yearly') {
+      if (_yearlyAssignedIds.isEmpty) {
+        showTopMessage(
+          "Assign at least one hierarchical user to the yearly goal",
+          isError: true,
+        );
+        return;
+      }
+      yearlyAssignedUserIds = _yearlyAssignedIds.toList();
+      assignedUserIds = yearlyAssignedUserIds;
+
       if (_subGoals.isEmpty) {
         showTopMessage("Add at least one monthly sub-goal", isError: true);
         return;
@@ -839,8 +1143,9 @@ class _CreateTaskPageState extends State<Createtask> {
         dueDate: goalDueDate!,
         targetQuantity: targetQuantity,
         assignedUserIds: assignedUserIds,
-        monthlyGoals: monthlyGoals,
-        sendParentGoalId: _goalType == 'Monthly',
+        yearlyAssignedUserIds: _goalType == 'Yearly' ? yearlyAssignedUserIds : null,
+        monthlyGoals: _goalType == 'Yearly' ? monthlyGoals : null,
+        sendParentGoalId: false,
         parentGoalId: null,
       );
     } catch (e) {
@@ -962,8 +1267,13 @@ class _CreateTaskPageState extends State<Createtask> {
 
   @override
   Widget build(BuildContext context) {
+    if (WebPushedChrome.isWeb(context)) return _webCreatePage();
+    final web = WebPushedChrome.isWeb(context);
     return Scaffold(
-      appBar: AppBar(
+      backgroundColor: WebPushedChrome.background(context),
+      appBar: web
+          ? null
+          : AppBar(
         title: Text(isTask ? "Create Task" : "Create Goal"),
         leading: IconButton(
           onPressed: () {
@@ -972,7 +1282,11 @@ class _CreateTaskPageState extends State<Createtask> {
           icon: const Icon(Icons.arrow_back_ios),
         ),
       ),
-      body: Stack(
+      body: WebFormPage.adapt(
+        context,
+        title: isTask ? 'Create task' : 'Create goal',
+        subtitle: 'Set the details, dates, and who it is assigned to',
+        child: Stack(
         children: [
           // Main content
           Padding(
@@ -1060,6 +1374,456 @@ class _CreateTaskPageState extends State<Createtask> {
             ),
         ],
       ),
+      ),
+    );
+  }
+
+  Widget _webCreatePage() {
+    final yearly = _goalType == 'Yearly';
+    return Scaffold(
+      backgroundColor: WebTheme.canvasOf(context),
+      body: Stack(
+        children: [
+          Padding(
+            padding: AppLayout.pagePadding(context),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    IconButton(
+                      tooltip: 'Back',
+                      visualDensity: VisualDensity.compact,
+                      onPressed: () => Navigator.pop(context),
+                      icon: Icon(Icons.arrow_back, size: 18, color: WebTheme.brand),
+                    ),
+                    Text(
+                      isTask ? 'Create task' : 'Create goal',
+                      style: TextStyle(
+                        color: WebTheme.brand,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    _webModeSwitch(),
+                    const Spacer(),
+                    FilledButton(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: WebTheme.brand,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                        textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+                      ),
+                      onPressed: _isLoading
+                          ? null
+                          : () {
+                              if (isTask) {
+                                _createTask();
+                              } else {
+                                _createGoal();
+                              }
+                            },
+                      child: Text(_isLoading ? 'Saving' : 'Create'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                Expanded(
+                  child: Align(
+                    alignment: Alignment.topCenter,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 920),
+                      child: SingleChildScrollView(
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
+                          decoration: BoxDecoration(
+                            color: WebTheme.surfaceOf(context),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: WebTheme.lineOf(context)),
+                          ),
+                          child: isTask ? _webTaskForm() : _webGoalForm(yearly),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (_topMessage != null)
+            AnimatedPositioned(
+              top: _showTopMessage ? 8 : -120,
+              left: 16,
+              right: 16,
+              duration: const Duration(milliseconds: 300),
+              child: Msgsnackbar(
+                context,
+                message: _topMessage!,
+                isError: _isErrorMessage,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _webModeSwitch() {
+    return Container(
+      height: 38,
+      decoration: BoxDecoration(
+        color: WebTheme.brandSoftOf(context),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _webMode('Goal', !isTask, () => setState(() => isTask = false)),
+          _webMode('Task', isTask, () => setState(() => isTask = true)),
+        ],
+      ),
+    );
+  }
+
+  Widget _webMode(String title, bool selected, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: selected ? WebTheme.brand : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Text(
+          title,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+            color: selected ? Colors.white : WebTheme.inkOf(context),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _webPair(Widget left, Widget right) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(child: left),
+          const SizedBox(width: 16),
+          Expanded(child: right),
+        ],
+      ),
+    );
+  }
+
+  Widget _webBox(String label, Widget child) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: WebTheme.mutedOf(context),
+          ),
+        ),
+        const SizedBox(height: 6),
+        child,
+      ],
+    );
+  }
+
+  InputDecoration _webDecoration(String hint, {IconData? icon}) {
+    final border = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(10),
+      borderSide: BorderSide(color: WebTheme.brand.withValues(alpha: 0.4)),
+    );
+    return InputDecoration(
+      hintText: hint,
+      hintStyle: TextStyle(fontSize: 14, color: WebTheme.mutedOf(context)),
+      isDense: true,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+      suffixIcon: icon == null
+          ? null
+          : Icon(icon, size: 18, color: WebTheme.brand),
+      suffixIconConstraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+      enabledBorder: border,
+      focusedBorder: border.copyWith(
+        borderSide: BorderSide(color: WebTheme.brand),
+      ),
+    );
+  }
+
+  Widget _webText(
+    TextEditingController controller,
+    String hint, {
+    int lines = 1,
+    TextInputType? keyboard,
+    List<TextInputFormatter>? formatters,
+    ValueChanged<String>? onChanged,
+  }) {
+    return TextField(
+      controller: controller,
+      maxLines: lines,
+      keyboardType: keyboard,
+      inputFormatters: formatters,
+      onChanged: onChanged,
+      style: TextStyle(fontSize: 14, color: WebTheme.inkOf(context)),
+      decoration: _webDecoration(hint),
+    );
+  }
+
+  Widget _webTapField(
+    TextEditingController controller,
+    String hint,
+    IconData icon,
+    VoidCallback onTap,
+  ) {
+    return TextField(
+      controller: controller,
+      readOnly: true,
+      onTap: onTap,
+      style: TextStyle(fontSize: 14, color: WebTheme.brand, fontWeight: FontWeight.w600),
+      decoration: _webDecoration(hint, icon: icon),
+    );
+  }
+
+  Widget _webDrop(
+    String? value,
+    List<String> items,
+    ValueChanged<String?> onChanged,
+  ) {
+    return Container(
+      height: 46,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: WebTheme.brand.withValues(alpha: 0.4)),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: items.contains(value) ? value : null,
+          isExpanded: true,
+          dropdownColor: WebTheme.surfaceOf(context),
+          iconEnabledColor: WebTheme.brandOf(context),
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+            color: WebTheme.inkOf(context),
+          ),
+          items: items
+              .map(
+                (item) => DropdownMenuItem(
+                  value: item,
+                  child: Text(
+                    item,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: WebTheme.inkOf(context),
+                    ),
+                  ),
+                ),
+              )
+              .toList(),
+          onChanged: onChanged,
+        ),
+      ),
+    );
+  }
+
+  Widget _webStaff(VoidCallback onAdd, Set<int> ids, {String? emptyLabel}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text(
+              'Staff',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: WebTheme.mutedOf(context),
+              ),
+            ),
+            const Spacer(),
+            TextButton.icon(
+              style: TextButton.styleFrom(
+                visualDensity: VisualDensity.compact,
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+              ),
+              onPressed: onAdd,
+              icon: Icon(Icons.person_add_alt_1, size: 18, color: WebTheme.brand),
+              label: Text(
+                'Add',
+                style: TextStyle(fontSize: 14, color: WebTheme.brand, fontWeight: FontWeight.w700),
+              ),
+            ),
+          ],
+        ),
+        _assignedStaffBox(ids: ids, emptyLabel: emptyLabel ?? 'No staff assigned'),
+      ],
+    );
+  }
+
+  Widget _webTaskForm() {
+    return Column(
+      children: [
+        _webPair(
+          _webBox('Task name', _webText(nameController, 'Task name')),
+          _webBox('Goal', _goalSelectField()),
+        ),
+        Padding(
+          padding: const EdgeInsets.only(bottom: 14),
+          child: _webBox(
+            'Description',
+            _webText(descriController, 'Description', lines: 3),
+          ),
+        ),
+        _webPair(
+          _webBox(
+            'Start date',
+            _webTapField(
+              createdDateController,
+              'Start date',
+              Icons.calendar_today,
+              () => _selectDate(context, createdDateController, true),
+            ),
+          ),
+          _webBox(
+            'Due date',
+            _webTapField(
+              dueDateController,
+              'Due date',
+              Icons.calendar_today,
+              () => _selectDate(context, dueDateController, false),
+            ),
+          ),
+        ),
+        _webPair(
+          _webBox(
+            'Start time',
+            _webTapField(
+              startTimeController,
+              'Optional',
+              Icons.access_time,
+              () => _pickTime(isStart: true),
+            ),
+          ),
+          _webBox(
+            'Due time',
+            _webTapField(
+              endTimeController,
+              'Optional',
+              Icons.access_time,
+              () => _pickTime(isStart: false),
+            ),
+          ),
+        ),
+        _webPair(
+          _webBox(
+            'Performance',
+            _webDrop(selectedPerformanceType, const ['Default', 'Qty'], (v) {
+              setState(() {
+                selectedPerformanceType = v ?? 'Default';
+                if (selectedPerformanceType != 'Qty') quantityController.clear();
+              });
+            }),
+          ),
+          _webBox(
+            'Priority',
+            _webDrop(selectedPriority, const ['Normal', 'Medium', 'High'], (v) {
+              setState(() => selectedPriority = v);
+            }),
+          ),
+        ),
+        if (selectedPerformanceType == 'Qty') ...[
+          _webBox('Quantity', _webText(quantityController, 'Quantity', keyboard: TextInputType.number, formatters: [FilteringTextInputFormatter.digitsOnly], onChanged: (_) => setState(() {}))),
+          const SizedBox(height: 6),
+          _quantitySplitSection(),
+        ],
+        const SizedBox(height: 4),
+        _webStaff(
+          () => _pickUsers(_taskAssignedIds, title: 'Assign members'),
+          _taskAssignedIds,
+        ),
+      ],
+    );
+  }
+
+  Widget _webGoalForm(bool yearly) {
+    return Column(
+      children: [
+        _webPair(
+          _webBox(
+            'Type',
+            _webDrop(_goalType, const ['Monthly', 'Yearly'], (v) {
+              if (v != null) _setGoalType(v);
+            }),
+          ),
+          _webBox('Title', _webText(goalTitleController, 'Goal title')),
+        ),
+        _webPair(
+          _webBox(
+            'Start date',
+            _webTapField(
+              goalStartController,
+              'Start date',
+              Icons.calendar_today,
+              () => selectDate(context, goalStartController, true),
+            ),
+          ),
+          _webBox(
+            'Due date',
+            _webTapField(
+              goalDueController,
+              'Due date',
+              Icons.calendar_today,
+              () => selectDate(context, goalDueController, false),
+            ),
+          ),
+        ),
+        _webPair(
+          _webBox(
+            'Priority',
+            _webDrop(selectedPriority, const ['Normal', 'Medium', 'High'], (v) {
+              setState(() => selectedPriority = v);
+            }),
+          ),
+          _webBox(
+            'Quantity',
+            _webText(
+              goalQuantityController,
+              'Optional',
+              keyboard: TextInputType.number,
+              formatters: [FilteringTextInputFormatter.digitsOnly],
+              onChanged: (_) => setState(() {}),
+            ),
+          ),
+        ),
+        _webStaff(
+          () => yearly
+              ? _pickUsers(
+                  _yearlyAssignedIds,
+                  title: 'Assign yearly users',
+                  users: _yearlyAssignableUsers,
+                )
+              : _pickUsers(_monthlyAssignedIds, title: 'Assign staff'),
+          yearly ? _yearlyAssignedIds : _monthlyAssignedIds,
+          emptyLabel: yearly ? 'No users assigned' : 'No staff assigned',
+        ),
+        if (yearly) ...[
+          const SizedBox(height: 8),
+          _yearlyBreakdown(),
+        ],
+      ],
     );
   }
 
@@ -1113,97 +1877,133 @@ class _CreateTaskPageState extends State<Createtask> {
     final share = _quantityShares[index];
     final brand = Theme.of(context).colorScheme.secondary;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: Row(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            width: 62,
-            child: Text(
-              "Share ${index + 1}",
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: Colors.grey.shade600,
-              ),
-            ),
-          ),
-          SizedBox(
-            width: 72,
-            child: TextField(
-              controller: share.quantityController,
-              keyboardType: TextInputType.number,
-              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              onChanged: (_) => setState(() {}),
-              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-              decoration: InputDecoration(
-                hintText: "Qty",
-                hintStyle: TextStyle(
-                  fontSize: 13,
-                  color: Colors.grey.shade500,
-                ),
-                isDense: true,
-                filled: true,
-                fillColor: _softFill(),
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 10,
-                ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide.none,
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide.none,
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(color: brand),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: share.memberIds.isEmpty
-                ? Text(
-                    "No members",
-                    style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
-                  )
-                : Wrap(
-                    spacing: 6,
-                    runSpacing: 4,
-                    children: share.memberIds.map((id) {
-                      return Text(
-                        _userLabel(id),
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      );
-                    }).toList(),
+          Row(
+            children: [
+              SizedBox(
+                width: 62,
+                child: Text(
+                  "Share ${index + 1}",
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey.shade600,
                   ),
+                ),
+              ),
+              SizedBox(
+                width: 72,
+                child: TextField(
+                  controller: share.quantityController,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  onChanged: (_) => setState(() {}),
+                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                  decoration: InputDecoration(
+                    hintText: "Qty",
+                    hintStyle: TextStyle(
+                      fontSize: 13,
+                      color: Colors.grey.shade500,
+                    ),
+                    isDense: true,
+                    filled: true,
+                    fillColor: _softFill(),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 10,
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide.none,
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide.none,
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(color: brand),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton.icon(
+                    onPressed: () => _pickUsers(
+                      share.memberIds,
+                      title: "Assign staff",
+                      mirrorOnTask: true,
+                    ),
+                    icon: Icon(Icons.person_add_alt_1, size: 18, color: brand),
+                    label: Text(
+                      "Assign staff",
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(color: brand, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ),
+              ),
+              IconButton(
+                visualDensity: VisualDensity.compact,
+                tooltip: "Remove share",
+                onPressed: () {
+                  setState(() {
+                    final removed = _quantityShares.removeAt(index);
+                    final dropped = removed.memberIds.toList();
+                    removed.dispose();
+                    _syncShareMembers(dropped);
+                  });
+                },
+                icon: Icon(Icons.close, size: 16, color: Colors.grey.shade600),
+              ),
+            ],
           ),
-          IconButton(
-            visualDensity: VisualDensity.compact,
-            tooltip: "Add members",
-            onPressed: () => _pickUsers(
-              share.memberIds,
-              title: "Assign share ${index + 1}",
+          if (share.memberIds.isEmpty)
+            Padding(
+              padding: const EdgeInsets.only(left: 62, top: 2),
+              child: Text(
+                "No members",
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+              ),
+            )
+          else
+            Padding(
+              padding: const EdgeInsets.only(left: 62, top: 6),
+              child: Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: share.memberIds.map((id) {
+                  return InputChip(
+                    label: Text(
+                      _userLabel(id),
+                      style: const TextStyle(
+                        color: Colors.black,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 12,
+                      ),
+                    ),
+                    visualDensity: VisualDensity.compact,
+                    onDeleted: () => setState(() {
+                      share.memberIds.remove(id);
+                      _syncShareMembers([id]);
+                    }),
+                    deleteIcon: const Icon(
+                      Icons.close,
+                      size: 14,
+                      color: Colors.black54,
+                    ),
+                    backgroundColor: brand.withValues(alpha: 0.08),
+                    side: BorderSide(color: brand.withValues(alpha: 0.3)),
+                  );
+                }).toList(),
+              ),
             ),
-            icon: Icon(Icons.person_add_alt_1, size: 18, color: brand),
-          ),
-          IconButton(
-            visualDensity: VisualDensity.compact,
-            tooltip: "Remove share",
-            onPressed: () {
-              setState(() {
-                final removed = _quantityShares.removeAt(index);
-                removed.dispose();
-              });
-            },
-            icon: Icon(Icons.close, size: 16, color: Colors.grey.shade600),
-          ),
         ],
       ),
     );
@@ -1289,13 +2089,7 @@ class _CreateTaskPageState extends State<Createtask> {
             ),
           ],
         ),
-        _assignedStaffBox(
-          ids: _taskAssignedIds,
-          onAdd: () => _pickUsers(
-            _taskAssignedIds,
-            title: "Assign members",
-          ),
-        ),
+        _assignedStaffBox(ids: _taskAssignedIds),
         const SizedBox(height: 20),
         CustomFormWidgets.label(context, "Description"),
         const SizedBox(height: 8),
@@ -1309,68 +2103,7 @@ class _CreateTaskPageState extends State<Createtask> {
         CustomFormWidgets.label(context, "Select Goal"),
         const SizedBox(height: 8),
 
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color.fromARGB(255, 25, 77, 38)),
-          ),
-          child: isGoalLoading
-              ? const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 12),
-                  child: Center(
-                    child: SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    ),
-                  ),
-                )
-              : DropdownButtonFormField<String>(
-            value: selectedGoalCode,
-
-            decoration: const InputDecoration(
-              border: InputBorder.none,
-              contentPadding: EdgeInsets.zero,
-            ),
-            hint: Text(
-              goalsList.isEmpty
-                  ? "No goals found for this department"
-                  : "Select Goal",
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            style: Theme.of(context).textTheme.titleLarge,
-
-            items: goalsList.map<DropdownMenuItem<String>>((goal) {
-              return DropdownMenuItem<String>(
-                value: goal['goalCode'].toString(),
-                child: Text(
-                  goal['title'] ?? "",
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-              );
-            }).toList(),
-            onChanged: goalsList.isEmpty
-                ? null
-                : (value) {
-                    setState(() {
-                      selectedGoalCode = value;
-
-                      final selectedGoal = goalsList.firstWhere(
-                        (g) => g['goalCode'].toString() == value,
-                      );
-                      final start = selectedGoal['startDate'];
-                      final due = selectedGoal['dueDate'];
-                      if (start != null) {
-                        goalStartDate = DateTime.tryParse(start.toString());
-                      }
-                      if (due != null) {
-                        goalDueDate = DateTime.tryParse(due.toString());
-                      }
-                    });
-                  },
-          ),
-        ),
+        _goalSelectField(),
 
         const SizedBox(height: 20),
         _row2(
@@ -1463,10 +2196,12 @@ class _CreateTaskPageState extends State<Createtask> {
       context: context,
       initialTime: TimeOfDay.now(),
       builder: (context, child) {
+        final theme = Theme.of(context);
+        if (theme.brightness == Brightness.dark) return child!;
         return Theme(
-          data: Theme.of(context).copyWith(
+          data: theme.copyWith(
             colorScheme: ColorScheme.light(
-              primary: Theme.of(context).colorScheme.secondary,
+              primary: theme.colorScheme.secondary,
               onPrimary: Colors.white,
               surface: Colors.white,
               onSurface: Colors.black,
@@ -1561,15 +2296,34 @@ class _CreateTaskPageState extends State<Createtask> {
               ),
             ],
           ),
-          _assignedStaffBox(
-            ids: _monthlyAssignedIds,
-            onAdd: () => _pickUsers(
-              _monthlyAssignedIds,
-              title: 'Assign staff',
-            ),
+          _assignedStaffBox(ids: _monthlyAssignedIds),
+        ] else ...[
+          Row(
+            children: [
+              Expanded(
+                child: CustomFormWidgets.label(context, "Yearly assigned users"),
+              ),
+              IconButton(
+                tooltip: 'Add users',
+                onPressed: () => _pickUsers(
+                  _yearlyAssignedIds,
+                  title: 'Assign yearly users',
+                  users: _yearlyAssignableUsers,
+                ),
+                icon: Icon(
+                  Icons.add,
+                  color: Theme.of(context).colorScheme.secondary,
+                ),
+              ),
+            ],
           ),
-        ] else
+          _assignedStaffBox(
+            ids: _yearlyAssignedIds,
+            emptyLabel: 'No hierarchical users assigned',
+          ),
+          const SizedBox(height: 22),
           _yearlyBreakdown(),
+        ],
       ],
     );
   }
@@ -1682,11 +2436,19 @@ class _CreateTaskPageState extends State<Createtask> {
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Color.fromARGB(255, 25, 77, 38)),
+          borderSide: BorderSide(
+            color: AppLayout.isMobile(context)
+                ? const Color.fromARGB(255, 25, 77, 38)
+                : WebTheme.brand,
+          ),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Color.fromARGB(255, 25, 77, 38)),
+          borderSide: BorderSide(
+            color: AppLayout.isMobile(context)
+                ? const Color.fromARGB(255, 25, 77, 38)
+                : WebTheme.brand,
+          ),
         ),
       ),
     );
@@ -1946,15 +2708,32 @@ class _CreateTaskPageState extends State<Createtask> {
           const SizedBox(height: 10),
           _monthPriority(goal),
           const SizedBox(height: 10),
-          _assignedStaffBox(
-            ids: goal.assignedUserIds,
-            onAdd: () => _pickUsers(
-              goal.assignedUserIds,
-              title: goal.titleController.text.trim().isEmpty
-                  ? 'Assign month ${index + 1}'
-                  : 'Assign ${goal.titleController.text.trim()}',
-            ),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Assigned staff',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+              ),
+              IconButton(
+                tooltip: 'Add staff',
+                visualDensity: VisualDensity.compact,
+                onPressed: () => _pickUsers(
+                  goal.assignedUserIds,
+                  title: goal.titleController.text.trim().isEmpty
+                      ? 'Assign month ${index + 1}'
+                      : 'Assign ${goal.titleController.text.trim()}',
+                ),
+                icon: Icon(Icons.add, color: brand),
+              ),
+            ],
           ),
+          _assignedStaffBox(ids: goal.assignedUserIds),
         ],
       ),
     );
@@ -2042,10 +2821,9 @@ class _CreateTaskPageState extends State<Createtask> {
 
   Widget _assignedStaffBox({
     required Set<int> ids,
-    required VoidCallback onAdd,
+    String emptyLabel = 'No staff assigned',
   }) {
-    final brand = Theme.of(context).colorScheme.secondary;
-    const border = Color.fromARGB(255, 25, 77, 38);
+    final ink = WebTheme.inkOf(context);
 
     if (_loadingUsers) {
       return const Padding(
@@ -2056,50 +2834,45 @@ class _CreateTaskPageState extends State<Createtask> {
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(10, 6, 4, 6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: border),
+        border: Border.all(color: WebTheme.lineOf(context)),
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Expanded(
-            child: ids.isEmpty
-                ? Text(
-                    'No staff assigned',
+      child: ids.isEmpty
+          ? Text(
+              emptyLabel,
+              style: TextStyle(
+                fontSize: 13,
+                color: WebTheme.mutedOf(context),
+              ),
+            )
+          : Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: ids.map((id) {
+                return InputChip(
+                  label: Text(
+                    _userLabel(id),
                     style: TextStyle(
-                      fontSize: 13,
-                      color: Colors.grey.shade600,
+                      color: ink,
+                      fontWeight: FontWeight.w600,
                     ),
-                  )
-                : Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: ids.map((id) {
-                      return InputChip(
-                        label: Text(
-                          _userLabel(id),
-                          style: const TextStyle(
-                            color: Colors.black,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        onDeleted: () => setState(() => ids.remove(id)),
-                        deleteIcon: const Icon(Icons.close, size: 16, color: Colors.black54),
-                        backgroundColor: brand.withValues(alpha: 0.08),
-                        side: BorderSide(color: brand.withValues(alpha: 0.3)),
-                      );
-                    }).toList(),
                   ),
-          ),
-          IconButton(
-            tooltip: 'Add staff',
-            onPressed: onAdd,
-            icon: Icon(Icons.add, color: brand),
-          ),
-        ],
-      ),
+                  onDeleted: () => setState(() {
+                    ids.remove(id);
+                    if (identical(ids, _taskAssignedIds)) {
+                      for (final share in _quantityShares) {
+                        share.memberIds.remove(id);
+                      }
+                    }
+                  }),
+                  deleteIcon: Icon(Icons.close, size: 16, color: WebTheme.mutedOf(context)),
+                  backgroundColor: WebTheme.brandSoftOf(context),
+                  side: BorderSide(color: WebTheme.lineOf(context)),
+                );
+              }).toList(),
+            ),
     );
   }
 
@@ -2211,5 +2984,149 @@ class _MonthlySubGoal {
     quantityController.dispose();
     startController.dispose();
     dueController.dispose();
+  }
+}
+
+class _GoalSearchPicker extends StatefulWidget {
+  final List<dynamic> goals;
+  final String? selectedCode;
+
+  const _GoalSearchPicker({
+    required this.goals,
+    required this.selectedCode,
+  });
+
+  @override
+  State<_GoalSearchPicker> createState() => _GoalSearchPickerState();
+}
+
+class _GoalSearchPickerState extends State<_GoalSearchPicker> {
+  final TextEditingController _search = TextEditingController();
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final border = WebTheme.brandOf(context);
+    final ink = WebTheme.inkOf(context);
+    final query = _search.text.trim().toLowerCase();
+    final filtered = widget.goals.where((goal) {
+      if (goal is! Map) return false;
+      if (query.isEmpty) return true;
+      final title = (goal['title'] ?? '').toString().toLowerCase();
+      final code = (goal['goalCode'] ?? '').toString().toLowerCase();
+      return title.contains(query) || code.contains(query);
+    }).toList();
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Select goal',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: ink,
+                  ),
+                ),
+              ),
+              IconButton(
+                onPressed: () => Navigator.pop(context),
+                icon: const Icon(Icons.close),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _search,
+            autofocus: true,
+            onChanged: (_) => setState(() {}),
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: ink,
+            ),
+            decoration: InputDecoration(
+              hintText: 'Search goal',
+              hintStyle: TextStyle(color: WebTheme.mutedOf(context)),
+              prefixIcon: Icon(Icons.search, color: border),
+              isDense: true,
+              contentPadding: const EdgeInsets.symmetric(
+                vertical: 12,
+                horizontal: 12,
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: WebTheme.lineOf(context)),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: border, width: 1.4),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Expanded(
+            child: filtered.isEmpty
+                ? Center(
+                    child: Text(
+                      'No matching goal',
+                      style: TextStyle(color: Colors.grey.shade600),
+                    ),
+                  )
+                : ListView.separated(
+                    itemCount: filtered.length,
+                    separatorBuilder: (_, _) => const SizedBox(height: 8),
+                    itemBuilder: (context, index) {
+                      final goal = filtered[index] as Map;
+                      final code = goal['goalCode'].toString();
+                      final title = (goal['title'] ?? '').toString();
+                      final selected = code == widget.selectedCode;
+                      return Material(
+                        color: selected
+                            ? WebTheme.brandSoftOf(context)
+                            : WebTheme.surfaceOf(context),
+                        borderRadius: BorderRadius.circular(12),
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(12),
+                          onTap: () => Navigator.pop(context, code),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 12,
+                            ),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: selected ? border : WebTheme.lineOf(context),
+                                width: selected ? 1.6 : 1,
+                              ),
+                            ),
+                            child: Text(
+                              title.isEmpty ? code : title,
+                              style: TextStyle(
+                                color: ink,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 15,
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
+    );
   }
 }

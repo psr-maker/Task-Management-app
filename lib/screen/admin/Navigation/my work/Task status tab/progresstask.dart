@@ -10,7 +10,14 @@ import 'package:staff_work_track/widgets/adaptive_goal_cards.dart';
 
 class InProcessTab extends StatefulWidget {
   final int adminId;
-  const InProcessTab({super.key, required this.adminId});
+  final String Function(Map task)? statusOf;
+  final Future<void> Function(Map<String, dynamic> task)? onStatusSaved;
+  const InProcessTab({
+    super.key,
+    required this.adminId,
+    this.statusOf,
+    this.onStatusSaved,
+  });
 
   @override
   State<InProcessTab> createState() => _InProcessTabState();
@@ -44,11 +51,11 @@ class _InProcessTabState extends State<InProcessTab> {
         }
 
         final tasks = snapshot.data!.where((task) {
-          final normalizedStatus = AppHelpers.normalize(
-            viewerTaskStatus(task, widget.adminId),
-          );
-          return normalizedStatus == "in progress" ||
-              normalizedStatus == "inprogress";
+          final normalizedStatus = widget.statusOf?.call(task) ??
+              AppHelpers.normalize(
+                viewerTaskStatus(task, widget.adminId),
+              );
+          return normalizedStatus == "inprogress";
         }).toList();
 
         if (tasks.isEmpty) {
@@ -63,6 +70,7 @@ class _InProcessTabState extends State<InProcessTab> {
               final task = tasks[index];
               return Taskstatus(
                 task: task,
+                onStatusSaved: widget.onStatusSaved,
                 onTap: () {
                   Navigator.push(
                     context,

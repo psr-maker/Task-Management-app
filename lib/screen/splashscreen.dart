@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:staff_work_track/core/theme/theme_provider.dart';
 import 'package:staff_work_track/core/widgets/buttons.dart';
 import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
 import 'package:staff_work_track/screen/super%20admin/fives/create_fives.dart';
@@ -67,11 +69,13 @@ class _SplashScreenState extends State<SplashScreen>
     if (!mounted) return;
 
     if (token == null || token.isEmpty || JwtHelper.isExpired(token)) {
+      context.read<ThemeProvider>().applyRole(null);
       _go(const LoginSelection());
       return;
     }
 
     final role = JwtHelper.getRole(token);
+    context.read<ThemeProvider>().applyRole(role);
 
     if (role == "1") {
       _go(const SuperAdmin());

@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:staff_work_track/core/theme/web_theme.dart';
 import 'package:staff_work_track/core/widgets/buttons.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
 import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
+import 'package:staff_work_track/core/widgets/request_workspace.dart';
+import 'package:staff_work_track/core/widgets/web_ui.dart';
 import 'package:staff_work_track/services/admin_service.dart';
 import 'package:staff_work_track/utils/role_hierarchy.dart';
 import 'package:staff_work_track/utils/time_utils.dart';
@@ -168,6 +171,7 @@ class _DeptOvertimeListState extends State<DeptOvertimeList> {
 
   @override
   Widget build(BuildContext context) {
+    if (WebPushedChrome.isWeb(context)) return _webList();
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
@@ -295,6 +299,65 @@ class _DeptOvertimeListState extends State<DeptOvertimeList> {
                 );
               },
             ),
+    );
+  }
+
+  Widget _webList() {
+    return Scaffold(
+      backgroundColor: WebTheme.canvasOf(context),
+      body: RequestWorkspace(
+        title: 'Overtime history',
+        subtitle: 'Department overtime list',
+        loading: loading,
+        filters: const ['All', 'Approved', 'Pending'],
+        selectedFilter: statusFilter,
+        onFilter: applyStatusFilter,
+        emptyTitle: 'No overtime',
+        emptyMessage: 'Overtime records will show here.',
+        stats: [
+          WorkspaceStat(
+            label: 'Records',
+            value: '${filteredData.length}',
+            icon: Icons.schedule_rounded,
+            color: WebTheme.brand,
+          ),
+          WorkspaceStat(
+            label: 'Overtime',
+            value: '${totalOvertimeHours.toStringAsFixed(1)} hrs',
+            icon: Icons.timelapse_rounded,
+            color: WebTheme.brand,
+          ),
+        ],
+        columns: const ['Work date', 'Requested by', 'Time', 'Hours', 'Reason'],
+        records: [
+          for (final item in filteredData)
+            WorkspaceRecord(
+              status: item['isApprov'] == true ? 'Approved' : 'Pending',
+              approvedColor: WebTheme.brand,
+              values: [
+                TimeUtils.formatDateValue(item['date']),
+                (item['name'] ?? item['staffName'] ?? '—').toString(),
+                '${formatTime(item['fromTime']?.toString())} – ${formatTime(item['toTime']?.toString())}',
+                '${item['totalHours'] ?? '—'} hrs',
+                (item['reason'] ?? '').toString(),
+              ],
+              actions: item['isApprov'] == true
+                  ? const []
+                  : [
+                      workspaceAction(
+                        'Reject',
+                        () => rejectOvertime(int.parse(item['id'].toString())),
+                        color: WebTheme.danger,
+                      ),
+                      workspaceAction(
+                        'Approve',
+                        () => approveOvertime(int.parse(item['id'].toString())),
+                        filled: true,
+                      ),
+                    ],
+            ),
+        ],
+      ),
     );
   }
 

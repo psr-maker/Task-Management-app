@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:staff_work_track/core/responsive/app_layout.dart';
+import 'package:staff_work_track/core/theme/web_theme.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
 import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
+import 'package:staff_work_track/core/widgets/web_ui.dart';
 import 'package:staff_work_track/services/dashboard_service.dart';
 
 class HrLeaves extends StatefulWidget {
@@ -112,15 +115,55 @@ class _HrLeavesState extends State<HrLeaves> {
     }
   }
 
-  Future<void> _selectMonth() async {
+  DateTime get _earliestMonth {
     final now = DateTime.now();
+    return DateTime(now.year - 2, 1);
+  }
 
+  DateTime get _latestMonth {
+    final now = DateTime.now();
+    return DateTime(now.year, now.month);
+  }
+
+  bool _canShiftMonth(int delta) {
+    final next = DateTime(selectedMonth.year, selectedMonth.month + delta);
+    final candidate = DateTime(next.year, next.month);
+    return !candidate.isBefore(_earliestMonth) && !candidate.isAfter(_latestMonth);
+  }
+
+  void _shiftMonth(int delta) {
+    if (!_canShiftMonth(delta)) return;
+    final next = DateTime(selectedMonth.year, selectedMonth.month + delta);
+    setState(() {
+      selectedMonth = DateTime(next.year, next.month);
+      _buildDepartments();
+      if (!departments.contains(selectedDepartment)) {
+        selectedDepartment = "All Departments";
+      }
+      _applyFilters();
+    });
+  }
+
+  void _chooseDepartment(String department) {
+    if (department == selectedDepartment) return;
+    setState(() {
+      selectedDepartment = department;
+      _applyFilters();
+    });
+  }
+
+  String _deptLabel(String department) {
+    if (department == "All Departments") return "All";
+    return department.replaceAll(" Department", "");
+  }
+
+  Future<void> _selectMonth() async {
     final picked = await showDialog<DateTime>(
       context: context,
       builder: (ctx) => _MonthYearPickerDialog(
         initialDate: selectedMonth,
-        firstDate: DateTime(now.year - 2, 1),
-        lastDate: DateTime(now.year, now.month),
+        firstDate: _earliestMonth,
+        lastDate: _latestMonth,
       ),
     );
 
@@ -272,6 +315,7 @@ class _HrLeavesState extends State<HrLeaves> {
 
   @override
   Widget build(BuildContext context) {
+    if (WebPushedChrome.isWeb(context)) return _webPage();
     return Scaffold(
       appBar: AppBar(title: const Text("Approved Leaves"),  leading: IconButton(
           onPressed: () => Navigator.pop(context),
@@ -346,6 +390,427 @@ class _HrLeavesState extends State<HrLeaves> {
     );
   }
 
+  Widget _webPage() {
+    return Scaffold(
+      backgroundColor: WebTheme.canvasOf(context),
+      body: Padding(
+        padding: AppLayout.pagePadding(context),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                IconButton(
+                  tooltip: 'Back',
+                  onPressed: () => Navigator.maybePop(context),
+                  icon: Icon(Icons.arrow_back, color: WebTheme.inkOf(context)),
+                ),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Leave Reports',
+                        style: TextStyle(
+                          fontSize: AppLayout.isDesktop(context) ? 24 : 20,
+                          fontWeight: FontWeight.w800,
+                          color: WebTheme.inkOf(context),
+                          letterSpacing: -0.4,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Approved leave by department',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: WebTheme.mutedOf(context),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            _webFilters(),
+            const SizedBox(height: 12),
+            Expanded(
+              child: isLoading
+                  ? const Center(child: RotatingFlower())
+                  : filteredLeaves.isEmpty
+                  ? _emptyState()
+                  : RefreshIndicator(
+                      onRefresh: _loadLeaves,
+                      child: _webLeaveList(),
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _webFilters() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+      decoration: BoxDecoration(
+        color: WebTheme.surfaceOf(context),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: WebTheme.lineOf(context)),
+        boxShadow: WebTheme.cardShadow(context),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Department',
+            style: TextStyle(
+              color: WebTheme.mutedOf(context),
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final department in departments) _deptChip(department),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Text(
+            'Month',
+            style: TextStyle(
+              color: WebTheme.mutedOf(context),
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 8),
+          _monthControl(),
+        ],
+      ),
+    );
+  }
+
+  Widget _deptChip(String department) {
+    final selected = selectedDepartment == department;
+    return Material(
+      color: selected ? WebTheme.brand : WebTheme.canvasOf(context),
+      borderRadius: BorderRadius.circular(20),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: () => _chooseDepartment(department),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: selected ? WebTheme.brand : WebTheme.lineOf(context),
+            ),
+          ),
+          child: Text(
+            _deptLabel(department),
+            style: TextStyle(
+              color: selected ? Colors.white : WebTheme.inkOf(context),
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _monthControl() {
+    return Row(
+      children: [
+        _monthStep(Icons.chevron_left_rounded, -1),
+        const SizedBox(width: 8),
+        Material(
+          color: WebTheme.brandSoftOf(context),
+          borderRadius: BorderRadius.circular(12),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: _selectMonth,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.calendar_month_rounded, size: 18, color: WebTheme.brand),
+                  const SizedBox(width: 8),
+                  Text(
+                    _monthName(selectedMonth),
+                    style: TextStyle(
+                      color: WebTheme.brand,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        _monthStep(Icons.chevron_right_rounded, 1),
+        const Spacer(),
+        Text(
+          '${filteredLeaves.length} ${filteredLeaves.length == 1 ? 'leave' : 'leaves'}',
+          style: TextStyle(
+            color: WebTheme.mutedOf(context),
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _monthStep(IconData icon, int delta) {
+    final enabled = _canShiftMonth(delta);
+    return Material(
+      color: WebTheme.canvasOf(context),
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: enabled ? () => _shiftMonth(delta) : null,
+        child: Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: WebTheme.lineOf(context)),
+          ),
+          child: Icon(
+            icon,
+            color: enabled ? WebTheme.inkOf(context) : WebTheme.mutedOf(context),
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _mediumDate(String value) {
+    try {
+      final date = DateTime.parse(value);
+      const months = [
+        "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+      ];
+      return "${date.day.toString().padLeft(2, '0')} ${months[date.month - 1]} ${date.year}";
+    } catch (_) {
+      return value;
+    }
+  }
+
+  String _leaveWhen(Map<String, dynamic> item) {
+    final from = item["fromDate"]?.toString() ?? "";
+    final to = item["toDate"]?.toString() ?? "";
+    final start = _mediumDate(from);
+    if (to.isEmpty) return start;
+    final end = _mediumDate(to);
+    if (end == start || end.isEmpty) return start;
+    return "$start – $end";
+  }
+
+  Widget _webLeaveList() {
+    final grouped = _groupByDepartmentAndStaff();
+    final showDepartment = selectedDepartment == "All Departments";
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      children: [
+        for (final department in grouped.entries) ...[
+          if (showDepartment)
+            Padding(
+              padding: const EdgeInsets.only(top: 6, bottom: 8),
+              child: Row(
+                children: [
+                  Icon(Icons.apartment_rounded, size: 16, color: WebTheme.brand),
+                  const SizedBox(width: 6),
+                  Text(
+                    department.key.replaceAll(" Department", ""),
+                    style: TextStyle(
+                      color: WebTheme.inkOf(context),
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          for (final staff in department.value.entries)
+            _webStaffCard(staff.key, staff.value),
+        ],
+      ],
+    );
+  }
+
+  Widget _webStaffCard(String name, List<Map<String, dynamic>> entries) {
+    final sorted = List<Map<String, dynamic>>.from(entries)
+      ..sort((a, b) {
+        final dateA = DateTime.tryParse(a["fromDate"]?.toString() ?? "") ?? DateTime(1900);
+        final dateB = DateTime.tryParse(b["fromDate"]?.toString() ?? "") ?? DateTime(1900);
+        return dateA.compareTo(dateB);
+      });
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
+      decoration: BoxDecoration(
+        color: WebTheme.surfaceOf(context),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: WebTheme.lineOf(context)),
+        boxShadow: WebTheme.cardShadow(context),
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final wide = constraints.maxWidth >= 560;
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  CircleAvatar(
+                    radius: 18,
+                    backgroundColor: WebTheme.brand,
+                    child: Text(
+                      name.isNotEmpty ? name[0].toUpperCase() : "?",
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      name,
+                      style: TextStyle(
+                        color: WebTheme.inkOf(context),
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    "${sorted.length} ${sorted.length == 1 ? 'day' : 'days'}",
+                    style: TextStyle(
+                      color: WebTheme.brand,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              if (wide) _webLeaveHeading(),
+              for (final item in sorted)
+                wide ? _webLeaveRow(item) : _compactLeave(item),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _webLeaveHeading() {
+    final style = TextStyle(
+      color: WebTheme.mutedOf(context),
+      fontSize: 11,
+      fontWeight: FontWeight.w700,
+    );
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(
+        children: [
+          SizedBox(width: 168, child: Text("Date", style: style)),
+          SizedBox(width: 110, child: Text("Day", style: style)),
+          SizedBox(width: 72, child: Text("Type", style: style)),
+          Expanded(child: Text("Reason", style: style)),
+        ],
+      ),
+    );
+  }
+
+  Widget _compactLeave(Map<String, dynamic> item) {
+    final session = item["leaveType"]?.toString().trim();
+    final day = (session == null || session.isEmpty) ? "Full Day" : session;
+    final type = item["leaveTyp"]?.toString().trim() ?? "";
+    final reason = item["reason"]?.toString().trim() ?? "";
+    final detail = [
+      day,
+      if (type.isNotEmpty) type,
+    ].join(" · ");
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      decoration: BoxDecoration(
+        border: Border(top: BorderSide(color: WebTheme.lineOf(context))),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            _leaveWhen(item),
+            style: TextStyle(
+              color: WebTheme.inkOf(context),
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            detail,
+            style: TextStyle(color: WebTheme.brand, fontWeight: FontWeight.w700, fontSize: 12),
+          ),
+          if (reason.isNotEmpty) ...[
+            const SizedBox(height: 2),
+            Text(
+              reason,
+              style: TextStyle(color: WebTheme.mutedOf(context), fontSize: 13),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _webLeaveRow(Map<String, dynamic> item) {
+    final session = item["leaveType"]?.toString().trim();
+    final day = (session == null || session.isEmpty) ? "Full Day" : session;
+    final type = item["leaveTyp"]?.toString().trim() ?? "";
+    final reason = item["reason"]?.toString().trim() ?? "";
+    final ink = TextStyle(
+      color: WebTheme.inkOf(context),
+      fontSize: 13,
+      fontWeight: FontWeight.w600,
+    );
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      decoration: BoxDecoration(
+        border: Border(top: BorderSide(color: WebTheme.lineOf(context))),
+      ),
+      child: Row(
+        children: [
+          SizedBox(width: 168, child: Text(_leaveWhen(item), style: ink)),
+          SizedBox(width: 110, child: Text(day, style: ink)),
+          SizedBox(
+            width: 72,
+            child: Text(type.isEmpty ? "—" : type, style: ink),
+          ),
+          Expanded(
+            child: Text(
+              reason.isEmpty ? "—" : reason,
+              style: TextStyle(color: WebTheme.mutedOf(context), fontSize: 13),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildGroupedList() {
     final grouped = _groupByDepartmentAndStaff();
 
@@ -370,16 +835,10 @@ class _HrLeavesState extends State<HrLeaves> {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: WebTheme.surfaceOf(context),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.grey.shade200),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        border: Border.all(color: WebTheme.lineOf(context)),
+        boxShadow: WebTheme.cardShadow(context),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -393,12 +852,12 @@ class _HrLeavesState extends State<HrLeaves> {
                   width: 30,
                   height: 30,
                   decoration: BoxDecoration(
-                    color: Colors.blue.withOpacity(0.10),
+                    color: WebTheme.brandSoftOf(context),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(
                     Icons.business_rounded,
-                    color: Colors.blue.shade700,
+                    color: WebTheme.brand,
                     size: 15,
                   ),
                 ),
@@ -411,8 +870,8 @@ class _HrLeavesState extends State<HrLeaves> {
                     children: [
                       Text(
                         department,
-                        style: const TextStyle(
-                          color: Colors.black87,
+                        style: TextStyle(
+                          color: WebTheme.inkOf(context),
                           fontSize: 17,
                           fontWeight: FontWeight.w700,
                         ),
@@ -423,7 +882,7 @@ class _HrLeavesState extends State<HrLeaves> {
                       Text(
                         "$totalLeaves leaves",
                         style: TextStyle(
-                          color: Colors.grey.shade600,
+                          color: WebTheme.mutedOf(context),
                           fontSize: 11,
                         ),
                       ),
@@ -437,13 +896,17 @@ class _HrLeavesState extends State<HrLeaves> {
                     vertical: 6,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: WebTheme.canvasOf(context),
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: Colors.grey.shade200),
+                    border: Border.all(color: WebTheme.lineOf(context)),
                   ),
                   child: Text(
                     "${staffMap.length} Staff",
-                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: WebTheme.inkOf(context),
+                    ),
                   ),
                 ),
               ],
@@ -484,9 +947,9 @@ class _HrLeavesState extends State<HrLeaves> {
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
-        color: Colors.grey.shade50,
+        color: WebTheme.canvasOf(context),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(color: WebTheme.lineOf(context)),
       ),
       child: Padding(
         padding: const EdgeInsets.all(12),
@@ -498,11 +961,13 @@ class _HrLeavesState extends State<HrLeaves> {
               children: [
                 CircleAvatar(
                   radius: 18,
+                  backgroundColor: WebTheme.brand,
                   child: Text(
                     name.isNotEmpty ? name[0].toUpperCase() : "?",
                     style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
+                      color: Colors.white,
                     ),
                   ),
                 ),
@@ -512,8 +977,8 @@ class _HrLeavesState extends State<HrLeaves> {
                 Expanded(
                   child: Text(
                     name,
-                    style: const TextStyle(
-                      color: Colors.black87,
+                    style: TextStyle(
+                      color: WebTheme.inkOf(context),
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
                     ),
@@ -526,13 +991,13 @@ class _HrLeavesState extends State<HrLeaves> {
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.blue.withOpacity(0.10),
+                    color: WebTheme.brandSoftOf(context),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
                     "${entries.length} ${entries.length == 1 ? 'leave' : 'leaves'}",
                     style: TextStyle(
-                      color: Colors.blue.shade700,
+                      color: WebTheme.brand,
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
                     ),
@@ -547,14 +1012,14 @@ class _HrLeavesState extends State<HrLeaves> {
                 padding: const EdgeInsets.only(left: 46),
                 child: Text(
                   reason,
-                  style: TextStyle(color: Colors.grey.shade700, fontSize: 12),
+                  style: TextStyle(color: WebTheme.mutedOf(context), fontSize: 12),
                 ),
               ),
             ],
 
             const SizedBox(height: 10),
 
-            Divider(height: 1, color: Colors.grey.shade200),
+            Divider(height: 1, color: WebTheme.lineOf(context)),
 
             const SizedBox(height: 8),
 
@@ -577,7 +1042,7 @@ class _HrLeavesState extends State<HrLeaves> {
           Text(
             session,
             style: TextStyle(
-              color: Colors.grey.shade600,
+              color: WebTheme.mutedOf(context),
               fontSize: 11,
               fontWeight: FontWeight.w700,
               letterSpacing: 0.3,
@@ -601,14 +1066,14 @@ class _HrLeavesState extends State<HrLeaves> {
       padding: const EdgeInsets.symmetric(vertical: 3),
       child: Row(
         children: [
-          Icon(Icons.circle, size: 5, color: Colors.grey.shade400),
+          Icon(Icons.circle, size: 5, color: WebTheme.mutedOf(context)),
 
           const SizedBox(width: 8),
 
           Text(
             _shortDate(fromDate),
-            style: const TextStyle(
-              color: Colors.black87,
+            style: TextStyle(
+              color: WebTheme.inkOf(context),
               fontSize: 12,
               fontWeight: FontWeight.w600,
             ),
@@ -617,13 +1082,13 @@ class _HrLeavesState extends State<HrLeaves> {
           if (leaveTyp.isNotEmpty) ...[
             Text(
               " - ",
-              style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
+              style: TextStyle(color: WebTheme.mutedOf(context), fontSize: 12),
             ),
 
             Text(
               leaveTyp,
               style: TextStyle(
-                color: Colors.grey.shade700,
+                color: WebTheme.mutedOf(context),
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
               ),
@@ -650,10 +1115,10 @@ class _HrLeavesState extends State<HrLeaves> {
 
             const SizedBox(height: 16),
 
-            const Text(
+            Text(
               "No Approved Leaves",
               style: TextStyle(
-                color: Colors.black87,
+                color: WebTheme.inkOf(context),
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
               ),
@@ -666,7 +1131,7 @@ class _HrLeavesState extends State<HrLeaves> {
                   ? "No leaves found for ${_monthName(selectedMonth)}"
                   : "No leaves found for $selectedDepartment",
               textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+              style: TextStyle(color: WebTheme.mutedOf(context), fontSize: 12),
             ),
           ],
         ),
@@ -730,13 +1195,24 @@ class _MonthYearPickerDialogState extends State<_MonthYearPickerDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final ink = WebTheme.inkOf(context);
+    final muted = WebTheme.mutedOf(context);
     return Dialog(
+      backgroundColor: WebTheme.surfaceOf(context),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            Text(
+              'Select month',
+              style: TextStyle(
+                color: ink,
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -744,14 +1220,15 @@ class _MonthYearPickerDialogState extends State<_MonthYearPickerDialog> {
                   onPressed: displayedYear > widget.firstDate.year
                       ? () => _changeYear(-1)
                       : null,
-                  icon: const Icon(Icons.chevron_left_rounded),
+                  icon: Icon(Icons.chevron_left_rounded, color: ink),
                 ),
 
                 Text(
                   "$displayedYear",
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 17,
                     fontWeight: FontWeight.w700,
+                    color: ink,
                   ),
                 ),
 
@@ -759,7 +1236,7 @@ class _MonthYearPickerDialogState extends State<_MonthYearPickerDialog> {
                   onPressed: displayedYear < widget.lastDate.year
                       ? () => _changeYear(1)
                       : null,
-                  icon: const Icon(Icons.chevron_right_rounded),
+                  icon: Icon(Icons.chevron_right_rounded, color: ink),
                 ),
               ],
             ),
@@ -796,20 +1273,27 @@ class _MonthYearPickerDialogState extends State<_MonthYearPickerDialog> {
                   child: Container(
                     decoration: BoxDecoration(
                       color: isSelected
-                          ? Theme.of(context).colorScheme.primary
-                          : Colors.grey.shade100,
+                          ? WebTheme.brand
+                          : enabled
+                          ? WebTheme.canvasOf(context)
+                          : WebTheme.canvasOf(context),
                       borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: isSelected
+                            ? WebTheme.brand
+                            : WebTheme.lineOf(context),
+                      ),
                     ),
                     alignment: Alignment.center,
                     child: Text(
                       monthLabels[index],
                       style: TextStyle(
-                        fontWeight: FontWeight.w600,
+                        fontWeight: FontWeight.w700,
                         color: !enabled
-                            ? Colors.grey.shade400
+                            ? muted
                             : isSelected
                             ? Colors.white
-                            : Colors.black87,
+                            : ink,
                       ),
                     ),
                   ),
@@ -823,7 +1307,10 @@ class _MonthYearPickerDialogState extends State<_MonthYearPickerDialog> {
               alignment: Alignment.centerRight,
               child: TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: const Text("Cancel"),
+                child: Text(
+                  "Cancel",
+                  style: TextStyle(color: WebTheme.brand, fontWeight: FontWeight.w700),
+                ),
               ),
             ),
           ],

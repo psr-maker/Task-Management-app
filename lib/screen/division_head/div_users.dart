@@ -4,8 +4,10 @@ import 'package:staff_work_track/Models/getusers.dart';
 import 'package:staff_work_track/Models/rolesmodel.dart';
 import 'package:staff_work_track/core/constant/division_config.dart';
 import 'package:staff_work_track/core/responsive/app_layout.dart';
+import 'package:staff_work_track/core/theme/web_theme.dart';
 import 'package:staff_work_track/core/widgets/form_popup.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
+import 'package:staff_work_track/core/widgets/users_page_bar.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/Reports/users/emp.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/users/Employee/empdetails.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/Task/goalntask_create.dart';
@@ -156,6 +158,7 @@ class _DivUsersState extends State<DivUsers> {
       context,
       Createtask(
         assignedToIds: selectedEmpIds.toList(),
+        assignedUsers: selectedUsers,
         assignedDepartments: departments,
       ),
       maxWidth: 880,
@@ -199,7 +202,6 @@ class _DivUsersState extends State<DivUsers> {
 
   Widget _usersByDepartment(List<UserModel> employees, bool isWeb) {
     final groups = _groupByDepartment(employees);
-    final secondary = Theme.of(context).colorScheme.secondary;
 
     return ListView(
       children: [
@@ -209,7 +211,7 @@ class _DivUsersState extends State<DivUsers> {
             child: Text(
               entry.key,
               style: TextStyle(
-                color: secondary,
+                color: WebTheme.brandOf(context),
                 fontSize: 15,
                 fontWeight: FontWeight.w700,
               ),
@@ -249,15 +251,15 @@ class _DivUsersState extends State<DivUsers> {
         title: Text(
           emp.name,
           style: TextStyle(
-            color: secondary,
+            color: WebTheme.brandOf(context),
             fontSize: 15,
             fontWeight: FontWeight.w600,
           ),
         ),
         subtitle: Text(
           getRoleName(emp.role),
-          style: const TextStyle(
-            color: Colors.black,
+          style: TextStyle(
+            color: WebTheme.inkOf(context),
             fontSize: 13,
             fontWeight: FontWeight.w500,
           ),
@@ -272,7 +274,7 @@ class _DivUsersState extends State<DivUsers> {
     final result = await openFormPage(
       context,
       const CreateUsers(),
-      maxWidth: 560,
+      maxWidth: 680,
     );
     if (result == true) _refreshUsers();
   }
@@ -281,6 +283,7 @@ class _DivUsersState extends State<DivUsers> {
     final selected = selectedDepartment == dept;
     final label = dept == "All" ? "All" : dept.replaceAll(" Department", "");
     final secondary = Theme.of(context).colorScheme.secondary;
+    final dark = WebTheme.isDark(context);
 
     return Padding(
       padding: const EdgeInsets.only(right: 8),
@@ -291,10 +294,18 @@ class _DivUsersState extends State<DivUsers> {
           height: 34,
           padding: const EdgeInsets.symmetric(horizontal: 12),
           decoration: BoxDecoration(
-            color: selected ? secondary : Colors.white,
+            color: selected
+                ? secondary
+                : dark
+                    ? WebTheme.surfaceOf(context)
+                    : Colors.white,
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color: selected ? secondary : const Color(0xFFD0D5D2),
+              color: selected
+                  ? secondary
+                  : dark
+                      ? WebTheme.lineOf(context)
+                      : const Color(0xFFD0D5D2),
             ),
           ),
           alignment: Alignment.center,
@@ -308,7 +319,11 @@ class _DivUsersState extends State<DivUsers> {
               Text(
                 label,
                 style: TextStyle(
-                  color: selected ? Colors.white : secondary,
+                  color: selected
+                      ? Colors.white
+                      : dark
+                          ? WebTheme.inkOf(context)
+                          : secondary,
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
                 ),
@@ -401,54 +416,32 @@ class _DivUsersState extends State<DivUsers> {
             if (isWeb)
               Padding(
                 padding: const EdgeInsets.only(bottom: 12),
-                child: Row(
-                  children: [
-                    Text(
-                      'Users',
-                      style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: TextField(
-                        controller: searchController,
-                        onChanged: (_) => setState(() {}),
-                        decoration: InputDecoration(
-                          hintText: 'Search users',
-                          hintStyle: const TextStyle(fontSize: 13),
-                          prefixIcon: const Icon(Icons.search, size: 18),
-                          isDense: true,
-                          filled: true,
-                          fillColor: Theme.of(context).cardColor,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                      ),
-                    ),
-                    if (!widget.openReports) ...[
-                      const SizedBox(width: 12),
-                      IconButton(
-                        tooltip: 'Add User',
-                        onPressed: _onAddUser,
-                        icon: const Icon(Icons.person_add_alt_1),
-                      ),
-                    ],
-                  ],
+                child: UsersPageBar(
+                  departments: ['All', ...childDepartments],
+                  selectedDepartment: selectedDepartment,
+                  onDepartmentChanged: (value) {
+                    setState(() => selectedDepartment = value);
+                  },
+                  searchController: searchController,
+                  onSearchChanged: (_) => setState(() {}),
+                  onAdd: widget.openReports
+                      ? null
+                      : (isSelectionMode ? _onAddGoalOrTask : _onAddUser),
+                  addLabel: isSelectionMode ? 'Add Goal/Task' : 'Add users',
+                ),
+              )
+            else ...[
+              SizedBox(
+                height: 34,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  children: ["All", ...childDepartments]
+                      .map(_buildDeptChip)
+                      .toList(),
                 ),
               ),
-            SizedBox(
-              height: 34,
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                children: ["All", ...childDepartments]
-                    .map(_buildDeptChip)
-                    .toList(),
-              ),
-            ),
-            const SizedBox(height: 10),
+              const SizedBox(height: 10),
+            ],
             Expanded(
               child: FutureBuilder<List<UserModel>>(
                 future: employeesFuture,
@@ -518,15 +511,15 @@ class _DivUsersState extends State<DivUsers> {
                           title: Text(
                             emp.name,
                             style: TextStyle(
-                              color: secondary,
+                              color: WebTheme.brandOf(context),
                               fontSize: 15,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
                           subtitle: Text(
                             getRoleName(emp.role),
-                            style: const TextStyle(
-                              color: Colors.black,
+                            style: TextStyle(
+                              color: WebTheme.inkOf(context),
                               fontSize: 13,
                               fontWeight: FontWeight.w500,
                             ),

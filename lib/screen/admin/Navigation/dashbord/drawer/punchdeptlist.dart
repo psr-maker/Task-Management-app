@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:staff_work_track/core/theme/web_theme.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
+import 'package:staff_work_track/core/widgets/request_workspace.dart';
 import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
 import 'package:staff_work_track/core/widgets/web_ui.dart';
 import 'package:staff_work_track/services/admin_service.dart';
 import 'package:staff_work_track/utils/app_helper.dart';
+import 'package:staff_work_track/utils/time_utils.dart';
 
 class PunchCorrdeptlist extends StatefulWidget {
   const PunchCorrdeptlist({super.key});
@@ -18,8 +21,8 @@ class _PunchCorrdeptlistState extends State<PunchCorrdeptlist> {
   bool isLoading = true;
 
   // Filter tabs
-  final List<String> filters = ["Pending", "Approved", "Rejected"];
-  String activeFilter = "Pending";
+  final List<String> filters = ["All", "Pending", "Approved", "Rejected"];
+  String activeFilter = "All";
 
   int? _actioningId;
   String? _topMessage;
@@ -47,6 +50,7 @@ class _PunchCorrdeptlistState extends State<PunchCorrdeptlist> {
   void applyFilter() {
     setState(() {
       filteredCorrections = corrections.where((e) {
+        if (activeFilter == 'All') return true;
         final status = (e["status"] ?? "").toString().toLowerCase();
         return status == activeFilter.toLowerCase();
       }).toList();
@@ -66,6 +70,18 @@ class _PunchCorrdeptlistState extends State<PunchCorrdeptlist> {
         _showTopMessage = false;
       });
     });
+  }
+
+  String _punchType(dynamic value) {
+    final text = value.toString().toLowerCase();
+    if (text.contains('punch out') || text.contains('evening')) return 'Punch out';
+    if (text.contains('punch in') || text.contains('morning')) return 'Punch in';
+    final shown = value.toString().trim();
+    return shown.isEmpty ? '—' : shown;
+  }
+
+  String _punchTime(dynamic value) {
+    return TimeUtils.formatTime12(value, empty: '—');
   }
 
   Future<void> handleDecision(int id, bool approved) async {
@@ -90,8 +106,57 @@ class _PunchCorrdeptlistState extends State<PunchCorrdeptlist> {
     }
   }
 
+  Widget _webBoard() {
+    final pending = corrections.where((item) => (item['status'] ?? '').toString().toLowerCase() == 'pending').length;
+    final approved = corrections.where((item) => (item['status'] ?? '').toString().toLowerCase() == 'approved').length;
+    final rejected = corrections.where((item) => (item['status'] ?? '').toString().toLowerCase() == 'rejected').length;
+    return Scaffold(
+      backgroundColor: WebTheme.canvasOf(context),
+      body: RequestWorkspace(
+        title: 'Attendance Correction',
+        subtitle: 'Review punch correction requests',
+        loading: isLoading,
+        filters: filters,
+        selectedFilter: activeFilter,
+        onFilter: (value) {
+          setState(() => activeFilter = value);
+          applyFilter();
+        },
+        emptyTitle: 'No $activeFilter requests',
+        emptyMessage: 'Correction requests in this status will show here.',
+        stats: [
+          WorkspaceStat(label: 'Pending', value: '$pending', icon: Icons.hourglass_top_rounded, color: const Color(0xFFB45309)),
+          WorkspaceStat(label: 'Approved', value: '$approved', icon: Icons.verified_rounded, color: WebTheme.brand),
+          WorkspaceStat(label: 'Rejected', value: '$rejected', icon: Icons.block_rounded, color: WebTheme.danger),
+        ],
+        columns: const ['Requested by', 'Work date', 'Type', 'Time', 'Reason'],
+        records: [
+          for (final item in filteredCorrections)
+            WorkspaceRecord(
+              status: (item['status'] ?? '').toString(),
+              approvedColor: WebTheme.brand,
+              values: [
+                (item['name'] ?? item['employeeName'] ?? '').toString(),
+                AppHelpers.formatDate((item['date'] ?? '').toString()),
+                _punchType(item['correctionType']),
+                _punchTime(item['punchTime']),
+                (item['reason'] ?? '').toString(),
+              ],
+              actions: (item['status'] ?? '').toString().toLowerCase() == 'pending'
+                  ? [
+                      workspaceAction('Reject', () => handleDecision(item['id'], false), color: WebTheme.danger),
+                      workspaceAction('Approve', () => handleDecision(item['id'], true), filled: true),
+                    ]
+                  : const [],
+            ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (WebPushedChrome.isWeb(context)) return _webBoard();
     final web = WebPushedChrome.isWeb(context);
     return Scaffold(
       backgroundColor: WebPushedChrome.background(context),
@@ -397,9 +462,9 @@ class _PunchTimelineItem extends StatelessWidget {
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Icon(
-                        type.contains("In")
-                            ? Icons.login_rounded
-                            : Icons.logout_rounded,
+                        type.toLowerCase().contains('punch out')
+                            ? Icons.logout_rounded
+                            : Icons.login_rounded,
                         color: const Color(0xff194d26),
                         size: 21,
                       ),

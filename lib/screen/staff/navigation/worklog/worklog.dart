@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:staff_work_track/core/responsive/app_layout.dart';
+import 'package:staff_work_track/core/theme/web_theme.dart';
 import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
-import 'package:staff_work_track/core/widgets/web_ui.dart';
+import 'package:staff_work_track/core/widgets/loading.dart';
 import 'package:staff_work_track/core/widgets/worklog_session_tile.dart';
 import 'package:staff_work_track/screen/staff/navigation/worklog/addworklog.dart';
 import 'package:staff_work_track/screen/staff/navigation/worklog/checkout_worklog.dart';
@@ -88,13 +89,17 @@ class _WorklogState extends State<Worklog> {
     int tempYear = selectedDate.year;
     int tempMonth = selectedDate.month;
     int tempDay = selectedDate.day;
+    const monthNames = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December',
+    ];
 
     int daysInMonth(int year, int month) => DateTime(year, month + 1, 0).day;
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Theme.of(context).colorScheme.primary,
+      backgroundColor: WebTheme.surfaceOf(context),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -103,72 +108,117 @@ class _WorklogState extends State<Worklog> {
           builder: (context, setModalState) {
             int maxDays = daysInMonth(tempYear, tempMonth);
             if (tempDay > maxDays) tempDay = maxDays;
+            final ink = WebTheme.inkOf(context);
+            final muted = WebTheme.mutedOf(context);
+            final field = BoxDecoration(
+              color: WebTheme.canvasOf(context),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: WebTheme.lineOf(context)),
+            );
+            Widget picker(String label, Widget control) {
+              return Expanded(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: field,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        label,
+                        style: TextStyle(
+                          color: muted,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      control,
+                    ],
+                  ),
+                ),
+              );
+            }
+
             return Padding(
               padding: EdgeInsets.only(
-                left: 15,
-                right: 15,
-                top: 15,
+                left: 16,
+                right: 16,
+                top: 16,
                 bottom: MediaQuery.of(context).viewInsets.bottom + 16,
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: WebTheme.lineOf(context),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
                   Text(
-                    "Select Date",
-                    style: Theme.of(context).textTheme.bodySmall,
+                    'Select date',
+                    style: TextStyle(
+                      color: ink,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 14),
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        "Year",
-                        style: Theme.of(context).textTheme.labelLarge,
-                      ),
-                      DropdownButton<int>(
-                        style: Theme.of(context).textTheme.labelLarge,
-                        value: tempYear,
-
-                        items: List.generate(27, (i) {
-                          int year = DateTime.now().year - i;
-                          return DropdownMenuItem(
-                            value: year,
-                            child: Text(
-                              year.toString(),
-                              style: Theme.of(context).textTheme.labelMedium,
+                      picker(
+                        'Year',
+                        DropdownButtonHideUnderline(
+                          child: DropdownButton<int>(
+                            isExpanded: true,
+                            dropdownColor: WebTheme.surfaceOf(context),
+                            value: tempYear,
+                            style: TextStyle(
+                              color: ink,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
                             ),
-                          );
-                        }),
-                        onChanged: (v) => setModalState(() => tempYear = v!),
+                            items: List.generate(27, (i) {
+                              final year = DateTime.now().year - i;
+                              return DropdownMenuItem(
+                                value: year,
+                                child: Text('$year'),
+                              );
+                            }),
+                            onChanged: (v) => setModalState(() => tempYear = v!),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      picker(
+                        'Month',
+                        DropdownButtonHideUnderline(
+                          child: DropdownButton<int>(
+                            isExpanded: true,
+                            dropdownColor: WebTheme.surfaceOf(context),
+                            value: tempMonth,
+                            style: TextStyle(
+                              color: ink,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                            ),
+                            items: List.generate(12, (i) {
+                              return DropdownMenuItem(
+                                value: i + 1,
+                                child: Text(monthNames[i]),
+                              );
+                            }),
+                            onChanged: (v) => setModalState(() => tempMonth = v!),
+                          ),
+                        ),
                       ),
                     ],
                   ),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        "Month",
-                        style: Theme.of(context).textTheme.labelLarge,
-                      ),
-                      DropdownButton<int>(
-                        style: Theme.of(context).textTheme.labelLarge,
-                        value: tempMonth,
-                        items: List.generate(12, (i) {
-                          return DropdownMenuItem(
-                            value: i + 1,
-                            child: Text(
-                              DateFormat('MMMM').format(DateTime(0, i + 1)),
-                              style: Theme.of(context).textTheme.labelMedium,
-                            ),
-                          );
-                        }),
-                        onChanged: (v) => setModalState(() => tempMonth = v!),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 14),
                   SizedBox(
-                    height: 200,
+                    height: 220,
                     child: GridView.builder(
                       itemCount: maxDays,
                       gridDelegate:
@@ -178,29 +228,28 @@ class _WorklogState extends State<Worklog> {
                             crossAxisSpacing: 6,
                           ),
                       itemBuilder: (context, index) {
-                        int day = index + 1;
-                        bool isSelected = day == tempDay;
+                        final day = index + 1;
+                        final isSelected = day == tempDay;
                         return GestureDetector(
                           onTap: () => setModalState(() => tempDay = day),
                           child: Container(
                             alignment: Alignment.center,
                             decoration: BoxDecoration(
-                              border: Border.all(
-                                width: 1.5,
-                                color: Theme.of(context).colorScheme.secondary,
-                              ),
                               color: isSelected
-                                  ? Theme.of(context).colorScheme.background
-                                  : Theme.of(context).colorScheme.onPrimary,
+                                  ? WebTheme.brand
+                                  : WebTheme.canvasOf(context),
                               borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: isSelected
+                                    ? WebTheme.brand
+                                    : WebTheme.lineOf(context),
+                              ),
                             ),
                             child: Text(
-                              day.toString(),
+                              '$day',
                               style: TextStyle(
-                                color: isSelected
-                                    ? Theme.of(context).colorScheme.onPrimary
-                                    : Theme.of(context).colorScheme.secondary,
-                                fontWeight: FontWeight.bold,
+                                color: isSelected ? Colors.white : ink,
+                                fontWeight: FontWeight.w700,
                               ),
                             ),
                           ),
@@ -208,10 +257,11 @@ class _WorklogState extends State<Worklog> {
                       },
                     ),
                   ),
-                  const SizedBox(height: 16),
-                  Center(
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
                     child: AppButton(
-                      text: "Apply",
+                      text: 'Apply',
                       isLoading: _isLoading,
                       onPressed: () async {
                         setState(() {
@@ -220,8 +270,8 @@ class _WorklogState extends State<Worklog> {
                         Navigator.pop(context);
                         await _loadLogs();
                       },
-                      color: Theme.of(context).colorScheme.secondary,
-                      txtcolor: Theme.of(context).colorScheme.onPrimary,
+                      color: WebTheme.brand,
+                      txtcolor: Colors.white,
                     ),
                   ),
                 ],
@@ -384,59 +434,33 @@ class _WorklogState extends State<Worklog> {
 
   @override
   Widget build(BuildContext context) {
-    final isWeb = !AppLayout.isMobile(context);
+    if (!AppLayout.isMobile(context)) return _webPage();
     return Scaffold(
-      appBar: isWeb
-          ? null
-          : AppBar(
-              title: const Text("Daily Worklog"),
-              actions: [
-                IconButton(
-                  tooltip: "Local worklogs",
-                  onPressed: _openLocalWorklogs,
-                  icon: const Icon(Icons.cloud_off_outlined),
-                ),
-                if (logs.isNotEmpty)
-                  TextButton(
-                    onPressed: canSubmit ? _submitDrafts : null,
-                    child: Text(
-                      appBarButtonText,
-                      style: Theme.of(context).textTheme.labelLarge,
-                    ),
-                  ),
-              ],
+      appBar: AppBar(
+        title: const Text("Daily Worklog"),
+        actions: [
+          IconButton(
+            tooltip: "Local worklogs",
+            onPressed: _openLocalWorklogs,
+            icon: const Icon(Icons.cloud_off_outlined),
+          ),
+          if (logs.isNotEmpty)
+            TextButton(
+              onPressed: canSubmit ? _submitDrafts : null,
+              child: Text(
+                appBarButtonText,
+                style: Theme.of(context).textTheme.labelLarge,
+              ),
             ),
+        ],
+      ),
       body: Padding(
-        padding: isWeb
-            ? AppLayout.pagePadding(context)
-            : const EdgeInsets.all(15),
+        padding: const EdgeInsets.all(15),
         child: Stack(
           children: [
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (isWeb) ...[
-                  Row(
-                    children: [
-                      const WebPageHeader(
-                        title: 'Worklog',
-                        subtitle: 'Daily hours and timeline',
-                      ),
-                      const Spacer(),
-                      IconButton(
-                        tooltip: 'Local worklogs',
-                        onPressed: _openLocalWorklogs,
-                        icon: const Icon(Icons.cloud_off_outlined),
-                      ),
-                      if (logs.isNotEmpty)
-                        TextButton(
-                          onPressed: canSubmit ? _submitDrafts : null,
-                          child: Text(appBarButtonText),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                ],
                 _weekHeader(),
                 SizedBox(height: 10),
                 _totalHours(),
@@ -464,6 +488,255 @@ class _WorklogState extends State<Worklog> {
         onPressed: _addWorklog,
         child: const Icon(Icons.add),
       ),
+    );
+  }
+
+  Widget _webPage() {
+    return Scaffold(
+      backgroundColor: WebTheme.canvasOf(context),
+      body: Padding(
+        padding: AppLayout.pagePadding(context),
+        child: Stack(
+          children: [
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _webToolbar(),
+                const SizedBox(height: 8),
+                _webWeek(),
+                const SizedBox(height: 8),
+                _webSummary(),
+                const SizedBox(height: 8),
+                Expanded(child: _webTimeline()),
+              ],
+            ),
+            if (_topMessage != null)
+              AnimatedPositioned(
+                top: _showTopMessage ? 0 : -120,
+                left: 16,
+                right: 16,
+                duration: const Duration(milliseconds: 300),
+                child: Msgsnackbar(
+                  context,
+                  message: _topMessage!,
+                  isError: _isErrorMessage,
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _webToolbar() {
+    return Row(
+      children: [
+        Text(
+          'Worklog',
+          style: TextStyle(
+            color: WebTheme.brandOf(context),
+            fontSize: 16,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(width: 10),
+        Text(
+          '${DateFormat('EEE').format(selectedDate)}, ${TimeUtils.formatDate(selectedDate)}',
+          style: TextStyle(color: WebTheme.mutedOf(context), fontSize: 13),
+        ),
+        const Spacer(),
+        IconButton(
+          tooltip: 'Local worklogs',
+          visualDensity: VisualDensity.compact,
+          onPressed: _openLocalWorklogs,
+          icon: Icon(Icons.cloud_off_outlined, size: 18, color: WebTheme.brandOf(context)),
+        ),
+        if (logs.isNotEmpty)
+          TextButton(
+            onPressed: canSubmit ? _submitDrafts : null,
+            style: TextButton.styleFrom(
+              visualDensity: VisualDensity.compact,
+              foregroundColor: WebTheme.brandOf(context),
+            ),
+            child: Text(appBarButtonText),
+          ),
+        const SizedBox(width: 4),
+        FilledButton.icon(
+          onPressed: _addWorklog,
+          icon: const Icon(Icons.add, size: 16),
+          label: const Text('Add'),
+          style: FilledButton.styleFrom(
+            visualDensity: VisualDensity.compact,
+            backgroundColor: WebTheme.brand,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _webWeek() {
+    final start = selectedDate.subtract(Duration(days: selectedDate.weekday % 7));
+    return Row(
+      children: [
+        for (var index = 0; index < 7; index++) ...[
+          if (index > 0) const SizedBox(width: 6),
+          Expanded(child: _webDay(start.add(Duration(days: index)))),
+        ],
+        const SizedBox(width: 8),
+        IconButton(
+          tooltip: 'Choose date',
+          onPressed: _pickYearMonthDate,
+          icon: Icon(Icons.edit_calendar_outlined, color: WebTheme.brandOf(context)),
+        ),
+      ],
+    );
+  }
+
+  Widget _webDay(DateTime day) {
+    final selected = day.year == selectedDate.year &&
+        day.month == selectedDate.month &&
+        day.day == selectedDate.day;
+    return Material(
+      color: selected ? WebTheme.brand : WebTheme.surfaceOf(context),
+      borderRadius: BorderRadius.circular(10),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(10),
+        onTap: () async {
+          setState(() => selectedDate = day);
+          await _loadLogs();
+        },
+        child: Container(
+          height: 46,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: selected ? WebTheme.brand : WebTheme.lineOf(context),
+            ),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                DateFormat('E').format(day),
+                style: TextStyle(
+                  color: selected ? Colors.white70 : WebTheme.mutedOf(context),
+                  fontWeight: FontWeight.w600,
+                  fontSize: 10,
+                ),
+              ),
+              Text(
+                '${day.day}',
+                style: TextStyle(
+                  color: selected ? Colors.white : WebTheme.inkOf(context),
+                  fontWeight: FontWeight.w800,
+                  fontSize: 14,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _webSummary() {
+    final drafts = logs.where((log) => log['status'] == 'Draft').length;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: WebTheme.surfaceOf(context),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: WebTheme.lineOf(context)),
+      ),
+      child: Row(
+        children: [
+          _webStat(formatHoursToHM(totalDuration()), 'Work time'),
+          _webDivider(),
+          _webStat('${logs.length}', 'Sessions'),
+          _webDivider(),
+          _webStat('$drafts', 'Drafts'),
+        ],
+      ),
+    );
+  }
+
+  Widget _webDivider() {
+    return Container(
+      width: 1,
+      height: 22,
+      margin: const EdgeInsets.symmetric(horizontal: 14),
+      color: WebTheme.lineOf(context),
+    );
+  }
+
+  Widget _webStat(String value, String label) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          value,
+          style: TextStyle(
+            color: WebTheme.brandOf(context),
+            fontSize: 14,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(width: 6),
+        Text(
+          label,
+          style: TextStyle(color: WebTheme.mutedOf(context), fontSize: 12),
+        ),
+      ],
+    );
+  }
+
+  Widget _webTimeline() {
+    if (_isLoading) return const Center(child: RotatingFlower());
+    if (logs.isEmpty) {
+      return Center(
+        child: Text(
+          'No worklogs for this day.',
+          style: TextStyle(color: WebTheme.mutedOf(context), fontSize: 14),
+        ),
+      );
+    }
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final columns = constraints.maxWidth >= 980 ? 2 : 1;
+        return ListView.builder(
+          padding: const EdgeInsets.only(bottom: 16),
+          itemCount: (logs.length / columns).ceil(),
+          itemBuilder: (context, row) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (var column = 0; column < columns; column++) ...[
+                    if (column > 0) const SizedBox(width: 12),
+                    Expanded(child: _webSession(row * columns + column)),
+                  ],
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _webSession(int index) {
+    if (index >= logs.length) return const SizedBox.shrink();
+    final log = logs[index];
+    final hasOut = (log['outImageUrl'] ?? '').toString().isNotEmpty ||
+        (log['outTime'] ?? '').toString().isNotEmpty;
+    return WorklogSessionTile(
+      log: log,
+      compact: true,
+      onCheckOut: hasOut ? null : () => _checkOut(log),
     );
   }
 

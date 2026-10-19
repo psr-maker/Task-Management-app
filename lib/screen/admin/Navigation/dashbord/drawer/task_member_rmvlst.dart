@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:staff_work_track/core/responsive/app_layout.dart';
 import 'package:staff_work_track/core/theme/web_theme.dart';
 import 'package:staff_work_track/core/widgets/empty_state.dart';
+import 'package:staff_work_track/core/widgets/request_workspace.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
 import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
 import 'package:staff_work_track/services/superadmin_service.dart';
@@ -57,27 +58,27 @@ class _TaskRemovalRequestState extends State<TaskRemovalRequest> {
   }) {
     return showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: Text(title),
         content: Text(message),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context, false),
+            onPressed: () => Navigator.pop(dialogContext, false),
             child: const Text("Cancel"),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.secondary,
+              backgroundColor: Theme.of(dialogContext).colorScheme.secondary,
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(10),
               ),
               elevation: 2,
             ),
-            onPressed: () => Navigator.pop(context, true),
+            onPressed: () => Navigator.pop(dialogContext, true),
             child: Text(
               "Proceed",
-              style: Theme.of(context).textTheme.titleMedium,
+              style: Theme.of(dialogContext).textTheme.titleMedium,
             ),
           ),
         ],
@@ -108,8 +109,88 @@ class _TaskRemovalRequestState extends State<TaskRemovalRequest> {
     }
   }
 
+  Widget _webPage() {
+    return Scaffold(
+      backgroundColor: WebTheme.canvasOf(context),
+      body: RequestWorkspace(
+        title: 'Task Penalty',
+        subtitle: 'Review removals before penalty points are applied',
+        loading: loading,
+        emptyTitle: 'No removal requests',
+        emptyMessage: 'Pending task removals will show here.',
+        stats: [
+          WorkspaceStat(
+            label: 'Open requests',
+            value: '${data.length}',
+            icon: Icons.assignment_late_rounded,
+            color: WebTheme.brand,
+          ),
+        ],
+        banner: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFFF7ED),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFFFED7AA)),
+          ),
+          child: const Text(
+            'Applying a penalty cannot be undone. Use No penalty when the person should leave the task without points.',
+            style: TextStyle(
+              color: Color(0xFF9A3412),
+              fontWeight: FontWeight.w600,
+              fontSize: 13,
+              height: 1.35,
+            ),
+          ),
+        ),
+        columns: const ['Staff', 'Task', 'Removed by', 'Date', 'Reason'],
+        records: [
+          for (final item in data)
+            WorkspaceRecord(
+              status: 'Pending',
+              values: [
+                (item['userName'] ?? 'Staff').toString(),
+                (item['taskName'] ?? '-').toString(),
+                (item['removedByName'] ?? '-').toString(),
+                TimeUtils.formatDateValue(item['removedDate']),
+                (item['reason'] ?? '-').toString(),
+              ],
+              actions: [
+                workspaceAction('No penalty', () async {
+                  final confirm = await _showConfirmDialog(
+                    context,
+                    title: 'Remove without penalty',
+                    message:
+                        'This removes the person from the task and does not apply penalty points. Continue?',
+                  );
+                  if (confirm != true) return;
+                  await _processRequest(item, applyPenalty: false);
+                }),
+                workspaceAction(
+                  'Apply penalty',
+                  () async {
+                    final confirm = await _showConfirmDialog(
+                      context,
+                      title: 'Apply penalty',
+                      message:
+                          'Penalty points will be applied based on task priority. Continue?',
+                    );
+                    if (confirm != true) return;
+                    await _processRequest(item, applyPenalty: true);
+                  },
+                  filled: true,
+                ),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (!AppLayout.isMobile(context)) return _webPage();
     return Scaffold(
       backgroundColor: WebTheme.canvasOf(context),
       appBar: AppBar(
@@ -194,7 +275,7 @@ class _TaskRemovalRequestState extends State<TaskRemovalRequest> {
                                         backgroundColor: WebTheme.brandSoftOf(context),
                                         child: Text(
                                           initial,
-                                          style: const TextStyle(
+                                          style: TextStyle(
                                             color: WebTheme.brand,
                                             fontWeight: FontWeight.w800,
                                           ),

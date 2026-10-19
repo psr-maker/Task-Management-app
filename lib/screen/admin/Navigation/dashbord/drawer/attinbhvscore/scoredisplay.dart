@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:staff_work_track/Models/getusers.dart';
 import 'package:staff_work_track/core/constant/division_config.dart';
+import 'package:staff_work_track/core/responsive/app_layout.dart';
+import 'package:staff_work_track/core/theme/web_theme.dart';
 import 'package:staff_work_track/core/widgets/load_error.dart';
+import 'package:staff_work_track/core/widgets/request_workspace.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
 import 'package:staff_work_track/screen/admin/Navigation/dashbord/drawer/attinbhvscore/addattnbhv.dart';
 import 'package:staff_work_track/services/admin_service.dart';
@@ -215,8 +218,104 @@ class _BehaviourScoreDisplayState extends State<BehaviourScoreDisplay> {
         (staff["integrity"] ?? 0);
   }
 
+  Future<void> _openAddScore() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AddBehaviourScore(
+          department: widget.Dept,
+          scoreLeaders: widget.scoreLeaders,
+        ),
+      ),
+    );
+    await loadScores();
+  }
+
+  Widget _webScores() {
+    final scores = filteredStaffScores;
+    final useDepartments = widget.scoreLeaders && departments.isNotEmpty;
+    final monthFilters = [
+      'All',
+      for (var month = 1; month <= 12; month++) _monthName(month),
+    ];
+    return Scaffold(
+      backgroundColor: WebTheme.canvasOf(context),
+      body: RequestWorkspace(
+        title: 'Attitude & Behaviour',
+        subtitle: widget.scoreLeaders
+            ? 'Scores for managers and division heads'
+            : 'Monthly behaviour scores',
+        loading: isLoading,
+        emptyTitle: 'No scores',
+        emptyMessage: errorMessage ?? _emptyScoreMessage(),
+        filters: useDepartments ? ['All', ...departments] : monthFilters,
+        selectedFilter: useDepartments ? departmentFilter : selectedMonthName,
+        onFilter: (value) {
+          if (useDepartments) {
+            setState(() => departmentFilter = value);
+            return;
+          }
+          setState(() {
+            selectedMonth = value == 'All' ? null : monthFilters.indexOf(value);
+          });
+        },
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (useDepartments) ...[
+              OutlinedButton.icon(
+                onPressed: selectMonth,
+                icon: const Icon(Icons.calendar_month, size: 16),
+                label: Text(selectedMonthName),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: WebTheme.brand,
+                  side: BorderSide(color: WebTheme.brand),
+                ),
+              ),
+              const SizedBox(width: 8),
+            ],
+            FilledButton.icon(
+              onPressed: _openAddScore,
+              icon: const Icon(Icons.add, size: 18),
+              label: const Text('Add score'),
+              style: FilledButton.styleFrom(
+                backgroundColor: WebTheme.brand,
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ],
+        ),
+        stats: [
+          WorkspaceStat(
+            label: 'People',
+            value: '${scores.length}',
+            icon: Icons.groups_rounded,
+            color: WebTheme.brand,
+          ),
+        ],
+        columns: useDepartments
+            ? const ['Name', 'Department', 'Communication', 'Punctuality', 'Integrity']
+            : const ['Name', 'Communication', 'Punctuality', 'Integrity'],
+        records: [
+          for (final staff in scores)
+            WorkspaceRecord(
+              status: '${totalScore(staff)} / 15',
+              values: [
+                (staff['staffName'] ?? '-').toString(),
+                if (useDepartments) (staff['department'] ?? '-').toString(),
+                '${staff['communication'] ?? 0} / 5',
+                '${staff['punctuality'] ?? 0} / 5',
+                '${staff['integrity'] ?? 0} / 5',
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (!AppLayout.isMobile(context)) return _webScores();
     return Scaffold(
    
       appBar: AppBar(
@@ -379,11 +478,11 @@ class _BehaviourScoreDisplayState extends State<BehaviourScoreDisplay> {
       width: double.infinity,
 
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: WebTheme.surfaceOf(context),
 
         borderRadius: BorderRadius.circular(14),
 
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(color: WebTheme.lineOf(context)),
       ),
 
       child: ClipRRect(
@@ -394,19 +493,21 @@ class _BehaviourScoreDisplayState extends State<BehaviourScoreDisplay> {
 
           child: SingleChildScrollView(
             child: DataTable(
-              headingRowColor: WidgetStateProperty.all(const Color(0xff194d26)),
+              headingRowColor: WidgetStateProperty.all(
+                WebTheme.brandSoftOf(context),
+              ),
 
               columnSpacing: 22,
 
-              headingTextStyle: const TextStyle(
-                color: Colors.white,
+              headingTextStyle: TextStyle(
+                color: WebTheme.brandOf(context),
                 fontWeight: FontWeight.bold,
                 fontSize: 13,
               ),
 
-              dataTextStyle: const TextStyle(
+              dataTextStyle: TextStyle(
                 fontSize: 13,
-                color: Colors.black87,
+                color: WebTheme.inkOf(context),
               ),
 
               columns: [

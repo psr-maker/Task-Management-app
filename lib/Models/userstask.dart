@@ -65,9 +65,20 @@ class TaskModel {
       dueDate: json['dueDate']?.toString(),
       totalMembers: json['totalMembers'] ?? 0,
       assignedTo: json['assignedTo'] ?? [],
-      assignerRole: json['assignerRole'],
+      assignerRole: (json['assignerRole'] ??
+              json['AssignerRole'] ??
+              json['createdByRole'] ??
+              json['creatorRole'])
+          ?.toString(),
       assignerDepartment: json['assignerDepartment'],
-      assignedBy: _assignedByLabel(json['assignedBy']),
+      assignedBy: _assignedByLabel(
+        json['assignedBy'] ??
+            json['AssignedBy'] ??
+            json['createdBy'] ??
+            json['CreatedBy'] ??
+            json['createdByName'] ??
+            json['assignBy'],
+      ),
       totalTasks: json["totalTasks"] ?? 0,
       pendingCount: json["pendingCount"] ?? 0,
       inProgressCount: json["inProgressCount"] ?? 0,
@@ -121,6 +132,7 @@ class EditTaskRequest {
   final List<int> assignedToIds;
   final List<RemovedUser> removedUsers;
   final int? quantity;
+  final String performanceType;
   final String? startTime;
   final String? endTime;
 
@@ -132,6 +144,7 @@ class EditTaskRequest {
     required this.dueDate,
     required this.assignedToIds,
     required this.removedUsers,
+    required this.performanceType,
     this.quantity,
     this.startTime,
     this.endTime,
@@ -145,8 +158,8 @@ class EditTaskRequest {
       "priority": priority,
       "due_Date": dueDate.toIso8601String(),
       "assignedToIds": assignedToIds,
-      // CHANGE THIS
       "removedMembers": removedUsers.map((e) => e.toJson()).toList(),
+      "performanceType": performanceType,
       "quantity": quantity,
       "startTime": startTime,
       "endTime": endTime,

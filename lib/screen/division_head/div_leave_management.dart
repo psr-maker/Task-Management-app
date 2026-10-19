@@ -4,6 +4,8 @@ import 'package:staff_work_track/core/constant/division_config.dart';
 import 'package:staff_work_track/core/widgets/buttons.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
 import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
+import 'package:staff_work_track/core/theme/web_theme.dart';
+import 'package:staff_work_track/core/widgets/request_workspace.dart';
 import 'package:staff_work_track/core/widgets/web_ui.dart';
 import 'package:staff_work_track/services/admin_service.dart';
 import 'package:staff_work_track/services/auth_service.dart';
@@ -28,9 +30,7 @@ class _DivLeaveManagementState extends State<DivLeaveManagement> {
   bool isActionLoading = false;
 
   List<Map<String, dynamic>> teamLeaves = [];
-  List<Map<String, dynamic>> ownLeaves = [];
   List<Map<String, dynamic>> teamPermissions = [];
-  List<Map<String, dynamic>> ownPermissions = [];
   Set<String> expandedItems = {};
   final Set<String> _rejecting = {};
   final Map<String, TextEditingController> _rejectReasons = {};
@@ -44,23 +44,23 @@ class _DivLeaveManagementState extends State<DivLeaveManagement> {
 
   List<String> childDepartments = [];
 
+  String get _loginDepartment => widget.department.trim();
+
+  bool _isLoginDepartment(String department) {
+    final login = _loginDepartment;
+    if (login.isEmpty) return false;
+    return DivisionConfig.isAllowedDepartment(department, [login]);
+  }
+
   List<String> get departments {
-    final parent = widget.department.trim();
-    final children = childDepartments;
     final chips = <String>[];
-    if (parent.isNotEmpty) chips.add(parent);
-    for (final dept in children) {
+    for (final dept in childDepartments) {
+      if (_isLoginDepartment(dept)) continue;
       if (!DivisionConfig.isAllowedDepartment(dept, chips)) {
         chips.add(dept);
       }
     }
     return chips;
-  }
-
-  bool get _isOwnLeaveTab {
-    final parent = widget.department.trim();
-    if (parent.isEmpty || selectedDepartment == "All") return false;
-    return DivisionConfig.isAllowedDepartment(selectedDepartment, [parent]);
   }
 
   @override
@@ -74,15 +74,24 @@ class _DivLeaveManagementState extends State<DivLeaveManagement> {
   @override
   void initState() {
     super.initState();
-    final parent = widget.department.trim();
-    selectedDepartment = parent.isNotEmpty ? parent : "All";
+    selectedDepartment = "All";
     _init();
   }
 
   Future<void> _init() async {
     await _loadLoginUser();
     try {
-      childDepartments = await AdminService.getMySubDepartments();
+      final login = _loginDepartment;
+      var names = await AdminService.getMySubDepartments(
+        headDepartment: login.isEmpty ? null : login,
+      );
+      if (names.isEmpty) {
+        names = await AdminService.getMySubDepartments();
+      }
+      childDepartments = [
+        for (final name in names)
+          if (!_isLoginDepartment(name)) name,
+      ];
     } catch (_) {}
     await _loadData();
   }
@@ -94,8 +103,6 @@ class _DivLeaveManagementState extends State<DivLeaveManagement> {
   }
 
   bool _canApproveOrReject(Map<String, dynamic> item) {
-    if (_isOwnLeaveTab) return false;
-
     final senderId =
         (item["senderId"] ??
                 item["SenderId"] ??
@@ -196,40 +203,54 @@ class _DivLeaveManagementState extends State<DivLeaveManagement> {
       });
     }
 
-    final allowed = [
-      if (widget.department.trim().isNotEmpty) widget.department,
-      ...childDepartments,
-    ];
-    final teamAllowed =
-        childDepartments.isNotEmpty ? childDepartments : allowed;
+    final allowed = departments;
 
     try {
-      final loadedTeamLeaves = <Map<String, dynamic>>[];
-      final loadedOwnLeaves = <Map<String, dynamic>>[];
-      final loadedTeamPermissions = <Map<String, dynamic>>[];
-      final loadedOwnPermissions = <Map<String, dynamic>>[];
-
-      try {
-        for (final item in await SuperAdminService.getLeaveList()) {
-          if (_isAllowedDept(_departmentOf(item), teamAllowed) ||
-              _departmentOf(item).trim().isEmpty) {
-            loadedTeamLeaves.add(item);
-          }
-        }
-      } catch (_) {}
-
-      try {
-        for (final item in _asMaps(await AdminService.getLeaves())) {
-          item["department"] ??= widget.department;
-          loadedOwnLeaves.add(item);
-        }
-      } catch (_) {}
-
       final departmentByUserId = <int, String>{};
       try {
         final staff = await AdminService.getEmployeesByDepartments(allowed);
         departmentByUserId.addAll(
           SuperAdminService.departmentByUserId(staff),
+        );
+      } catch (_) {}
+
+      bool receivedForDivision(Map<String, dynamic> item) {
+        final senderId = int.tryParse(
+          (item["senderId"] ??
+                  item["SenderId"] ??
+                  item["userId"] ??
+                  item["uid"] ??
+                  item["staffId"] ??
+                  "")
+              .toString(),
+        );
+        if (_loginUserId != null &&
+            senderId != null &&
+            senderId.toString() == _loginUserId) {
+          return false;
+        }
+        final department = _departmentOf(item).trim();
+        if (_isLoginDepartment(department)) return false;
+        if (department.isEmpty || allowed.isEmpty) return true;
+        return _isAllowedDept(department, allowed);
+      }
+
+      final loadedTeamLeaves = <Map<String, dynamic>>[];
+      final loadedTeamPermissions = <Map<String, dynamic>>[];
+
+      try {
+        final leaves = await SuperAdminService.getLeaveList();
+        SuperAdminService.attachSenderDepartments(leaves, departmentByUserId);
+        loadedTeamLeaves.addAll(
+          leaves.where(receivedForDivision).where((item) => !_isHolidayLeave(item)),
+        );
+      } catch (_) {}
+
+      try {
+        final leaves = _asMaps(await AdminService.getDepartmentLeaves());
+        SuperAdminService.attachSenderDepartments(leaves, departmentByUserId);
+        loadedTeamLeaves.addAll(
+          leaves.where(receivedForDivision).where((item) => !_isHolidayLeave(item)),
         );
       } catch (_) {}
 
@@ -239,22 +260,13 @@ class _DivLeaveManagementState extends State<DivLeaveManagement> {
           permissions,
           departmentByUserId,
         );
-        loadedTeamPermissions.addAll(permissions);
-      } catch (_) {}
-
-      try {
-        for (final item in _asMaps(await AdminService.getPermissions())) {
-          item["department"] ??= widget.department;
-          loadedOwnPermissions.add(item);
-        }
+        loadedTeamPermissions.addAll(permissions.where(receivedForDivision));
       } catch (_) {}
 
       if (!mounted) return;
       setState(() {
         teamLeaves = _uniqueById(loadedTeamLeaves);
-        ownLeaves = _uniqueById(loadedOwnLeaves);
         teamPermissions = _uniqueById(loadedTeamPermissions);
-        ownPermissions = _uniqueById(loadedOwnPermissions);
         isLoading = false;
       });
     } catch (_) {
@@ -264,21 +276,15 @@ class _DivLeaveManagementState extends State<DivLeaveManagement> {
   }
 
   List<Map<String, dynamic>> get _sourceItems {
-    return activeTab == "Leave"
-        ? (_isOwnLeaveTab ? ownLeaves : teamLeaves)
-        : (_isOwnLeaveTab ? ownPermissions : teamPermissions);
+    return activeTab == "Leave" ? teamLeaves : teamPermissions;
   }
 
   List<Map<String, dynamic>> get _departmentScopedItems {
+    if (selectedDepartment == "All") return _sourceItems;
     return _sourceItems.where((item) {
-      if (!_isOwnLeaveTab &&
-          selectedDepartment != "All" &&
-          !DivisionConfig.isAllowedDepartment(_departmentOf(item), [
-            selectedDepartment,
-          ])) {
-        return false;
-      }
-      return true;
+      return DivisionConfig.isAllowedDepartment(_departmentOf(item), [
+        selectedDepartment,
+      ]);
     }).toList();
   }
 
@@ -331,10 +337,56 @@ class _DivLeaveManagementState extends State<DivLeaveManagement> {
     return grouped;
   }
 
+  bool _isHolidayLeave(Map<String, dynamic> item) {
+    final fields = [
+      item['leaveTyp'],
+      item['leavecategory'],
+      item['leaveCategory'],
+      item['LeaveTyp'],
+      item['leaveType'],
+      item['type'],
+      item['LeaveType'],
+    ];
+    for (final field in fields) {
+      final raw = (field ?? '').toString().trim();
+      if (raw.isEmpty || raw.toLowerCase() == 'null') continue;
+      final parts = raw
+          .split(RegExp(r'[,/|]'))
+          .map((part) => part.trim())
+          .where((part) => part.isNotEmpty)
+          .toList();
+      if (parts.isEmpty) continue;
+      if (parts.every((part) => part.toLowerCase().contains('holiday'))) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  String _withoutHoliday(dynamic value) {
+    final raw = (value ?? '').toString().trim();
+    if (raw.isEmpty || raw == 'null') return '';
+    final kept = raw
+        .split(RegExp(r'[,/|]'))
+        .map((part) => part.trim())
+        .where((part) => part.isNotEmpty && !part.toLowerCase().contains('holiday'))
+        .toList();
+    return kept.join(', ');
+  }
+
+  String _leaveCategory(Map<String, dynamic> item) {
+    return _shown(
+      _withoutHoliday(item['leaveTyp'] ?? item['leavecategory'] ?? item['leaveCategory']),
+    );
+  }
+
+  String _leaveDay(Map<String, dynamic> item) {
+    return _shown(_withoutHoliday(item['leaveType'] ?? item['type']));
+  }
+
   String _leaveTypeOf(Map<String, dynamic> item) {
-    final type = (item["leaveType"] ?? item["type"] ?? "").toString().trim();
-    final session =
-        (item["leaveTyp"] ?? item["leavecategory"] ?? "").toString().trim();
+    final type = _withoutHoliday(item["leaveType"] ?? item["type"]);
+    final session = _withoutHoliday(item["leaveTyp"] ?? item["leavecategory"]);
     if (type.isNotEmpty && session.isNotEmpty) return "$type - $session";
     if (type.isNotEmpty) return type;
     if (session.isNotEmpty) return session;
@@ -349,10 +401,20 @@ class _DivLeaveManagementState extends State<DivLeaveManagement> {
     return TimeUtils.formatTime12(time, empty: "-");
   }
 
+  String _shown(dynamic value) {
+    final text = (value ?? '').toString().trim();
+    return text.isEmpty || text == 'null' ? '—' : text;
+  }
+
+  String _rejectWhy(Map<String, dynamic> item) {
+    if (_statusOf(item) != 'rejected') return '—';
+    return _shown(item['rejectionReason']);
+  }
+
   Color _statusColor(String status) {
     switch (status.toLowerCase()) {
       case "approved":
-        return Colors.green;
+        return WebTheme.brandOf(context);
       case "rejected":
         return Colors.red;
       default:
@@ -360,10 +422,22 @@ class _DivLeaveManagementState extends State<DivLeaveManagement> {
     }
   }
 
+  Widget _departmentBanner() {
+    final options = ["All", ...departments];
+    return SizedBox(
+      height: 34,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        children: options.map(_buildDeptChip).toList(),
+      ),
+    );
+  }
+
   Widget _buildDeptChip(String dept) {
     final selected = selectedDepartment == dept;
     final label = dept == "All" ? "All" : dept.replaceAll(" Department", "");
     final secondary = Theme.of(context).colorScheme.secondary;
+    final dark = WebTheme.isDark(context);
 
     return Padding(
       padding: const EdgeInsets.only(right: 8),
@@ -378,10 +452,18 @@ class _DivLeaveManagementState extends State<DivLeaveManagement> {
           height: 34,
           padding: const EdgeInsets.symmetric(horizontal: 12),
           decoration: BoxDecoration(
-            color: selected ? secondary : Colors.white,
+            color: selected
+                ? secondary
+                : dark
+                    ? WebTheme.surfaceOf(context)
+                    : Colors.white,
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color: selected ? secondary : const Color(0xFFD0D5D2),
+              color: selected
+                  ? secondary
+                  : dark
+                      ? WebTheme.lineOf(context)
+                      : const Color(0xFFD0D5D2),
             ),
           ),
           alignment: Alignment.center,
@@ -395,7 +477,11 @@ class _DivLeaveManagementState extends State<DivLeaveManagement> {
               Text(
                 label,
                 style: TextStyle(
-                  color: selected ? Colors.white : secondary,
+                  color: selected
+                      ? Colors.white
+                      : dark
+                          ? WebTheme.inkOf(context)
+                          : secondary,
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
                 ),
@@ -416,7 +502,7 @@ class _DivLeaveManagementState extends State<DivLeaveManagement> {
       case "Rejected":
         return const Color(0xFFD64545);
       default:
-        return Theme.of(context).colorScheme.secondary;
+        return WebTheme.brandOf(context);
     }
   }
 
@@ -441,7 +527,9 @@ class _DivLeaveManagementState extends State<DivLeaveManagement> {
       child: Container(
         padding: const EdgeInsets.all(4),
         decoration: BoxDecoration(
-          color: const Color(0xFFF3F5F4),
+          color: WebTheme.isDark(context)
+              ? WebTheme.surfaceOf(context)
+              : const Color(0xFFF3F5F4),
           borderRadius: BorderRadius.circular(16),
         ),
         child: Row(
@@ -487,7 +575,9 @@ class _DivLeaveManagementState extends State<DivLeaveManagement> {
                           fontWeight: FontWeight.w700,
                           color: selected
                               ? Colors.white
-                              : const Color(0xFF5C6560),
+                              : WebTheme.isDark(context)
+                                  ? WebTheme.mutedOf(context)
+                                  : const Color(0xFF5C6560),
                         ),
                       ),
                       const SizedBox(height: 1),
@@ -528,7 +618,13 @@ class _DivLeaveManagementState extends State<DivLeaveManagement> {
             borderRadius: BorderRadius.circular(8),
           ),
           child: Center(
-            child: Text(title, style: Theme.of(context).textTheme.labelLarge),
+            child: Text(
+              title,
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                color: selected ? Colors.white : Colors.white70,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
           ),
         ),
       ),
@@ -570,6 +666,37 @@ class _DivLeaveManagementState extends State<DivLeaveManagement> {
     }
   }
 
+  Future<String?> _askRejectReason() async {
+    final controller = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Reject leave'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(
+            hintText: 'Rejection reason',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Reject'),
+          ),
+        ],
+      ),
+    );
+    final note = controller.text.trim();
+    controller.dispose();
+    if (ok != true || note.isEmpty) return null;
+    return note;
+  }
+
   Future<void> _reject(
     Map<String, dynamic> item,
     bool isPermission, {
@@ -579,6 +706,14 @@ class _DivLeaveManagementState extends State<DivLeaveManagement> {
     if (id == null) {
       _showTop("Invalid ${isPermission ? "permission" : "leave"} ID.");
       return;
+    }
+
+    var note = reason?.trim() ?? '';
+    if (!isPermission && note.isEmpty) {
+      final entered = await _askRejectReason();
+      if (!mounted) return;
+      if (entered == null) return;
+      note = entered;
     }
 
     setState(() => isActionLoading = true);
@@ -591,7 +726,7 @@ class _DivLeaveManagementState extends State<DivLeaveManagement> {
           : await AdminService.updateLeaveStatus(
               id: id,
               status: "Rejected",
-              reason: reason,
+              reason: note,
             );
 
       _showTop(
@@ -606,6 +741,113 @@ class _DivLeaveManagementState extends State<DivLeaveManagement> {
     }
   }
 
+  ButtonStyle _tabStyle() {
+    return ButtonStyle(
+      backgroundColor: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.selected)) return WebTheme.brand;
+        return WebTheme.surfaceOf(context);
+      }),
+      foregroundColor: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.selected)) return Colors.white;
+        return WebTheme.inkOf(context);
+      }),
+      side: WidgetStateProperty.all(
+        BorderSide(color: WebTheme.brand.withValues(alpha: 0.45)),
+      ),
+    );
+  }
+
+  Widget _webLeave() {
+    final items = _filteredItems;
+    final isPermission = activeTab == 'Permission';
+    final pending = items.where(_isPending).length;
+    return Scaffold(
+      backgroundColor: WebTheme.canvasOf(context),
+      body: RequestWorkspace(
+        title: 'Leave & Permission',
+        subtitle: 'Review your team requests',
+        loading: isLoading,
+        scrollable: true,
+        banner: _departmentBanner(),
+        filters: statusTabs,
+        selectedFilter: selectedStatus,
+        onFilter: (value) => setState(() {
+          selectedStatus = value;
+          expandedItems.clear();
+        }),
+        trailing: SegmentedButton<String>(
+          style: _tabStyle(),
+          segments: const [
+            ButtonSegment(value: 'Leave', label: Text('Leave')),
+            ButtonSegment(value: 'Permission', label: Text('Permission')),
+          ],
+          selected: {activeTab},
+          onSelectionChanged: (value) {
+            setState(() {
+              activeTab = value.first;
+              selectedStatus = 'All';
+              expandedItems.clear();
+              _rejecting.clear();
+            });
+          },
+        ),
+        stats: [
+          WorkspaceStat(label: 'Showing', value: '${items.length}', icon: Icons.event_available_rounded, color: WebTheme.brandOf(context)),
+          WorkspaceStat(label: 'Pending', value: '$pending', icon: Icons.hourglass_top_rounded, color: const Color(0xFFB45309)),
+        ],
+        emptyTitle: isPermission ? 'No permission found' : 'No leave found',
+        columns: isPermission
+            ? const ['Name', 'Designation', 'From time', 'To time', 'Total hours', 'Reason', 'Applied on', 'Apply date']
+            : const [
+                'Name',
+                'Designation',
+                'Contact number',
+                'Leave type',
+                'Day',
+                'Applied on',
+                'Leave date',
+                'Reason',
+                'Reject reason',
+              ],
+        records: [
+          for (final item in items)
+            WorkspaceRecord(
+              status: _statusOf(item),
+              approvedColor: WebTheme.brandOf(context),
+              values: isPermission
+                  ? [
+                      (item['name'] ?? '').toString(),
+                      _shown(item['designation']),
+                      _formatTime(item['fromTime'] ?? item['FromTime']),
+                      _formatTime(item['toTime'] ?? item['ToTime']),
+                      '${item['totalHours'] ?? item['totalhours'] ?? '—'} hours',
+                      _shown(item['reason']),
+                      _shown(AppHelpers.formatDate((item['submittedDate'] ?? '').toString())),
+                      _formatDate(item['date'] ?? item['fromDate']),
+                    ]
+                  : [
+                      (item['name'] ?? '').toString(),
+                      _shown(item['designation']),
+                      _shown(item['contactNumber']),
+                      _leaveCategory(item),
+                      _leaveDay(item),
+                      _shown(AppHelpers.formatDate((item['submittedDate'] ?? '').toString())),
+                      _formatDate(item['fromDate'] ?? item['date']),
+                      _shown(item['reason']),
+                      _rejectWhy(item),
+                    ],
+              actions: _isPending(item) && _canApproveOrReject(item)
+                  ? [
+                      workspaceAction('Approve', () => _approve(item, isPermission), filled: true),
+                      workspaceAction('Reject', () => _reject(item, isPermission), color: WebTheme.danger),
+                    ]
+                  : const [],
+            ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final items = _filteredItems;
@@ -613,6 +855,7 @@ class _DivLeaveManagementState extends State<DivLeaveManagement> {
     final isPermission = activeTab == "Permission";
 
     final web = WebPushedChrome.isWeb(context);
+    if (web) return _webLeave();
     return Scaffold(
       backgroundColor: WebPushedChrome.background(context),
       appBar: AppBar(
@@ -638,7 +881,7 @@ class _DivLeaveManagementState extends State<DivLeaveManagement> {
       body: WebPushedChrome.body(
         context,
         title: 'Leave & Permission',
-        subtitle: 'Requests for the departments you can access',
+        subtitle: 'Leaves received from your departments',
         panel: false,
         child: Stack(
         children: [
@@ -754,7 +997,11 @@ class _DivLeaveManagementState extends State<DivLeaveManagement> {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        border: Border.all(color: Theme.of(context).colorScheme.secondary),
+        border: Border.all(
+          color: WebTheme.isDark(context)
+              ? WebTheme.lineOf(context)
+              : Theme.of(context).colorScheme.secondary,
+        ),
         borderRadius: BorderRadius.circular(10),
       ),
       child: Column(
@@ -862,8 +1109,18 @@ class _DivLeaveManagementState extends State<DivLeaveManagement> {
                       item["totalHours"] ?? item["totalhours"] ?? "-",
                     ),
                     _infoRow("Reason", item["reason"]),
+                    _infoRow(
+                      "Applied on",
+                      AppHelpers.formatDate(item["submittedDate"]?.toString()),
+                    ),
+                    _infoRow(
+                      "Apply date",
+                      _formatDate(item["date"] ?? item["fromDate"]),
+                    ),
                   ] else ...[
                     _infoRow("Leave Type", _leaveTypeOf(item)),
+                    _infoRow("Designation", item["designation"]),
+                    _infoRow("Contact", item["contactNumber"]),
                     _infoRow(
                       "From Date",
                       _formatDate(item["fromDate"] ?? item["date"]),
@@ -887,14 +1144,10 @@ class _DivLeaveManagementState extends State<DivLeaveManagement> {
                         item["rejectionReason"] ?? item["reason"],
                       ),
                   ],
-                  if (!_isOwnLeaveTab &&
-                      _isPending(item) &&
-                      _canApproveOrReject(item)) ...[
+                  if (_isPending(item) && _canApproveOrReject(item)) ...[
                     const SizedBox(height: 10),
                     _actionButtons(item, isPermission, key),
-                  ] else if (!_isOwnLeaveTab &&
-                      _isPending(item) &&
-                      !_canApproveOrReject(item))
+                  ] else if (_isPending(item) && !_canApproveOrReject(item))
                     _infoRow("Approval", "Awaiting Director approval"),
                 ],
               ),
@@ -921,7 +1174,7 @@ class _DivLeaveManagementState extends State<DivLeaveManagement> {
                 text: "Approve",
                 isLoading: isActionLoading,
                 onPressed: () => _approve(item, isPermission),
-                color: Theme.of(context).colorScheme.secondary,
+                color: Theme.of(context).colorScheme.primary,
                 txtcolor: Theme.of(context).colorScheme.onPrimary,
               ),
             ),

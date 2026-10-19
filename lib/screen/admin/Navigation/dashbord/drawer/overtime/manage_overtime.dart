@@ -1,9 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:staff_work_track/core/responsive/app_layout.dart';
+import 'package:staff_work_track/core/theme/web_theme.dart';
+import 'package:staff_work_track/core/widgets/form_popup.dart';
+import 'package:staff_work_track/core/widgets/list_download_button.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
+import 'package:staff_work_track/core/widgets/request_workspace.dart';
 import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
 import 'package:staff_work_track/screen/admin/Navigation/dashbord/drawer/overtime/create_overtime.dart';
 import 'package:staff_work_track/screen/admin/Navigation/dashbord/drawer/overtime/overtime_details.dart';
 import 'package:staff_work_track/screen/admin/Navigation/dashbord/drawer/overtime/select_staff.dart';
+import 'package:staff_work_track/services/admin_service.dart';
 import 'package:staff_work_track/services/overtime_service.dart';
 import 'package:staff_work_track/utils/role_hierarchy.dart';
 import 'package:staff_work_track/utils/time_utils.dart';
@@ -22,6 +28,7 @@ class _ManagerOvertimeState extends State<ManagerOvertime> {
 
   List<dynamic> allData = [];
   List<dynamic> filteredData = [];
+  List<dynamic> historyView = [];
 
   String searchQuery = "";
 
@@ -29,7 +36,6 @@ class _ManagerOvertimeState extends State<ManagerOvertime> {
   DateTime? endDate;
 
   int? processingId;
-  final Set<int> _handledIds = {};
   String? _topMessage;
   bool _isErrorMessage = true;
   bool _showTopMessage = false;
@@ -50,16 +56,42 @@ class _ManagerOvertimeState extends State<ManagerOvertime> {
     }
 
     try {
-      final data = await OvertimeService.getDepartmentOvertime();
       final eligibility = await loadOvertimeEligibility();
+      final merged = <String, Map<String, dynamic>>{};
+
+      void take(dynamic data) {
+        for (final raw in _asItemList(data)) {
+          if (raw is! Map) continue;
+          final item = Map<String, dynamic>.from(raw);
+          if (_staffSkipsOvertime(eligibility, item)) continue;
+          final id = (item['id'] ?? item['overtimeId'] ?? '').toString().trim();
+          final key = id.isEmpty ? '${item['date']}-${item['staffName']}-${item['fromTime']}' : id;
+          final current = merged[key];
+          if (current == null) {
+            merged[key] = item;
+            continue;
+          }
+          item.forEach((field, value) {
+            final existing = current[field];
+            final empty = existing == null || existing.toString().trim().isEmpty;
+            if (empty && value != null && value.toString().trim().isNotEmpty) {
+              current[field] = value;
+            }
+          });
+        }
+      }
+
+      take(await OvertimeService.getDepartmentOvertime());
+      try {
+        take(await OvertimeService.getOvertimeByDepartments([widget.dept]));
+      } catch (_) {}
+      try {
+        take(await AdminService.getDepartmentOverTimes());
+      } catch (_) {}
 
       if (!mounted) return;
 
-      allData = List<dynamic>.from(data).where((item) {
-        if (item is Map && eligibility.excludesRecord(item)) return false;
-        final id = int.tryParse(item["id"]?.toString() ?? "");
-        return id == null || !_handledIds.contains(id);
-      }).toList();
+      allData = merged.values.toList();
 
       _applyFilters();
 
@@ -70,6 +102,7 @@ class _ManagerOvertimeState extends State<ManagerOvertime> {
       setState(() {
         allData = [];
         filteredData = [];
+        historyView = [];
       });
 
       showAppMessage(context, "Failed to load overtime: $e");
@@ -84,9 +117,6 @@ class _ManagerOvertimeState extends State<ManagerOvertime> {
 
   void _applyFilters() {
     List<dynamic> result = List<dynamic>.from(allData);
-    result = result.where((item) {
-      return _isCurrentRequest(item);
-    }).toList();
 
     if (searchQuery.trim().isNotEmpty) {
       final query = searchQuery.trim().toLowerCase();
@@ -138,7 +168,40 @@ class _ManagerOvertimeState extends State<ManagerOvertime> {
       return dateB.compareTo(dateA);
     });
 
-    filteredData = result;
+    historyView = result;
+    filteredData = result.where(_isCurrentRequest).toList();
+  }
+
+  List<dynamic> _asItemList(dynamic data) {
+    if (data is List) return data;
+    if (data is Map) {
+      for (final key in [
+        'data',
+        'Data',
+        'overtimes',
+        'OverTimes',
+        'result',
+        'Result',
+        'items',
+        'Items',
+      ]) {
+        final value = data[key];
+        if (value is List) return value;
+      }
+    }
+    return const [];
+  }
+
+  bool _staffSkipsOvertime(OvertimeEligibility eligibility, Map item) {
+    for (final key in ['staffId', 'employeeId', 'uid', 'userId']) {
+      final id = int.tryParse('${item[key] ?? ''}');
+      if (id != null && id > 0) return eligibility.excludedUserIds.contains(id);
+    }
+    final name = (item['staffName'] ?? item['name'] ?? '')
+        .toString()
+        .trim()
+        .toLowerCase();
+    return name.isNotEmpty && eligibility.excludedNames.contains(name);
   }
 
   String _status(dynamic value) {
@@ -249,11 +312,6 @@ class _ManagerOvertimeState extends State<ManagerOvertime> {
       if (!mounted) return;
 
       setState(() {
-        _handledIds.add(id);
-        allData = allData
-            .where((entry) => int.tryParse(entry["id"]?.toString() ?? "") != id)
-            .toList();
-        _applyFilters();
         processingId = null;
       });
 
@@ -401,8 +459,126 @@ class _ManagerOvertimeState extends State<ManagerOvertime> {
     });
   }
 
+  String webFilter = 'All';
+
+  List<dynamic> get _webRows {
+    switch (webFilter) {
+      case 'Pending':
+        return historyView.where(_isCurrentRequest).toList();
+      case 'Approved':
+        return historyView.where((item) {
+          return _status(item['managerStatus']) == 'approved' ||
+              item['isApprov'] == true ||
+              item['isApproved'] == true;
+        }).toList();
+      case 'Rejected':
+        return historyView.where((item) {
+          final status = _recordStatus(item);
+          return status == 'Staff Rejected' || status == 'Manager Rejected';
+        }).toList();
+      default:
+        return historyView;
+    }
+  }
+
+  String _rejectRemark(dynamic item) {
+    String text(dynamic value) {
+      final raw = (value ?? '').toString().trim();
+      return raw.isEmpty || raw == 'null' ? '' : raw;
+    }
+
+    final staff = text(item['staffResponseReason'] ?? item['staffRemarks']);
+    final manager = text(
+      item['managerResponseReason'] ?? item['managerRemarks'],
+    );
+    final parts = <String>[];
+    if (staff.isNotEmpty) parts.add('Staff: $staff');
+    if (manager.isNotEmpty) parts.add('Manager: $manager');
+    return parts.isEmpty ? '—' : parts.join(' · ');
+  }
+
+  String _recordStatus(dynamic item) {
+    final staff = _status(item['staffStatus']);
+    final manager = _status(item['managerStatus']);
+    if (staff == 'rejected') return 'Staff Rejected';
+    if (manager == 'rejected') return 'Manager Rejected';
+    if (manager == 'approved' ||
+        item['isApprov'] == true ||
+        item['isApproved'] == true) {
+      return 'Approved';
+    }
+    if (_isWaitingForStaff(item)) return 'Pending';
+    if (_isWaitingForManager(item)) return 'Accepted';
+    return 'Pending';
+  }
+
+  Widget _webOvertime() {
+    final rows = _webRows;
+    final waiting = historyView.where(_isWaitingForManager).length;
+    return Scaffold(
+      backgroundColor: WebTheme.canvasOf(context),
+      body: RequestWorkspace(
+        title: 'Overtime',
+        subtitle: widget.dept,
+        loading: loading,
+        scrollable: true,
+        plainStatus: true,
+        filters: const ['All', 'Pending', 'Approved', 'Rejected'],
+        selectedFilter: webFilter,
+        onFilter: (value) => setState(() => webFilter = value),
+        downloadTitle: 'Overtime',
+        emptyTitle: 'No overtime',
+        emptyMessage: 'Overtime requests for this department will show here.',
+        stats: [
+          WorkspaceStat(label: 'Records', value: '${rows.length}', icon: Icons.schedule_rounded, color: WebTheme.brand),
+          WorkspaceStat(label: 'Needs approval', value: '$waiting', icon: Icons.pending_actions_rounded, color: const Color(0xFFB45309)),
+        ],
+        trailing: FilledButton.icon(
+          onPressed: () async {
+            await openFormPage(
+              context,
+              ManagerOvertimeCreate(dept: widget.dept),
+              maxWidth: 760,
+            );
+            if (!mounted) return;
+            await loadData();
+          },
+          icon: const Icon(Icons.add, size: 18),
+          label: const Text('Add overtime'),
+          style: FilledButton.styleFrom(
+            backgroundColor: WebTheme.brand,
+            foregroundColor: Colors.white,
+          ),
+        ),
+        columns: const ['Staff', 'Work date', 'Time', 'Hours', 'Reason', 'Reject remarks'],
+        records: [
+          for (final item in rows)
+            WorkspaceRecord(
+              status: _recordStatus(item),
+              approvedColor: WebTheme.brand,
+              values: [
+                item['staffName']?.toString() ?? 'Unknown Staff',
+                _formatDate(item['date']),
+                '${_formatTime(item['fromTime'])} – ${_formatTime(item['toTime'])}',
+                formatHours(item['totalHours']),
+                item['reason']?.toString() ?? '',
+                _rejectRemark(item),
+              ],
+              actions: _isWaitingForManager(item)
+                  ? [
+                      workspaceAction('Reject', () => _managerDecision(item, false), color: WebTheme.danger),
+                      workspaceAction('Approve', () => _managerDecision(item, true), filled: true),
+                    ]
+                  : const [],
+            ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (!AppLayout.isMobile(context)) return _webOvertime();
     return Scaffold(
       appBar: AppBar(
         title: const Text("Overtime Management"),
@@ -411,6 +587,31 @@ class _ManagerOvertimeState extends State<ManagerOvertime> {
           icon: const Icon(Icons.arrow_back_ios),
         ),
         actions: [
+          ListDownloadButton(
+            title: 'Overtime',
+            onAppBar: true,
+            headers: const [
+              'Staff',
+              'Work date',
+              'Time',
+              'Hours',
+              'Reason',
+              'Reject remarks',
+              'Status',
+            ],
+            rows: () => [
+              for (final item in filteredData)
+                [
+                  item['staffName']?.toString() ?? 'Unknown Staff',
+                  _formatDate(item['date']),
+                  '${_formatTime(item['fromTime'])} – ${_formatTime(item['toTime'])}',
+                  formatHours(item['totalHours']),
+                  item['reason']?.toString() ?? '',
+                  _rejectRemark(item),
+                  _recordStatus(item),
+                ],
+            ],
+          ),
           IconButton(
             onPressed: _openOvertimeHistory,
             icon: const Icon(Icons.list_alt),

@@ -7,10 +7,10 @@ import 'package:staff_work_track/services/auth_service.dart';
 class DashboardService {
   static const String baseUrl = ApiConstants.apiurl;
 
-  Future<Map<String, dynamic>> getDashboardSummary() async {
+  Future<Map<String, dynamic>> getDashboardSummary({required int year}) async {
     final token = await AuthService.getToken();
     final response = await http.get(
-      Uri.parse("$baseUrl/Dashboard/dashboard-summary"),
+      Uri.parse("$baseUrl/Dashboard/dashboard-summary?year=$year"),
       headers: {
         "Content-Type": "application/json",
         if (token != null && token.isNotEmpty) "Authorization": "Bearer $token",

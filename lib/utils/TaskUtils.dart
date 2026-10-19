@@ -6,6 +6,21 @@ import 'package:staff_work_track/utils/enum.dart';
 
 class TaskUtils {
   
+  static String apiStatus(TaskStatus status) {
+    switch (status) {
+      case TaskStatus.pending:
+        return "pending";
+      case TaskStatus.inProgress:
+        return "inprogress";
+      case TaskStatus.completed:
+        return "completed";
+      case TaskStatus.paused:
+        return "paused";
+      case TaskStatus.NotStarted:
+        return "notstarted";
+    }
+  }
+
   static String getStatusText(TaskStatus status) {
     switch (status) {
       case TaskStatus.pending:
@@ -59,7 +74,7 @@ class TaskUtils {
       case TaskStatus.completed:
         return Colors.green;
       case TaskStatus.NotStarted:
-        return Colors.black54;
+        return const Color(0xFF9CA3AF);
     }
   }
 
@@ -119,7 +134,7 @@ class droptaskutils {
       case "Completed":
         return Colors.green;
       case "Notstarted":
-        return Colors.black54;
+        return const Color(0xFF9CA3AF);
       default:
         return Colors.grey;
     }

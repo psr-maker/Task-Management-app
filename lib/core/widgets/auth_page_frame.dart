@@ -40,7 +40,7 @@ class AuthPageFrame extends StatelessWidget {
                   'assets/flower.png',
                   width: 28,
                   height: 28,
-                  errorBuilder: (context, error, stackTrace) => const Icon(
+                  errorBuilder: (context, error, stackTrace) => Icon(
                     Icons.bolt_rounded,
                     color: WebTheme.brand,
                     size: 28,
@@ -95,7 +95,7 @@ class AuthPageFrame extends StatelessWidget {
                                   color: WebTheme.brandSoft,
                                   borderRadius: BorderRadius.circular(999),
                                 ),
-                                child: const Text(
+                                child: Text(
                                   'STAFF PERFORMANCE',
                                   style: TextStyle(
                                     color: WebTheme.brand,

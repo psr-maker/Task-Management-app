@@ -1,10 +1,13 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:staff_work_track/Models/getusers.dart';
+import 'package:staff_work_track/Models/rolesmodel.dart';
+import 'package:staff_work_track/utils/TaskUtils.dart';
 import 'package:staff_work_track/utils/enum.dart';
 import 'package:staff_work_track/services/auth_service.dart';
 import 'package:staff_work_track/services/superadmin_service.dart';
 import 'package:staff_work_track/utils/goal_quantity.dart';
+import 'package:staff_work_track/utils/jwt_helper.dart';
 import 'package:staff_work_track/core/constant/apiurl.dart';
 import 'package:staff_work_track/core/constant/division_config.dart';
 
@@ -55,6 +58,110 @@ class AdminService {
     return [];
   }
 
+  /// Active department managers in the signed-in division head's departments.
+  static Future<List<UserModel>> managersUnderDivisionHead({
+    String? ownDepartment,
+  }) async {
+    final token = await AuthService.getToken();
+    final departments = <String>[];
+
+    void addDepartment(String name) {
+      final value = name.trim();
+      if (value.isEmpty) return;
+      if (departments.any(
+        (item) => DivisionConfig.isAllowedDepartment(value, [item]),
+      )) {
+        return;
+      }
+      departments.add(value);
+    }
+
+    addDepartment(ownDepartment ?? '');
+    if (token != null) {
+      addDepartment(JwtHelper.getDepartment(token) ?? '');
+    }
+    try {
+      for (final name in await getMySubDepartments()) {
+        addDepartment(name);
+      }
+    } catch (_) {}
+    final own = (ownDepartment ?? '').trim();
+    if (own.isNotEmpty) {
+      try {
+        for (final name in await getMySubDepartments(headDepartment: own)) {
+          addDepartment(name);
+        }
+      } catch (_) {}
+    }
+
+    List<UserModel> everyone = [];
+    try {
+      everyone = await SuperAdminService.getAllUsers();
+    } catch (_) {}
+    try {
+      for (final name in await getDivisionHeadDepartments(everyone)) {
+        addDepartment(name);
+      }
+    } catch (_) {}
+
+    List<Role> roles = [];
+    try {
+      roles = await SuperAdminService.getRoles();
+    } catch (_) {}
+
+    bool isActiveManager(UserModel user) {
+      if (user.userId <= 0) return false;
+      if (user.status.trim().toLowerCase() == 'inactive') return false;
+      if (AppRoles.isDivisionHead(user.role)) return false;
+      if (AppRoles.isManager(user.role)) return true;
+      final id = int.tryParse(user.role.trim());
+      if (id == null) return false;
+      for (final role in roles) {
+        if (role.id != id) continue;
+        if (AppRoles.isManager(role.name)) return true;
+        if (role.position == 3) return true;
+      }
+      return false;
+    }
+
+    bool inDivision(String department) {
+      return departments.any(
+        (item) => _sameDepartment(department, item),
+      );
+    }
+
+    final byId = <int, UserModel>{};
+
+    void take(Iterable<UserModel> users, {required bool trustDepartment}) {
+      for (final user in users) {
+        if (!isActiveManager(user)) continue;
+        if (!trustDepartment &&
+            departments.isNotEmpty &&
+            !inDivision(user.department)) {
+          continue;
+        }
+        byId[user.userId] = user;
+      }
+    }
+
+    take(everyone, trustDepartment: false);
+
+    if (departments.isNotEmpty) {
+      try {
+        take(
+          await getEmployeesByDepartments(departments),
+          trustDepartment: true,
+        );
+      } catch (_) {}
+    }
+
+    final managers = byId.values.toList()
+      ..sort(
+        (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
+      );
+    return managers;
+  }
+
   static Future<List<String>> getMySubDepartments({
     String? headDepartment,
   }) async {
@@ -79,10 +186,10 @@ class AdminService {
       }
       if (response.statusCode != 200) return [];
 
-      final decoded = jsonDecode(response.body);
-      if (decoded is! Map) return [];
+      final decoded = _unwrapAccess(jsonDecode(response.body));
+      if (decoded is! Map) continue;
       final heads = decoded["headDepartments"] ?? decoded["HeadDepartments"];
-      if (heads is! List) return [];
+      if (heads is! List) continue;
 
       final names = <String>[];
       final parent = headDepartment?.trim() ?? "";
@@ -197,7 +304,46 @@ class AdminService {
       );
     }
 
+    for (final head in divisionHeads) {
+      try {
+        final subs = await getMySubDepartments(
+          headDepartment: head.department,
+        );
+        for (final sub in subs) {
+          addName(sub);
+        }
+      } catch (_) {}
+    }
+
     return owned;
+  }
+
+  static dynamic _unwrapAccess(dynamic decoded) {
+    if (decoded is! Map) return decoded;
+    for (final key in const ["data", "Data", "result", "Result"]) {
+      final inner = decoded[key];
+      if (inner is Map &&
+          (inner["headDepartments"] != null ||
+              inner["HeadDepartments"] != null)) {
+        return inner;
+      }
+      if (inner is List) return {"headDepartments": inner};
+    }
+    return decoded;
+  }
+
+  static bool _sameDepartment(String? left, String? right) {
+    if (DivisionConfig.isAllowedDepartment(left, [right ?? ""])) return true;
+    String key(String? value) {
+      return DivisionConfig.normalize(value ?? "")
+          .replaceAll("division", "")
+          .replaceAll(RegExp(r"\s+"), " ")
+          .trim();
+    }
+
+    final a = key(left);
+    final b = key(right);
+    return a.isNotEmpty && a == b;
   }
 
   static void _collectDivisionDepartments(
@@ -219,17 +365,29 @@ class AdminService {
     }
     if (decoded is! Map) return;
 
-    final nested =
-        decoded["headDepartments"] ??
-        decoded["HeadDepartments"] ??
-        decoded["departmentAccess"] ??
-        decoded["DepartmentAccess"] ??
-        decoded["data"] ??
-        decoded["Data"];
-    if (nested is List) {
-      for (final item in nested) {
+    for (final key in const [
+      "headDepartments",
+      "HeadDepartments",
+      "departmentAccess",
+      "DepartmentAccess",
+      "data",
+      "Data",
+      "result",
+      "Result",
+    ]) {
+      final nested = decoded[key];
+      if (nested is List) {
+        for (final item in nested) {
+          _collectDivisionDepartments(
+            item,
+            divisionHeads,
+            departmentNamesById,
+            addName,
+          );
+        }
+      } else if (nested is Map && !identical(nested, decoded)) {
         _collectDivisionDepartments(
-          item,
+          nested,
           divisionHeads,
           departmentNamesById,
           addName,
@@ -265,9 +423,7 @@ class AdminService {
         (userId != null &&
             divisionHeads.any((head) => head.userId == userId)) ||
         divisionHeads.any(
-          (head) => DivisionConfig.isAllowedDepartment(head.department, [
-            headName,
-          ]),
+          (head) => _sameDepartment(head.department, headName),
         );
     if (!isDivisionGroup) return;
 
@@ -429,10 +585,11 @@ class AdminService {
     }
   }
 
-  static Future<void> updateTaskStatus({
+  static Future<Map<String, dynamic>> updateTaskStatus({
     required String taskCode,
     required TaskStatus status,
     int? achievedQuantity,
+    int? splitId,
   }) async {
     final token = await AuthService.getToken();
     if (token == null) throw Exception("User not logged in");
@@ -445,8 +602,9 @@ class AdminService {
       },
       body: jsonEncode({
         "taskCode": taskCode,
-        "status": status.name,
+        "status": TaskUtils.apiStatus(status),
         if (achievedQuantity != null) "completedQuantity": achievedQuantity,
+        if (splitId != null) "splitId": splitId,
       }),
     );
 
@@ -462,6 +620,13 @@ class AdminService {
       } catch (_) {}
       throw Exception(message);
     }
+
+    try {
+      final decoded = jsonDecode(response.body);
+      if (decoded is Map<String, dynamic>) return decoded;
+      if (decoded is Map) return Map<String, dynamic>.from(decoded);
+    } catch (_) {}
+    return {};
   }
 
   static Future<List<dynamic>> getTasksByDepartment(String department) async {
@@ -499,8 +664,19 @@ class AdminService {
       );
 
       if (response.statusCode == 200) {
-        final List data = jsonDecode(response.body);
-        return data.cast<Map<String, dynamic>>();
+        final decoded = jsonDecode(response.body);
+        final raw = decoded is List
+            ? decoded
+            : decoded is Map
+            ? (decoded["data"] ?? decoded["result"] ?? decoded["tasks"])
+            : null;
+        if (raw is! List) {
+          throw Exception("Failed to load completed task points");
+        }
+        return raw
+            .whereType<Map>()
+            .map((item) => Map<String, dynamic>.from(item))
+            .toList();
       } else {
         throw Exception("Failed to load completed task points");
       }
@@ -1236,7 +1412,7 @@ class AdminService {
   Future<List<dynamic>> getDepartmentExtraWork() async {
     final token = await AuthService.getToken();
 
-    final url = Uri.parse('$baseUrl/Manager/get-department-extra-work');
+    final url = Uri.parse('$baseUrl/Manager/department-extra-work');
 
     final response = await http.get(
       url,
@@ -1251,6 +1427,13 @@ class AdminService {
 
       if (data is List) {
         return data;
+      }
+      if (data is Map) {
+        final list = data['extraWorks'] ??
+            data['ExtraWorks'] ??
+            data['data'] ??
+            data['Data'];
+        if (list is List) return list;
       }
 
       return [];

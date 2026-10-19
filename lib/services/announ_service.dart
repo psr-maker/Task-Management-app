@@ -405,47 +405,69 @@ class AnnouncementService {
     }
   }
 
-  static Future<List<WarningModel>> getDepartmentWarnings() async {
-    try {
-      final token = await AuthService.getToken();
+  static Future<List<WarningModel>> getHrWarnings() async {
+    final token = await AuthService.getToken();
+    final response = await http.get(
+      Uri.parse("$baseUrl/Announcement/get-hr-warnings"),
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer $token",
+      },
+    );
 
-      final response = await http.get(
-        Uri.parse("$baseUrl/Announcement/get-department-warnings"),
-        headers: {
-          "Authorization": "Bearer $token",
-          "Content-Type": "application/json",
-        },
-      );
-
-      if (response.statusCode == 200) {
-        final List data = jsonDecode(response.body);
-
-        // ✅ Convert to model list
-        return data.map((e) => WarningModel.fromJson(e)).toList();
-      } else {
-        throw Exception("Failed: ${response.body}");
-      }
-    } catch (e) {
-      throw Exception(e.toString());
+    if (response.statusCode == 200) {
+      final decoded = jsonDecode(response.body);
+      final raw = decoded is List
+          ? decoded
+          : decoded is Map
+          ? (decoded['warnings'] ?? decoded['data'] ?? decoded['Data'] ?? [])
+          : [];
+      final list = raw is List ? raw : [];
+      return list
+          .whereType<Map>()
+          .map((warning) => WarningModel.fromJson(Map<String, dynamic>.from(warning)))
+          .toList();
     }
+
+    throw Exception("Failed to load HR warnings");
   }
 
   static Future<List<WarningModel>> getWarningsByUser(int userId) async {
-    try {
-      final response = await http.get(
-        Uri.parse("$baseUrl/Announcement/get-warnings-by-user/$userId"),
-        headers: {"Content-Type": "application/json"},
-      );
+    final token = await AuthService.getToken();
+    final response = await http.get(
+      Uri.parse("$baseUrl/Announcement/get-warnings-by-user/$userId"),
+      headers: {
+        "Content-Type": "application/json",
+        if (token != null && token.isNotEmpty) "Authorization": "Bearer $token",
+      },
+    );
 
-      if (response.statusCode == 200) {
-        List data = jsonDecode(response.body);
-
-        return data.map((e) => WarningModel.fromJson(e)).toList();
-      } else {
-        throw Exception("Failed to load warnings");
-      }
-    } catch (e) {
-      throw Exception("Error: $e");
+    if (response.statusCode == 200) {
+      return _parseWarnings(jsonDecode(response.body));
     }
+    throw Exception("Failed to load warnings");
+  }
+
+  static List<WarningModel> _parseWarnings(dynamic decoded) {
+    final raw = decoded is List
+        ? decoded
+        : decoded is Map
+        ? (decoded['warnings'] ??
+              decoded['Warnings'] ??
+              decoded['data'] ??
+              decoded['Data'] ??
+              [])
+        : [];
+    if (raw is! List) return [];
+    final warnings = <WarningModel>[];
+    for (final item in raw) {
+      if (item is! Map) continue;
+      try {
+        warnings.add(WarningModel.fromJson(Map<String, dynamic>.from(item)));
+      } catch (e) {
+        debugPrint('Skip warning: $e');
+      }
+    }
+    return warnings;
   }
 }

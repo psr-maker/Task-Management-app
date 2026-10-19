@@ -1,5 +1,8 @@
 ﻿import 'package:flutter/material.dart';
+import 'package:staff_work_track/core/responsive/app_layout.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
+import 'package:staff_work_track/core/widgets/worklog_date_picker.dart';
+import 'package:staff_work_track/core/widgets/worklog_web_board.dart';
 import 'package:staff_work_track/core/widgets/worklog_session_tile.dart';
 import 'package:staff_work_track/services/announ_service.dart';
 import 'package:staff_work_track/utils/time_utils.dart';
@@ -102,27 +105,31 @@ class _UsersWorklogState extends State<Staffworklog> {
     return grouped;
   }
 
-  // DATE PICKER
-  void _showDatePicker() async {
-    DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: selectedDate ?? DateTime.now(),
-      firstDate: DateTime(2020),
-      lastDate: DateTime(2100),
-    );
+  void _setDate(DateTime? value) {
+    setState(() => selectedDate = value);
+    applyFilter();
+  }
 
-    if (picked != null) {
-      setState(() {
-        selectedDate = picked;
+  Widget _webBoard() {
+    return WorklogWebBoard(
+      title: 'Worklogs',
+      subtitle: 'Check-in and check-out for your department',
+      loading: isLoading,
+      logs: filteredLogs,
+      searchController: searchController,
+      onSearch: (value) {
+        searchQuery = value;
         applyFilter();
-      });
-    }
+      },
+      selectedDate: selectedDate,
+      onDate: _setDate,
+    );
   }
 
   // BUILD UI
   @override
   Widget build(BuildContext context) {
-    final groupedLogs = groupByDate(filteredLogs);
+    if (!AppLayout.isMobile(context)) return _webBoard();
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
@@ -159,14 +166,27 @@ class _UsersWorklogState extends State<Staffworklog> {
               });
             },
           ),
-          IconButton(
-            icon: const Icon(Icons.calendar_today),
-            onPressed: _showDatePicker,
-          ),
         ],
       ),
 
-      body: isLoading
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: WorklogDateButton(date: selectedDate, onChanged: _setDate),
+            ),
+          ),
+          Expanded(child: _mobileList()),
+        ],
+      ),
+    );
+  }
+
+  Widget _mobileList() {
+    final groupedLogs = groupByDate(filteredLogs);
+    return isLoading
           ? const Center(child: RotatingFlower())
           : filteredLogs.isEmpty
           ? const Center(child: Text("No Worklogs Found"))
@@ -193,7 +213,6 @@ class _UsersWorklogState extends State<Staffworklog> {
                   ],
                 );
               }).toList(),
-            ),
-    );
+            );
   }
 }

@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:staff_work_track/core/responsive/app_layout.dart';
+import 'package:staff_work_track/core/theme/web_theme.dart';
 import 'package:staff_work_track/core/widgets/buttons.dart';
+import 'package:staff_work_track/core/widgets/request_workspace.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
 import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
 import 'package:staff_work_track/screen/staff/navigation/dashboard/drawer/ovtme/overtimes_details.dart';
@@ -22,6 +25,8 @@ class _OvertimeListtttState extends State<OvertimeListttt> {
 
   List<dynamic> allData = [];
   List<dynamic> filteredData = [];
+  List<dynamic> historyData = [];
+  String webFilter = 'All';
 
   DateTime? fromDate;
   DateTime? toDate;
@@ -52,8 +57,12 @@ class _OvertimeListtttState extends State<OvertimeListttt> {
       debugPrint("$data");
       debugPrint("==========================================");
 
-      final pendingManagerRequests = data.where((item) {
+      final history = data.where((item) {
         if (item is Map && eligibility.excludesRecord(item)) return false;
+        return true;
+      }).toList();
+
+      final pendingManagerRequests = history.where((item) {
         final id = int.tryParse(item["id"].toString());
         if (id != null && _handledIds.contains(id)) return false;
 
@@ -85,6 +94,7 @@ class _OvertimeListtttState extends State<OvertimeListttt> {
       }
 
       setState(() {
+        historyData = history;
         allData = pendingManagerRequests;
         loading = false;
       });
@@ -382,8 +392,99 @@ class _OvertimeListtttState extends State<OvertimeListttt> {
     });
   }
 
+  String _overtimeStatus(dynamic item) {
+    final staff = (item['staffStatus'] ?? '').toString().trim().toLowerCase();
+    final manager = (item['managerStatus'] ?? '').toString().trim().toLowerCase();
+    if (staff == 'rejected') return 'Staff Rejected';
+    if (manager == 'rejected') return 'Manager Rejected';
+    if (manager == 'approved') return 'Approved';
+    if (staff == 'pending') return 'Pending';
+    if (staff == 'accepted') return 'Accepted';
+    return 'Pending';
+  }
+
+  String _rejectRemark(dynamic item) {
+    String text(dynamic value) {
+      final raw = (value ?? '').toString().trim();
+      return raw.isEmpty || raw == 'null' ? '' : raw;
+    }
+
+    final staff = text(item['staffResponseReason'] ?? item['staffRemarks']);
+    final manager = text(item['managerResponseReason'] ?? item['managerRemarks']);
+    final parts = <String>[];
+    if (staff.isNotEmpty) parts.add('Staff: $staff');
+    if (manager.isNotEmpty) parts.add('Manager: $manager');
+    return parts.isEmpty ? '—' : parts.join(' · ');
+  }
+
+  List<dynamic> get _webRows {
+    final rows = [...historyData];
+    rows.sort((a, b) {
+      final left = DateTime.tryParse(a['date']?.toString() ?? '') ?? DateTime(1900);
+      final right = DateTime.tryParse(b['date']?.toString() ?? '') ?? DateTime(1900);
+      return right.compareTo(left);
+    });
+    if (webFilter == 'All') return rows;
+    if (webFilter == 'Rejected') {
+      return rows.where((item) {
+        final status = _overtimeStatus(item);
+        return status == 'Staff Rejected' || status == 'Manager Rejected';
+      }).toList();
+    }
+    return rows.where((item) => _overtimeStatus(item) == webFilter).toList();
+  }
+
+  Widget _webOvertime() {
+    final rows = _webRows;
+    return Scaffold(
+      backgroundColor: WebTheme.canvasOf(context),
+      body: RequestWorkspace(
+        title: 'Overtime',
+        subtitle: 'Your overtime requests',
+        loading: loading,
+        scrollable: true,
+        plainStatus: true,
+        filters: const ['All', 'Pending', 'Accepted', 'Approved', 'Rejected'],
+        selectedFilter: webFilter,
+        onFilter: (value) => setState(() => webFilter = value),
+        emptyTitle: 'No overtime',
+        emptyMessage: 'Overtime requests will show here.',
+        stats: [
+          WorkspaceStat(
+            label: 'Records',
+            value: '${rows.length}',
+            icon: Icons.schedule_rounded,
+            color: WebTheme.brandOf(context),
+          ),
+        ],
+        columns: const ['Work date', 'Time', 'Hours', 'Reason', 'Reject remarks'],
+        records: [
+          for (final item in rows)
+            WorkspaceRecord(
+              status: _overtimeStatus(item),
+              approvedColor: WebTheme.brandOf(context),
+              values: [
+                formatDate(item['date']),
+                '${formatTime(item['fromTime'])} – ${formatTime(item['toTime'])}',
+                '${(double.tryParse(item['totalHours']?.toString() ?? '0') ?? 0).toStringAsFixed(2)} hrs',
+                item['reason']?.toString() ?? '',
+                _rejectRemark(item),
+              ],
+              actions: _overtimeStatus(item) == 'Pending'
+                  ? [
+                      workspaceAction('Reject', () => rejectOvertime(item), color: WebTheme.danger),
+                      workspaceAction('Accept', () => acceptOvertime(item), filled: true),
+                    ]
+                  : const [],
+            ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (!AppLayout.isMobile(context)) return _webOvertime();
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
@@ -594,7 +695,7 @@ class _OvertimeListtttState extends State<OvertimeListttt> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      "Overtime Request",
+                      "Overtime Requirement",
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 14,

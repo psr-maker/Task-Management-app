@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:staff_work_track/core/responsive/app_layout.dart';
+import 'package:staff_work_track/core/theme/web_theme.dart';
+import 'package:staff_work_track/core/widgets/audit_log_web_view.dart';
+import 'package:staff_work_track/core/widgets/list_download_button.dart';
 import 'package:staff_work_track/Models/auditlog.dart';
 import 'package:staff_work_track/Models/department.dart';
 import 'package:staff_work_track/Models/getusers.dart';
@@ -447,9 +451,9 @@ class _DivAuditLogState extends State<DivAuditLog> {
       case 'logout':
         return Theme.of(context).colorScheme.error;
       case 'login':
-        return Theme.of(context).colorScheme.secondary;
+        return WebTheme.brandOf(context);
       default:
-        return Theme.of(context).colorScheme.secondary;
+        return WebTheme.brandOf(context);
     }
   }
 
@@ -468,8 +472,57 @@ class _DivAuditLogState extends State<DivAuditLog> {
     }
   }
 
+  Future<void> _pickRange() async {
+    final pickedRange = await pickCompactDateRange(
+      context,
+      initial: selectedRange,
+    );
+    if (pickedRange != null) {
+      setState(() => selectedRange = pickedRange);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (AppLayout.isMobile(context)) return _mobilePage();
+    final groupedLogs = _visibleLogs();
+    return Scaffold(
+      backgroundColor: WebTheme.canvasOf(context),
+      body: isLoading
+          ? const Center(child: RotatingFlower())
+          : errorMessage != null
+              ? const AppLoadError()
+              : AuditLogWebView(
+                  selectedRange: selectedRange,
+                  onPickRange: _pickRange,
+                  onClearRange: () => setState(() => selectedRange = null),
+                  departments: departmentChips,
+                  selectedDepartment: selectedDepartment,
+                  departmentSelected: (dept) => selectedDepartment == 'All'
+                      ? dept == 'All'
+                      : _isSameDepartment(selectedDepartment, dept),
+                  onDepartment: (dept) =>
+                      setState(() => selectedDepartment = dept),
+                  entries: [
+                    for (final log in groupedLogs)
+                      AuditWebEntry(
+                        when: auditWhenLabel(log.dateTime),
+                        actor: log.editedByName.isNotEmpty
+                            ? log.editedByName
+                            : 'Unknown User',
+                        meta: '${log.editedRole} · ${log.department}',
+                        action: log.action,
+                        title: _entityTitle(log),
+                        changes: auditChangeSummary(log),
+                        color: actionColor(log.action),
+                        icon: actionIcon(log.action),
+                      ),
+                  ],
+                ),
+    );
+  }
+
+  Widget _mobilePage() {
     final groupedLogs = _visibleLogs();
 
     return Scaffold(
@@ -480,15 +533,35 @@ class _DivAuditLogState extends State<DivAuditLog> {
           onPressed: () => Navigator.pop(context),
         ),
         actions: [
+          ListDownloadButton(
+            title: 'Audit log',
+            onAppBar: true,
+            headers: const [
+              'When',
+              'User',
+              'Role / Department',
+              'Action',
+              'Item',
+              'Changes',
+            ],
+            rows: () => [
+              for (final log in _visibleLogs())
+                [
+                  auditWhenLabel(log.dateTime),
+                  log.editedByName.isNotEmpty ? log.editedByName : 'Unknown User',
+                  '${log.editedRole} · ${log.department}',
+                  log.action,
+                  _entityTitle(log),
+                  auditChangeSummary(log),
+                ],
+            ],
+          ),
           IconButton(
             icon: const Icon(Icons.calendar_month),
             onPressed: () async {
-              final now = DateTime.now();
-              final pickedRange = await showDateRangePicker(
-                context: context,
-                firstDate: DateTime(now.year - 5),
-                lastDate: now,
-                initialDateRange: selectedRange,
+              final pickedRange = await pickCompactDateRange(
+                context,
+                initial: selectedRange,
               );
               if (pickedRange != null) {
                 setState(() => selectedRange = pickedRange);
@@ -550,6 +623,7 @@ class _DivAuditLogState extends State<DivAuditLog> {
         : _isSameDepartment(selectedDepartment, dept);
     final label = dept == "All" ? "All" : dept.replaceAll(" Department", "");
     final secondary = Theme.of(context).colorScheme.secondary;
+    final dark = WebTheme.isDark(context);
 
     return Padding(
       padding: const EdgeInsets.only(right: 8),
@@ -560,10 +634,18 @@ class _DivAuditLogState extends State<DivAuditLog> {
           height: 34,
           padding: const EdgeInsets.symmetric(horizontal: 12),
           decoration: BoxDecoration(
-            color: selected ? secondary : Colors.white,
+            color: selected
+                ? secondary
+                : dark
+                    ? WebTheme.surfaceOf(context)
+                    : Colors.white,
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color: selected ? secondary : const Color(0xFFD0D5D2),
+              color: selected
+                  ? secondary
+                  : dark
+                      ? WebTheme.lineOf(context)
+                      : const Color(0xFFD0D5D2),
             ),
           ),
           alignment: Alignment.center,
@@ -577,7 +659,11 @@ class _DivAuditLogState extends State<DivAuditLog> {
               Text(
                 label,
                 style: TextStyle(
-                  color: selected ? Colors.white : secondary,
+                  color: selected
+                      ? Colors.white
+                      : dark
+                          ? WebTheme.inkOf(context)
+                          : secondary,
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
                 ),

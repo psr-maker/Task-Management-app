@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:staff_work_track/Models/navrole.dart';
+import 'package:staff_work_track/core/theme/web_theme.dart';
 import 'package:staff_work_track/utils/enum.dart';
 
 class CurvedBottomNav extends StatelessWidget {
@@ -18,6 +19,7 @@ class CurvedBottomNav extends StatelessWidget {
   Widget build(BuildContext context) {
     final items = roleNavItems[role]!;
 
+    final bar = WebTheme.brand;
     return SizedBox(
       height: 60,
       child: Stack(
@@ -25,7 +27,7 @@ class CurvedBottomNav extends StatelessWidget {
         children: [
           CustomPaint(
             size: const Size(double.infinity, 60),
-            painter: CurvedNavPainter(currentIndex),
+            painter: CurvedNavPainter(currentIndex, bar),
           ),
 
           Positioned(
@@ -47,9 +49,7 @@ class CurvedBottomNav extends StatelessWidget {
                         height: 36,
                         width: 36,
                         decoration: BoxDecoration(
-                          color: isActive
-                              ? const Color.fromARGB(255, 30, 45, 38)
-                              : Colors.transparent,
+                          color: isActive ? bar : Colors.transparent,
                           shape: BoxShape.circle,
                           boxShadow: isActive
                               ? [
@@ -90,13 +90,14 @@ class CurvedBottomNav extends StatelessWidget {
 
 class CurvedNavPainter extends CustomPainter {
   final int index;
+  final Color color;
 
-  CurvedNavPainter(this.index);
+  CurvedNavPainter(this.index, this.color);
 
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = const Color.fromARGB(255, 30, 45, 38)
+      ..color = color
       ..style = PaintingStyle.fill;
 
     final path = Path();
@@ -133,5 +134,6 @@ class CurvedNavPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(CustomPainter oldDelegate) => true;
+  bool shouldRepaint(covariant CurvedNavPainter oldDelegate) =>
+      oldDelegate.index != index || oldDelegate.color != color;
 }

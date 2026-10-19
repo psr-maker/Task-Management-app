@@ -32,20 +32,20 @@ class AppLayout {
 
   static EdgeInsets pagePadding(BuildContext context) {
     if (isDesktop(context)) {
-      return const EdgeInsets.fromLTRB(32, 24, 32, 32);
+      return const EdgeInsets.fromLTRB(16, 8, 16, 16);
     }
     if (isTablet(context)) {
-      return const EdgeInsets.symmetric(horizontal: 20, vertical: 16);
+      return const EdgeInsets.fromLTRB(12, 8, 12, 12);
     }
     return const EdgeInsets.all(15);
   }
 
   static EdgeInsets shellInset(BuildContext context) {
     if (isDesktop(context)) {
-      return const EdgeInsets.fromLTRB(12, 8, 12, 12);
+      return const EdgeInsets.fromLTRB(8, 8, 8, 8);
     }
     if (isTablet(context)) {
-      return const EdgeInsets.fromLTRB(8, 6, 8, 8);
+      return const EdgeInsets.fromLTRB(6, 6, 6, 6);
     }
     return EdgeInsets.zero;
   }

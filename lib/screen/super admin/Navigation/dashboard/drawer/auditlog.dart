@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:staff_work_track/core/responsive/app_layout.dart';
+import 'package:staff_work_track/core/theme/web_theme.dart';
+import 'package:staff_work_track/core/widgets/audit_log_web_view.dart';
+import 'package:staff_work_track/core/widgets/list_download_button.dart';
 import 'package:staff_work_track/core/widgets/load_error.dart';
 import 'package:staff_work_track/Models/auditlog.dart';
 import 'package:staff_work_track/Models/getusers.dart';
@@ -266,7 +270,7 @@ class _AuditLogPageState extends State<AuditLogPage> {
     if (action == "login") {
       return Text(
         "User logged in",
-        style: const TextStyle(fontSize: 12, color: Colors.black),
+        style: TextStyle(fontSize: 12, color: WebTheme.inkOf(context)),
       );
     }
     if (action == "logout") {
@@ -291,7 +295,7 @@ class _AuditLogPageState extends State<AuditLogPage> {
       if (action == "delete") {
         return RichText(
           text: TextSpan(
-            style: const TextStyle(fontSize: 12, color: Colors.black),
+            style: TextStyle(fontSize: 12, color: WebTheme.inkOf(context)),
             children: [
               const TextSpan(text: "User "),
               TextSpan(
@@ -313,7 +317,7 @@ class _AuditLogPageState extends State<AuditLogPage> {
       if (action == "delete") {
         return RichText(
           text: TextSpan(
-            style: const TextStyle(fontSize: 12, color: Colors.black),
+            style: TextStyle(fontSize: 12, color: WebTheme.inkOf(context)),
             children: [
               const TextSpan(text: "Task '"),
               TextSpan(
@@ -328,7 +332,7 @@ class _AuditLogPageState extends State<AuditLogPage> {
       if (action == "edit") {
         return RichText(
           text: TextSpan(
-            style: const TextStyle(fontSize: 12, color: Colors.black),
+            style: TextStyle(fontSize: 12, color: WebTheme.inkOf(context)),
             children: [
               const TextSpan(text: "Task '"),
               TextSpan(
@@ -350,7 +354,7 @@ class _AuditLogPageState extends State<AuditLogPage> {
       if (action == "delete") {
         return RichText(
           text: TextSpan(
-            style: const TextStyle(fontSize: 12, color: Colors.black),
+            style: TextStyle(fontSize: 12, color: WebTheme.inkOf(context)),
             children: [
               const TextSpan(text: "Goal '"),
               TextSpan(
@@ -365,7 +369,7 @@ class _AuditLogPageState extends State<AuditLogPage> {
       if (action == "edit") {
         return RichText(
           text: TextSpan(
-            style: const TextStyle(fontSize: 12, color: Colors.black),
+            style: TextStyle(fontSize: 12, color: WebTheme.inkOf(context)),
             children: [
               const TextSpan(text: "Goal '"),
               TextSpan(
@@ -396,10 +400,66 @@ class _AuditLogPageState extends State<AuditLogPage> {
     return user?.name ?? "Unknown User";
   }
 
+  String _plainTitle(AuditLogGroupModel log, Map<String, UserModel> users) {
+    final action = log.action.toLowerCase();
+    if (action == 'login') return 'User logged in';
+    if (action == 'logout') return 'User logged out';
+    if (log.entityType == 'User') {
+      final name = action == 'delete'
+          ? _getUserName(log)
+          : _getAffectedUserName(log, users);
+      if (action == 'status update') return 'User $name status was changed';
+      if (action == 'delete') return 'User $name deleted permanently';
+      return 'User : $name';
+    }
+    if (log.entityType == 'Task') {
+      final name = _getTaskName(log);
+      if (action == 'delete') return "Task '$name' was permanently deleted";
+      if (action == 'edit') return "Task '$name' updated";
+      return 'Task : $name';
+    }
+    if (log.entityType == 'Goal') {
+      final name = _getGoalName(log);
+      if (action == 'delete') return "Goal '$name' was permanently deleted";
+      if (action == 'edit') return "Goal '$name' updated";
+      return 'Goal : $name';
+    }
+    return '${log.entityType} : ${log.entityId}';
+  }
+
+  void _openLog(AuditLogGroupModel log, Map<String, UserModel> users) {
+    if (log.entityType == 'User' && log.action.toLowerCase() != 'delete') {
+      final affectedUser = _getAffectedUser(log, users);
+      if (affectedUser != null) {
+        _navigateToUserDetails(context, affectedUser);
+      }
+      return;
+    }
+    if (log.entityType == 'Task' && log.action.toLowerCase() != 'delete') {
+      final taskCode = _getTaskCodeForNavigation(log);
+      if (taskCode != null) {
+        _navigateToTaskDetails(context, taskCode);
+      }
+    }
+  }
+
+  Future<void> _pickRange() async {
+    final pickedRange = await pickCompactDateRange(
+      context,
+      initial: selectedRange,
+    );
+    if (pickedRange != null) {
+      setState(() => selectedRange = pickedRange);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final mobile = AppLayout.isMobile(context);
     return Scaffold(
-      appBar: AppBar(
+      backgroundColor: mobile ? null : WebTheme.canvasOf(context),
+      appBar: mobile
+          ? AppBar(
         title: const Text("Audit Log"),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios),
@@ -408,23 +468,11 @@ class _AuditLogPageState extends State<AuditLogPage> {
         actions: [
           IconButton(
             icon: const Icon(Icons.calendar_month),
-            onPressed: () async {
-              final now = DateTime.now();
-              final pickedRange = await showDateRangePicker(
-                context: context,
-                firstDate: DateTime(now.year - 5),
-                lastDate: now,
-                initialDateRange: selectedRange,
-              );
-              if (pickedRange != null) {
-                setState(() {
-                  selectedRange = pickedRange;
-                });
-              }
-            },
+            onPressed: _pickRange,
           ),
         ],
-      ),
+      )
+          : null,
       body: FutureBuilder<List<Object>>(
         future: Future.wait([
           SuperAdminService.getAuditLogs(),
@@ -447,20 +495,76 @@ class _AuditLogPageState extends State<AuditLogPage> {
             _groupLogs(filteredLogs, users),
             users,
           );
-          if (groupedLogs.isEmpty) {
-            return const Center(
-              child: Text(
-                "No audit logs found",
-                style: TextStyle(fontSize: 14),
-              ),
+          if (!AppLayout.isMobile(context)) {
+            return AuditLogWebView(
+              selectedRange: selectedRange,
+              onPickRange: _pickRange,
+              onClearRange: () => setState(() => selectedRange = null),
+              entries: [
+                for (final log in groupedLogs)
+                  AuditWebEntry(
+                    when: auditWhenLabel(log.dateTime),
+                    actor: log.editedByName.isNotEmpty
+                        ? log.editedByName
+                        : 'System',
+                    meta: '${log.editedRole} · ${log.department}',
+                    action: log.action,
+                    title: _plainTitle(log, users),
+                    changes: auditChangeSummary(log),
+                    color: actionColor(log.action),
+                    icon: actionIcon(log.action),
+                    highlighted: widget.highlightid != null &&
+                        (log.taskCode == widget.highlightid ||
+                            log.entityId == widget.highlightid),
+                    onTap: () => _openLog(log, users),
+                  ),
+              ],
             );
           }
-          return ListView.builder(
-            padding: const EdgeInsets.all(12),
-            itemCount: groupedLogs.length,
-            itemBuilder: (context, index) {
-              return _buildAuditItem(groupedLogs[index], users);
-            },
+          return Column(
+            children: [
+              Align(
+                alignment: Alignment.centerRight,
+                child: ListDownloadButton(
+                  title: 'Audit log',
+                  headers: const [
+                    'When',
+                    'User',
+                    'Role / Department',
+                    'Action',
+                    'Item',
+                    'Changes',
+                  ],
+                  rows: () => [
+                    for (final log in groupedLogs)
+                      [
+                        auditWhenLabel(log.dateTime),
+                        log.editedByName.isNotEmpty ? log.editedByName : 'System',
+                        '${log.editedRole} · ${log.department}',
+                        log.action,
+                        _plainTitle(log, users),
+                        auditChangeSummary(log),
+                      ],
+                  ],
+                ),
+              ),
+              Expanded(
+                child: groupedLogs.isEmpty
+                    ? const Center(
+                        child: Text(
+                          "No audit logs found",
+                          style: TextStyle(fontSize: 14),
+                        ),
+                      )
+                    : ListView.builder(
+                        padding: const EdgeInsets.all(12),
+                        itemCount: groupedLogs.length,
+                        itemBuilder: (context, index) {
+                          return _buildAuditItem(groupedLogs[index], users);
+                        },
+                      ),
+              ),
+            ],
           );
         },
       ),
@@ -585,7 +689,11 @@ class _AuditLogPageState extends State<AuditLogPage> {
                           alignment: Alignment.bottomRight,
                           child: Text(
                             log.dateTime.toLocal().toString().split('.').first,
-                            style: Theme.of(context).textTheme.labelSmall,
+                            style: TextStyle(
+                              color: WebTheme.inkOf(context),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ),
                       ],

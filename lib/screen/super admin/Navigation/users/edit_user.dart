@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:staff_work_track/Models/rolesmodel.dart';
+import 'package:staff_work_track/core/theme/web_theme.dart';
 import 'package:staff_work_track/core/widgets/buttons.dart';
-import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
+import 'package:staff_work_track/core/widgets/web_ui.dart';
 import 'package:staff_work_track/services/auth_service.dart';
 import 'package:staff_work_track/services/superadmin_service.dart';
 import 'package:staff_work_track/utils/jwt_helper.dart';
-import 'package:staff_work_track/widgets/customfieldwidget.dart';
 
 class EditUser extends StatefulWidget {
   final dynamic user;
@@ -191,131 +191,218 @@ class _EditUserState extends State<EditUser> {
       }
     }
 
+    final web = WebPushedChrome.isWeb(context);
+    final ink = WebTheme.inkOf(context);
+    InputDecoration field(String label) {
+      return InputDecoration(
+        labelText: label,
+        filled: true,
+        fillColor: WebTheme.canvasOf(context),
+        labelStyle: TextStyle(
+          color: WebTheme.mutedOf(context),
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+        ),
+        floatingLabelStyle: TextStyle(
+          color: WebTheme.brandOf(context),
+          fontWeight: FontWeight.w700,
+        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide(color: WebTheme.lineOf(context)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide(color: WebTheme.brandOf(context), width: 1.4),
+        ),
+      );
+    }
+
+    final name = TextField(
+      controller: usernameController,
+      textInputAction: TextInputAction.next,
+      style: TextStyle(color: ink, fontSize: 14, fontWeight: FontWeight.w600),
+      decoration: field('Name'),
+    );
+    final email = TextField(
+      controller: emailController,
+      keyboardType: TextInputType.emailAddress,
+      textInputAction: TextInputAction.next,
+      style: TextStyle(color: ink, fontSize: 14, fontWeight: FontWeight.w600),
+      decoration: field('Email'),
+    );
+    final department = DropdownButtonFormField<String>(
+      value: departments.contains(selectedDepartment) ? selectedDepartment : null,
+      isExpanded: true,
+      decoration: field('Department'),
+      dropdownColor: WebTheme.surfaceOf(context),
+      style: TextStyle(color: ink, fontSize: 14, fontWeight: FontWeight.w600),
+      items: [
+        for (final item in departments)
+          DropdownMenuItem(value: item, child: Text(item)),
+      ],
+      onChanged: (value) => setState(() => selectedDepartment = value),
+    );
+    final role = DropdownButtonFormField<Role>(
+      value: selectedValue,
+      isExpanded: true,
+      decoration: field('Role'),
+      dropdownColor: WebTheme.surfaceOf(context),
+      style: TextStyle(color: ink, fontSize: 14, fontWeight: FontWeight.w600),
+      items: [
+        for (final item in roleItems)
+          DropdownMenuItem(value: item, child: Text(item.name)),
+      ],
+      onChanged: (value) => setState(() => selectedRole = value),
+    );
+    final fields = web
+        ? Column(
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: name),
+                  const SizedBox(width: 12),
+                  Expanded(child: email),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: department),
+                  const SizedBox(width: 12),
+                  Expanded(child: role),
+                ],
+              ),
+            ],
+          )
+        : Column(
+            children: [
+              name,
+              const SizedBox(height: 14),
+              email,
+              const SizedBox(height: 14),
+              department,
+              const SizedBox(height: 14),
+              role,
+            ],
+          );
+    final message = _topMessage == null || !_showTopMessage
+        ? const SizedBox.shrink()
+        : Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: (_isErrorMessage ? WebTheme.danger : const Color(0xFF166534))
+                    .withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                _topMessage!,
+                style: TextStyle(
+                  color: _isErrorMessage ? WebTheme.danger : const Color(0xFF166534),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          );
+    final actions = Padding(
+      padding: const EdgeInsets.fromLTRB(12, 8, 16, 16),
+      child: Row(
+        children: [
+          TextButton(
+            onPressed: _isLoading ? null : () => Navigator.pop(context),
+            child: Text(
+              'Cancel',
+              style: TextStyle(
+                color: WebTheme.mutedOf(context),
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          const Spacer(),
+          AppButton(
+            text: 'Save changes',
+            isLoading: _isLoading,
+            onPressed: _isLoading ? null : updateUser,
+            color: WebTheme.brand,
+            txtcolor: Colors.white,
+          ),
+        ],
+      ),
+    );
+    final scrolled = SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
+      child: fields,
+    );
+    final body = Column(
+      mainAxisSize: web ? MainAxisSize.min : MainAxisSize.max,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (web)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 8, 8),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Edit user',
+                        style: TextStyle(
+                          color: WebTheme.inkOf(context),
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        usernameController.text.trim().isEmpty
+                            ? 'Update account details'
+                            : usernameController.text.trim(),
+                        style: TextStyle(color: WebTheme.mutedOf(context), fontSize: 13),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Close',
+                  onPressed: _isLoading ? null : () => Navigator.pop(context),
+                  icon: Icon(Icons.close, color: WebTheme.inkOf(context)),
+                ),
+              ],
+            ),
+          ),
+        message,
+        if (web)
+          ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.62),
+            child: scrolled,
+          )
+        else
+          Expanded(child: scrolled),
+        actions,
+      ],
+    );
+    if (web) {
+      return Material(color: WebTheme.surfaceOf(context), child: body);
+    }
     return Scaffold(
+      backgroundColor: WebPushedChrome.background(context),
       appBar: AppBar(
         leading: IconButton(
           onPressed: () => Navigator.pop(context),
           icon: const Icon(Icons.arrow_back_ios),
         ),
-        title: const Text("Edit User"),
+        title: const Text('Edit User'),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Stack(
-          children: [
-            SingleChildScrollView(
-              child: Column(
-                children: [
-                  Center(
-                    child: Icon(
-                      Icons.edit,
-                      size: 64,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  Container(
-                    width: MediaQuery.of(context).size.width,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: Theme.of(context).colorScheme.primary,
-                        width: 2,
-                      ),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(20),
-                      child: Column(
-                        children: [
-                          CustomTextField(controller: usernameController),
-                          const SizedBox(height: 20),
-                          CustomTextField(
-                            controller: emailController,
-                            isEmail: true,
-                          ),
-                          const SizedBox(height: 20),
-                          DropdownButtonFormField<String>(
-                            style: Theme.of(context).textTheme.bodyLarge,
-                            value:
-                                departments.contains(selectedDepartment)
-                                    ? selectedDepartment
-                                    : null,
-                            decoration: const InputDecoration(
-                              border: OutlineInputBorder(),
-                              labelText: "Department",
-                            ),
-                            items: departments
-                                .map(
-                                  (d) => DropdownMenuItem(
-                                    value: d,
-                                    child: Text(
-                                      d,
-                                      style: Theme.of(
-                                        context,
-                                      ).textTheme.headlineSmall,
-                                    ),
-                                  ),
-                                )
-                                .toList(),
-                            onChanged: (value) {
-                              setState(() => selectedDepartment = value);
-                            },
-                          ),
-                          const SizedBox(height: 20),
-                          DropdownButtonFormField<Role>(
-                            style: Theme.of(context).textTheme.bodyLarge,
-                            value: selectedValue,
-                            decoration: const InputDecoration(
-                              border: OutlineInputBorder(),
-                              labelText: "Role",
-                            ),
-                            items: roleItems
-                                .map(
-                                  (role) => DropdownMenuItem(
-                                    value: role,
-                                    child: Text(
-                                      role.name,
-                                      style: Theme.of(
-                                        context,
-                                      ).textTheme.headlineSmall,
-                                    ),
-                                  ),
-                                )
-                                .toList(),
-                            onChanged: (value) {
-                              setState(() => selectedRole = value);
-                            },
-                          ),
-                          const SizedBox(height: 40),
-                          AppButton(
-                            text: "Update User",
-                            isLoading: _isLoading,
-                            onPressed: updateUser,
-                            color: Theme.of(context).colorScheme.secondary,
-                            txtcolor: Theme.of(context).colorScheme.onPrimary,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            if (_topMessage != null)
-              AnimatedPositioned(
-                top: _showTopMessage ? 0 : -120,
-                left: 16,
-                right: 16,
-                duration: const Duration(milliseconds: 300),
-                child: Msgsnackbar(
-                  context,
-                  message: _topMessage!,
-                  isError: _isErrorMessage,
-                ),
-              ),
-          ],
-        ),
-      ),
+      body: body,
     );
   }
 }

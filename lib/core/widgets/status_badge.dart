@@ -3,8 +3,11 @@ import 'package:staff_work_track/core/theme/web_theme.dart';
 
 class StatusBadge extends StatelessWidget {
   final String label;
+  final Color? approvedColor;
 
-  const StatusBadge(this.label, {super.key});
+  const StatusBadge(this.label, {super.key, this.approvedColor});
+
+  static Color foreground(String raw) => _tone(raw).fg;
 
   static ({Color fg, Color bg}) _tone(String raw) {
     final value = raw.toLowerCase();
@@ -33,13 +36,22 @@ class StatusBadge extends StatelessWidget {
         value.contains('success')) {
       return (fg: WebTheme.success, bg: const Color(0xFFDCFCE7));
     }
+    if (value == 'image' ||
+        value == 'pdf' ||
+        value == 'excel' ||
+        value == 'notice') {
+      return (fg: WebTheme.brand, bg: WebTheme.brandSoft);
+    }
     return (fg: WebTheme.muted, bg: const Color(0xFFF1F5F9));
   }
 
   @override
   Widget build(BuildContext context) {
     final text = label.trim().isEmpty ? 'Unknown' : label.trim();
-    final tone = _tone(text);
+    var tone = _tone(text);
+    if (approvedColor != null && text.toLowerCase().contains('approv')) {
+      tone = (fg: approvedColor!, bg: approvedColor!.withValues(alpha: 0.14));
+    }
     final dark = WebTheme.isDark(context);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),

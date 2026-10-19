@@ -336,13 +336,61 @@ int tasksCompletedCount(Iterable tasks) {
   return count;
 }
 
-/// Progress % from quantity first, else completed tasks / total tasks, else stored progress.
+List<Map> _tasksUnderGoal(
+  Map goal, {
+  Iterable<Map>? months,
+  Iterable? tasks,
+}) {
+  final result = <Map>[];
+  final seen = <int>{};
+
+  void addTask(dynamic task) {
+    if (task is! Map) return;
+    if (!seen.add(identityHashCode(task))) return;
+    result.add(task);
+  }
+
+  void addList(dynamic source) {
+    if (source is! Iterable) return;
+    for (final item in source) {
+      addTask(item);
+    }
+  }
+
+  void walk(Map node) {
+    addList(node["tasks"] ?? node["Tasks"]);
+    final nested = node["monthlyGoals"] ?? node["MonthlyGoals"];
+    if (nested is! Iterable) return;
+    for (final month in nested) {
+      if (month is Map) walk(month);
+    }
+  }
+
+  addList(tasks);
+  if (months != null) {
+    for (final month in months) {
+      addList(month["tasks"] ?? month["Tasks"]);
+    }
+  }
+  walk(goal);
+  return result;
+}
+
+/// Progress is how many tasks under the goal are completed.
+/// Quantity does not reduce this. With no tasks, stored progress is used.
 int goalProgressPercent(
   Map goal, {
   Iterable<Map>? months,
   Iterable? tasks,
   bool preferMonthTotals = false,
 }) {
+  final taskList = _tasksUnderGoal(goal, months: months, tasks: tasks);
+  if (taskList.isNotEmpty) {
+    final done = tasksCompletedCount(taskList);
+    if (done >= taskList.length) return 100;
+    return ((done * 100) / taskList.length).round();
+  }
+
   final quantity = goalQuantityView(
     goal,
     months: months,
@@ -350,28 +398,6 @@ int goalProgressPercent(
     preferMonthTotals: preferMonthTotals,
   );
   if (quantity != null) return quantity.percent;
-
-  final taskList = tasks ?? goal["tasks"] ?? goal["Tasks"];
-  if (taskList is Iterable && taskList.isNotEmpty) {
-    final total = taskList.length;
-    if (total > 0) {
-      return ((tasksCompletedCount(taskList) * 100) / total).round();
-    }
-  }
-
-  if (preferMonthTotals && months != null && months.isNotEmpty) {
-    var totalTasks = 0;
-    var doneTasks = 0;
-    for (final month in months) {
-      final nested = month["tasks"] ?? month["Tasks"];
-      if (nested is! Iterable || nested.isEmpty) continue;
-      totalTasks += nested.length;
-      doneTasks += tasksCompletedCount(nested);
-    }
-    if (totalTasks > 0) {
-      return ((doneTasks * 100) / totalTasks).round();
-    }
-  }
 
   final stored = goal["progress"] ?? goal["Progress"] ?? 0;
   if (stored is num) return stored.round().clamp(0, 100);

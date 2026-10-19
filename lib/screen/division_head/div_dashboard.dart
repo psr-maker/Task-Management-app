@@ -1,33 +1,34 @@
-import 'dart:math' as math;
-
-import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
-import 'package:staff_work_track/core/widgets/load_error.dart';
+import 'package:provider/provider.dart';
 import 'package:staff_work_track/core/responsive/app_layout.dart';
 import 'package:staff_work_track/core/responsive/web_shell_controller.dart';
+import 'package:staff_work_track/core/theme/theme_provider.dart';
+import 'package:staff_work_track/core/theme/web_theme.dart';
 import 'package:staff_work_track/core/widgets/app_menu_drawer.dart';
+import 'package:staff_work_track/core/widgets/load_error.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
-import 'package:staff_work_track/core/widgets/web_ui.dart';
+import 'package:staff_work_track/screen/staff/navigation/dashboard/staff_warnings.dart';
 import 'package:staff_work_track/screen/admin/Navigation/dashbord/drawer/attinbhvscore/scoredisplay.dart';
 import 'package:staff_work_track/screen/admin/Navigation/dashbord/drawer/task%20points/emptaskreview.dart';
+import 'package:staff_work_track/screen/admin/Navigation/dashbord/manager_report.dart';
 import 'package:staff_work_track/screen/dashboard/dashboard_lists.dart';
 import 'package:staff_work_track/screen/division_head/div_compensation.dart';
+import 'package:staff_work_track/Models/warning_model.dart';
+import 'package:staff_work_track/core/constant/division_config.dart';
 import 'package:staff_work_track/screen/division_head/div_leave_management.dart';
-import 'package:staff_work_track/screen/division_head/div_overtime.dart';
+import 'package:staff_work_track/screen/division_head/div_users.dart';
 import 'package:staff_work_track/screen/division_head/drawer/div_auditlog.dart';
 import 'package:staff_work_track/screen/staff/navigation/dashboard/dashboard.dart';
+import 'package:staff_work_track/screen/super%20admin/Navigation/Reports/department/department_dashboard.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/Reports/reports_table.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/drawer/anouncement.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/drawer/points.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/drawer/usersworklog.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/settings/settings.dart';
 import 'package:staff_work_track/services/admin_service.dart';
+import 'package:staff_work_track/services/announ_service.dart';
 import 'package:staff_work_track/services/reports_service.dart';
-import 'package:staff_work_track/utils/TaskUtils.dart';
-import 'package:staff_work_track/utils/enum.dart';
-import 'package:staff_work_track/widgets/StatCard.dart';
 import 'package:staff_work_track/utils/work_performance.dart';
-import 'package:staff_work_track/widgets/kpicard.dart';
 
 class DivDashboard extends StatefulWidget {
   final String department;
@@ -46,12 +47,17 @@ class DivDashboard extends StatefulWidget {
 }
 
 class _DivDashboardState extends State<DivDashboard> {
-  late Future<Map<String, dynamic>> reportFuture;
-  int selectedType = 0;
+  Future<Map<String, dynamic>>? dashboard;
+  DateTime selectedYear = DateTime.now();
+  int selectedMonth = DateTime.now().month <= 1 ? 12 : DateTime.now().month - 1;
   bool isDivisionView = true;
   List<String> childDepartments = [];
   bool _departmentsLoading = true;
-  TaskTiming taskTiming = TaskTiming.empty;
+  int overdueTaskCount = 0;
+  int overdueGoalCount = 0;
+  int apiWarningCount = 0;
+  List<Map<String, dynamic>> overdueTaskList = [];
+  List<Map<String, dynamic>> overdueGoalList = [];
 
   void _openList(
     DashboardListKind kind,
@@ -71,101 +77,347 @@ class _DivDashboardState extends State<DivDashboard> {
   @override
   void initState() {
     super.initState();
+    final now = DateTime.now();
+    if (now.month == 1) {
+      selectedYear = DateTime(now.year - 1);
+      selectedMonth = 12;
+    }
     _loadDepartments();
   }
 
   Future<void> _loadDepartments() async {
     List<String> names = [];
+    final own = widget.department.trim();
     try {
-      names = await AdminService.getMySubDepartments();
+      names = await AdminService.getMySubDepartments(
+        headDepartment: own.isEmpty ? null : own,
+      );
     } catch (_) {}
+    if (names.isEmpty && own.isNotEmpty) names = [own];
     if (!mounted) return;
     setState(() {
       childDepartments = names;
       _departmentsLoading = false;
+      if (names.isNotEmpty) dashboard = _loadDashboard();
     });
-    _fetchReport();
   }
 
-  void _fetchReport() {
-    final now = DateTime.now();
-    reportFuture = ReportsService.fetchDivisionReport(
-      childDepartments,
-      fromDate: DateTime(now.year, 1, 1),
-      toDate: DateTime(now.year, 12, 31, 23, 59, 59),
+  Future<void> _pickYear() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: selectedYear,
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now(),
+      initialDatePickerMode: DatePickerMode.year,
     );
-    _loadTaskTiming(now.year);
+    if (picked == null || !mounted) return;
+    setState(() {
+      selectedYear = picked;
+      final now = DateTime.now();
+      selectedMonth = picked.year == now.year
+          ? (now.month <= 1 ? 1 : now.month - 1)
+          : 12;
+      dashboard = _loadDashboard();
+    });
   }
 
-  Future<void> _loadTaskTiming(int year) async {
-    final timing = await TaskTiming.loadDepartments(
-      childDepartments,
-      year: year,
+  void _openReports() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ReportsTable(department: widget.department),
+      ),
     );
-    if (!mounted) return;
-    setState(() => taskTiming = timing);
   }
 
-  double _toDouble(dynamic value) {
-    if (value == null) return 0.0;
-    if (value is int) return value.toDouble();
-    if (value is double) return value;
-    return double.tryParse(value.toString()) ?? 0.0;
+  void _openSettings() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const Settings()),
+    );
+  }
+
+  List<String> _warningDepartments() {
+    return [
+      if (widget.department.trim().isNotEmpty) widget.department,
+      ...childDepartments,
+    ];
+  }
+
+  StaffWarningsPage _warningsPage() {
+    return StaffWarningsPage(
+      userId: widget.userId,
+      departmentScope: true,
+      department: widget.department,
+      filterDepartments: _warningDepartments(),
+    );
+  }
+
+  void _openWarnings() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => _warningsPage()),
+    );
+  }
+
+  Future<void> _fetchWarnings() async {
+    try {
+      final warnings = await AnnouncementService.getWarnings();
+      final allowed = _warningDepartments();
+      final count = warnings.where((WarningModel item) {
+        return allowed.any(
+          (name) => DivisionConfig.isAllowedDepartment(item.receiverDept, [name]),
+        );
+      }).length;
+      if (!mounted) return;
+      setState(() => apiWarningCount = count);
+    } catch (_) {}
+  }
+
+  Future<Map<String, dynamic>> _loadDashboard() async {
+    final year = selectedYear.year;
+    _fetchWarnings();
+    final division = await ReportsService.fetchDivisionReport(
+      childDepartments,
+      fromDate: DateTime(year, 1, 1),
+      toDate: DateTime(year, 12, 31, 23, 59, 59),
+    );
+    final results = await Future.wait([
+      _loadScores(year),
+      TaskTiming.loadDepartments(childDepartments, year: year),
+      _scopedUserCount(),
+      _loadDueSoon(),
+    ]);
+    final scores = results[0] as Map<String, dynamic>;
+    final monthly = scores['monthly'] as List? ?? const [];
+    final departments = scores['departments'] as List? ?? const [];
+    final timing = results[1] as TaskTiming;
+    final userCount = results[2] as int?;
+    final dueSoon = results[3] as ({int goals, int tasks});
+    final tasks = _mapList(
+      division['overdueTasksList'] ??
+          division['overdueTaskslist'] ??
+          division['OverdueTasksList'] ??
+          division['overdueTaskList'],
+    );
+    final goals = _mapList(
+      division['overdueGoalsList'] ??
+          division['overdueGoalslist'] ??
+          division['OverdueGoalsList'] ??
+          division['overdueGoalList'],
+    );
+    final overdueTasks = tasks.isNotEmpty
+        ? tasks.length
+        : _int(division['overdueTasks'] ?? division['OverdueTasks']);
+    final overdueGoals = goals.isNotEmpty
+        ? goals.length
+        : _int(division['overdueGoals'] ?? division['OverdueGoals']);
+    final totalTasks = _int(division['totalTasks']);
+    final completedTasks = _int(division['completedTasks']);
+    final summary = {
+      ...division,
+      'overdueTasks': overdueTasks,
+      'overdueGoals': overdueGoals,
+      if (userCount != null) 'totalUsers': userCount,
+      if (totalTasks > 0)
+        'taskCompletionPercentage': completedTasks / totalTasks * 100,
+      'onTimeTaskCompletionPercentage': ?timing.onTime,
+      'delayedTaskPercentage': ?timing.delayed,
+    };
+    if (!mounted) {
+      return {
+        'summary': summary,
+        'monthly': monthly,
+        'departments': departments,
+      };
+    }
+    setState(() {
+      overdueTaskList = tasks;
+      overdueGoalList = goals;
+      overdueTaskCount = overdueTasks;
+      overdueGoalCount = overdueGoals;
+    });
+    return {
+      'summary': summary,
+      'monthly': monthly,
+      'departments': departments,
+      'dueSoonGoals': dueSoon.goals,
+      'dueSoonTasks': dueSoon.tasks,
+    };
+  }
+
+  Future<({int goals, int tasks})> _loadDueSoon() async {
+    try {
+      final results = await Future.wait([
+        loadWorkItems(
+          kind: DashboardListKind.goals,
+          filter: WorkStatusFilter.dueSoon,
+          departments: childDepartments,
+        ),
+        loadWorkItems(
+          kind: DashboardListKind.tasks,
+          filter: WorkStatusFilter.dueSoon,
+          departments: childDepartments,
+        ),
+      ]);
+      return (goals: results[0].length, tasks: results[1].length);
+    } catch (error) {
+      debugPrint('Division due soon: $error');
+      return (goals: 0, tasks: 0);
+    }
+  }
+
+  Future<int?> _scopedUserCount() async {
+    try {
+      final users = await AdminService.getEmployeesByDepartments(
+        childDepartments,
+      );
+      return users.length;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<Map<String, dynamic>> _loadScores(int year) async {
+    const keys = [
+      'totalScore',
+      'productivity',
+      'goalPoints',
+      'taskPoints',
+      'attitudeScore',
+      'fiveS',
+    ];
+    final results = await Future.wait(
+      childDepartments.map((department) async {
+        try {
+          final report = await ReportsService.getdeptMonthlyProductivity(
+            department,
+            year,
+          );
+          final raw = report['monthlyData'] ?? report['MonthlyData'];
+          if (raw is! List) return <Map<String, dynamic>>[];
+          return [
+            for (final item in raw)
+              if (item is Map) Map<String, dynamic>.from(item),
+          ];
+        } catch (_) {
+          return <Map<String, dynamic>>[];
+        }
+      }),
+    );
+    final buckets = <int, Map<String, List<double>>>{};
+    for (final rows in results) {
+      for (final row in rows) {
+        final month = _int(row['month'] ?? row['Month']);
+        if (month < 1 || month > 12) continue;
+        final bag = buckets.putIfAbsent(month, () => {});
+        for (final key in keys) {
+          final value = row[key] ?? row['${key[0].toUpperCase()}${key.substring(1)}'];
+          if (value == null) continue;
+          (bag[key] ??= []).add(_num(value));
+        }
+      }
+    }
+    final months = buckets.keys.toList()..sort();
+    return {
+      'monthly': [
+        for (final month in months)
+          {
+            'month': month,
+            for (final key in keys)
+              if ((buckets[month]?[key] ?? []).isNotEmpty)
+                key: buckets[month]![key]!.reduce((a, b) => a + b) /
+                    buckets[month]![key]!.length,
+          },
+      ],
+      'departments': [
+        for (var i = 0; i < childDepartments.length; i++)
+          {
+            'department': childDepartments[i],
+            'monthlyData': results[i],
+          },
+      ],
+    };
+  }
+
+  List<Map<String, dynamic>> _mapList(dynamic raw) {
+    if (raw is! List) return [];
+    return [
+      for (final item in raw)
+        if (item is Map) Map<String, dynamic>.from(item),
+    ];
+  }
+
+  double _num(dynamic value) {
+    if (value is num) return value.toDouble();
+    return double.tryParse('${value ?? ''}') ?? 0;
+  }
+
+  int _int(dynamic value) {
+    if (value is int) return value;
+    if (value is num) return value.round();
+    return int.tryParse('${value ?? ''}') ?? 0;
+  }
+
+  void _keepRoleTheme() {
+    context.read<ThemeProvider>().applyRole(widget.role);
+  }
+
+  void _openProfile() {
+    _keepRoleTheme();
+    if (!isDivisionView) return;
+    setState(() => isDivisionView = false);
+  }
+
+  void _backToDivision() {
+    _keepRoleTheme();
+    WebShellScope.maybeOf(context)?.update(clearSelection: true);
+    setState(() => isDivisionView = true);
+  }
+
+  String get _divisionName {
+    final name = widget.department.trim();
+    return name.isEmpty ? 'Division' : name;
+  }
+
+  void _openUsers() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => DivUsers(
+          department: widget.department,
+          showAppBar: true,
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    final warnings = apiWarningCount;
     if (!isDivisionView) {
       return StaffDashboard(
         userid: widget.userId,
         role: widget.role,
-        backToLabel: "Division Dashboard",
-        onBackToManager: () {
-          setState(() => isDivisionView = true);
-        },
+        backToLabel: 'Back to dashboard',
+        replaceShellMenu: true,
+        onBackToManager: _backToDivision,
       );
     }
 
     final isWeb = !AppLayout.isMobile(context);
     bindWebHeader(
       context,
-      onReports: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => ReportsTable(department: widget.department),
-          ),
-        );
-      },
-      onSettings: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const Settings()),
-        );
-      },
+      overdueCount: warnings,
+      onOverdue: _openWarnings,
+      onReports: _openReports,
+      onSettings: _openSettings,
       menuItems: _sidebarMenu(),
     );
 
     return Scaffold(
       drawer: isWeb ? null : _buildDrawer(context),
-      appBar: isWeb
-          ? null
-          : AppBar(
-        title: const Text("Division Head"),
-        actions: [
-               
-               
-                IconButton(
-                  icon: const Icon(Icons.settings),
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => Settings()),
-                    );
-                  },
-                ),
-              ],
-      ),
+      appBar: isWeb ? null : _mobileAppBar(),
       body: _departmentsLoading
           ? const Center(child: RotatingFlower())
           : childDepartments.isEmpty
@@ -173,246 +425,96 @@ class _DivDashboardState extends State<DivDashboard> {
               child: Padding(
                 padding: EdgeInsets.all(24),
                 child: Text(
-                  "No departments are mapped under this division.",
+                  'No departments are mapped under this division.',
                   textAlign: TextAlign.center,
                 ),
               ),
             )
           : FutureBuilder<Map<String, dynamic>>(
-              future: reportFuture,
+              future: dashboard,
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: RotatingFlower());
                 }
-                if (snapshot.hasError) {
+                if (snapshot.hasError || snapshot.data == null) {
                   return const AppLoadError();
                 }
-                final data = snapshot.data ?? {};
-                final departmentData = List<Map<String, dynamic>>.from(
-                  data["departmentData"] ?? [],
-                );
-
+                final payload = snapshot.data!;
+                final summary = payload['summary'] is Map
+                    ? Map<String, dynamic>.from(payload['summary'] as Map)
+                    : <String, dynamic>{};
+                final monthly = payload['monthly'] is List
+                    ? payload['monthly'] as List
+                    : const [];
+                final departmentSeries = payload['departments'] is List
+                    ? [
+                        for (final item in payload['departments'] as List)
+                          if (item is Map) Map<String, dynamic>.from(item),
+                      ]
+                    : const <Map<String, dynamic>>[];
                 return RefreshIndicator(
                   onRefresh: () async {
-                    setState(_fetchReport);
-                    await reportFuture;
+                    final next = _loadDashboard();
+                    setState(() => dashboard = next);
+                    await next;
                   },
-                  child: SingleChildScrollView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    padding: AppLayout.pagePadding(context),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (isWeb)
-                          WebPageHeader(
-                            title: widget.department.isEmpty
-                                ? "Division Overview"
-                                : "${widget.department} Overview",
-                            subtitle:
-                                'Goals, tasks and department performance',
-                          )
-                        else
-                          Text(
-                            widget.department.isEmpty
-                                ? "Division Overview"
-                                : "${widget.department} Overview",
-                            style: Theme.of(context).textTheme.displaySmall,
+                  child: ManagerReport(
+                    department: _divisionName,
+                    year: selectedYear.year,
+                    month: selectedMonth,
+                    summary: summary,
+                    monthly: monthly,
+                    roleLabel: 'Division Head',
+                    scopedDepartments: childDepartments,
+                    departmentSeries: departmentSeries,
+                    onPickYear: _pickYear,
+                    onSelectMonth: (value) =>
+                        setState(() => selectedMonth = value),
+                    onOpenReports: _openReports,
+                    onOpenSettings: _openSettings,
+                    onOpenUsers: _openUsers,
+                    onOpenDepartment: (name) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              DepartmentDashboardPage(department: name),
+                        ),
+                      );
+                    },
+                    onOpenStaff: (userId, role, name, department) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => StaffDashboard(
+                            userid: userId,
+                            role: role,
+                            personName: name,
+                            personDepartment: department,
+                            backToLabel: 'Back to dashboard',
+                            onBackToManager: () => Navigator.pop(context),
                           ),
-                        const SizedBox(height: 10),
-                        WebResponsiveRow(
-                          minChildWidth: 180,
-                          children: [
-                            SmallStatCard(
-                              title: "Total Users",
-                              value: (data["totalUsers"] ?? 0).toString(),
-                              icon: Icons.people,
-                              color: Colors.brown,
-                              onTap: () => _openList(
-                                DashboardListKind.staff,
-                                "Total Users",
-                              ),
-                            ),
-                            SmallStatCard(
-                              title: "Total Department",
-                              value: (data["totalDepartments"] ??
-                                      childDepartments.length)
-                                  .toString(),
-                              icon: Icons.apartment,
-                              color: Theme.of(context).colorScheme.secondary,
-                              onTap: () => _openList(
-                                DashboardListKind.departments,
-                                "Departments",
-                              ),
-                            ),
-                          ],
                         ),
-                        const SizedBox(height: 20),
-                        Text(
-                          "Goal Summary",
-                          style: Theme.of(context).textTheme.displaySmall,
-                        ),
-                        const SizedBox(height: 10),
-                        WebResponsiveRow(
-                          minChildWidth: 160,
-                          children: [
-                            SmallStatCard(
-                              title: "Completed Goal",
-                              value: (data["completedGoals"] ?? 0).toString(),
-                              icon: Icons.check_circle_outlined,
-                              color: Colors.green,
-                              onTap: () => _openList(
-                                DashboardListKind.goals,
-                                "Completed Goals",
-                                filter: WorkStatusFilter.completed,
-                              ),
-                            ),
-                            SmallStatCard(
-                              title: "Pending Goal",
-                              value: (data["pendingGoals"] ?? 0).toString(),
-                              icon: Icons.pending_actions,
-                              color: Colors.orange,
-                              onTap: () => _openList(
-                                DashboardListKind.goals,
-                                "Pending Goals",
-                                filter: WorkStatusFilter.pending,
-                              ),
-                            ),
-                            SmallStatCard(
-                              title: "Overdue Goal",
-                              value: (data["overdueGoals"] ?? 0).toString(),
-                              icon: Icons.error_outline,
-                              color: Colors.red,
-                              onTap: () => _openList(
-                                DashboardListKind.goals,
-                                "Overdue Goals",
-                                filter: WorkStatusFilter.overdue,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 20),
-                        Text(
-                          "Task Summary",
-                          style: Theme.of(context).textTheme.displaySmall,
-                        ),
-                        const SizedBox(height: 10),
-                        WebResponsiveRow(
-                          minChildWidth: 160,
-                          children: [
-                            SmallStatCard(
-                              title: "Completed Tasks",
-                              value: (data["completedTasks"] ?? 0).toString(),
-                              icon: Icons.task_outlined,
-                              color: Colors.teal,
-                              onTap: () => _openList(
-                                DashboardListKind.tasks,
-                                "Completed Tasks",
-                                filter: WorkStatusFilter.completed,
-                              ),
-                            ),
-                            SmallStatCard(
-                              title: "Pending Tasks",
-                              value: (data["pendingTasks"] ?? 0).toString(),
-                              icon: Icons.pending_outlined,
-                              color: const Color.fromARGB(255, 235, 211, 0),
-                              onTap: () => _openList(
-                                DashboardListKind.tasks,
-                                "Pending Tasks",
-                                filter: WorkStatusFilter.pending,
-                              ),
-                            ),
-                            SmallStatCard(
-                              title: "Overdue Tasks",
-                              value: (data["overdueTasks"] ?? 0).toString(),
-                              icon: Icons.warning_amber_rounded,
-                              color: Colors.redAccent,
-                              onTap: () => _openList(
-                                DashboardListKind.tasks,
-                                "Overdue Tasks",
-                                filter: WorkStatusFilter.overdue,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 20),
-                        Text(
-                          "Overall Performance Overview",
-                          style: Theme.of(context).textTheme.displaySmall,
-                        ),
-                        const SizedBox(height: 15),
-                        WebResponsiveRow(
-                          minChildWidth: 180,
-                          children: [
-                            KpiCircleCard(
-                              title: "Completion %",
-                              goalPercent: ringPercent(
-                                data["totalGoals"],
-                                _toDouble(data["goalCompletionPercentage"]),
-                              ),
-                              taskPercent: ringPercent(
-                                data["totalTasks"],
-                                completionPercent(
-                                  data["completedTasks"],
-                                  data["totalTasks"],
-                                ),
-                              ),
-                              onTap: () => _openList(
-                                DashboardListKind.goals,
-                                "Completed Goals",
-                                filter: WorkStatusFilter.completed,
-                              ),
-                            ),
-                            KpiCircleCard(
-                              title: "On-Time %",
-                              goalPercent: ringPercent(
-                                data["totalGoals"],
-                                _toDouble(
-                                  data["onTimeGoalCompletionPercentage"],
-                                ),
-                              ),
-                              taskPercent: ringPercent(
-                                data["totalTasks"],
-                                taskTiming.onTime,
-                              ),
-                              onTap: () => _openList(
-                                DashboardListKind.goals,
-                                "On-Time Completed Goals",
-                                filter: WorkStatusFilter.onTime,
-                              ),
-                            ),
-                            KpiCircleCard(
-                              title: "Delayed %",
-                              goalPercent: ringPercent(
-                                data["totalGoals"],
-                                _toDouble(data["delayedGoalPercentage"]),
-                              ),
-                              taskPercent: ringPercent(
-                                data["totalTasks"],
-                                taskTiming.delayed,
-                              ),
-                              onTap: () => _openList(
-                                DashboardListKind.goals,
-                                "Delayed Completed Goals",
-                                filter: WorkStatusFilter.delayed,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 20),
-                        if (departmentData.isNotEmpty) ...[
-                          Text(
-                            "All Department Performance",
-                            style: Theme.of(context).textTheme.displaySmall,
-                          ),
-                          const SizedBox(height: 15),
-                          _buildToggle(),
-                          const SizedBox(height: 15),
-                          _buildDepartmentChart(departmentData),
-                          const SizedBox(height: 20),
-                        ],
-                       // Alldeptproducticity(departments: childDepartments),
-                      ],
+                      );
+                    },
+                    onOpenTasks: (title, filter) => _openList(
+                      DashboardListKind.tasks,
+                      title,
+                      filter: filter,
                     ),
+                    onOpenGoals: (title, filter) => _openList(
+                      DashboardListKind.goals,
+                      title,
+                      filter: filter,
+                    ),
+                    warningCount: apiWarningCount,
+                    dueSoonGoals: payload['dueSoonGoals'] is int
+                        ? payload['dueSoonGoals'] as int
+                        : 0,
+                    dueSoonTasks: payload['dueSoonTasks'] is int
+                        ? payload['dueSoonTasks'] as int
+                        : 0,
+                    onWarnings: _openWarnings,
                   ),
                 );
               },
@@ -420,8 +522,112 @@ class _DivDashboardState extends State<DivDashboard> {
     );
   }
 
+  PreferredSizeWidget _mobileAppBar() {
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    ];
+    final name = widget.department.trim().isEmpty
+        ? 'Division overview'
+        : widget.department.trim();
+    return AppBar(
+      backgroundColor: WebTheme.isDark(context) ? WebTheme.darkHeader : WebTheme.brand,
+      foregroundColor: Colors.white,
+      iconTheme: const IconThemeData(color: Colors.white),
+      toolbarHeight: 64,
+      titleSpacing: 0,
+      title: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const Text(
+            'Division Head',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(color: Colors.white70, fontSize: 11),
+          ),
+        ],
+      ),
+      actions: [
+        PopupMenuButton<int>(
+          onSelected: (value) => setState(() => selectedMonth = value),
+          itemBuilder: (context) => [
+            for (var month = 1; month <= 12; month++)
+              PopupMenuItem(value: month, child: Text(months[month - 1])),
+          ],
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6),
+            child: Text(
+              months[selectedMonth.clamp(1, 12) - 1],
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
+                fontSize: 13,
+              ),
+            ),
+          ),
+        ),
+        InkWell(
+          onTap: _pickYear,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6),
+            child: Text(
+              '${selectedYear.year}',
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
+                fontSize: 13,
+              ),
+            ),
+          ),
+        ),
+        IconButton(
+          tooltip: 'Warnings',
+          visualDensity: VisualDensity.compact,
+          onPressed: _openWarnings,
+          icon: Badge(
+            isLabelVisible: apiWarningCount > 0,
+            label: Text('$apiWarningCount'),
+            child: const Icon(
+              Icons.warning_amber_rounded,
+              color: Color(0xFFFFC107),
+              size: 22,
+            ),
+          ),
+        ),
+        IconButton(
+          tooltip: 'Reports',
+          visualDensity: VisualDensity.compact,
+          onPressed: _openReports,
+          icon: const Icon(Icons.bar_chart_rounded, color: Colors.white, size: 20),
+        ),
+        IconButton(
+          tooltip: 'Settings',
+          visualDensity: VisualDensity.compact,
+          onPressed: _openSettings,
+          icon: const Icon(Icons.settings_outlined, color: Colors.white, size: 20),
+        ),
+      ],
+    );
+  }
+
   List<WebMenuItem> _sidebarMenu() {
     void open(Widget page) {
+      if (WebShellScope.contentNavigator.currentState != null) {
+        WebShellScope.open(page);
+        return;
+      }
+      if (!mounted) return;
       Navigator.push(context, MaterialPageRoute(builder: (_) => page));
     }
 
@@ -432,7 +638,7 @@ class _DivDashboardState extends State<DivDashboard> {
         group: 'Performance',
         onTap: () => open(const ProductivityCalculationPage()),
       ),
-        WebMenuItem(
+      WebMenuItem(
         icon: Icons.task_alt_rounded,
         label: 'Task Performance',
         group: 'Performance',
@@ -470,10 +676,10 @@ class _DivDashboardState extends State<DivDashboard> {
         onTap: () => open(DivCompensation(department: widget.department)),
       ),
       WebMenuItem(
-        icon: Icons.schedule_rounded,
-        label: 'Overtime',
+        icon: Icons.warning_amber_rounded,
+        label: 'Warnings',
         group: 'Requests',
-        onTap: () => open(DivOvertime(department: widget.department)),
+        onTap: () => open(_warningsPage()),
       ),
       WebMenuItem(
         icon: Icons.campaign_rounded,
@@ -488,11 +694,22 @@ class _DivDashboardState extends State<DivDashboard> {
         onTap: () => open(DivAuditLog(department: widget.department)),
       ),
       WebMenuItem(
-        icon: Icons.person_outline_rounded,
+        icon: isDivisionView
+            ? Icons.person_outline_rounded
+            : Icons.person_rounded,
         label: 'My Profile',
         group: 'Profile',
-        onTap: () => setState(() => isDivisionView = false),
+        selected: !isDivisionView,
+        onTap: _openProfile,
       ),
+      if (!isDivisionView)
+        WebMenuItem(
+          icon: Icons.arrow_back_rounded,
+          label: 'Back to dashboard',
+          group: 'Profile',
+          selected: true,
+          onTap: _backToDivision,
+        ),
     ];
   }
 
@@ -504,212 +721,5 @@ class _DivDashboardState extends State<DivDashboard> {
       icon: Icons.account_tree_rounded,
       items: _sidebarMenu(),
     );
-  }
-  Widget _buildToggle() {
-    return Container(
-      height: 40,
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade200,
-        borderRadius: BorderRadius.circular(25),
-      ),
-      child: Row(children: [_toggleItem("Task", 0), _toggleItem("Goal", 1)]),
-    );
-  }
-
-  Widget _toggleItem(String text, int index) {
-    final isSelected = selectedType == index;
-    return Expanded(
-      child: GestureDetector(
-        onTap: () => setState(() => selectedType = index),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 250),
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: isSelected
-                ? Theme.of(context).colorScheme.primary
-                : Colors.transparent,
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Text(
-            text,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: isSelected ? Colors.white : Colors.black87,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDepartmentChart(List departments) {
-    const double departmentWidth = 100;
-    final double chartWidth = math.max(
-      MediaQuery.of(context).size.width,
-      departments.length * departmentWidth,
-    );
-
-    return SizedBox(
-      height: 220,
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        physics: const BouncingScrollPhysics(),
-        child: SizedBox(
-          width: chartWidth,
-          child: BarChart(
-            BarChartData(
-              alignment: BarChartAlignment.spaceAround,
-              barGroups: _generateBarGroups(departments),
-              maxY: _getMaxChartValue(departments),
-              titlesData: FlTitlesData(
-                leftTitles: const AxisTitles(
-                  sideTitles: SideTitles(showTitles: false),
-                ),
-                rightTitles: const AxisTitles(
-                  sideTitles: SideTitles(showTitles: false),
-                ),
-                topTitles: AxisTitles(
-                  sideTitles: SideTitles(
-                    showTitles: true,
-                    reservedSize: 28,
-                    getTitlesWidget: (value, meta) {
-                      final index = value.toInt();
-                      if (index < 0 || index >= departments.length) {
-                        return const SizedBox();
-                      }
-                      final dept = departments[index];
-                      final chartData = selectedType == 0
-                          ? dept["tasks"]
-                          : dept["goals"];
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 4),
-                        child: Text(
-                          (chartData["total"] ?? 0).toString(),
-                          style: Theme.of(context).textTheme.labelLarge
-                              ?.copyWith(fontWeight: FontWeight.bold),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-                bottomTitles: AxisTitles(
-                  sideTitles: SideTitles(
-                    showTitles: true,
-                    interval: 1,
-                    reservedSize: 45,
-                    getTitlesWidget: (value, meta) {
-                      final index = value.toInt();
-                      if (index < 0 || index >= departments.length) {
-                        return const SizedBox();
-                      }
-                      final deptName = departments[index]["department"]
-                          .toString()
-                          .replaceAll("Department", "")
-                          .trim();
-                      return SizedBox(
-                        width: departmentWidth - 10,
-                        child: Padding(
-                          padding: const EdgeInsets.only(top: 8),
-                          child: Text(
-                            deptName,
-                            textAlign: TextAlign.center,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.labelMedium
-                                ?.copyWith(fontWeight: FontWeight.w600),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ),
-              borderData: FlBorderData(
-                show: true,
-                border: const Border(
-                  left: BorderSide(color: Colors.grey, width: 1),
-                  bottom: BorderSide(color: Colors.grey, width: 1),
-                ),
-              ),
-              barTouchData: BarTouchData(
-                enabled: true,
-                touchTooltipData: BarTouchTooltipData(
-                  getTooltipItem: (group, groupIndex, rod, rodIndex) {
-                    final dept = departments[groupIndex];
-                    final chartData = selectedType == 0
-                        ? dept["tasks"]
-                        : dept["goals"];
-                    final title = selectedType == 0 ? "Task" : "Goal";
-                    return BarTooltipItem(
-                      "${dept["department"]}\n\n"
-                      "Total $title: ${chartData["total"] ?? 0}\n"
-                      "Completed: ${chartData["completed"] ?? 0}\n"
-                      "Pending: ${chartData["pending"] ?? 0}\n"
-                      "Overdue: ${chartData["overdue"] ?? 0}",
-                      const TextStyle(
-                        color: Colors.white,
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    );
-                  },
-                ),
-              ),
-              gridData: const FlGridData(show: false),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  double _getMaxChartValue(List departments) {
-    if (departments.isEmpty) return 10;
-    double maxValue = 0;
-    for (final dept in departments) {
-      final chartData = selectedType == 0 ? dept["tasks"] : dept["goals"];
-      final total =
-          _toDouble(chartData["completed"]) +
-          _toDouble(chartData["pending"]) +
-          _toDouble(chartData["overdue"]);
-      if (total > maxValue) maxValue = total;
-    }
-    return maxValue == 0 ? 10 : maxValue * 1.2;
-  }
-
-  List<BarChartGroupData> _generateBarGroups(List departments) {
-    return List.generate(departments.length, (index) {
-      final dept = departments[index];
-      final chartData = selectedType == 0 ? dept["tasks"] : dept["goals"];
-      final completed = _toDouble(chartData["completed"]);
-      final pending = _toDouble(chartData["pending"]);
-      final overdue = _toDouble(chartData["overdue"]);
-      final total = completed + pending + overdue;
-      return BarChartGroupData(
-        x: index,
-        barRods: [
-          BarChartRodData(
-            toY: total,
-            width: 8,
-            borderRadius: BorderRadius.circular(6),
-            rodStackItems: [
-              BarChartRodStackItem(
-                0,
-                completed,
-                TaskUtils.getStatusColor(TaskStatus.completed),
-              ),
-              BarChartRodStackItem(
-                completed,
-                completed + pending,
-                TaskUtils.getStatusColor(TaskStatus.pending),
-              ),
-              BarChartRodStackItem(completed + pending, total, Colors.red),
-            ],
-          ),
-        ],
-      );
-    });
   }
 }

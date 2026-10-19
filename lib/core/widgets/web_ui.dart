@@ -313,3 +313,97 @@ class WebResponsiveRow extends StatelessWidget {
     );
   }
 }
+
+class WebFormPage extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final Widget child;
+
+  const WebFormPage({
+    super.key,
+    required this.title,
+    required this.subtitle,
+    required this.child,
+  });
+
+  static Widget adapt(
+    BuildContext context, {
+    required String title,
+    required String subtitle,
+    required Widget child,
+  }) {
+    if (!WebPushedChrome.isWeb(context)) return child;
+    return WebFormPage(title: title, subtitle: subtitle, child: child);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: AppLayout.pagePadding(context),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              IconButton(
+                tooltip: 'Back',
+                onPressed: () => Navigator.maybePop(context),
+                icon: Icon(Icons.arrow_back, color: WebTheme.inkOf(context)),
+              ),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: AppLayout.isDesktop(context) ? 24 : 20,
+                        fontWeight: FontWeight.w800,
+                        color: WebTheme.inkOf(context),
+                        letterSpacing: -0.4,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: WebTheme.mutedOf(context),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Expanded(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final width = constraints.maxWidth > 880
+                    ? 880.0
+                    : constraints.maxWidth;
+                return Align(
+                  alignment: Alignment.topCenter,
+                  child: SizedBox(
+                    width: width,
+                    height: constraints.maxHeight,
+                    child: DecoratedBox(
+                      decoration: WebTheme.card(context),
+                      child: child,
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

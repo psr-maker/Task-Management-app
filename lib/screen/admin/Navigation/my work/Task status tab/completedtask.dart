@@ -10,7 +10,14 @@ import 'package:staff_work_track/widgets/adaptive_goal_cards.dart';
 
 class CompletedTab extends StatefulWidget {
   final int adminId;
-  const CompletedTab({super.key, required this.adminId});
+  final String Function(Map task)? statusOf;
+  final Future<void> Function(Map<String, dynamic> task)? onStatusSaved;
+  const CompletedTab({
+    super.key,
+    required this.adminId,
+    this.statusOf,
+    this.onStatusSaved,
+  });
 
   @override
   State<CompletedTab> createState() => _CompletedTabState();
@@ -45,9 +52,10 @@ class _CompletedTabState extends State<CompletedTab> {
 
         // Filter only completed tasks
         final tasks = snapshot.data!.where((task) {
-          final normalizedStatus = AppHelpers.normalize(
-            viewerTaskStatus(task, widget.adminId),
-          );
+          final normalizedStatus = widget.statusOf?.call(task) ??
+              AppHelpers.normalize(
+                viewerTaskStatus(task, widget.adminId),
+              );
           return normalizedStatus == "completed";
         }).toList();
 
@@ -63,6 +71,7 @@ class _CompletedTabState extends State<CompletedTab> {
               final task = tasks[index];
               return Taskstatus(
                 task: task,
+                onStatusSaved: widget.onStatusSaved,
                 onTap: () {
                   Navigator.push(
                     context,

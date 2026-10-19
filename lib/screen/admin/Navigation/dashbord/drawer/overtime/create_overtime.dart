@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:staff_work_track/Models/getusers.dart';
+import 'package:staff_work_track/core/theme/web_theme.dart';
 import 'package:staff_work_track/core/widgets/buttons.dart';
+import 'package:staff_work_track/core/widgets/web_ui.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
 import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
 import 'package:staff_work_track/services/overtime_service.dart';
@@ -30,6 +32,7 @@ class _ManagerOvertimeCreateState extends State<ManagerOvertimeCreate> {
   final _endController = TextEditingController();
 
   final _reasonController = TextEditingController();
+  final _staffFocus = FocusNode();
 
   List<UserModel> users = [];
   List<UserModel> filteredUsers = [];
@@ -46,7 +49,30 @@ class _ManagerOvertimeCreateState extends State<ManagerOvertimeCreate> {
   @override
   void initState() {
     super.initState();
+    _staffFocus.addListener(() {
+      if (!mounted) return;
+      if (_staffFocus.hasFocus) {
+        setState(() {
+          showEmployeeList = true;
+          _filterStaff(_nameController.text);
+        });
+        return;
+      }
+      Future.delayed(const Duration(milliseconds: 200), () {
+        if (!mounted || _staffFocus.hasFocus) return;
+        setState(() => showEmployeeList = false);
+      });
+    });
     loadUsers();
+  }
+
+  void _filterStaff(String value) {
+    final query = value.trim().toLowerCase();
+    filteredUsers = users.where((user) {
+      final name = user.name.toLowerCase();
+      final dept = user.department.toLowerCase();
+      return query.isEmpty || name.contains(query) || dept.contains(query);
+    }).toList();
   }
 
   Future<void> loadUsers() async {
@@ -194,19 +220,6 @@ class _ManagerOvertimeCreateState extends State<ManagerOvertimeCreate> {
     final time = await showTimePicker(
       context: context,
       initialTime: TimeOfDay.now(),
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: ColorScheme.light(
-              primary: Theme.of(context).colorScheme.secondary,
-              onPrimary: Colors.white,
-              surface: Colors.white,
-              onSurface: Colors.black,
-            ),
-          ),
-          child: child!,
-        );
-      },
     );
 
     if (time == null) return;
@@ -226,21 +239,30 @@ class _ManagerOvertimeCreateState extends State<ManagerOvertimeCreate> {
     _startController.dispose();
     _endController.dispose();
     _reasonController.dispose();
+    _staffFocus.dispose();
 
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final web = WebPushedChrome.isWeb(context);
     return Scaffold(
-      appBar: AppBar(
+      backgroundColor: WebPushedChrome.background(context),
+      appBar: web
+          ? null
+          : AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text("Create Overtime Request"),
+        title: const Text("Create Overtime Requirement"),
       ),
-      body: Stack(
+      body: WebFormPage.adapt(
+        context,
+        title: 'Add overtime',
+        subtitle: 'Request extra hours for a staff member',
+        child: Stack(
         children: [
           loadingUsers
               ? const Center(child: RotatingFlower())
@@ -253,25 +275,26 @@ class _ManagerOvertimeCreateState extends State<ManagerOvertimeCreate> {
                     const SizedBox(height: 5),
                     TextFormField(
                       controller: _nameController,
+                      focusNode: _staffFocus,
                       style: Theme.of(context).textTheme.headlineLarge,
                       decoration: _inputDecoration(
-                        "Select employee",
+                        "Staff name",
                         Icons.person,
                         suffix: Icons.keyboard_arrow_down,
                       ),
+                      onTap: () {
+                        setState(() {
+                          showEmployeeList = true;
+                          _filterStaff(_nameController.text);
+                        });
+                      },
                       onChanged: (value) {
                         setState(() {
                           selectedUid = null;
                           selectedDept = null;
                           _deptController.clear();
-              
                           showEmployeeList = true;
-              
-                          filteredUsers = users.where((user) {
-                            return user.name.toLowerCase().contains(
-                              value.toLowerCase(),
-                            );
-                          }).toList();
+                          _filterStaff(value);
                         });
                       },
                       validator: (value) {
@@ -281,149 +304,125 @@ class _ManagerOvertimeCreateState extends State<ManagerOvertimeCreate> {
                         return null;
                       },
                     ),
-              
                     if (showEmployeeList)
                       Container(
                         constraints: const BoxConstraints(maxHeight: 220),
                         margin: const EdgeInsets.only(top: 5),
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: WebTheme.surfaceOf(context),
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.grey.shade300),
+                          border: Border.all(color: WebTheme.lineOf(context)),
                         ),
-                        child: ListView.builder(
-                          shrinkWrap: true,
-                          itemCount: filteredUsers.length,
-                          itemBuilder: (context, index) {
-                            final user = filteredUsers[index];
-              
-                            return ListTile(
-                              leading: const CircleAvatar(
-                                radius: 20,
-                                child: Icon(Icons.person, size: 15),
+                        child: filteredUsers.isEmpty
+                            ? Padding(
+                                padding: const EdgeInsets.all(12),
+                                child: Text(
+                                  'No staff in this department',
+                                  style: TextStyle(color: WebTheme.mutedOf(context)),
+                                ),
+                              )
+                            : ListView.builder(
+                                shrinkWrap: true,
+                                itemCount: filteredUsers.length,
+                                itemBuilder: (context, index) {
+                                  final user = filteredUsers[index];
+                                  return ListTile(
+                                    dense: true,
+                                    title: Text(
+                                      user.name,
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                        color: WebTheme.inkOf(context),
+                                      ),
+                                    ),
+                                    subtitle: Text(
+                                      user.department,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: WebTheme.mutedOf(context),
+                                      ),
+                                    ),
+                                    onTap: () {
+                                      setState(() {
+                                        selectedUid = user.userId;
+                                        selectedDept = user.department;
+                                        _nameController.text = user.name;
+                                        _deptController.text = user.department;
+                                        showEmployeeList = false;
+                                      });
+                                    },
+                                  );
+                                },
                               ),
-                              title: Text(
-                                user.name,
-                                style: Theme.of(context).textTheme.titleSmall,
-                              ),
-                              subtitle: Text(
-                                user.department,
-                                style: Theme.of(context).textTheme.labelSmall,
-                              ),
-                              onTap: () {
-                                setState(() {
-                                  selectedUid = user.userId;
-              
-                                  selectedDept = user.department;
-              
-                                  _nameController.text = user.name;
-              
-                                  _deptController.text = user.department;
-              
-                                  showEmployeeList = false;
-                                });
-                              },
-                            );
-                          },
-                        ),
                       ),
-              
-                    const SizedBox(height: 18),
-                    CustomFormWidgets.label(context, 'Department'),
-                    const SizedBox(height: 5),
-                    TextFormField(
-                      controller: _deptController,
-                      readOnly: true,
-                      style: Theme.of(context).textTheme.headlineLarge,
-                      decoration: _inputDecoration(
-                        "Department",
-                        Icons.business_outlined,
+                    const SizedBox(height: 16),
+                    _fieldPair(
+                      _timeField(
+                        label: 'From time',
+                        controller: _startController,
+                        hint: 'From time',
+                        empty: 'Select from time',
+                      ),
+                      _timeField(
+                        label: 'To time',
+                        controller: _endController,
+                        hint: 'To time',
+                        empty: 'Select to time',
                       ),
                     ),
-              
-                    const SizedBox(height: 18),
-              
-                    CustomFormWidgets.label(context, 'Overtime Date'),
-                    const SizedBox(height: 5),
-                    TextFormField(
-                      controller: _dateController,
-                      readOnly: true,
-                      onTap: pickDate,
-                      style: Theme.of(context).textTheme.headlineLarge,
-                      decoration: _inputDecoration(
-                        "Select date",
-                        Icons.calendar_today_outlined,
+                    const SizedBox(height: 16),
+                    _fieldPair(
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          CustomFormWidgets.label(context, 'Date'),
+                          const SizedBox(height: 5),
+                          TextFormField(
+                            controller: _dateController,
+                            readOnly: true,
+                            onTap: pickDate,
+                            style: Theme.of(context).textTheme.headlineLarge,
+                            decoration: _inputDecoration(
+                              'Select date',
+                              Icons.calendar_today_outlined,
+                            ),
+                            validator: (value) =>
+                                value == null || value.isEmpty
+                                ? 'Select date'
+                                : null,
+                          ),
+                        ],
                       ),
-                      validator: (value) => value == null || value.isEmpty
-                          ? "Select date"
-                          : null,
-                    ),
-              
-                    const SizedBox(height: 18),
-              
-                    CustomFormWidgets.label(context, 'From Time'),
-                    const SizedBox(height: 5),
-                    TextFormField(
-                      controller: _startController,
-                      readOnly: true,
-                      style: Theme.of(context).textTheme.headlineLarge,
-                      onTap: () => pickTime(_startController),
-                      decoration: _inputDecoration(
-                        "Select start time",
-                        Icons.schedule_outlined,
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          CustomFormWidgets.label(context, 'Reason'),
+                          const SizedBox(height: 5),
+                          TextFormField(
+                            controller: _reasonController,
+                            maxLines: 2,
+                            style: Theme.of(context).textTheme.headlineLarge,
+                            decoration: _inputDecoration(
+                              'Enter reason',
+                              Icons.note_alt_outlined,
+                            ),
+                            validator: (value) {
+                              if (value == null || value.trim().isEmpty) {
+                                return 'Enter reason';
+                              }
+                              return null;
+                            },
+                          ),
+                        ],
                       ),
-                      validator: (value) => value == null || value.isEmpty
-                          ? "Select start time"
-                          : null,
                     ),
-              
-                    const SizedBox(height: 18),
-              
-                    CustomFormWidgets.label(context, 'To Time'),
-              
-                    TextFormField(
-                      controller: _endController,
-                      readOnly: true,
-                      style: Theme.of(context).textTheme.headlineLarge,
-                      onTap: () => pickTime(_endController),
-                      decoration: _inputDecoration(
-                        "Select end time",
-                        Icons.schedule_outlined,
-                      ),
-                      validator: (value) => value == null || value.isEmpty
-                          ? "Select end time"
-                          : null,
-                    ),
-              
-                    const SizedBox(height: 18),
-              
-                    CustomFormWidgets.label(context, 'Reason'),
-                    const SizedBox(height: 5),
-                    TextFormField(
-                      controller: _reasonController,
-                      maxLines: 4,
-                      style: Theme.of(context).textTheme.headlineLarge,
-                      decoration: _inputDecoration(
-                        "Enter overtime reason",
-                        Icons.note_alt_outlined,
-                      ),
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return "Enter reason";
-                        }
-              
-                        return null;
-                      },
-                    ),
-              
                     const SizedBox(height: 28),
-              
                     AppButton(
                       text: "Send Request",
                       isLoading: loading,
                       onPressed: loading ? null : submit,
-                      color: Theme.of(context).colorScheme.secondary,
-                      txtcolor: Theme.of(context).colorScheme.onPrimary,
+                      color: WebTheme.brand,
+                      txtcolor: Colors.white,
                     ),
                   ],
                 ),
@@ -448,6 +447,51 @@ class _ManagerOvertimeCreateState extends State<ManagerOvertimeCreate> {
             ),
         ],
       ),
+      ),
+    );
+  }
+
+  Widget _fieldPair(Widget left, Widget right) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth < 520) {
+          return Column(
+            children: [left, const SizedBox(height: 16), right],
+          );
+        }
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(child: left),
+            const SizedBox(width: 12),
+            Expanded(child: right),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _timeField({
+    required String label,
+    required TextEditingController controller,
+    required String hint,
+    required String empty,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        CustomFormWidgets.label(context, label),
+        const SizedBox(height: 5),
+        TextFormField(
+          controller: controller,
+          readOnly: true,
+          onTap: () => pickTime(controller),
+          style: Theme.of(context).textTheme.headlineLarge,
+          decoration: _inputDecoration(hint, Icons.schedule_outlined),
+          validator: (value) =>
+              value == null || value.isEmpty ? empty : null,
+        ),
+      ],
     );
   }
 
@@ -461,15 +505,17 @@ class _ManagerOvertimeCreateState extends State<ManagerOvertimeCreate> {
       hintStyle: Theme.of(context).textTheme.labelSmall,
       prefixIcon: Icon(icon, size: 15),
       suffixIcon: suffix != null ? Icon(suffix) : null,
+      filled: true,
+      fillColor: WebTheme.surfaceOf(context),
       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color.fromARGB(255, 25, 77, 38)),
+        borderSide: BorderSide(color: WebTheme.brandOf(context)),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(
-          color: Color.fromARGB(255, 25, 77, 38),
+        borderSide: BorderSide(
+          color: WebTheme.brandOf(context),
           width: 1.5,
         ),
       ),

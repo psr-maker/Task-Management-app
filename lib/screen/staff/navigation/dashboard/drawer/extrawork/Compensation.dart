@@ -3,8 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:staff_work_track/core/theme/web_theme.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
 import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
+import 'package:staff_work_track/core/widgets/request_workspace.dart';
 import 'package:staff_work_track/core/widgets/web_ui.dart';
 import 'package:staff_work_track/services/overtime_service.dart';
+import 'package:staff_work_track/services/superadmin_service.dart';
 import 'package:staff_work_track/utils/time_utils.dart';
 
 class MyExtraWorkPage extends StatefulWidget {
@@ -17,6 +19,7 @@ class MyExtraWorkPage extends StatefulWidget {
 class _MyExtraWorkPageState extends State<MyExtraWorkPage>
     with SingleTickerProviderStateMixin {
   List<Map<String, dynamic>> extraWorks = [];
+  final Map<String, String> _taskNames = {};
 
   bool isLoading = true;
 
@@ -57,10 +60,15 @@ class _MyExtraWorkPageState extends State<MyExtraWorkPage>
 
       if (!mounted) return;
 
+      final works = result
+          .map((item) => Map<String, dynamic>.from(item))
+          .toList();
+      await _resolveTaskNames(works);
+
+      if (!mounted) return;
+
       setState(() {
-        extraWorks = result
-            .map((item) => Map<String, dynamic>.from(item))
-            .toList();
+        extraWorks = works;
       });
     } catch (e) {
       debugPrint('MY EXTRA WORK ERROR: $e');
@@ -108,7 +116,102 @@ class _MyExtraWorkPageState extends State<MyExtraWorkPage>
   }
 
   String _getStatus(Map<String, dynamic> work) {
-    return work['status']?.toString().trim() ?? '';
+    final raw = (work['status'] ?? work['Status'] ?? '').toString().trim();
+    switch (raw.toLowerCase().replaceAll(' ', '').replaceAll('_', '')) {
+      case 'pending':
+        return 'Pending';
+      case 'accepted':
+        return 'Accepted';
+      case 'approved':
+        return 'Approved';
+      case 'staffrejected':
+        return 'StaffRejected';
+      case 'managerrejected':
+        return 'ManagerRejected';
+      case 'rejected':
+        return 'Rejected';
+      default:
+        return raw;
+    }
+  }
+
+  String _firstText(Map<String, dynamic> item, List<String> keys) {
+    final lower = {
+      for (final entry in item.entries)
+        entry.key.toString().toLowerCase(): entry.value,
+    };
+    for (final key in keys) {
+      final value = lower[key.toLowerCase()];
+      if (value == null) continue;
+      final text = value.toString().trim();
+      if (text.isEmpty || text == 'null') continue;
+      return text;
+    }
+    return '';
+  }
+
+  String _taskKey(Map<String, dynamic> item) {
+    return _firstText(item, ['taskId', 'taskCode', 'taskid']);
+  }
+
+  Future<void> _resolveTaskNames(List<Map<String, dynamic>> works) async {
+    final missing = <String>{};
+    for (final item in works) {
+      if (_directTaskName(item).isNotEmpty) continue;
+      final id = _taskKey(item);
+      if (id.isNotEmpty && !_taskNames.containsKey(id)) missing.add(id);
+    }
+    if (missing.isEmpty) return;
+
+    for (final id in missing) {
+      if (_taskNames.containsKey(id)) continue;
+      try {
+        final details = await SuperAdminService.getTaskByCode(id);
+        final name = _firstText(details, ['task', 'taskName', 'title']);
+        if (name.isNotEmpty) _taskNames[id] = name;
+      } catch (_) {}
+    }
+  }
+
+  String _directTaskName(Map<String, dynamic> item) {
+    final named = _firstText(item, ['taskName', 'taskTitle', 'title']);
+    if (named.isNotEmpty) return named;
+    final task = item['task'] ?? item['Task'];
+    if (task is Map) {
+      return _firstText(Map<String, dynamic>.from(task), [
+        'task',
+        'taskName',
+        'name',
+        'title',
+      ]);
+    }
+    if (task is String) {
+      final text = task.trim();
+      if (text.isEmpty || text == _taskKey(item)) return '';
+      return text;
+    }
+    return '';
+  }
+
+  String _taskLabel(Map<String, dynamic> item) {
+    final direct = _directTaskName(item);
+    if (direct.isNotEmpty) return direct;
+    final mapped = _taskNames[_taskKey(item)];
+    if (mapped != null && mapped.trim().isNotEmpty) return mapped.trim();
+    return '—';
+  }
+
+  String _rejectNote(Map<String, dynamic> item) {
+    final staff = _firstText(item, ['staffRemarks', 'staffRemark']);
+    final manager = _firstText(item, [
+      'managerRemarks',
+      'rejectionReason',
+      'managerRemark',
+    ]);
+    final parts = <String>[];
+    if (staff.isNotEmpty) parts.add('Staff: $staff');
+    if (manager.isNotEmpty) parts.add('Manager: $manager');
+    return parts.isEmpty ? '—' : parts.join(' · ');
   }
 
   int? _getId(Map<String, dynamic> work) {
@@ -230,6 +333,12 @@ class _MyExtraWorkPageState extends State<MyExtraWorkPage>
       case 'Approved':
         return 'Approved';
 
+      case 'StaffRejected':
+        return 'Staff Rejected';
+
+      case 'ManagerRejected':
+        return 'Manager Rejected';
+
       case 'Rejected':
         return 'Rejected';
 
@@ -249,6 +358,8 @@ class _MyExtraWorkPageState extends State<MyExtraWorkPage>
       case 'Approved':
         return Colors.green;
 
+      case 'StaffRejected':
+      case 'ManagerRejected':
       case 'Rejected':
         return Colors.redAccent;
 
@@ -299,6 +410,24 @@ class _MyExtraWorkPageState extends State<MyExtraWorkPage>
     }
   }
 
+  String _shown(dynamic value) {
+    final text = (value ?? '').toString().trim();
+    return text.isEmpty || text == 'null' ? '—' : text;
+  }
+
+  String _formatWorkType(String value) {
+    switch (value) {
+      case 'WeeklyOff':
+        return 'Weekly Off';
+      case 'PublicHoliday':
+        return 'Public Holiday';
+      case 'CompanyHoliday':
+        return 'Company Holiday';
+      default:
+        return value.trim().isEmpty ? '—' : value;
+    }
+  }
+
   void showTopMessage(String message, {bool isError = true}) {
     setState(() {
       _topMessage = message;
@@ -314,10 +443,75 @@ class _MyExtraWorkPageState extends State<MyExtraWorkPage>
     });
   }
 
+  Widget _webCompensation() {
+    final index = _tabController.index.clamp(0, tabs.length - 1);
+    final filter = tabs[index];
+    final works = _getFilteredWorks(filter);
+    return Scaffold(
+      backgroundColor: WebTheme.canvasOf(context),
+      body: RequestWorkspace(
+        title: 'Compensation Work',
+        subtitle: 'Your extra work requests',
+        loading: isLoading,
+        scrollable: true,
+        plainStatus: true,
+        filters: tabs,
+        selectedFilter: filter,
+        onFilter: (value) {
+          final next = tabs.indexOf(value);
+          if (next >= 0) _tabController.animateTo(next);
+          setState(() {});
+        },
+        stats: [
+          WorkspaceStat(
+            label: 'In this view',
+            value: '${works.length}',
+            icon: Icons.more_time_rounded,
+            color: WebTheme.brandOf(context),
+          ),
+        ],
+        columns: const [
+          'Work date',
+          'Task',
+          'Work type',
+          'Requested by',
+          'Time',
+          'Hours',
+          'Reason',
+          'Rejected remarks',
+        ],
+        records: [
+          for (final item in works)
+            WorkspaceRecord(
+              status: _statusText(_getStatus(item)),
+              approvedColor: WebTheme.brandOf(context),
+              values: [
+                _formatDate(item['workDate']),
+                _taskLabel(item),
+                _formatWorkType((item['workType'] ?? '').toString()),
+                _shown(item['managerName'] ?? item['staffName']),
+                '${_formatTime(item['startTime'])} - ${_formatTime(item['endTime'])}',
+                '${_formatHours(item['expectedHours'])} hours',
+                _shown(item['reason']),
+                _rejectNote(item),
+              ],
+              actions: _getStatus(item) == 'Pending'
+                  ? [
+                      workspaceAction('Reject', () => _rejectExtraWork(item), color: WebTheme.danger),
+                      workspaceAction('Accept', () => _acceptExtraWork(item), filled: true),
+                    ]
+                  : const [],
+            ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final secondaryColor = Theme.of(context).colorScheme.secondary;
     final web = WebPushedChrome.isWeb(context);
+    if (web) return _webCompensation();
 
     return Scaffold(
       backgroundColor: WebPushedChrome.background(context),
@@ -546,6 +740,14 @@ class _MyExtraWorkPageState extends State<MyExtraWorkPage>
             const SizedBox(height: 10),
 
             _infoRow(
+              Icons.task_alt_outlined,
+              'Task',
+              _taskLabel(work),
+            ),
+
+            const SizedBox(height: 10),
+
+            _infoRow(
               Icons.access_time_outlined,
               'Time',
               '${_formatTime(work['startTime'])} - '
@@ -744,14 +946,14 @@ class _MyExtraWorkPageState extends State<MyExtraWorkPage>
       crossAxisAlignment: CrossAxisAlignment.center,
 
       children: [
-        Icon(icon, size: 15, color: Colors.black54),
+        Icon(icon, size: 15, color: WebTheme.mutedOf(context)),
 
         const SizedBox(width: 10),
 
         Text(
           '$title:',
 
-          style: const TextStyle(color: Colors.black87, fontSize: 13),
+          style: TextStyle(color: WebTheme.mutedOf(context), fontSize: 13),
         ),
 
         const SizedBox(width: 6),
@@ -762,8 +964,8 @@ class _MyExtraWorkPageState extends State<MyExtraWorkPage>
 
             overflow: TextOverflow.ellipsis,
 
-            style: const TextStyle(
-              color: Colors.black,
+            style: TextStyle(
+              color: WebTheme.inkOf(context),
               fontSize: 13,
               fontWeight: FontWeight.w500,
             ),

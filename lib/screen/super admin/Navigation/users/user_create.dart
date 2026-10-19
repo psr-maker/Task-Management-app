@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:staff_work_track/Models/rolesmodel.dart';
-import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
+import 'package:staff_work_track/core/theme/web_theme.dart';
+import 'package:staff_work_track/core/widgets/web_ui.dart';
 import 'package:staff_work_track/services/auth_service.dart';
 import 'package:staff_work_track/core/widgets/buttons.dart';
 import 'package:staff_work_track/services/superadmin_service.dart';
-import 'package:staff_work_track/widgets/customfieldwidget.dart';
 
 class CreateUsers extends StatefulWidget {
   const CreateUsers({super.key});
@@ -191,356 +191,225 @@ class _CreateUsersState extends State<CreateUsers> {
     }
   }
 
+  InputDecoration _field(BuildContext context, String label) {
+    return InputDecoration(
+      labelText: label,
+      filled: true,
+      fillColor: WebTheme.canvasOf(context),
+      labelStyle: TextStyle(
+        color: WebTheme.mutedOf(context),
+        fontSize: 13,
+        fontWeight: FontWeight.w600,
+      ),
+      floatingLabelStyle: TextStyle(
+        color: WebTheme.brandOf(context),
+        fontWeight: FontWeight.w700,
+      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: BorderSide(color: WebTheme.lineOf(context)),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: BorderSide(color: WebTheme.brandOf(context), width: 1.4),
+      ),
+      hintStyle: TextStyle(color: WebTheme.mutedOf(context), fontSize: 14),
+    );
+  }
+
+  Widget _message(BuildContext context) {
+    if (_topMessage == null || !_showTopMessage) return const SizedBox.shrink();
+    final color = _isErrorMessage ? WebTheme.danger : const Color(0xFF166534);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: color.withValues(alpha: 0.35)),
+        ),
+        child: Text(
+          _topMessage!,
+          style: TextStyle(color: color, fontSize: 13, fontWeight: FontWeight.w600),
+        ),
+      ),
+    );
+  }
+
+  Widget _fields(BuildContext context, bool web) {
+    final ink = WebTheme.inkOf(context);
+    final name = TextField(
+      controller: usernameController,
+      textInputAction: TextInputAction.next,
+      style: TextStyle(color: ink, fontSize: 14, fontWeight: FontWeight.w600),
+      decoration: _field(context, 'Name'),
+    );
+    final email = TextField(
+      controller: emailController,
+      keyboardType: TextInputType.emailAddress,
+      textInputAction: TextInputAction.next,
+      style: TextStyle(color: ink, fontSize: 14, fontWeight: FontWeight.w600),
+      decoration: _field(context, 'Email'),
+    );
+    final department = DropdownButtonFormField<String>(
+      value: departments.contains(selectedDepartment) ? selectedDepartment : null,
+      isExpanded: true,
+      decoration: _field(context, 'Department'),
+      dropdownColor: WebTheme.surfaceOf(context),
+      style: TextStyle(color: ink, fontSize: 14, fontWeight: FontWeight.w600),
+      items: [
+        for (final dept in departments)
+          DropdownMenuItem(value: dept.toString(), child: Text(dept.toString())),
+      ],
+      onChanged: (value) => setState(() => selectedDepartment = value),
+    );
+    final role = DropdownButtonFormField<Role>(
+      value: roles.contains(selectedRole) ? selectedRole : null,
+      isExpanded: true,
+      decoration: _field(context, 'Role'),
+      dropdownColor: WebTheme.surfaceOf(context),
+      style: TextStyle(color: ink, fontSize: 14, fontWeight: FontWeight.w600),
+      items: [
+        for (final item in roles)
+          DropdownMenuItem(value: item, child: Text(item.name)),
+      ],
+      onChanged: (value) => setState(() => selectedRole = value),
+    );
+    if (!web) {
+      return Column(
+        children: [
+          name,
+          const SizedBox(height: 14),
+          email,
+          const SizedBox(height: 14),
+          department,
+          const SizedBox(height: 14),
+          role,
+        ],
+      );
+    }
+    return Column(
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(child: name),
+            const SizedBox(width: 12),
+            Expanded(child: email),
+          ],
+        ),
+        const SizedBox(height: 14),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(child: department),
+            const SizedBox(width: 12),
+            Expanded(child: role),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _actions(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 8, 16, 16),
+      child: Row(
+        children: [
+          TextButton(
+            onPressed: _isLoading ? null : () => Navigator.pop(context),
+            child: Text(
+              'Cancel',
+              style: TextStyle(
+                color: WebTheme.mutedOf(context),
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          const Spacer(),
+          AppButton(
+            text: 'Create user',
+            isLoading: _isLoading,
+            onPressed: _isLoading ? null : createUser,
+            color: WebTheme.brand,
+            txtcolor: Colors.white,
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text("Add New User"),
-
-        leading: IconButton(
-          onPressed: () {
-            Navigator.pop(context);
-          },
-          icon: const Icon(
-            Icons.arrow_back_ios,
-          ),
-        ),
-      ),
-
-      body: Padding(
-        padding: const EdgeInsets.only(
-          left: 20,
-          right: 20,
-          top: 40,
-        ),
-
-        child: SingleChildScrollView(
-          child: Stack(
-            children: [
-
-              Column(
-                children: [
-
-                  // USER ICON
-                  const Center(
-                    child: Icon(
-                      Icons.person_add,
-                      size: 65,
-                    ),
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  Container(
-                    width: double.infinity,
-
-                    decoration: BoxDecoration(
-                      borderRadius:
-                          BorderRadius.circular(10),
-
-                      border: Border.all(
-                        color: Theme.of(context)
-                            .colorScheme
-                            .primary,
-                        width: 2,
+    final web = WebPushedChrome.isWeb(context);
+    final fields = SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
+      child: _fields(context, web),
+    );
+    final body = Column(
+      mainAxisSize: web ? MainAxisSize.min : MainAxisSize.max,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (web)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 8, 8),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Add user',
+                        style: TextStyle(
+                          color: WebTheme.inkOf(context),
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
-                    ),
-
-                    child: Padding(
-                      padding:
-                          const EdgeInsets.all(20),
-
-                      child: Column(
-                        crossAxisAlignment:
-                            CrossAxisAlignment.start,
-
-                        children: [
-
-                          // =====================
-                          // USERNAME
-                          // =====================
-
-                          Text(
-                            "Enter UserName",
-                            style: Theme.of(context)
-                                .textTheme
-                                .headlineLarge,
-                          ),
-
-                          const SizedBox(height: 8),
-
-                          CustomTextField(
-                            controller:
-                                usernameController,
-                          ),
-
-                          const SizedBox(height: 20),
-
-                          // =====================
-                          // EMAIL
-                          // =====================
-
-                          Text(
-                            "Enter Email",
-                            style: Theme.of(context)
-                                .textTheme
-                                .headlineLarge,
-                          ),
-
-                          const SizedBox(height: 8),
-
-                          CustomTextField(
-                            controller:
-                                emailController,
-                            isEmail: true,
-                          ),
-
-                          const SizedBox(height: 20),
-
-                          // =====================
-                          // DEPARTMENT
-                          // =====================
-
-                          Text(
-                            "Select Department",
-                            style: Theme.of(context)
-                                .textTheme
-                                .headlineLarge,
-                          ),
-
-                          const SizedBox(height: 8),
-
-                          Container(
-                            padding:
-                                const EdgeInsets
-                                    .symmetric(
-                              horizontal: 12,
-                            ),
-
-                            decoration:
-                                BoxDecoration(
-                              borderRadius:
-                                  BorderRadius
-                                      .circular(8),
-
-                              border: Border.all(
-                                color: Theme.of(
-                                  context,
-                                )
-                                    .colorScheme
-                                    .primary,
-                              ),
-                            ),
-
-                            child:
-                                DropdownButton<String>(
-                              value:
-                                  selectedDepartment,
-
-                              isExpanded: true,
-
-                              underline:
-                                  const SizedBox(),
-
-                              hint: Text(
-                                "Select Department",
-                                style: Theme.of(
-                                  context,
-                                )
-                                    .textTheme
-                                    .headlineSmall,
-                              ),
-
-                              style: Theme.of(
-                                context,
-                              )
-                                  .textTheme
-                                  .headlineSmall,
-
-                              items: departments
-                                  .map((dept) {
-                                return DropdownMenuItem<
-                                    String>(
-                                  value: dept,
-
-                                  child: Text(
-                                    dept,
-
-                                    style: Theme.of(
-                                      context,
-                                    )
-                                        .textTheme
-                                        .headlineSmall,
-                                  ),
-                                );
-                              }).toList(),
-
-                              onChanged: (value) {
-                                setState(() {
-                                  selectedDepartment =
-                                      value;
-                                });
-                              },
-                            ),
-                          ),
-
-                          const SizedBox(height: 20),
-
-                          // =====================
-                          // ROLE
-                          // =====================
-
-                          Text(
-                            "Select Role",
-                            style: Theme.of(context)
-                                .textTheme
-                                .headlineLarge,
-                          ),
-
-                          const SizedBox(height: 8),
-
-                          Container(
-                            padding:
-                                const EdgeInsets
-                                    .symmetric(
-                              horizontal: 12,
-                            ),
-
-                            decoration:
-                                BoxDecoration(
-                              borderRadius:
-                                  BorderRadius
-                                      .circular(8),
-
-                              border: Border.all(
-                                color: Theme.of(
-                                  context,
-                                )
-                                    .colorScheme
-                                    .primary,
-                              ),
-                            ),
-
-                            child:
-                                DropdownButton<Role>(
-                              value: selectedRole,
-
-                              isExpanded: true,
-
-                              underline:
-                                  const SizedBox(),
-
-                              hint: Text(
-                                "Select Role",
-                                style: Theme.of(
-                                  context,
-                                )
-                                    .textTheme
-                                    .headlineSmall,
-                              ),
-
-                              style: Theme.of(
-                                context,
-                              )
-                                  .textTheme
-                                  .headlineSmall,
-
-                              items: roles.map((role) {
-                                return DropdownMenuItem<
-                                    Role>(
-                                  value: role,
-
-                                  child: Text(
-                                    role.name,
-
-                                    style: Theme.of(
-                                      context,
-                                    )
-                                        .textTheme
-                                        .headlineSmall,
-                                  ),
-                                );
-                              }).toList(),
-
-                              onChanged: (value) {
-                                setState(() {
-                                  selectedRole =
-                                      value;
-                                });
-                              },
-                            ),
-                          ),
-
-                          const SizedBox(height: 25),
-
-                          // =====================
-                          // CREATE BUTTON
-                          // =====================
-
-                          Center(
-                            child: AppButton(
-                              text: "Create User",
-
-                              isLoading:
-                                  _isLoading,
-
-                              onPressed: _isLoading
-                                  ? null
-                                  : createUser,
-
-                              color: Theme.of(
-                                context,
-                              )
-                                  .colorScheme
-                                  .secondary,
-
-                              txtcolor: Theme.of(
-                                context,
-                              )
-                                  .colorScheme
-                                  .onPrimary,
-                            ),
-                          ),
-                          const SizedBox(height: 15),
-                        ],
+                      const SizedBox(height: 2),
+                      Text(
+                        'Create a staff account',
+                        style: TextStyle(color: WebTheme.mutedOf(context), fontSize: 13),
                       ),
-                    ),
-                  ),
-                ],
-              ),
-
-              // =========================
-              // TOP MESSAGE
-              // =========================
-
-              if (_topMessage != null)
-                AnimatedPositioned(
-                  top: _showTopMessage
-                      ? 0
-                      : -120,
-
-                  left: 16,
-                  right: 16,
-
-                  duration:
-                      const Duration(
-                    milliseconds: 300,
-                  ),
-
-                  child: Msgsnackbar(
-                    context,
-
-                    message:
-                        _topMessage!,
-
-                    isError:
-                        _isErrorMessage,
+                    ],
                   ),
                 ),
-            ],
+                IconButton(
+                  tooltip: 'Close',
+                  onPressed: _isLoading ? null : () => Navigator.pop(context),
+                  icon: Icon(Icons.close, color: WebTheme.inkOf(context)),
+                ),
+              ],
+            ),
           ),
+        _message(context),
+        if (web)
+          ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.62),
+            child: fields,
+          )
+        else
+          Expanded(child: fields),
+        _actions(context),
+      ],
+    );
+    if (web) {
+      return Material(color: WebTheme.surfaceOf(context), child: body);
+    }
+    return Scaffold(
+      backgroundColor: WebPushedChrome.background(context),
+      appBar: AppBar(
+        title: const Text('Add New User'),
+        leading: IconButton(
+          onPressed: () => Navigator.pop(context),
+          icon: const Icon(Icons.arrow_back_ios),
         ),
       ),
+      body: body,
     );
   }
 }

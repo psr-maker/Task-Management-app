@@ -10,6 +10,7 @@ import 'package:staff_work_track/services/superadmin_service.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/Reports/report_export.dart';
 import 'package:staff_work_track/utils/TaskUtils.dart';
 import 'package:staff_work_track/utils/app_helper.dart';
+import 'package:staff_work_track/utils/goal_assignment.dart';
 import 'package:staff_work_track/utils/goal_quantity.dart';
 import 'package:staff_work_track/utils/time_utils.dart';
 import 'package:staff_work_track/widgets/StatCard.dart';
@@ -36,19 +37,30 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
   List<dynamic> filteredGoals = [];
   List<dynamic> allLeaves = [];
   List<dynamic> allPermissions = [];
+  List<dynamic> allOvertimes = [];
+  List<dynamic> allCompensations = [];
   List<dynamic> filteredLeaves = [];
   List<dynamic> filteredPermissions = [];
+  List<dynamic> filteredOvertimes = [];
+  List<dynamic> filteredCompensations = [];
   List<Map<String, dynamic>> reportUsers = [];
   String? selectedStatus;
   String? selectedPriority;
   String? selectedOverdue;
+  String? selectedDepartment;
   String? selectedLeaveStatus;
+  String? selectedPermissionStatus;
+  String? selectedOvertimeStatus;
+  String? selectedCompensationStatus;
   String? selectedLeaveType;
+  List<String> departmentOptions = [];
   DateTime? selectedLeaveDate;
 
   DateTime? selectedPermissionDate;
-  DateTime? startDate;
-  DateTime? endDate;
+  DateTime? dueFrom;
+  DateTime? dueTo;
+  DateTime? completedFrom;
+  DateTime? completedTo;
   String workDateBy = "Due Date";
 
   bool isLoading = true;
@@ -64,6 +76,7 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
     _headerX.addListener(() => _mirrorScroll(_headerX, _bodyX));
     _bodyX.addListener(() => _mirrorScroll(_bodyX, _headerX));
     fetchTasks();
+    _loadDepartments();
   }
 
   void _mirrorScroll(ScrollController from, ScrollController to) {
@@ -93,6 +106,9 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
       final tasks = List<dynamic>.from(result["tasks"] ?? []);
       final goals = List<dynamic>.from(result["goals"] ?? []);
       await _attachAssigneeNames(goals, tasks);
+      _nestMonths(goals);
+      _syncYearlyGoalStatus(goals);
+      final visibleGoals = _visibleGoals(goals);
 
       if (!mounted) return;
       setState(() {
@@ -102,15 +118,21 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
             .toList();
         allTasks = tasks;
         filteredTasks = List<dynamic>.from(allTasks);
-        allGoals = goals;
+        allGoals = visibleGoals;
         filteredGoals = List<dynamic>.from(allGoals);
         allLeaves = List<dynamic>.from(result["leaveList"] ?? []);
         filteredLeaves = List<dynamic>.from(allLeaves);
         allPermissions = List<dynamic>.from(result["permissionList"] ?? []);
         filteredPermissions = List<dynamic>.from(allPermissions);
+        allOvertimes = List<dynamic>.from(result["overtimeList"] ?? []);
+        filteredOvertimes = List<dynamic>.from(allOvertimes);
+        allCompensations = List<dynamic>.from(result["compensationList"] ?? []);
+        filteredCompensations = List<dynamic>.from(allCompensations);
+        _rememberDepartments();
         loadError = null;
         isLoading = false;
       });
+      applyFilters();
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -172,6 +194,19 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
           "PerformanceType",
           "quantitySplits",
           "QuantitySplits",
+          "yearlyAssignedUserIds",
+          "YearlyAssignedUserIds",
+          "yearlyAssignedUsers",
+          "YearlyAssignedUsers",
+          "assignedUserIds",
+          "AssignedUserIds",
+          "parentGoalId",
+          "ParentGoalId",
+          "goalType",
+          "GoalType",
+          "monthlyGoals",
+          "MonthlyGoals",
+          "goalId",
         ]) {
           final value = source[key];
           if (value == null) continue;
@@ -181,8 +216,7 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
         }
       }
 
-      for (final goal in goals) {
-        if (goal is! Map) continue;
+      void enrich(Map goal) {
         final code = (goal["goalCode"] ?? goal["GoalCode"] ?? "").toString();
         final source = goalsByCode[code];
         if (source != null) apply(goal, source);
@@ -196,6 +230,16 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
             if (taskSource != null) apply(task, taskSource);
           }
         }
+        final months = goal["monthlyGoals"] ?? goal["MonthlyGoals"];
+        if (months is List) {
+          for (final month in months) {
+            if (month is Map) enrich(month);
+          }
+        }
+      }
+
+      for (final goal in goals) {
+        if (goal is Map) enrich(goal);
       }
 
       for (final task in tasks) {
@@ -259,12 +303,193 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
     }
   }
 
+  Future<void> _loadDepartments() async {
+    try {
+      final names = await ReportsService.getAllDepartments();
+      if (!mounted) return;
+      setState(() {
+        departmentOptions = {
+          ...departmentOptions,
+          for (final name in names)
+            if (name.trim().isNotEmpty) name.trim(),
+        }.toList()
+          ..sort();
+      });
+    } catch (_) {}
+  }
+
+  void _rememberDepartments() {
+    final names = departmentOptions.toSet();
+    for (final user in reportUsers) {
+      final name = _readDepartment(user);
+      if (name.isNotEmpty) names.add(name);
+    }
+    departmentOptions = names.toList()..sort();
+  }
+
+  String _readDepartment(Map item) {
+    for (final key in const [
+      'department',
+      'Department',
+      'departmentName',
+      'DepartmentName',
+      'dept',
+      'Dept',
+    ]) {
+      final value = item[key]?.toString().trim() ?? '';
+      if (value.isNotEmpty && value.toLowerCase() != 'null') return value;
+    }
+    return '';
+  }
+
+  String _departmentByUserId(String id) {
+    final wanted = id.trim();
+    if (wanted.isEmpty) return '';
+    for (final user in reportUsers) {
+      final userId = (user['userId'] ?? user['UserId'] ?? user['id'] ?? user['Id'] ?? '')
+          .toString()
+          .trim();
+      if (userId != wanted) continue;
+      return _readDepartment(user);
+    }
+    return '';
+  }
+
+  String _departmentByUserName(String name) {
+    final wanted = name.trim().toLowerCase();
+    if (wanted.isEmpty) return '';
+    for (final user in reportUsers) {
+      final userName = (user['name'] ?? user['Name'] ?? user['userName'] ?? '')
+          .toString()
+          .trim()
+          .toLowerCase();
+      if (userName != wanted) continue;
+      return _readDepartment(user);
+    }
+    return '';
+  }
+
+  String _itemDepartment(dynamic item) {
+    if (item is! Map) return '';
+    final direct = _readDepartment(item);
+    if (direct.isNotEmpty) return direct;
+
+    final ids = <String>{};
+    void collectId(dynamic raw) {
+      if (raw == null || raw is bool) return;
+      if (raw is num || raw is String) {
+        final text = raw.toString().trim();
+        if (text.isNotEmpty && text != 'null' && int.tryParse(text) != null) {
+          ids.add(text);
+        }
+        return;
+      }
+      if (raw is Map) {
+        final nested = _readDepartment(raw);
+        if (nested.isNotEmpty) {
+          ids.add('dept:$nested');
+          return;
+        }
+        collectId(raw['userId'] ?? raw['UserId'] ?? raw['id'] ?? raw['Id']);
+        return;
+      }
+      if (raw is List) {
+        for (final entry in raw) {
+          collectId(entry);
+        }
+      }
+    }
+
+    collectId(item['userId'] ?? item['UserId'] ?? item['staffId'] ?? item['employeeId']);
+    collectId(
+      item['assignedTo'] ?? item['AssignedTo'] ?? item['assignTo'] ?? item['users'] ?? item['Users'],
+    );
+
+    for (final id in ids) {
+      if (id.startsWith('dept:')) return id.substring(5);
+      final fromUser = _departmentByUserId(id);
+      if (fromUser.isNotEmpty) return fromUser;
+    }
+
+    for (final name in _namesFrom(item)) {
+      final fromName = _departmentByUserName(name);
+      if (fromName.isNotEmpty) return fromName;
+    }
+    return '';
+  }
+
+  bool _matchesDepartment(dynamic item) {
+    final wanted = selectedDepartment?.trim();
+    if (wanted == null || wanted.isEmpty) return true;
+    return _itemDepartment(item).toLowerCase() == wanted.toLowerCase();
+  }
+
+  bool _responseScopedToUser() {
+    final userId = widget.userId;
+    if (userId == null) return false;
+    if (reportUsers.length > 1) return false;
+    if (reportUsers.isEmpty) return true;
+    final id = readPersonId(reportUsers.first);
+    return id == null || id == userId;
+  }
+
+  bool _matchesSelectedUser(dynamic item) {
+    final userId = widget.userId;
+    if (userId == null || _responseScopedToUser()) return true;
+    if (item is! Map) return false;
+    final map = Map<String, dynamic>.from(item);
+    if (personIdsFrom(map).contains(userId)) return true;
+    if (goalAssigneeIds(map).contains(userId)) return true;
+    for (final key in const [
+      'assignedTo',
+      'AssignedTo',
+      'assignTo',
+      'users',
+      'Users',
+    ]) {
+      if (personIdsFrom(map[key]).contains(userId)) return true;
+    }
+    final wanted = _userNameById(userId.toString()).trim().toLowerCase();
+    if (wanted.isEmpty) return false;
+    if (_namesFrom(map).any((name) => name.toLowerCase() == wanted)) {
+      return true;
+    }
+    for (final key in const [
+      'staffName',
+      'StaffName',
+      'userName',
+      'employeeName',
+      'name',
+      'Name',
+    ]) {
+      final value = (map[key] ?? '').toString().trim().toLowerCase();
+      if (value == wanted) return true;
+      if (value.contains('-') && value.split('-').last.trim() == wanted) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  DataCell _departmentCell(dynamic item) {
+    final name = _itemDepartment(item);
+    return DataCell(Text(name.isEmpty ? '-' : name, style: _tableStyle));
+  }
+
+  bool _sameStatus(dynamic raw, String? selected) {
+    if (selected == null) return true;
+    return TaskUtils.parseStatus((raw ?? '').toString()) ==
+        TaskUtils.parseStatus(selected);
+  }
+
   void applyFilters() {
     setState(() {
       filteredTasks = allTasks.where((task) {
+        if (!_matchesSelectedUser(task)) return false;
+        if (!_matchesDepartment(task)) return false;
+
         if (selectedStatus != null &&
-            (task["status"] ?? "").toLowerCase() !=
-                selectedStatus!.toLowerCase()) {
+            !_sameStatus(task["status"], selectedStatus)) {
           return false;
         }
 
@@ -287,9 +512,11 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
       }).toList();
 
       filteredGoals = allGoals.where((goal) {
+        if (!_matchesSelectedUser(goal)) return false;
+        if (!_matchesDepartment(goal)) return false;
+
         if (selectedStatus != null &&
-            (goal["status"] ?? "").toLowerCase() !=
-                selectedStatus!.toLowerCase()) {
+            !_sameStatus(goal["status"], selectedStatus)) {
           return false;
         }
 
@@ -313,6 +540,9 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
 
       // ---------------- LEAVE FILTER ----------------
       filteredLeaves = allLeaves.where((leave) {
+        if (!_matchesSelectedUser(leave)) return false;
+        if (!_matchesDepartment(leave)) return false;
+
         if (selectedLeaveStatus != null &&
             (leave["status"] ?? "").toLowerCase() !=
                 selectedLeaveStatus!.toLowerCase())
@@ -340,6 +570,15 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
 
       // ---------------- PERMISSION FILTER ----------------
       filteredPermissions = allPermissions.where((p) {
+        if (!_matchesSelectedUser(p)) return false;
+        if (!_matchesDepartment(p)) return false;
+
+        if (selectedPermissionStatus != null &&
+            (p["status"] ?? "").toString().toLowerCase() !=
+                selectedPermissionStatus!.toLowerCase()) {
+          return false;
+        }
+
         final filterDate = selectedPermissionDate ?? selectedLeaveDate;
         if (filterDate != null) {
           final rawDate = p["date"];
@@ -355,24 +594,65 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
         }
         return true;
       }).toList();
+
+      filteredOvertimes = allOvertimes.where((item) {
+        if (!_matchesSelectedUser(item)) return false;
+        if (!_matchesDepartment(item)) return false;
+        if (selectedOvertimeStatus != null &&
+            _overtimeStatus(item).toLowerCase() !=
+                selectedOvertimeStatus!.toLowerCase()) {
+          return false;
+        }
+        if (selectedLeaveDate != null &&
+            !_sameDay(item["date"], selectedLeaveDate!)) {
+          return false;
+        }
+        return true;
+      }).toList();
+
+      filteredCompensations = allCompensations.where((item) {
+        if (!_matchesSelectedUser(item)) return false;
+        if (!_matchesDepartment(item)) return false;
+        if (selectedCompensationStatus != null &&
+            !_matchesCompensationStatus(item, selectedCompensationStatus!)) {
+          return false;
+        }
+        if (selectedLeaveDate != null &&
+            !_sameDay(item["workDate"] ?? item["date"], selectedLeaveDate!)) {
+          return false;
+        }
+        return true;
+      }).toList();
     });
   }
 
+  bool _sameDay(dynamic raw, DateTime day) {
+    final date = DateTime.tryParse(raw?.toString() ?? '');
+    if (date == null) return false;
+    return date.year == day.year && date.month == day.month && date.day == day.day;
+  }
+
+  bool _matchesCompensationStatus(dynamic item, String wanted) {
+    final status = _compensationStatus(item).toLowerCase();
+    if (wanted.toLowerCase() == 'rejected') return status.contains('reject');
+    return status == wanted.toLowerCase();
+  }
+
   bool _matchesWorkDate(dynamic item) {
-    if (startDate == null && endDate == null) return true;
+    final from = workDateBy == "Completed Date" ? completedFrom : dueFrom;
+    final to = workDateBy == "Completed Date" ? completedTo : dueTo;
+    if (from == null && to == null) return true;
     if (item is! Map) return false;
     final raw = workDateBy == "Completed Date"
         ? (item["completedDate"] ?? item["completed_Date"])
         : (item["dueDate"] ?? item["due_Date"]);
     final day = _parseDay(raw);
     if (day == null) return false;
-    if (startDate != null) {
-      final from = DateTime(startDate!.year, startDate!.month, startDate!.day);
-      if (day.isBefore(from)) return false;
+    if (from != null && day.isBefore(DateTime(from.year, from.month, from.day))) {
+      return false;
     }
-    if (endDate != null) {
-      final to = DateTime(endDate!.year, endDate!.month, endDate!.day);
-      if (day.isAfter(to)) return false;
+    if (to != null && day.isAfter(DateTime(to.year, to.month, to.day))) {
+      return false;
     }
     return true;
   }
@@ -402,16 +682,39 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
         0;
   }
 
-  String _qtyText(dynamic task, {required bool completed}) {
-    if (!_isQuantityTask(task)) return "-";
-    final map = Map<String, dynamic>.from(task as Map);
-    if (completed) {
-      final done = taskAchievedQty(map);
-      return (done > 0 ? done : goalDone(map)).toString();
+  ({int target, int done}) _qtyTotals(Map item) {
+    var target = taskAssignedQty(item);
+    if (target <= 0) target = goalTarget(item);
+    var done = taskAchievedQty(item);
+    if (done <= 0) done = goalDone(item);
+
+    final tasks = item["tasks"] ?? item["Tasks"];
+    if (tasks is List && (target <= 0 || done <= 0)) {
+      var taskTarget = 0;
+      var taskDone = 0;
+      for (final task in tasks) {
+        if (task is! Map) continue;
+        final map = Map<String, dynamic>.from(task);
+        final assigned = taskAssignedQty(map);
+        taskTarget += assigned > 0 ? assigned : goalTarget(map);
+        final achieved = taskAchievedQty(map);
+        taskDone += achieved > 0 ? achieved : goalDone(map);
+      }
+      if (target <= 0) target = taskTarget;
+      if (done <= 0) done = taskDone;
     }
-    final assigned = taskAssignedQty(map);
-    if (assigned > 0) return assigned.toString();
-    return goalTarget(map).toString();
+    return (target: target, done: done);
+  }
+
+  String _qtyText(dynamic task, {required bool completed}) {
+    if (task is! Map) return "-";
+    final map = Map<String, dynamic>.from(task);
+    if (!_isQuantityTask(map) && _qtyTotals(map).target <= 0 && _qtyTotals(map).done <= 0) {
+      return "-";
+    }
+    final totals = _qtyTotals(map);
+    if (totals.target <= 0 && totals.done <= 0) return "-";
+    return (completed ? totals.done : totals.target).toString();
   }
 
   List<({String name, dynamic item})> _goalTaskEntries(dynamic goal) {
@@ -422,11 +725,6 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
 
     if (goal is Map) {
       add(goal["tasks"]);
-      if (_isYearly(goal)) {
-        for (final month in _monthlyChildren(goal)) {
-          add(month["tasks"]);
-        }
-      }
     }
 
     final lines = <({String name, dynamic item})>[];
@@ -445,44 +743,107 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
     return lines;
   }
 
-  List<String> _goalTaskLines(dynamic goal) {
-    return [for (final entry in _goalTaskEntries(goal)) entry.name];
+  String _pendingText(dynamic task) {
+    final target = int.tryParse(_qtyText(task, completed: false)) ?? 0;
+    final done = int.tryParse(_qtyText(task, completed: true)) ?? 0;
+    if (_qtyText(task, completed: false) == "-" && _qtyText(task, completed: true) == "-") {
+      return "-";
+    }
+    final pending = target - done;
+    return (pending < 0 ? 0 : pending).toString();
   }
 
-  List<String> _qtyLines(dynamic goal, {required bool completed}) {
-    final tasks = _goalTaskEntries(goal);
-    final lines = <String>[];
-    if (_isQuantityTask(goal) || tasks.isEmpty) {
-      lines.add(_qtyText(goal, completed: completed));
-    }
-    for (final entry in tasks) {
-      lines.add(_qtyText(entry.item, completed: completed));
-    }
-    return lines;
+  ({String name, String target, String done, String pending}) _qtyRow(
+    String name,
+    dynamic item,
+  ) {
+    return (
+      name: name,
+      target: _qtyText(item, completed: false),
+      done: _qtyText(item, completed: true),
+      pending: _pendingText(item),
+    );
   }
 
-  Widget _lineStack(List<String> lines, {bool firstIsGoal = false}) {
-    final style = Theme.of(context).textTheme.labelMedium;
-    if (lines.isEmpty) {
-      return Text("-", style: style);
+  List<({String name, String target, String done, String pending})>
+  _goalQtyRows(dynamic goal) {
+    final rows = <({String name, String target, String done, String pending})>[];
+    if (goal is Map && isYearlyGoal(Map<String, dynamic>.from(goal))) {
+      final months = _monthsOf(Map<String, dynamic>.from(goal));
+      if (months.isNotEmpty) {
+        var target = 0;
+        var done = 0;
+        var counted = false;
+        for (final month in months) {
+          final title = (month["title"] ?? month["goal"] ?? "Month").toString();
+          rows.add(_qtyRow(title, month));
+          final totals = _qtyTotals(month);
+          if (totals.target > 0 || totals.done > 0) {
+            counted = true;
+            target += totals.target;
+            done += totals.done;
+          }
+        }
+        final pending = target - done;
+        rows.insert(0, (
+          name: "Goal",
+          target: counted ? target.toString() : _qtyText(goal, completed: false),
+          done: counted ? done.toString() : _qtyText(goal, completed: true),
+          pending: counted
+              ? (pending < 0 ? 0 : pending).toString()
+              : _pendingText(goal),
+        ));
+        return rows;
+      }
     }
+
+    if (goal is Map && (_isQuantityTask(goal) || _qtyTotals(Map<String, dynamic>.from(goal)).target > 0)) {
+      rows.add(_qtyRow("Goal", goal));
+    }
+    for (final entry in _goalTaskEntries(goal)) {
+      rows.add(_qtyRow(entry.name, entry.item));
+    }
+    if (rows.isEmpty) {
+      rows.add((name: "-", target: "-", done: "-", pending: "-"));
+    }
+    return rows;
+  }
+
+  TextStyle get _tableStyle => TextStyle(
+    fontSize: 11,
+    height: 1.2,
+    color: WebTheme.inkOf(context),
+    fontWeight: FontWeight.w500,
+  );
+
+  Widget _alignedLines(
+    List<String> lines, {
+    required double width,
+    FontWeight weight = FontWeight.w500,
+    Color? color,
+  }) {
+    final style = _tableStyle.copyWith(fontWeight: weight, color: color);
+    final line = WebTheme.lineOf(context).withValues(alpha: 0.45);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        for (var i = 0; i < lines.length; i++)
+        for (var i = 0; i < lines.length; i++) ...[
+          if (i > 0) Container(height: 1, width: width, color: line),
           SizedBox(
-            height: 22,
+            height: 36,
+            width: width,
             child: Align(
               alignment: Alignment.centerLeft,
               child: Text(
                 lines[i],
-                style: firstIsGoal && i == 0
-                    ? style?.copyWith(fontWeight: FontWeight.w700)
-                    : style,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: style,
               ),
             ),
           ),
+        ],
       ],
     );
   }
@@ -527,7 +888,7 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
           PopupMenuButton<String>(
             tooltip: "Download",
             icon: const Icon(Icons.download_rounded),
-            color: const Color(0xFF163824),
+            color: WebTheme.brand,
             onSelected: _downloadReport,
             itemBuilder: (context) => const [
               PopupMenuItem(
@@ -552,6 +913,7 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
               showModalBottomSheet(
                 context: context,
                 isScrollControlled: true,
+                backgroundColor: WebTheme.canvasOf(context),
                 shape: const RoundedRectangleBorder(
                   borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
                 ),
@@ -583,28 +945,24 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
                       "Tasks",
                       "Leave",
                       "Permission",
+                      "Overtime",
+                      "Compensation",
                     ])
                       ChoiceChip(
-                        label: Text(
-                          type,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 13,
-                          ),
-                        ),
+                        label: Text(type),
                         selected: _activeTable == type,
                         showCheckmark: false,
-                        backgroundColor: WebTheme.brand,
-                        selectedColor: const Color(0xFF14532D),
+                        backgroundColor: WebTheme.canvasOf(context),
+                        selectedColor: WebTheme.brand,
                         side: BorderSide(
                           color: _activeTable == type
-                              ? Colors.white
-                              : Colors.transparent,
-                          width: 1.4,
+                              ? WebTheme.brand
+                              : WebTheme.lineOf(context),
                         ),
-                        labelStyle: const TextStyle(
-                          color: Colors.white,
+                        labelStyle: TextStyle(
+                          color: _activeTable == type
+                              ? Colors.white
+                              : WebTheme.mutedOf(context),
                           fontWeight: FontWeight.w700,
                           fontSize: 13,
                         ),
@@ -616,17 +974,24 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
 
                 /// 🔹 FILTER CHIPS SECTION - FOR GOALS/TASKS
                 if (selectedView == "Work" &&
-                    (selectedStatus != null ||
+                    (selectedDepartment != null ||
+                        selectedStatus != null ||
                         selectedPriority != null ||
                         selectedOverdue != null ||
-                        startDate != null ||
-                        endDate != null))
+                        _activeDateSet))
                   Padding(
                     padding: const EdgeInsets.only(bottom: 8),
                     child: Wrap(
                       spacing: 8,
                       runSpacing: 8,
                       children: [
+                        if (selectedDepartment != null)
+                          _buildFilterChip("Department: $selectedDepartment", () {
+                            setState(() {
+                              selectedDepartment = null;
+                              applyFilters();
+                            });
+                          }),
                         if (selectedStatus != null)
                           _buildFilterChip("Status: $selectedStatus", () {
                             setState(() {
@@ -648,11 +1013,16 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
                               applyFilters();
                             });
                           }),
-                        if (startDate != null || endDate != null)
+                        if (_activeDateSet)
                           _buildFilterChip(_dateRangeLabel(), () {
                             setState(() {
-                              startDate = null;
-                              endDate = null;
+                              if (workDateBy == "Completed Date") {
+                                completedFrom = null;
+                                completedTo = null;
+                              } else {
+                                dueFrom = null;
+                                dueTo = null;
+                              }
                               applyFilters();
                             });
                           }),
@@ -661,8 +1031,12 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
                   ),
 
                 if (selectedView == "Leave" &&
-                    (selectedLeaveType != null ||
+                    (selectedDepartment != null ||
+                        selectedLeaveType != null ||
                         selectedLeaveStatus != null ||
+                        selectedPermissionStatus != null ||
+                        selectedOvertimeStatus != null ||
+                        selectedCompensationStatus != null ||
                         selectedLeaveDate != null))
                   Padding(
                     padding: const EdgeInsets.only(bottom: 8),
@@ -670,6 +1044,13 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
                       spacing: 8,
                       runSpacing: 8,
                       children: [
+                        if (selectedDepartment != null)
+                          _buildFilterChip("Department: $selectedDepartment", () {
+                            setState(() {
+                              selectedDepartment = null;
+                              applyFilters();
+                            });
+                          }),
                         if (selectedLeaveType != null)
                           _buildFilterChip(
                             "Leave Type: $selectedLeaveType",
@@ -687,6 +1068,36 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
                               applyFilters();
                             });
                           }),
+                        if (selectedPermissionStatus != null)
+                          _buildFilterChip(
+                            "Status: $selectedPermissionStatus",
+                            () {
+                              setState(() {
+                                selectedPermissionStatus = null;
+                                applyFilters();
+                              });
+                            },
+                          ),
+                        if (selectedOvertimeStatus != null)
+                          _buildFilterChip(
+                            "Status: $selectedOvertimeStatus",
+                            () {
+                              setState(() {
+                                selectedOvertimeStatus = null;
+                                applyFilters();
+                              });
+                            },
+                          ),
+                        if (selectedCompensationStatus != null)
+                          _buildFilterChip(
+                            "Status: $selectedCompensationStatus",
+                            () {
+                              setState(() {
+                                selectedCompensationStatus = null;
+                                applyFilters();
+                              });
+                            },
+                          ),
                         if (selectedLeaveDate != null)
                           _buildFilterChip(
                             "Date: ${AppHelpers.formatDate(selectedLeaveDate!.toString())}",
@@ -708,9 +1119,7 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
                           ? (selectedType == "Tasks"
                                 ? filteredTasks
                                 : filteredGoals)
-                          : (selectedLeaveView == "Leave"
-                                ? filteredLeaves
-                                : filteredPermissions);
+                          : _attendanceList();
                       if (loadError != null && currentList.isEmpty) {
                         return const AppLoadError();
                       }
@@ -726,9 +1135,7 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
                           ? (selectedType == "Tasks"
                                 ? _buildTaskTable()
                                 : _buildGoalTable())
-                          : (selectedLeaveView == "Leave"
-                                ? _buildLeaveTable()
-                                : _buildPermissionTable());
+                          : _attendanceTable();
                       return Container(
                         width: double.infinity,
                         decoration: BoxDecoration(
@@ -756,21 +1163,35 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
     double dataRowMinHeight = 48,
     double dataRowMaxHeight = double.infinity,
   }) {
-    const headingHeight = 56.0;
+    const headingHeight = 40.0;
     Widget sheet({required bool header}) {
       return DataTable(
         showCheckboxColumn: false,
         headingRowHeight: header ? headingHeight : 0,
         headingRowColor: WidgetStateProperty.all(WebTheme.brandSoftOf(context)),
-        headingTextStyle: const TextStyle(
-          fontSize: 13,
+        headingTextStyle: TextStyle(
+          fontSize: 11,
           fontWeight: FontWeight.w700,
-          color: WebTheme.brand,
+          color: WebTheme.brandOf(context),
+        ),
+        dataTextStyle: _tableStyle,
+        border: TableBorder(
+          verticalInside: BorderSide(
+            color: WebTheme.isDark(context)
+                ? const Color(0xFFD1D5DB)
+                : const Color(0xFF374151),
+            width: 1.4,
+          ),
+          horizontalInside: BorderSide(
+            color: WebTheme.isDark(context)
+                ? const Color(0xFF9CA3AF)
+                : const Color(0xFF6B7280),
+          ),
         ),
         dataRowMinHeight: header ? 0 : dataRowMinHeight,
         dataRowMaxHeight: header ? 0 : dataRowMaxHeight,
-        horizontalMargin: 16,
-        columnSpacing: 28,
+        horizontalMargin: 10,
+        columnSpacing: 14,
         columns: columns,
         rows: rows,
       );
@@ -815,9 +1236,225 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
     );
   }
 
+  List<dynamic> _attendanceList() {
+    switch (selectedLeaveView) {
+      case "Permission":
+        return filteredPermissions;
+      case "Overtime":
+        return filteredOvertimes;
+      case "Compensation":
+        return filteredCompensations;
+      default:
+        return filteredLeaves;
+    }
+  }
+
+  Widget _attendanceTable() {
+    switch (selectedLeaveView) {
+      case "Permission":
+        return _buildPermissionTable();
+      case "Overtime":
+        return _buildOvertimeTable();
+      case "Compensation":
+        return _buildCompensationTable();
+      default:
+        return _buildLeaveTable();
+    }
+  }
+
+  String _staffName(dynamic item) {
+    if (item is! Map) return "-";
+    for (final key in const ["staffName", "name", "employeeName"]) {
+      final value = (item[key] ?? "").toString().trim();
+      if (value.isNotEmpty && value.toLowerCase() != "null") return value;
+    }
+    final id = item["employeeId"] ?? item["staffId"] ?? item["uid"];
+    final name = _userNameById("${id ?? ""}").trim();
+    return name.isEmpty ? "-" : name;
+  }
+
+  String _overtimeStatus(dynamic item) {
+    final manager = (item is Map ? item["managerStatus"] : "")
+        .toString()
+        .trim();
+    final staff = (item is Map ? item["staffStatus"] : "").toString().trim();
+    if (manager.toLowerCase() == "approved") return "Approved";
+    if (manager.toLowerCase() == "rejected" ||
+        staff.toLowerCase() == "rejected") {
+      return "Rejected";
+    }
+    if (staff.toLowerCase() == "accepted") return "Accepted";
+    return "Pending";
+  }
+
+  String _compensationStatus(dynamic item) {
+    final raw = (item is Map ? item["status"] : "").toString().trim();
+    switch (raw.toLowerCase()) {
+      case "approved":
+        return "Approved";
+      case "accepted":
+        return "Accepted";
+      case "staffrejected":
+        return "Staff Rejected";
+      case "managerrejected":
+        return "Manager Rejected";
+      case "rejected":
+        return "Rejected";
+      default:
+        return raw.isEmpty ? "Pending" : raw;
+    }
+  }
+
+  String _requestRemarks(dynamic item) {
+    if (item is! Map) return "-";
+    String text(dynamic value) {
+      final raw = (value ?? "").toString().trim();
+      return raw.isEmpty || raw.toLowerCase() == "null" ? "" : raw;
+    }
+
+    final staff = text(item["staffResponseReason"] ?? item["staffRemarks"]);
+    final manager = text(
+      item["managerResponseReason"] ?? item["managerRemarks"],
+    );
+    final parts = <String>[];
+    if (staff.isNotEmpty) parts.add("Staff: $staff");
+    if (manager.isNotEmpty) parts.add("Manager: $manager");
+    return parts.isEmpty ? "-" : parts.join(" · ");
+  }
+
+  bool _compensationUsed(dynamic item) {
+    if (item is! Map) return false;
+    final value = item["isCompensationUsed"];
+    if (value == true) return true;
+    return value?.toString().toLowerCase() == "true";
+  }
+
+  String _workTypeLabel(dynamic value) {
+    switch ((value ?? "").toString()) {
+      case "WeeklyOff":
+        return "Weekly Off";
+      case "PublicHoliday":
+        return "Public Holiday";
+      case "CompanyHoliday":
+        return "Company Holiday";
+      default:
+        final text = (value ?? "").toString().trim();
+        return text.isEmpty ? "-" : text;
+    }
+  }
+
+  String _timeRange(dynamic from, dynamic to) {
+    return "${TimeUtils.formatTime12(from, empty: "-")} - ${TimeUtils.formatTime12(to, empty: "-")}";
+  }
+
+  DataCell _statusCell(String status) {
+    final value = status.toLowerCase();
+    final color = value == "approved"
+        ? Colors.green
+        : value == "accepted"
+        ? Colors.blue
+        : value.contains("reject")
+        ? Colors.red
+        : Colors.orange;
+    return DataCell(
+      Text(
+        status,
+        style: _tableStyle.copyWith(color: color),
+      ),
+    );
+  }
+
+  Widget _buildOvertimeTable() {
+    return _pinnedTable(
+      columns: const [
+        DataColumn(label: Text("Department")),
+        DataColumn(label: Text("Staff")),
+        DataColumn(label: Text("Date")),
+        DataColumn(label: Text("Time")),
+        DataColumn(label: Text("Hours")),
+        DataColumn(label: Text("Reason")),
+        DataColumn(label: Text("Status")),
+        DataColumn(label: Text("Remarks")),
+      ],
+      rows: filteredOvertimes.map((item) {
+        return DataRow(
+          cells: [
+            _departmentCell(item),
+            DataCell(Text(_staffName(item), style: _tableStyle)),
+            DataCell(Text(_cellDate(item["date"]), style: _tableStyle)),
+            DataCell(
+              Text(
+                _timeRange(item["fromTime"], item["toTime"]),
+                style: _tableStyle,
+              ),
+            ),
+            DataCell(
+              Text(
+                _hoursLabel(item["totalHours"]),
+                style: _tableStyle,
+              ),
+            ),
+            DataCell(Text((item["reason"] ?? "").toString(), style: _tableStyle)),
+            _statusCell(_overtimeStatus(item)),
+            DataCell(Text(_requestRemarks(item), style: _tableStyle)),
+          ],
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildCompensationTable() {
+    return _pinnedTable(
+      columns: const [
+        DataColumn(label: Text("Department")),
+        DataColumn(label: Text("Staff")),
+        DataColumn(label: Text("Work Date")),
+        DataColumn(label: Text("Work Type")),
+        DataColumn(label: Text("Time")),
+        DataColumn(label: Text("Hours")),
+        DataColumn(label: Text("Reason")),
+        DataColumn(label: Text("Status")),
+        DataColumn(label: Text("Remarks")),
+        DataColumn(label: Text("Used")),
+      ],
+      rows: filteredCompensations.map((item) {
+        return DataRow(
+          cells: [
+            _departmentCell(item),
+            DataCell(Text(_staffName(item), style: _tableStyle)),
+            DataCell(
+              Text(
+                _cellDate(item["workDate"] ?? item["date"]),
+                style: _tableStyle,
+              ),
+            ),
+            DataCell(Text(_workTypeLabel(item["workType"]), style: _tableStyle)),
+            DataCell(
+              Text(
+                _timeRange(item["startTime"], item["endTime"]),
+                style: _tableStyle,
+              ),
+            ),
+            DataCell(
+              Text(
+                _hoursLabel(item["expectedHours"] ?? item["totalHours"]),
+                style: _tableStyle,
+              ),
+            ),
+            DataCell(Text((item["reason"] ?? "").toString(), style: _tableStyle)),
+            _statusCell(_compensationStatus(item)),
+            DataCell(Text(_requestRemarks(item), style: _tableStyle)),
+            DataCell(Text(_compensationUsed(item) ? "Yes" : "No", style: _tableStyle)),
+          ],
+        );
+      }).toList(),
+    );
+  }
+
   Widget _buildLeaveTable() {
     return _pinnedTable(
       columns: const [
+        DataColumn(label: Text("Department")),
         DataColumn(label: Text("Leave Category")),
         DataColumn(label: Text("Leave Type")),
         DataColumn(label: Text("Date")),
@@ -830,62 +1467,61 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
       rows: filteredLeaves.map((item) {
         return DataRow(
           cells: [
+            _departmentCell(item),
             DataCell(
               Text(
                 item["leavecategory"] ?? "-",
-                style: Theme.of(context).textTheme.labelMedium,
+                style: _tableStyle,
               ),
             ),
             DataCell(
               Text(
                 item["type"] ?? "-",
-                style: Theme.of(context).textTheme.labelMedium,
+                style: _tableStyle,
               ),
             ),
             DataCell(
               Text(
                 AppHelpers.formatDate(item["fromDate"] ?? "-"),
-                style: Theme.of(context).textTheme.labelMedium,
+                style: _tableStyle,
               ),
             ),
             DataCell(
               Text(
                 item["reason"] ?? "",
-                style: Theme.of(context).textTheme.labelMedium,
+                style: _tableStyle,
               ),
             ),
 
             DataCell(
               Text(
                 item["status"] ?? "",
-                style: TextStyle(
+                style: _tableStyle.copyWith(
                   color: item["status"] == "Approved"
                       ? Colors.green
                       : item["status"] == "Rejected"
                       ? Colors.red
                       : Colors.orange,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
                 ),
               ),
             ),
             DataCell(
               Text(
                 AppHelpers.formatDate(item["approvedate"] ?? "-"),
-                style: Theme.of(context).textTheme.labelMedium,
+                style: _tableStyle,
               ),
             ),
             DataCell(
               Text(
                 item["rejreason"] ?? "-",
-                style: Theme.of(context).textTheme.labelMedium,
+                style: _tableStyle,
               ),
             ),
 
             DataCell(
               Text(
                 AppHelpers.formatDate(item["compensationDate"] ?? "-"),
-                style: Theme.of(context).textTheme.labelMedium,
+                style: _tableStyle,
               ),
             ),
           ],
@@ -897,6 +1533,7 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
   Widget _buildPermissionTable() {
     return _pinnedTable(
       columns: const [
+        DataColumn(label: Text("Department")),
         DataColumn(label: Text("Reason")),
         DataColumn(label: Text("Date")),
         DataColumn(label: Text("From Time")),
@@ -908,53 +1545,52 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
       rows: filteredPermissions.map((item) {
         return DataRow(
           cells: [
+            _departmentCell(item),
             DataCell(
               Text(
                 item["reason"] ?? "",
-                style: Theme.of(context).textTheme.labelMedium,
+                style: _tableStyle,
               ),
             ),
             DataCell(
               Text(
                 AppHelpers.formatDate(item["date"] ?? "-"),
-                style: Theme.of(context).textTheme.labelMedium,
+                style: _tableStyle,
               ),
             ),
             DataCell(
               Text(
                 item["fromTime"] ?? "-",
-                style: Theme.of(context).textTheme.labelMedium,
+                style: _tableStyle,
               ),
             ),
             DataCell(
               Text(
                 item["toTime"] ?? "-",
-                style: Theme.of(context).textTheme.labelMedium,
+                style: _tableStyle,
               ),
             ),
             DataCell(
               Text(
                 _hoursLabel(item["totalHours"] ?? item["totalhours"]),
-                style: Theme.of(context).textTheme.labelMedium,
+                style: _tableStyle,
               ),
             ),
             DataCell(
               Text(
                 _cellDate(item["submittedDate"] ?? item["submdate"]),
-                style: Theme.of(context).textTheme.labelMedium,
+                style: _tableStyle,
               ),
             ),
             DataCell(
               Text(
                 item["status"] ?? "",
-                style: TextStyle(
+                style: _tableStyle.copyWith(
                   color: item["status"] == "Approved"
                       ? Colors.green
                       : item["status"] == "Rejected"
                       ? Colors.red
                       : Colors.orange,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
                 ),
               ),
             ),
@@ -970,6 +1606,7 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
         DataColumn(label: Text("Sl.No")),
         DataColumn(label: Text("Task")),
         DataColumn(label: Text("Assigned To")),
+        DataColumn(label: Text("Department")),
         DataColumn(label: Text("Status")),
         DataColumn(label: Text("Priority")),
         DataColumn(label: Text("Points")),
@@ -996,20 +1633,21 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
       onSelectChanged: (_) => _openTask(task),
       cells: [
         DataCell(
-          Text("${index + 1}", style: Theme.of(context).textTheme.labelMedium),
+          Text("${index + 1}", style: _tableStyle),
         ),
         DataCell(
           Text(
             (task["task"] ?? "-").toString(),
-            style: Theme.of(context).textTheme.labelMedium,
+            style: _tableStyle,
           ),
         ),
         DataCell(
           Text(
             _assigneeLabel(task),
-            style: Theme.of(context).textTheme.labelMedium,
+            style: _tableStyle,
           ),
         ),
+        _departmentCell(task),
         DataCell(
           Text(
             task["status"] ?? "-",
@@ -1018,7 +1656,7 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
                 TaskUtils.parseStatus(task["status"] ?? ""),
               ),
               fontWeight: FontWeight.w700,
-              fontSize: 14,
+              fontSize: 11,
             ),
           ),
         ),
@@ -1028,35 +1666,35 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
             style: TextStyle(
               color: TaskUtils.getPriorityColor(task["priority"]),
               fontWeight: FontWeight.w600,
-              fontSize: 14,
+              fontSize: 11,
             ),
           ),
         ),
         DataCell(
           Text(
             (task["points"] ?? 0).toString(),
-            style: Theme.of(context).textTheme.labelMedium,
+            style: _tableStyle,
           ),
         ),
         DataCell(
           Text(
             _qtyText(task, completed: false),
-            style: Theme.of(context).textTheme.labelMedium,
+            style: _tableStyle,
           ),
         ),
         DataCell(
           Text(
             _qtyText(task, completed: true),
-            style: Theme.of(context).textTheme.labelMedium,
+            style: _tableStyle,
           ),
         ),
         DataCell(
-          Text(dueDate, style: Theme.of(context).textTheme.labelMedium),
+          Text(dueDate, style: _tableStyle),
         ),
         DataCell(
           Text(
             completedDate,
-            style: Theme.of(context).textTheme.labelMedium,
+            style: _tableStyle,
           ),
         ),
         DataCell(
@@ -1065,7 +1703,7 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
             style: TextStyle(
               color: task["isOverdue"] == true ? Colors.red : Colors.green,
               fontWeight: FontWeight.bold,
-              fontSize: 14,
+              fontSize: 11,
             ),
           ),
         ),
@@ -1082,9 +1720,11 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
         DataColumn(label: Text("Goal")),
         DataColumn(label: Text("Goal Type")),
         DataColumn(label: Text("Assigned To")),
+        DataColumn(label: Text("Department")),
         DataColumn(label: Text("Tasks")),
         DataColumn(label: Text("Target Qty")),
         DataColumn(label: Text("Completed Qty")),
+        DataColumn(label: Text("Pending Qty")),
         DataColumn(label: Text("Status")),
         DataColumn(label: Text("Priority")),
         DataColumn(label: Text("Due Date")),
@@ -1101,59 +1741,61 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
   }
 
   DataRow _goalRow(dynamic goal, int index) {
-    final tasksList = _goalTaskEntries(goal);
     final goalType = (goal["goalType"] ?? goal["GoalType"] ?? "-").toString();
 
     return DataRow(
       onSelectChanged: (_) => _openGoal(goal),
       cells: [
         DataCell(
-          Text("${index + 1}", style: Theme.of(context).textTheme.labelMedium),
+          Text("${index + 1}", style: _tableStyle),
         ),
         DataCell(
           Align(
             alignment: Alignment.topLeft,
             child: Text(
               (goal["title"] ?? "").toString(),
-              style: Theme.of(context).textTheme.labelMedium,
+              style: _tableStyle,
             ),
           ),
         ),
         DataCell(
           Text(
             goalType.isEmpty ? "-" : goalType,
-            style: Theme.of(context).textTheme.labelMedium,
+            style: _tableStyle,
           ),
         ),
         DataCell(
           Text(
             _assigneeLabel(goal),
-            style: Theme.of(context).textTheme.labelMedium,
+            style: _tableStyle,
+          ),
+        ),
+        _departmentCell(goal),
+        DataCell(
+          _alignedLines(
+            [for (final row in _goalQtyRows(goal)) row.name],
+            width: 180,
+            weight: FontWeight.w700,
           ),
         ),
         DataCell(
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 360),
-            child: _lineStack(
-              tasksList.isEmpty
-                  ? const ["-"]
-                  : [
-                      if (_isQuantityTask(goal)) "",
-                      for (final entry in tasksList) entry.name,
-                    ],
-            ),
+          _alignedLines(
+            [for (final row in _goalQtyRows(goal)) row.target],
+            width: 72,
           ),
         ),
         DataCell(
-          _lineStack(
-            _qtyLines(goal, completed: false),
-            firstIsGoal: _isQuantityTask(goal),
+          _alignedLines(
+            [for (final row in _goalQtyRows(goal)) row.done],
+            width: 88,
+            weight: FontWeight.w700,
+            color: WebTheme.brand,
           ),
         ),
         DataCell(
-          _lineStack(
-            _qtyLines(goal, completed: true),
-            firstIsGoal: _isQuantityTask(goal),
+          _alignedLines(
+            [for (final row in _goalQtyRows(goal)) row.pending],
+            width: 80,
           ),
         ),
         DataCell(
@@ -1164,7 +1806,7 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
                 TaskUtils.parseStatus(goal["status"] ?? ""),
               ),
               fontWeight: FontWeight.w600,
-              fontSize: 14,
+              fontSize: 11,
             ),
           ),
         ),
@@ -1174,32 +1816,32 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
             style: TextStyle(
               color: TaskUtils.getPriorityColor(goal["priority"]),
               fontWeight: FontWeight.w600,
-              fontSize: 14,
+              fontSize: 11,
             ),
           ),
         ),
         DataCell(
           Text(
             _cellDate(goal["dueDate"] ?? goal["due_Date"]),
-            style: Theme.of(context).textTheme.labelMedium,
+            style: _tableStyle,
           ),
         ),
         DataCell(
           Text(
             _cellDate(goal["completedDate"] ?? goal["completed_Date"]),
-            style: Theme.of(context).textTheme.labelMedium,
+            style: _tableStyle,
           ),
         ),
         DataCell(
           Text(
             _percentLabel(goal["progress"]),
-            style: Theme.of(context).textTheme.labelMedium,
+            style: _tableStyle,
           ),
         ),
         DataCell(
           Text(
             (goal["points"] ?? 0).toString(),
-            style: Theme.of(context).textTheme.labelMedium,
+            style: _tableStyle,
           ),
         ),
         DataCell(
@@ -1208,7 +1850,7 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
             style: TextStyle(
               color: goal["isOverdue"] == true ? Colors.red : Colors.green,
               fontWeight: FontWeight.bold,
-              fontSize: 14,
+              fontSize: 11,
             ),
           ),
         ),
@@ -1284,6 +1926,144 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
       }
       return copy;
     }).toList();
+  }
+
+  void _nestMonths(List<dynamic> goals) {
+    final yearlyById = <String, Map>{};
+    for (final item in goals) {
+      if (item is! Map || !isYearlyGoal(Map<String, dynamic>.from(item))) {
+        continue;
+      }
+      final id = _idOf(item["goalId"] ?? item["id"] ?? item["Id"]);
+      if (id.isNotEmpty) yearlyById[id] = item;
+    }
+
+    for (final item in goals) {
+      if (item is! Map || isYearlyGoal(Map<String, dynamic>.from(item))) {
+        continue;
+      }
+      final parentId = _idOf(item["parentGoalId"] ?? item["ParentGoalId"]);
+      final parent = yearlyById[parentId];
+      if (parent == null) continue;
+      final months = parent["monthlyGoals"] ?? parent["MonthlyGoals"];
+      final list = months is List ? List<dynamic>.from(months) : <dynamic>[];
+      final code = (item["goalCode"] ?? item["GoalCode"] ?? "").toString();
+      final exists = list.any((month) {
+        if (month is! Map || code.isEmpty) return false;
+        return (month["goalCode"] ?? month["GoalCode"] ?? "").toString() == code;
+      });
+      if (!exists) list.add(item);
+      parent["monthlyGoals"] = list;
+    }
+  }
+
+  void _syncYearlyGoalStatus(List<dynamic> goals) {
+    for (final item in goals) {
+      if (item is! Map || !isYearlyGoal(Map<String, dynamic>.from(item))) {
+        continue;
+      }
+      final next = _yearlyGoalStatus(Map<String, dynamic>.from(item));
+      if (next.isEmpty) continue;
+      item["status"] = next;
+    }
+  }
+
+  String _yearlyGoalStatus(Map goal) {
+    bool completed(Map item) {
+      final status = (item["status"] ?? item["Status"] ?? "")
+          .toString()
+          .trim()
+          .toLowerCase();
+      if (status == "completed") return true;
+      final progress = item["progress"] ?? item["Progress"];
+      if (progress is num && progress >= 100) return true;
+      final progressText = progress?.toString().replaceAll("%", "").trim() ?? "";
+      final progressValue = double.tryParse(progressText);
+      if (progressValue != null && progressValue >= 100) return true;
+      final done = item["completedDate"] ?? item["completed_Date"];
+      final text = done?.toString().trim() ?? "";
+      return text.isNotEmpty && text != "null" && text != "-";
+    }
+
+    final months = _monthsOf(goal);
+    if (months.isNotEmpty && months.every(completed)) return "Completed";
+    if (completed(goal)) return "Completed";
+    if (months.any(completed)) return "InProgress";
+    final stored = (goal["status"] ?? goal["Status"] ?? "").toString().trim();
+    return stored;
+  }
+
+  List<Map<String, dynamic>> _monthsOf(Map yearly) {
+    final months = <Map<String, dynamic>>[];
+    final seen = <String>{};
+    void add(dynamic raw) {
+      if (raw is! Map) return;
+      final month = Map<String, dynamic>.from(raw);
+      if (isYearlyGoal(month)) return;
+      final key = (month["goalCode"] ?? month["GoalCode"] ?? month["title"] ?? "")
+          .toString();
+      if (key.isNotEmpty && !seen.add(key)) return;
+      months.add(month);
+    }
+
+    final nested = yearly["monthlyGoals"] ?? yearly["MonthlyGoals"];
+    if (nested is List) {
+      for (final month in nested) {
+        add(month);
+      }
+    }
+    for (final month in _monthlyChildren(yearly)) {
+      add(month);
+    }
+    return months;
+  }
+
+  List<dynamic> _visibleGoals(List<dynamic> goals) {
+    final userId = widget.userId;
+    if (userId == null || _responseScopedToUser()) return goals;
+
+    final yearlyIds = <String>{};
+    for (final item in goals) {
+      if (item is! Map || !isYearlyGoal(Map<String, dynamic>.from(item))) {
+        continue;
+      }
+      if (!showYearlyGoalTo(Map<String, dynamic>.from(item), userId)) continue;
+      final id = _idOf(item["goalId"] ?? item["id"] ?? item["Id"]);
+      if (id.isNotEmpty) yearlyIds.add(id);
+    }
+
+    final visible = <dynamic>[];
+    final seen = <String>{};
+    for (final item in goals) {
+      if (item is! Map) continue;
+      final map = Map<String, dynamic>.from(item);
+      final key = (map["goalCode"] ?? map["GoalCode"] ?? map["title"] ?? "")
+          .toString();
+      if (isYearlyGoal(map)) {
+        if (!showYearlyGoalTo(map, userId)) {
+          for (final month in _monthsOf(map)) {
+            if (!showMonthGoalTo(month, userId)) continue;
+            final monthKey =
+                (month["goalCode"] ?? month["GoalCode"] ?? month["title"] ?? "")
+                    .toString();
+            if (monthKey.isNotEmpty && !seen.add(monthKey)) continue;
+            visible.add(month);
+          }
+        } else if (key.isEmpty || seen.add(key)) {
+          visible.add(item);
+        }
+        continue;
+      }
+
+      final parentId = _idOf(map["parentGoalId"] ?? map["ParentGoalId"]);
+      if (parentId.isNotEmpty && yearlyIds.contains(parentId)) continue;
+      if (!showMonthGoalTo(map, userId, listedForUser: goalAssigneeIds(map).isEmpty)) {
+        continue;
+      }
+      if (key.isNotEmpty && !seen.add(key)) continue;
+      visible.add(item);
+    }
+    return visible;
   }
 
   List<Map<String, dynamic>> _monthlyChildren(Map yearly) {
@@ -1401,9 +2181,16 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
     return "";
   }
 
+  bool get _activeDateSet {
+    if (workDateBy == "Completed Date") {
+      return completedFrom != null || completedTo != null;
+    }
+    return dueFrom != null || dueTo != null;
+  }
+
   Widget _buildFilterChip(String label, VoidCallback onDelete) {
     return Chip(
-      backgroundColor: const Color(0xFF194D26),
+      backgroundColor: WebTheme.brand,
       side: BorderSide.none,
       label: Text(
         label,
@@ -1436,16 +2223,21 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
   }
 
   String _dateRangeLabel() {
-    final from = startDate == null ? "Any" : TimeUtils.formatDate(startDate!);
-    final to = endDate == null ? "Any" : TimeUtils.formatDate(endDate!);
-    return "$workDateBy: $from - $to";
+    final from = workDateBy == "Completed Date" ? completedFrom : dueFrom;
+    final to = workDateBy == "Completed Date" ? completedTo : dueTo;
+    final fromText = from == null ? "Any" : TimeUtils.formatDate(from);
+    final toText = to == null ? "Any" : TimeUtils.formatDate(to);
+    return "$workDateBy: $fromText - $toText";
   }
 
   Future<void> _pickWorkBound({
+    required bool completed,
     required bool isStart,
     required void Function(void Function()) modalSetState,
   }) async {
-    final current = isStart ? startDate : endDate;
+    final current = completed
+        ? (isStart ? completedFrom : completedTo)
+        : (isStart ? dueFrom : dueTo);
     final picked = await showDatePicker(
       context: context,
       initialDate: current ?? DateTime.now(),
@@ -1454,18 +2246,32 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
     );
     if (picked == null) return;
     modalSetState(() {
-      if (isStart) {
-        startDate = picked;
+      if (completed) {
+        if (isStart) {
+          completedFrom = picked;
+        } else {
+          completedTo = picked;
+        }
+        if (completedFrom != null &&
+            completedTo != null &&
+            completedFrom!.isAfter(completedTo!)) {
+          final swap = completedFrom;
+          completedFrom = completedTo;
+          completedTo = swap;
+        }
       } else {
-        endDate = picked;
+        if (isStart) {
+          dueFrom = picked;
+        } else {
+          dueTo = picked;
+        }
+        if (dueFrom != null && dueTo != null && dueFrom!.isAfter(dueTo!)) {
+          final swap = dueFrom;
+          dueFrom = dueTo;
+          dueTo = swap;
+        }
       }
-      if (startDate != null &&
-          endDate != null &&
-          startDate!.isAfter(endDate!)) {
-        final swap = startDate;
-        startDate = endDate;
-        endDate = swap;
-      }
+      workDateBy = completed ? "Completed Date" : "Due Date";
     });
     applyFilters();
   }
@@ -1515,6 +2321,7 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
           "Sl.No",
           "Task",
           "Assigned To",
+          "Department",
           "Status",
           "Priority",
           "Points",
@@ -1526,6 +2333,7 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
         ];
       case "Leave":
         return const [
+          "Department",
           "Leave Category",
           "Leave Type",
           "Date",
@@ -1537,6 +2345,7 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
         ];
       case "Permission":
         return const [
+          "Department",
           "Reason",
           "Date",
           "From Time",
@@ -1545,15 +2354,41 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
           "Submitted Date",
           "Status",
         ];
+      case "Overtime":
+        return const [
+          "Department",
+          "Staff",
+          "Date",
+          "Time",
+          "Hours",
+          "Reason",
+          "Status",
+          "Remarks",
+        ];
+      case "Compensation":
+        return const [
+          "Department",
+          "Staff",
+          "Work Date",
+          "Work Type",
+          "Time",
+          "Hours",
+          "Reason",
+          "Status",
+          "Remarks",
+          "Used",
+        ];
       default:
         return const [
           "Sl.No",
           "Goal",
           "Goal Type",
           "Assigned To",
+          "Department",
           "Tasks",
           "Target Qty",
           "Completed Qty",
+          "Pending Qty",
           "Status",
           "Priority",
           "Due Date",
@@ -1574,6 +2409,9 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
               "${index + 1}",
               (filteredTasks[index]["task"] ?? "-").toString(),
               _assigneeLabel(filteredTasks[index]),
+              _itemDepartment(filteredTasks[index]).isEmpty
+                  ? "-"
+                  : _itemDepartment(filteredTasks[index]),
               (filteredTasks[index]["status"] ?? "-").toString(),
               (filteredTasks[index]["priority"] ?? "-").toString(),
               (filteredTasks[index]["points"] ?? 0).toString(),
@@ -1594,6 +2432,7 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
         return [
           for (final item in filteredLeaves)
             [
+              _itemDepartment(item).isEmpty ? "-" : _itemDepartment(item),
               (item["leavecategory"] ?? "-").toString(),
               (item["type"] ?? "-").toString(),
               AppHelpers.formatDate(item["fromDate"] ?? "-"),
@@ -1608,6 +2447,7 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
         return [
           for (final item in filteredPermissions)
             [
+              _itemDepartment(item).isEmpty ? "-" : _itemDepartment(item),
               (item["reason"] ?? "").toString(),
               AppHelpers.formatDate(item["date"] ?? "-"),
               (item["fromTime"] ?? "-").toString(),
@@ -1615,6 +2455,36 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
               _hoursLabel(item["totalHours"] ?? item["totalhours"]),
               _cellDate(item["submittedDate"] ?? item["submdate"]),
               (item["status"] ?? "").toString(),
+            ],
+        ];
+      case "Overtime":
+        return [
+          for (final item in filteredOvertimes)
+            [
+              _itemDepartment(item).isEmpty ? "-" : _itemDepartment(item),
+              _staffName(item),
+              _cellDate(item["date"]),
+              _timeRange(item["fromTime"], item["toTime"]),
+              _hoursLabel(item["totalHours"]),
+              (item["reason"] ?? "").toString(),
+              _overtimeStatus(item),
+              _requestRemarks(item),
+            ],
+        ];
+      case "Compensation":
+        return [
+          for (final item in filteredCompensations)
+            [
+              _itemDepartment(item).isEmpty ? "-" : _itemDepartment(item),
+              _staffName(item),
+              _cellDate(item["workDate"] ?? item["date"]),
+              _workTypeLabel(item["workType"]),
+              _timeRange(item["startTime"], item["endTime"]),
+              _hoursLabel(item["expectedHours"] ?? item["totalHours"]),
+              (item["reason"] ?? "").toString(),
+              _compensationStatus(item),
+              _requestRemarks(item),
+              _compensationUsed(item) ? "Yes" : "No",
             ],
         ];
       default:
@@ -1628,9 +2498,21 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
                       "-")
                   .toString(),
               _assigneeLabel(filteredGoals[index]),
-              _goalTaskLines(filteredGoals[index]).join("\n"),
-              _qtyLines(filteredGoals[index], completed: false).join("\n"),
-              _qtyLines(filteredGoals[index], completed: true).join("\n"),
+              _itemDepartment(filteredGoals[index]).isEmpty
+                  ? "-"
+                  : _itemDepartment(filteredGoals[index]),
+              _goalQtyRows(filteredGoals[index])
+                  .map((row) => row.name)
+                  .join("\n"),
+              _goalQtyRows(filteredGoals[index])
+                  .map((row) => row.target)
+                  .join("\n"),
+              _goalQtyRows(filteredGoals[index])
+                  .map((row) => row.done)
+                  .join("\n"),
+              _goalQtyRows(filteredGoals[index])
+                  .map((row) => row.pending)
+                  .join("\n"),
               (filteredGoals[index]["status"] ?? "-").toString(),
               (filteredGoals[index]["priority"] ?? "").toString(),
               _cellDate(
@@ -1650,7 +2532,8 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
   }
 
   Widget buildFilterSheet(void Function(void Function()) modalSetState) {
-    const ink = Color(0xFF194D26);
+    final ink = WebTheme.inkOf(context);
+    final muted = WebTheme.mutedOf(context);
 
     return Container(
       padding: EdgeInsets.fromLTRB(
@@ -1659,9 +2542,9 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
         16,
         16 + MediaQuery.paddingOf(context).bottom,
       ),
-      decoration: const BoxDecoration(
-        color: Color(0xFFF7FAF8),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      decoration: BoxDecoration(
+        color: WebTheme.canvasOf(context),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
       child: SingleChildScrollView(
         child: Column(
@@ -1673,12 +2556,12 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
                 height: 4,
                 margin: const EdgeInsets.only(bottom: 14),
                 decoration: BoxDecoration(
-                  color: ink.withValues(alpha: 0.25),
+                  color: muted.withValues(alpha: 0.45),
                   borderRadius: BorderRadius.circular(4),
                 ),
               ),
             ),
-            const Text(
+            Text(
               "Filters",
               style: TextStyle(
                 color: ink,
@@ -1687,21 +2570,54 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
               ),
             ),
             const SizedBox(height: 4),
-            const Text(
+            Text(
               "Choose what to show in the table",
-              style: TextStyle(color: Color(0xFF66756C), fontSize: 13),
+              style: TextStyle(color: muted, fontSize: 13),
             ),
             const SizedBox(height: 16),
+            if (widget.department == null && widget.userId == null)
+              _filterCard(
+                "Department",
+                DropdownButtonHideUnderline(
+                  child: DropdownButton<String?>(
+                    isExpanded: true,
+                    value: departmentOptions.contains(selectedDepartment)
+                        ? selectedDepartment
+                        : null,
+                    hint: Text("All departments", style: TextStyle(color: muted)),
+                    dropdownColor: WebTheme.surfaceOf(context),
+                    style: TextStyle(color: ink, fontSize: 14),
+                    items: [
+                      DropdownMenuItem<String?>(
+                        value: null,
+                        child: Text(
+                          "All departments",
+                          style: TextStyle(color: ink),
+                        ),
+                      ),
+                      for (final name in departmentOptions)
+                        DropdownMenuItem<String?>(
+                          value: name,
+                          child: Text(name, style: TextStyle(color: ink)),
+                        ),
+                    ],
+                    onChanged: (value) {
+                      modalSetState(() => selectedDepartment = value);
+                      applyFilters();
+                    },
+                  ),
+                ),
+              ),
             if (selectedView == "Work") ...[
               _filterCard(
                 "Status",
                 _buildChoiceChips(
                   values: const [
-                    "Not Started",
-                    "InProgress",
-                    "Completed",
+                    "Not started",
+                    "In progress",
+                    "Paused",
                     "Pending",
-                    "Pause",
+                    "Completed",
                   ],
                   selectedValue: selectedStatus,
                   modalSetState: modalSetState,
@@ -1735,59 +2651,44 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
                   },
                 ),
               ),
-              _filterCard(
-                "Date",
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        _dateModeButton(
-                          label: "Due Date",
-                          selected: workDateBy == "Due Date",
-                          onTap: () {
-                            modalSetState(() => workDateBy = "Due Date");
-                            applyFilters();
-                          },
-                        ),
-                        const SizedBox(width: 8),
-                        _dateModeButton(
-                          label: "Completed Date",
-                          selected: workDateBy == "Completed Date",
-                          onTap: () {
-                            modalSetState(() => workDateBy = "Completed Date");
-                            applyFilters();
-                          },
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        _rangeDateButton(
-                          caption: "From date",
-                          value: startDate == null
-                              ? "Pick date"
-                              : TimeUtils.formatDate(startDate!),
-                          onTap: () => _pickWorkBound(
-                            isStart: true,
-                            modalSetState: modalSetState,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        _rangeDateButton(
-                          caption: "To date",
-                          value: endDate == null
-                              ? "Pick date"
-                              : TimeUtils.formatDate(endDate!),
-                          onTap: () => _pickWorkBound(
-                            isStart: false,
-                            modalSetState: modalSetState,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+              _dateRangeCard(
+                title: "Due date",
+                selected: workDateBy == "Due Date",
+                from: dueFrom,
+                to: dueTo,
+                onSelect: () {
+                  modalSetState(() => workDateBy = "Due Date");
+                  applyFilters();
+                },
+                onFrom: () => _pickWorkBound(
+                  completed: false,
+                  isStart: true,
+                  modalSetState: modalSetState,
+                ),
+                onTo: () => _pickWorkBound(
+                  completed: false,
+                  isStart: false,
+                  modalSetState: modalSetState,
+                ),
+              ),
+              _dateRangeCard(
+                title: "Completed date",
+                selected: workDateBy == "Completed Date",
+                from: completedFrom,
+                to: completedTo,
+                onSelect: () {
+                  modalSetState(() => workDateBy = "Completed Date");
+                  applyFilters();
+                },
+                onFrom: () => _pickWorkBound(
+                  completed: true,
+                  isStart: true,
+                  modalSetState: modalSetState,
+                ),
+                onTo: () => _pickWorkBound(
+                  completed: true,
+                  isStart: false,
+                  modalSetState: modalSetState,
                 ),
               ),
             ],
@@ -1795,7 +2696,12 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
               _filterCard(
                 "Type",
                 _buildChoiceChips(
-                  values: const ["Leave", "Permission"],
+                  values: const [
+                    "Leave",
+                    "Permission",
+                    "Overtime",
+                    "Compensation",
+                  ],
                   selectedValue: selectedLeaveView,
                   modalSetState: modalSetState,
                   onSelected: (value) {
@@ -1836,12 +2742,56 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
                   ),
                 ),
               ],
+              if (selectedLeaveView == "Permission")
+                _filterCard(
+                  "Status",
+                  _buildChoiceChips(
+                    values: const ["Pending", "Approved", "Rejected"],
+                    selectedValue: selectedPermissionStatus,
+                    modalSetState: modalSetState,
+                    onSelected: (value) {
+                      selectedPermissionStatus =
+                          selectedPermissionStatus == value ? null : value;
+                      applyFilters();
+                    },
+                  ),
+                ),
+              if (selectedLeaveView == "Overtime")
+                _filterCard(
+                  "Status",
+                  _buildChoiceChips(
+                    values: const ["Pending", "Accepted", "Approved", "Rejected"],
+                    selectedValue: selectedOvertimeStatus,
+                    modalSetState: modalSetState,
+                    onSelected: (value) {
+                      selectedOvertimeStatus = selectedOvertimeStatus == value
+                          ? null
+                          : value;
+                      applyFilters();
+                    },
+                  ),
+                ),
+              if (selectedLeaveView == "Compensation")
+                _filterCard(
+                  "Status",
+                  _buildChoiceChips(
+                    values: const ["Pending", "Accepted", "Approved", "Rejected"],
+                    selectedValue: selectedCompensationStatus,
+                    modalSetState: modalSetState,
+                    onSelected: (value) {
+                      selectedCompensationStatus =
+                          selectedCompensationStatus == value ? null : value;
+                      applyFilters();
+                    },
+                  ),
+                ),
               _filterCard(
                 "Date",
                 Row(
                   children: [
                     _rangeDateButton(
                   caption: "Date",
+                  selected: true,
                   value: selectedLeaveDate != null
                       ? AppHelpers.formatDate(
                           selectedLeaveDate!.toIso8601String(),
@@ -1879,18 +2829,24 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
                     selectedStatus = null;
                     selectedPriority = null;
                     selectedOverdue = null;
-                    startDate = null;
-                    endDate = null;
+                    selectedDepartment = null;
+                    dueFrom = null;
+                    dueTo = null;
+                    completedFrom = null;
+                    completedTo = null;
                     workDateBy = "Due Date";
                     selectedLeaveType = null;
                     selectedLeaveStatus = null;
+                    selectedPermissionStatus = null;
+                    selectedOvertimeStatus = null;
+                    selectedCompensationStatus = null;
                     selectedLeaveDate = null;
                     selectedPermissionDate = null;
                     selectedLeaveView = null;
                   });
                   applyFilters();
                 },
-                color: ink,
+                color: WebTheme.brand,
                 txtcolor: Colors.white,
               ),
             ),
@@ -1906,17 +2862,17 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: WebTheme.surfaceOf(context),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFD7E5DC)),
+        border: Border.all(color: WebTheme.lineOf(context)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             title,
-            style: const TextStyle(
-              color: Color(0xFF194D26),
+            style: TextStyle(
+              color: WebTheme.inkOf(context),
               fontSize: 14,
               fontWeight: FontWeight.w700,
             ),
@@ -1928,36 +2884,73 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
     );
   }
 
-  Widget _dateModeButton({
-    required String label,
+  Widget _dateRangeCard({
+    required String title,
     required bool selected,
-    required VoidCallback onTap,
+    required DateTime? from,
+    required DateTime? to,
+    required VoidCallback onSelect,
+    required VoidCallback onFrom,
+    required VoidCallback onTo,
   }) {
-    return Expanded(
-      child: Material(
-        color: selected ? const Color(0xFF194D26) : Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(12),
-          onTap: onTap,
-          child: Container(
-            alignment: Alignment.center,
-            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFF194D26)),
-            ),
-            child: Text(
-              label,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: selected ? Colors.white : const Color(0xFF194D26),
-                fontWeight: FontWeight.w700,
-                fontSize: 13,
-              ),
+    final border = selected ? WebTheme.brand : WebTheme.lineOf(context);
+    final titleColor = selected ? WebTheme.brand : WebTheme.mutedOf(context);
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+      decoration: BoxDecoration(
+        color: selected
+            ? WebTheme.brandSoftOf(context)
+            : WebTheme.canvasOf(context),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: border, width: selected ? 1.6 : 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          InkWell(
+            onTap: onSelect,
+            child: Row(
+              children: [
+                Icon(
+                  selected
+                      ? Icons.radio_button_checked
+                      : Icons.radio_button_off,
+                  size: 18,
+                  color: titleColor,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  title,
+                  style: TextStyle(
+                    color: titleColor,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
             ),
           ),
-        ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              _rangeDateButton(
+                caption: "From",
+                value: from == null ? "Pick date" : TimeUtils.formatDate(from),
+                selected: selected,
+                onTap: onFrom,
+              ),
+              const SizedBox(width: 8),
+              _rangeDateButton(
+                caption: "To",
+                value: to == null ? "Pick date" : TimeUtils.formatDate(to),
+                selected: selected,
+                onTap: onTo,
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -1965,11 +2958,15 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
   Widget _rangeDateButton({
     required String caption,
     required String value,
+    required bool selected,
     required VoidCallback onTap,
   }) {
+    final tone = selected ? WebTheme.brand : WebTheme.mutedOf(context);
     return Expanded(
       child: Material(
-        color: const Color(0xFFF4F8F5),
+        color: selected
+            ? WebTheme.surfaceOf(context)
+            : WebTheme.canvasOf(context),
         borderRadius: BorderRadius.circular(14),
         child: InkWell(
           borderRadius: BorderRadius.circular(14),
@@ -1978,15 +2975,17 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: const Color(0xFF194D26)),
+              border: Border.all(
+                color: selected ? WebTheme.brand : WebTheme.lineOf(context),
+              ),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   caption,
-                  style: const TextStyle(
-                    color: Color(0xFF66756C),
+                  style: TextStyle(
+                    color: WebTheme.mutedOf(context),
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
                   ),
@@ -1994,17 +2993,13 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
                 const SizedBox(height: 6),
                 Row(
                   children: [
-                    const Icon(
-                      Icons.calendar_today_rounded,
-                      color: Color(0xFF194D26),
-                      size: 16,
-                    ),
+                    Icon(Icons.calendar_today_rounded, color: tone, size: 16),
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
                         value,
-                        style: const TextStyle(
-                          color: Color(0xFF194D26),
+                        style: TextStyle(
+                          color: tone,
                           fontWeight: FontWeight.w700,
                           fontSize: 13,
                         ),
@@ -2032,7 +3027,7 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
       children: values.map((value) {
         final isSelected = selectedValue == value;
         return Material(
-          color: isSelected ? const Color(0xFF194D26) : const Color(0xFFE7F0EA),
+          color: isSelected ? WebTheme.brand : WebTheme.canvasOf(context),
           borderRadius: BorderRadius.circular(22),
           child: InkWell(
             borderRadius: BorderRadius.circular(22),
@@ -2041,12 +3036,18 @@ class _DeadlineReportsTabState extends State<ReportsTable> {
                 onSelected(value);
               });
             },
-            child: Padding(
+            child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(
+                  color: isSelected ? WebTheme.brand : WebTheme.lineOf(context),
+                ),
+              ),
               child: Text(
                 value,
                 style: TextStyle(
-                  color: isSelected ? Colors.white : const Color(0xFF194D26),
+                  color: isSelected ? Colors.white : WebTheme.mutedOf(context),
                   fontWeight: FontWeight.w700,
                   fontSize: 13,
                 ),

@@ -1,5 +1,7 @@
 
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:staff_work_track/core/theme/theme_provider.dart';
 import 'package:staff_work_track/screen/authen/login_selection.dart';
 import 'package:staff_work_track/services/auth_service.dart';
 import 'package:staff_work_track/core/widgets/buttons.dart';
@@ -22,8 +24,9 @@ class _LogoutState extends State<Logout> {
     await AuthService.logout();
 
     if (!mounted) return;
+    context.read<ThemeProvider>().applyRole(null);
 
-    Navigator.of(context).pushAndRemoveUntil(
+    Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => const LoginSelection()),
       (route) => false,
     );

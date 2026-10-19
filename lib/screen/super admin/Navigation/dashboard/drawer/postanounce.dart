@@ -3,7 +3,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:staff_work_track/core/theme/web_theme.dart';
 import 'package:staff_work_track/core/widgets/buttons.dart';
+import 'package:staff_work_track/core/widgets/web_ui.dart';
 import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
 import 'package:staff_work_track/core/providers/data_refresh_provider.dart';
 import 'package:staff_work_track/services/announ_service.dart';
@@ -132,15 +134,29 @@ class _PostAnnouncementPageState extends State<PostAnnouncementPage> {
 
   @override
   Widget build(BuildContext context) {
+    final web = WebPushedChrome.isWeb(context);
     return Scaffold(
-      appBar: AppBar(
+      backgroundColor: WebPushedChrome.background(context),
+      appBar: web
+          ? null
+          : AppBar(
+        backgroundColor: WebTheme.brand,
+        foregroundColor: Colors.white,
+        iconTheme: const IconThemeData(color: Colors.white),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios),
+          icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text("New Announcement"),
+        title: const Text(
+          "New Announcement",
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+        ),
       ),
-      body: Stack(
+      body: WebFormPage.adapt(
+        context,
+        title: 'New announcement',
+        subtitle: 'Share a notice with the people who need it',
+        child: Stack(
         children: [
           Padding(
             padding: const EdgeInsets.all(15),
@@ -190,7 +206,13 @@ class _PostAnnouncementPageState extends State<PostAnnouncementPage> {
                   ),
                   const SizedBox(height: 15),
 
-                  TextButton(onPressed: pickFile, child: Text("Select File")),
+                  TextButton(
+                    onPressed: pickFile,
+                    style: TextButton.styleFrom(
+                      foregroundColor: WebTheme.brandOf(context),
+                    ),
+                    child: const Text("Select File"),
+                  ),
                   if (selectedFileName != null) _buildFilePreview(),
 
                   const SizedBox(height: 30),
@@ -200,8 +222,8 @@ class _PostAnnouncementPageState extends State<PostAnnouncementPage> {
                       text: "Upload",
                       isLoading: _isLoading,
                       onPressed: uploadAnnouncement,
-                      color: Theme.of(context).colorScheme.secondary,
-                      txtcolor: Theme.of(context).colorScheme.onPrimary,
+                      color: WebTheme.brand,
+                      txtcolor: Colors.white,
                     ),
                   ),
                 ],
@@ -221,6 +243,7 @@ class _PostAnnouncementPageState extends State<PostAnnouncementPage> {
               ),
             ),
         ],
+      ),
       ),
     );
   }
@@ -253,24 +276,25 @@ class _PostAnnouncementPageState extends State<PostAnnouncementPage> {
 
     if (ext == "pdf") {
       icon = Icons.picture_as_pdf;
-      color = Colors.red;
+      color = WebTheme.dark;
     } else if (["doc", "docx"].contains(ext)) {
       icon = Icons.description;
-      color = Colors.blue;
+      color = WebTheme.brand;
     } else if (["xls", "xlsx", "csv"].contains(ext)) {
       icon = Icons.table_chart;
-      color = Colors.green;
+      color = WebTheme.palette.primary;
     } else {
       icon = Icons.insert_drive_file;
-      color = Colors.grey;
+      color = WebTheme.muted;
     }
 
     return Container(
       margin: const EdgeInsets.only(top: 10),
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
+        color: WebTheme.brandSoftOf(context),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.grey.shade300),
+        border: Border.all(color: WebTheme.lineOf(context)),
       ),
       child: Row(
         children: [
@@ -278,7 +302,7 @@ class _PostAnnouncementPageState extends State<PostAnnouncementPage> {
           const SizedBox(width: 10),
           Expanded(child: Text(fileName, overflow: TextOverflow.ellipsis)),
           IconButton(
-            icon: const Icon(Icons.close, color: Colors.red),
+            icon: Icon(Icons.close, color: WebTheme.danger),
             onPressed: () {
               setState(() {
                 selectedFile = null;

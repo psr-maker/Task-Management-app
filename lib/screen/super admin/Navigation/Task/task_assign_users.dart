@@ -3,6 +3,7 @@ import 'package:jwt_decode/jwt_decode.dart';
 import 'package:staff_work_track/Models/getusers.dart';
 import 'package:staff_work_track/Models/rolesmodel.dart';
 import 'package:staff_work_track/core/constant/division_config.dart';
+import 'package:staff_work_track/core/responsive/app_layout.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
 import 'package:staff_work_track/services/admin_service.dart';
 import 'package:staff_work_track/services/auth_service.dart';
@@ -134,6 +135,8 @@ class _AssignUsersPageState extends State<AssignUsersPage> {
 
   Future<List<UserModel>> _ensureLoginUser(List<UserModel> users) async {
     if (loginUserId == null) return users;
+    // Division heads assign only managers — do not force-add themselves.
+    if (AppRoles.isDivisionHead(loginRole)) return users;
     if (users.any((user) => user.userId == loginUserId)) return users;
 
     try {
@@ -164,6 +167,7 @@ class _AssignUsersPageState extends State<AssignUsersPage> {
             user: user,
             roles: roles,
             loginUserId: loginUserId,
+            loginRole: loginRole,
           ),
         )
         .toList();
@@ -258,14 +262,17 @@ class _AssignUsersPageState extends State<AssignUsersPage> {
 
   @override
   Widget build(BuildContext context) {
+    final popup = !AppLayout.isMobile(context);
     return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text("Assign users"),
-      ),
+      appBar: popup
+          ? null
+          : AppBar(
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back_ios),
+                onPressed: () => Navigator.pop(context),
+              ),
+              title: const Text("Assign users"),
+            ),
       body: isLoading
           ? const Center(child: RotatingFlower())
           : StaffPicker(

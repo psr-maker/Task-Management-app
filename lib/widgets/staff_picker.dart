@@ -5,6 +5,7 @@ import 'package:staff_work_track/core/widgets/buttons.dart';
 class StaffPicker extends StatefulWidget {
   final List<UserModel> users;
   final Set<int> selectedIds;
+  final Map<int, String> namesById;
   final String title;
   final void Function(Set<int> ids)? onDone;
 
@@ -12,6 +13,7 @@ class StaffPicker extends StatefulWidget {
     super.key,
     required this.users,
     required this.selectedIds,
+    this.namesById = const {},
     required this.title,
     this.onDone,
   });
@@ -49,6 +51,89 @@ class _StaffPickerState extends State<StaffPicker> {
       return;
     }
     Navigator.pop(context, _selected);
+  }
+
+  String _personLabel(UserModel user) {
+    final saved = widget.namesById[user.userId]?.trim() ?? '';
+    if (saved.isNotEmpty && saved != '${user.userId}') return saved;
+    final display = user.displayName.trim();
+    if (display.isNotEmpty && display != '${user.userId}') return display;
+    final raw = user.name.trim();
+    if (raw.isEmpty || raw == '${user.userId}') return 'Staff';
+    return raw;
+  }
+
+  Map<String, List<UserModel>> _grouped(List<UserModel> users) {
+    final groups = <String, List<UserModel>>{};
+    for (final user in users) {
+      final name = user.department.trim().isEmpty
+          ? 'Other'
+          : user.department.trim();
+      groups.putIfAbsent(name, () => []).add(user);
+    }
+    final names = groups.keys.toList()
+      ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+    return {for (final name in names) name: groups[name]!};
+  }
+
+  Widget _userTile(UserModel user, Color brand) {
+    final checked = _selected.contains(user.userId);
+    final label = _personLabel(user);
+    final ink = Theme.of(context).colorScheme.onSurface;
+    return Card(
+      color: checked
+          ? brand.withValues(alpha: 0.12)
+          : Theme.of(context).colorScheme.surface,
+      elevation: 2,
+      margin: const EdgeInsets.only(bottom: 8),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: checked ? brand : Colors.transparent,
+          width: checked ? 1.4 : 0,
+        ),
+      ),
+      child: ListTile(
+        onTap: () {
+          setState(() {
+            if (checked) {
+              _selected.remove(user.userId);
+            } else {
+              _selected.add(user.userId);
+            }
+          });
+        },
+        leading: CircleAvatar(
+          backgroundColor: brand,
+          child: Text(
+            label.isNotEmpty ? label[0].toUpperCase() : '?',
+            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+              color: Theme.of(context).colorScheme.onSecondary,
+            ),
+          ),
+        ),
+        title: Text(
+          label,
+          style: TextStyle(
+            color: ink,
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        subtitle: Text(
+          user.department.trim().isEmpty ? 'Staff' : user.department.trim(),
+          style: TextStyle(
+            color: ink,
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        trailing: Icon(
+          checked ? Icons.check_circle : Icons.circle_outlined,
+          color: checked ? brand : Colors.grey.shade400,
+        ),
+      ),
+    );
   }
 
   @override
@@ -120,24 +205,29 @@ class _StaffPickerState extends State<StaffPicker> {
               spacing: 8,
               runSpacing: 8,
               children: _selected.map((id) {
-                final name = _userById(id)?.displayName ?? '';
-                final label = name.isEmpty ? 'User $id' : name;
+                final person = _userById(id);
+                final saved = widget.namesById[id]?.trim() ?? '';
+                final label = person == null
+                    ? (saved.isNotEmpty && saved != '$id' ? saved : 'User $id')
+                    : _personLabel(person);
                 return InputChip(
                   label: Text(
                     label,
-                    style: const TextStyle(
-                      color: Colors.black,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurface,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
                   onDeleted: () => setState(() => _selected.remove(id)),
-                  deleteIcon: const Icon(
+                  deleteIcon: Icon(
                     Icons.close,
                     size: 16,
-                    color: Colors.black54,
+                    color: Theme.of(context).colorScheme.onSurface,
                   ),
-                  backgroundColor: brand.withValues(alpha: 0.08),
-                  side: BorderSide(color: brand.withValues(alpha: 0.3)),
+                  backgroundColor: Theme.of(context).colorScheme.surface,
+                  side: BorderSide(
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.25),
+                  ),
                 );
               }).toList(),
             ),
@@ -153,91 +243,33 @@ class _StaffPickerState extends State<StaffPicker> {
                       style: TextStyle(color: Colors.grey.shade600),
                     ),
                   )
-                : ListView.separated(
-                    itemCount: filtered.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 8),
-                    itemBuilder: (context, index) {
-                      final user = filtered[index];
-                      final checked = _selected.contains(user.userId);
-                      return Material(
-                        color: checked
-                            ? brand.withValues(alpha: 0.1)
-                            : Theme.of(context).cardColor,
-                        borderRadius: BorderRadius.circular(12),
-                        child: InkWell(
-                          borderRadius: BorderRadius.circular(12),
-                          onTap: () {
-                            setState(() {
-                              if (checked) {
-                                _selected.remove(user.userId);
-                              } else {
-                                _selected.add(user.userId);
-                              }
-                            });
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 10,
-                            ),
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: checked ? brand : fieldBorder,
-                                width: checked ? 1.6 : 1,
-                              ),
-                            ),
-                            child: Row(
-                              children: [
-                                CircleAvatar(
-                                  radius: 18,
-                                  backgroundColor: brand.withValues(alpha: 0.12),
-                                  child: Text(
-                                    staffInitials(
-                                      user.displayName.isEmpty
-                                          ? user.name
-                                          : user.displayName,
-                                    ),
-                                    style: const TextStyle(
-                                      color: Colors.black,
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Text(
-                                    user.displayName.isEmpty
-                                        ? user.name
-                                        : user.displayName,
-                                    style: const TextStyle(
-                                      color: Colors.black,
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 15,
-                                    ),
-                                  ),
-                                ),
-                                Icon(
-                                  checked
-                                      ? Icons.check_circle
-                                      : Icons.circle_outlined,
-                                  color: checked ? brand : Colors.grey.shade400,
-                                ),
-                              ],
+                : ListView(
+                    children: [
+                      for (final entry in _grouped(filtered).entries) ...[
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(4, 12, 4, 8),
+                          child: Text(
+                            entry.key,
+                            style: TextStyle(
+                              color: brand,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
                         ),
-                      );
-                    },
+                        for (final user in entry.value) _userTile(user, brand),
+                      ],
+                    ],
                   ),
           ),
           const SizedBox(height: 10),
-          AppButton(
-            text: "Done",
-            onPressed: _finish,
-            color: Theme.of(context).colorScheme.secondary,
-            txtcolor: Theme.of(context).colorScheme.onPrimary,
+          Center(
+            child: AppButton(
+              text: "Done",
+              onPressed: _finish,
+              color: Theme.of(context).colorScheme.secondary,
+              txtcolor: Theme.of(context).colorScheme.onPrimary,
+            ),
           ),
         ],
       ),

@@ -107,7 +107,9 @@ class AppMenuDrawer extends StatelessWidget {
                     Padding(
                       padding: const EdgeInsets.only(bottom: 8),
                       child: Material(
-                        color: WebTheme.surfaceOf(context),
+                        color: item.selected
+                            ? WebTheme.brand
+                            : WebTheme.surfaceOf(context),
                         borderRadius: BorderRadius.circular(14),
                         child: InkWell(
                           borderRadius: BorderRadius.circular(14),
@@ -127,13 +129,15 @@ class AppMenuDrawer extends StatelessWidget {
                                   height: 36,
                                   alignment: Alignment.center,
                                   decoration: BoxDecoration(
-                                    color: WebTheme.brandSoftOf(context),
+                                    color: item.selected
+                                        ? Colors.white
+                                        : WebTheme.brandSoftOf(context),
                                     borderRadius: BorderRadius.circular(10),
                                   ),
                                   child: Icon(
                                     item.icon,
                                     size: 18,
-                                    color: iconColor,
+                                    color: item.selected ? WebTheme.brand : iconColor,
                                   ),
                                 ),
                                 const SizedBox(width: 12),
@@ -141,16 +145,22 @@ class AppMenuDrawer extends StatelessWidget {
                                   child: Text(
                                     item.label,
                                     style: TextStyle(
-                                      color: WebTheme.inkOf(context),
+                                      color: item.selected
+                                          ? Colors.white
+                                          : WebTheme.inkOf(context),
                                       fontSize: 14,
-                                      fontWeight: FontWeight.w600,
+                                      fontWeight: item.selected
+                                          ? FontWeight.w800
+                                          : FontWeight.w600,
                                     ),
                                   ),
                                 ),
                                 Icon(
                                   Icons.chevron_right,
                                   size: 18,
-                                  color: WebTheme.mutedOf(context),
+                                  color: item.selected
+                                      ? Colors.white
+                                      : WebTheme.mutedOf(context),
                                 ),
                               ],
                             ),

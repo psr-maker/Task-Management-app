@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:staff_work_track/core/theme/web_theme.dart';
 
 class ThemeProvider extends ChangeNotifier {
   bool _isDarkMode = false;
@@ -23,20 +24,49 @@ class ThemeProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  TimePickerThemeData _timePickerTheme({
+    required Color selected,
+    required Color onSelected,
+    required Color idleText,
+  }) {
+    return TimePickerThemeData(
+      dayPeriodBorderSide: BorderSide(color: selected),
+      dayPeriodColor: WidgetStateColor.resolveWith((states) {
+        if (states.contains(WidgetState.selected)) return selected;
+        return Colors.transparent;
+      }),
+      dayPeriodTextColor: WidgetStateColor.resolveWith((states) {
+        if (states.contains(WidgetState.selected)) return onSelected;
+        return idleText;
+      }),
+      dayPeriodTextStyle: const TextStyle(
+        fontSize: 14,
+        fontWeight: FontWeight.w700,
+      ),
+    );
+  }
+
+  void applyRole(String? role) {
+    final next = RolePalette.forRole(role);
+    if (WebTheme.palette.name == next.name) return;
+    WebTheme.palette = next;
+    notifyListeners();
+  }
+
   ThemeData get lightTheme {
-    const deepGreen = Color.fromARGB(255, 25, 77, 38);
-    const background = Colors.white;
+    final deepGreen = WebTheme.brand;
+    final background = Colors.white;
 
     return ThemeData(
       brightness: Brightness.light,
       useMaterial3: true,
       scaffoldBackgroundColor: background,
 
-      appBarTheme: const AppBarTheme(
+      appBarTheme: AppBarTheme(
         backgroundColor: deepGreen,
         foregroundColor: Colors.white,
         elevation: 0,
-        iconTheme: IconThemeData(color: Colors.white, size: 20),
+        iconTheme: const IconThemeData(color: Colors.white, size: 20),
         titleTextStyle: TextStyle(
           color: Colors.white,
           fontSize: 18,
@@ -45,17 +75,39 @@ class ThemeProvider extends ChangeNotifier {
         ),
       ),
 
-      iconTheme: const IconThemeData(color: deepGreen, size: 18),
+      iconTheme: IconThemeData(color: deepGreen, size: 18),
 
       primaryColor: deepGreen,
 
-      colorScheme: const ColorScheme.light(
-        primary: Color.fromARGB(255, 68, 99, 80),
+      colorScheme: ColorScheme.light(
+        primary: deepGreen,
         secondary: deepGreen,
         tertiary: Colors.white54,
         onPrimary: Colors.white,
         surface: Colors.white,
         error: Colors.red,
+      ),
+
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          backgroundColor: deepGreen,
+          foregroundColor: Colors.white,
+        ),
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: deepGreen,
+          foregroundColor: Colors.white,
+        ),
+      ),
+      floatingActionButtonTheme: FloatingActionButtonThemeData(
+        backgroundColor: deepGreen,
+        foregroundColor: Colors.white,
+      ),
+      timePickerTheme: _timePickerTheme(
+        selected: deepGreen,
+        onSelected: Colors.white,
+        idleText: deepGreen,
       ),
 
       splashColor: Colors.white,
@@ -67,11 +119,11 @@ class ThemeProvider extends ChangeNotifier {
         margin: const EdgeInsets.symmetric(vertical: 2),
         shape: RoundedRectangleBorder(
           borderRadius: const BorderRadius.all(Radius.circular(14)),
-          side: BorderSide(color: Color.fromARGB(255, 15, 35, 20), width: 2),
+          side: BorderSide(color: WebTheme.dark, width: 2),
         ),
       ),
 
-      chipTheme: const ChipThemeData(
+      chipTheme: ChipThemeData(
         backgroundColor: deepGreen,
         selectedColor: deepGreen,
         disabledColor: Colors.grey,
@@ -81,7 +133,7 @@ class ThemeProvider extends ChangeNotifier {
         brightness: Brightness.dark,
       ),
 
-      textTheme: const TextTheme(
+      textTheme: TextTheme(
         displayLarge: TextStyle(
           fontSize: 22,
           fontWeight: FontWeight.bold,
@@ -125,7 +177,7 @@ class ThemeProvider extends ChangeNotifier {
         titleSmall: TextStyle(
           fontSize: 13,
           fontWeight: FontWeight.w600,
-          color: Color.fromARGB(255, 25, 77, 38),
+          color: deepGreen,
         ),
         bodySmall: TextStyle(
           fontSize: 18,
@@ -157,123 +209,168 @@ class ThemeProvider extends ChangeNotifier {
   }
 
   ThemeData get darkTheme {
-    const deepGreen = Color.fromARGB(255, 25, 77, 38);
+    final staff = WebTheme.palette.name == 'staff';
+    final manager = WebTheme.palette.name == 'manager';
+    final division = WebTheme.palette.name == 'divisionHead';
+    final accent = staff
+        ? WebTheme.staffDarkAccent
+        : manager
+            ? WebTheme.managerDarkAccent
+            : division
+                ? WebTheme.divisionDarkAccent
+                : WebTheme.brand;
+    final onAccent = staff
+        ? WebTheme.staffDarkOnAccent
+        : manager
+            ? const Color(0xFF052E16)
+            : division
+                ? WebTheme.divisionDarkOnAccent
+                : Colors.white;
+    final ink = staff ? WebTheme.staffDarkInk : Colors.white;
+    final muted = staff ? WebTheme.staffDarkMuted : Colors.white70;
+    final headline = staff || manager || division ? accent : Colors.white;
+    final secondary = manager || division ? WebTheme.brand : accent;
+    final onSecondary = manager || division ? Colors.white : onAccent;
 
     return ThemeData(
       brightness: Brightness.dark,
       useMaterial3: true,
-      scaffoldBackgroundColor: const Color(0xFF0F1A14),
+      scaffoldBackgroundColor: WebTheme.darkCanvas,
 
-      colorScheme: const ColorScheme.dark(
-        primary: Color.fromARGB(255, 82, 112, 90),
-        secondary: Color.fromARGB(255, 74, 104, 75),
-        tertiary: Colors.white,
-        onPrimary: Colors.white,
+      colorScheme: ColorScheme.dark(
+        primary: accent,
+        secondary: secondary,
+        tertiary: staff ? muted : Colors.white,
+        onPrimary: onAccent,
+        onSecondary: onSecondary,
+        surface: WebTheme.darkSurface,
+        onSurface: ink,
         error: Colors.redAccent,
-        onSecondary: deepGreen,
       ),
 
-      appBarTheme: const AppBarTheme(
-        backgroundColor: Color(0xFF132A1B),
-        foregroundColor: Colors.white,
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          backgroundColor: accent,
+          foregroundColor: onAccent,
+        ),
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: accent,
+          foregroundColor: onAccent,
+        ),
+      ),
+      floatingActionButtonTheme: FloatingActionButtonThemeData(
+        backgroundColor: accent,
+        foregroundColor: onAccent,
+      ),
+      timePickerTheme: _timePickerTheme(
+        selected: accent,
+        onSelected: onAccent,
+        idleText: ink,
+      ),
+
+      appBarTheme: AppBarTheme(
+        backgroundColor: WebTheme.darkHeader,
+        foregroundColor: ink,
         elevation: 0,
-        iconTheme: IconThemeData(color: Colors.white, size: 20),
+        iconTheme: IconThemeData(color: ink, size: 20),
         titleTextStyle: TextStyle(
-          color: Colors.white,
+          color: ink,
           fontSize: 18,
           fontWeight: FontWeight.bold,
         ),
       ),
 
-      iconTheme: const IconThemeData(color: Colors.white, size: 18),
+      iconTheme: IconThemeData(color: ink, size: 18),
 
       cardTheme: CardThemeData(
-        color: const Color(0xFF132A1B),
+        color: WebTheme.darkSurface,
         elevation: 2,
         margin: const EdgeInsets.symmetric(vertical: 6),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       ),
 
-      chipTheme: const ChipThemeData(
-        backgroundColor: Color(0xFF1E3A2F),
-        selectedColor: deepGreen,
+      chipTheme: ChipThemeData(
+        backgroundColor: WebTheme.darkBrandSoft,
+        selectedColor: manager || division ? WebTheme.brand : accent,
         disabledColor: Colors.grey,
-        labelStyle: TextStyle(color: Colors.white),
-        secondaryLabelStyle: TextStyle(color: Colors.white70),
+        labelStyle: TextStyle(color: ink),
+        secondaryLabelStyle: TextStyle(color: muted),
         padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         brightness: Brightness.dark,
       ),
 
-      splashColor: const Color(0x33194D26),
-      highlightColor: const Color(0x1A194D26),
+      splashColor: accent.withValues(alpha: 0.2),
+      highlightColor: accent.withValues(alpha: 0.1),
 
-      textTheme: const TextTheme(
+      textTheme: TextTheme(
         displayLarge: TextStyle(
           fontSize: 22,
           fontWeight: FontWeight.bold,
-          color: Colors.white,
+          color: headline,
         ),
         displayMedium: TextStyle(
           fontSize: 20,
           fontWeight: FontWeight.bold,
-          color: Colors.white,
+          color: headline,
         ),
         displaySmall: TextStyle(
           fontSize: 18,
           fontWeight: FontWeight.bold,
-          color: Colors.white,
+          color: headline,
         ),
         headlineLarge: TextStyle(
           fontSize: 15,
           fontWeight: FontWeight.bold,
-          color: Colors.white,
+          color: ink,
         ),
         headlineMedium: TextStyle(
           fontSize: 14,
           fontWeight: FontWeight.w600,
-          color: Colors.white,
+          color: ink,
         ),
         headlineSmall: TextStyle(
           fontSize: 13,
           fontWeight: FontWeight.w600,
-          color: Colors.white,
+          color: ink,
         ),
         titleLarge: TextStyle(
           fontSize: 12,
           fontWeight: FontWeight.bold,
-          color: Colors.white,
+          color: ink,
         ),
         titleMedium: TextStyle(
           fontSize: 10,
           fontWeight: FontWeight.w600,
-          color: Colors.white,
+          color: ink,
         ),
-        bodyLarge: TextStyle(fontSize: 16, color: Colors.white),
-        bodyMedium: TextStyle(fontSize: 14, color: Colors.white),
+        bodyLarge: TextStyle(fontSize: 16, color: ink),
+        bodyMedium: TextStyle(fontSize: 14, color: ink),
         bodySmall: TextStyle(
           fontSize: 18,
-          color: Colors.white70,
+          color: muted,
           fontWeight: FontWeight.bold,
         ),
         labelLarge: TextStyle(
           fontSize: 15,
           fontWeight: FontWeight.w700,
-          color: Colors.white,
+          color: ink,
         ),
         labelMedium: TextStyle(
           fontSize: 14,
           fontWeight: FontWeight.w600,
-          color: Colors.white70,
+          color: muted,
         ),
         labelSmall: TextStyle(
           fontSize: 10,
           fontWeight: FontWeight.w600,
-          color: Colors.white60,
+          color: muted,
         ),
         titleSmall: TextStyle(
           fontSize: 13,
           fontWeight: FontWeight.w600,
-          color: Color.fromARGB(255, 25, 77, 38),
+          color: staff ? accent : WebTheme.brandSoft,
         ),
       ),
     );

@@ -5,6 +5,7 @@ import 'package:staff_work_track/core/theme/web_theme.dart';
 import 'package:staff_work_track/core/widgets/buttons.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
 import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
+import 'package:staff_work_track/core/widgets/request_workspace.dart';
 import 'package:staff_work_track/core/widgets/status_badge.dart';
 import 'package:staff_work_track/core/widgets/web_ui.dart';
 import 'package:staff_work_track/services/admin_service.dart';
@@ -260,7 +261,7 @@ class _StaffLeavesState extends State<StaffLeaves>
   Color statusColor(String status) {
     switch (status.toLowerCase()) {
       case "approved":
-        return Colors.green;
+        return WebTheme.brand;
       case "rejected":
         return Colors.red;
       default:
@@ -275,6 +276,41 @@ class _StaffLeavesState extends State<StaffLeaves>
 
   String formatTime(String? time) {
     return TimeUtils.formatTime12(time, empty: "-");
+  }
+
+  String _shown(dynamic value) {
+    final text = (value ?? '').toString().trim();
+    return text.isEmpty || text == 'null' ? '—' : text;
+  }
+
+  String _rejectWhy(dynamic item) {
+    final status = (item['status'] ?? '').toString().toLowerCase();
+    if (status != 'rejected') return '—';
+    return _shown(item['rejectionReason']);
+  }
+
+  String _leaveCategory(dynamic item) {
+    return _shown(item['leaveTyp'] ?? item['leavecategory'] ?? item['leaveCategory']);
+  }
+
+  String _leaveDay(dynamic item) {
+    return _shown(item['leaveType'] ?? item['type']);
+  }
+
+  ButtonStyle _tabStyle() {
+    return ButtonStyle(
+      backgroundColor: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.selected)) return WebTheme.brand;
+        return WebTheme.surfaceOf(context);
+      }),
+      foregroundColor: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.selected)) return Colors.white;
+        return WebTheme.inkOf(context);
+      }),
+      side: WidgetStateProperty.all(
+        BorderSide(color: WebTheme.brand.withValues(alpha: 0.45)),
+      ),
+    );
   }
 
   Widget _webFilters() {
@@ -315,10 +351,156 @@ class _StaffLeavesState extends State<StaffLeaves>
     );
   }
 
+  Future<void> _decide(dynamic item, String status) async {
+    final id = _itemId(item);
+    if (id == null) {
+      showTopMessage('Invalid request', isError: true);
+      return;
+    }
+    String? reason;
+    if (status == 'Rejected') {
+      final controller = TextEditingController();
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Reject request'),
+          content: TextField(
+            controller: controller,
+            decoration: const InputDecoration(hintText: 'Reason'),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('Reject'),
+            ),
+          ],
+        ),
+      );
+      if (ok != true) return;
+      reason = controller.text.trim();
+    }
+    final success = activeTab == 'Permission'
+        ? await AdminService.updatePermissionStatus(
+            id: id,
+            status: status,
+            asDirector: widget.isDirectorView,
+          )
+        : await AdminService.updateLeaveStatus(
+            id: id,
+            status: status,
+            reason: reason,
+            asDirector: widget.isDirectorView,
+          );
+    showTopMessage(
+      success
+          ? '${activeTab == 'Permission' ? 'Permission' : 'Leave'} ${status.toLowerCase()}'
+          : 'Could not update the request',
+      isError: !success,
+    );
+    if (success) loadItems();
+  }
+
+  Widget _webLeave() {
+    final statusFilters = activeTab == 'Leave' ? tabs : permissionTabs;
+    final selected = statusFilters[_tabController.index.clamp(0, statusFilters.length - 1)];
+    final pending = filteredItems.where((item) => (item['status'] ?? '').toString().toLowerCase() == 'pending').length;
+    return Scaffold(
+      backgroundColor: WebTheme.canvasOf(context),
+      body: RequestWorkspace(
+        title: 'Leave & Permission',
+        subtitle: widget.isDirectorView
+            ? 'Approve requests across departments'
+            : 'Review your team requests',
+        loading: isLoading,
+        scrollable: true,
+        filters: statusFilters,
+        selectedFilter: selected,
+        onFilter: (value) {
+          _tabController.index = statusFilters.indexOf(value);
+          filterItems();
+        },
+        trailing: SegmentedButton<String>(
+          style: _tabStyle(),
+          segments: const [
+            ButtonSegment(value: 'Leave', label: Text('Leave')),
+            ButtonSegment(value: 'Permission', label: Text('Permission')),
+          ],
+          selected: {activeTab},
+          onSelectionChanged: (value) {
+            setState(() {
+              activeTab = value.first;
+              _tabController.index = 0;
+            });
+            loadItems();
+          },
+        ),
+        stats: [
+          WorkspaceStat(label: 'Showing', value: '${filteredItems.length}', icon: Icons.event_available_rounded, color: WebTheme.brand),
+          WorkspaceStat(label: 'Pending', value: '$pending', icon: Icons.hourglass_top_rounded, color: const Color(0xFFB45309)),
+        ],
+        columns: activeTab == 'Permission'
+            ? const ['Name', 'Designation', 'From time', 'To time', 'Total hours', 'Reason', 'Applied on', 'Apply date']
+            : const [
+                'Name',
+                'Designation',
+                'Contact number',
+                'Leave type',
+                'Day',
+                'Applied on',
+                'Leave date',
+                'Reason',
+                'Reject reason',
+              ],
+        emptyTitle: activeTab == 'Leave' ? 'No leave found' : 'No permission found',
+        records: [
+          for (final item in filteredItems)
+            WorkspaceRecord(
+              status: (item['status'] ?? '').toString(),
+              approvedColor: WebTheme.brand,
+              values: activeTab == 'Permission'
+                  ? [
+                      (item['name'] ?? '').toString(),
+                      _shown(item['designation']),
+                      formatTime((item['fromTime'] ?? item['FromTime'])?.toString()),
+                      formatTime((item['toTime'] ?? item['ToTime'])?.toString()),
+                      '${item['totalHours'] ?? '—'} hours',
+                      _shown(item['reason']),
+                      _shown(AppHelpers.formatDate(item['submittedDate']?.toString())),
+                      formatDate((item['date'] ?? item['fromDate'])?.toString()),
+                    ]
+                  : [
+                      (item['name'] ?? '').toString(),
+                      _shown(item['designation']),
+                      _shown(item['contactNumber']),
+                      _leaveCategory(item),
+                      _leaveDay(item),
+                      _shown(AppHelpers.formatDate(item['submittedDate']?.toString())),
+                      formatDate((item['fromDate'] ?? item['date'])?.toString()),
+                      _shown(item['reason']),
+                      _rejectWhy(item),
+                    ],
+              actions: (item['status'] ?? '').toString().toLowerCase() == 'pending' &&
+                      _canApproveOrReject(item)
+                  ? [
+                      workspaceAction('Approve', () => _decide(item, 'Approved'), filled: true),
+                      workspaceAction('Reject', () => _decide(item, 'Rejected'), color: WebTheme.danger),
+                    ]
+                  : const [],
+            ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final groupedData = groupByMonth(filteredItems);
     final web = WebPushedChrome.isWeb(context);
+    if (web) return _webLeave();
     return Scaffold(
       backgroundColor: WebPushedChrome.background(context),
       appBar: AppBar(
@@ -362,7 +544,10 @@ class _StaffLeavesState extends State<StaffLeaves>
                           child: Center(
                             child: Text(
                               'Leave',
-                              style: Theme.of(context).textTheme.labelLarge,
+                              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                                color: activeTab == 'Leave' ? Colors.white : Colors.white70,
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
                           ),
                         ),
@@ -392,7 +577,10 @@ class _StaffLeavesState extends State<StaffLeaves>
                           child: Center(
                             child: Text(
                               'Permission',
-                              style: Theme.of(context).textTheme.labelLarge,
+                              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                                color: activeTab == 'Permission' ? Colors.white : Colors.white70,
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
                           ),
                         ),
@@ -630,6 +818,11 @@ class _StaffLeavesState extends State<StaffLeaves>
                     infoRow("To Time", formatTime(e["toTime"])),
                     infoRow("Total Hours", e["totalHours"] ?? "-"),
                     infoRow("Reason", e["reason"]),
+                    infoRow(
+                      "Applied on",
+                      AppHelpers.formatDate(e["submittedDate"]?.toString()),
+                    ),
+                    infoRow("Apply date", formatDate(e["date"] ?? e["fromDate"])),
                     if (status == "pending" && _canApproveOrReject(e))
                       buildPermissionActionSection(e)
                     else if (status == "pending")

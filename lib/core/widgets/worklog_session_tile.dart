@@ -90,10 +90,12 @@ class WorklogSessionTile extends StatelessWidget {
     super.key,
     required this.log,
     this.onCheckOut,
+    this.compact = false,
   });
 
   final Map log;
   final VoidCallback? onCheckOut;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -109,9 +111,9 @@ class WorklogSessionTile extends StatelessWidget {
         (log['outTime'] ?? '').toString().isNotEmpty;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 14),
-      padding: const EdgeInsets.all(14),
-      decoration: WebTheme.card(context),
+      margin: EdgeInsets.only(bottom: compact ? 0 : 14),
+      padding: EdgeInsets.all(compact ? 10 : 14),
+      decoration: WebTheme.card(context, radius: compact ? 10 : 14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -126,7 +128,7 @@ class WorklogSessionTile extends StatelessWidget {
                       Text(
                         name,
                         style: TextStyle(
-                          fontSize: 16,
+                          fontSize: compact ? 14 : 16,
                           fontWeight: FontWeight.w700,
                           color: WebTheme.inkOf(context),
                         ),
@@ -144,7 +146,7 @@ class WorklogSessionTile extends StatelessWidget {
                       Text(
                         title,
                         style: TextStyle(
-                          fontSize: 15,
+                          fontSize: compact ? 13 : 15,
                           fontWeight: FontWeight.w600,
                           color: WebTheme.inkOf(context),
                         ),
@@ -180,7 +182,7 @@ class WorklogSessionTile extends StatelessWidget {
               style: TextStyle(fontSize: 13, color: WebTheme.mutedOf(context)),
             ),
           ],
-          const SizedBox(height: 12),
+          SizedBox(height: compact ? 8 : 12),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -194,7 +196,7 @@ class WorklogSessionTile extends StatelessWidget {
                   color: const Color(0xFF166534),
                 ),
               ),
-              const SizedBox(width: 10),
+              SizedBox(width: compact ? 8 : 10),
               Expanded(
                 child: _evidence(
                   context,
@@ -208,7 +210,7 @@ class WorklogSessionTile extends StatelessWidget {
             ],
           ),
           if (!hasOut && onCheckOut != null) ...[
-            const SizedBox(height: 12),
+            SizedBox(height: compact ? 8 : 12),
             SizedBox(
               width: double.infinity,
               child: AppButton(
@@ -271,7 +273,7 @@ class WorklogSessionTile extends StatelessWidget {
           child: ClipRRect(
             borderRadius: BorderRadius.circular(10),
             child: SizedBox(
-              height: 110,
+              height: compact ? 72 : 110,
               width: double.infinity,
               child: url == null
                   ? Container(
@@ -300,7 +302,7 @@ class WorklogSessionTile extends StatelessWidget {
         const SizedBox(height: 6),
         Text(
           location.isEmpty ? 'No location' : location,
-          maxLines: 3,
+          maxLines: compact ? 1 : 3,
           overflow: TextOverflow.ellipsis,
           style: TextStyle(fontSize: 11, color: WebTheme.mutedOf(context)),
         ),

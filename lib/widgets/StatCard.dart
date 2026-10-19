@@ -10,6 +10,7 @@ import 'package:staff_work_track/screen/super%20admin/Navigation/Task/edit_goal.
 import 'package:staff_work_track/services/auth_service.dart';
 import 'package:staff_work_track/services/superadmin_service.dart';
 import 'package:staff_work_track/utils/app_helper.dart';
+import 'package:staff_work_track/utils/goal_assignment.dart';
 import 'package:staff_work_track/utils/goal_quantity.dart';
 import 'package:staff_work_track/utils/goal_task_enrich.dart';
 import 'package:staff_work_track/utils/enum.dart';
@@ -234,6 +235,7 @@ class TaskCard extends StatelessWidget {
 
             // Task info
             Expanded(
+              flex: 3,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -268,10 +270,15 @@ class TaskCard extends StatelessWidget {
             ),
 
             // Right section
-            Column(
+            Flexible(
+              flex: 2,
+              child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 120),
+              child: Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Container(
                       width: 8,
@@ -282,12 +289,16 @@ class TaskCard extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 6),
-                    Text(
-                      task["priority"] ?? "",
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: priorityColor,
-                        fontSize: 11,
+                    Flexible(
+                      child: Text(
+                        task["priority"] ?? "",
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: priorityColor,
+                          fontSize: 11,
+                        ),
                       ),
                     ),
                   ],
@@ -304,6 +315,8 @@ class TaskCard extends StatelessWidget {
                   ),
                   child: Text(
                     task["status"] ?? "",
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: theme.textTheme.bodySmall?.copyWith(
                       fontWeight: FontWeight.bold,
                       color: statusColor,
@@ -312,6 +325,8 @@ class TaskCard extends StatelessWidget {
                   ),
                 ),
               ],
+            ),
+            ),
             ),
           ],
         ),
@@ -347,6 +362,14 @@ class _TaskCardState extends State<Taskstatus> {
   int? _userId;
 
   bool get isCompleted => selectedStatus == TaskStatus.completed;
+
+  void _notifyGoalRefresh() {
+    try {
+      final refresh = context.read<DataRefreshNotifier>();
+      refresh.refreshTasks();
+      refresh.refreshGoals();
+    } catch (_) {}
+  }
 
   static const _assignedQtyKeys = [
     "quantity",
@@ -397,7 +420,7 @@ class _TaskCardState extends State<Taskstatus> {
       if (people is List) widget.task["assignedTo"] = people;
       final done = readGoalInt(details, _completedQtyKeys);
       if (done != null) widget.task["completedQuantity"] = done;
-      _keepTaskOpenUntilEveryShareIsDone();
+      _applyStoredStatus(details);
       if (mounted) setState(() {});
       widget.onTaskDataUpdated?.call();
     } catch (e) {
@@ -412,30 +435,21 @@ class _TaskCardState extends State<Taskstatus> {
     if (id == null) return;
     setState(() {
       _userId = id;
-      _keepTaskOpenUntilEveryShareIsDone();
+      _applyStoredStatus(widget.task);
     });
   }
 
-  void _keepTaskOpenUntilEveryShareIsDone() {
-    final shares = widget.task["quantitySplits"] ?? widget.task["QuantitySplits"];
-    if (shares is! List || shares.isEmpty) return;
+  void _applyStoredStatus(Map source) {
+    final status = source["status"] ?? source["Status"];
+    if (status != null && status.toString().trim().isNotEmpty) {
+      widget.task["status"] = status.toString();
+    }
     final userId = _userId;
-    if (userId != null) {
-      final mine = memberUserStatus(widget.task, userId);
-      if (mine != null) {
-        selectedStatus = TaskUtils.parseStatus(mine);
-        return;
-      }
-    }
-    if (allQuantitySharesCompleted(widget.task)) {
-      widget.task["status"] = "Completed";
-      selectedStatus = TaskStatus.completed;
-      return;
-    }
-    widget.task["status"] = "In Progress";
-    if (selectedStatus == TaskStatus.completed) {
-      selectedStatus = TaskStatus.inProgress;
-    }
+    final stored = userId == null
+        ? (widget.task["status"] ?? "").toString()
+        : viewerTaskStatus(widget.task, userId);
+    if (stored.trim().isEmpty) return;
+    selectedStatus = TaskUtils.parseStatus(stored);
   }
 
   int get _myQuantity {
@@ -576,6 +590,22 @@ class _TaskCardState extends State<Taskstatus> {
     }
   }
 
+  void _writeViewerStatus(TaskStatus value) {
+    final api = TaskUtils.apiStatus(value);
+    widget.task["status"] = api;
+    widget.task["userStatus"] = api;
+    final userId = _userId;
+    final people = widget.task["assignedTo"] ?? widget.task["AssignedTo"];
+    if (userId == null || people is! List) return;
+    for (final person in people) {
+      if (person is! Map) continue;
+      final id = int.tryParse("${person["userId"] ?? person["UserId"]}");
+      if (id != userId) continue;
+      person["userStatus"] = api;
+      person["UserStatus"] = api;
+    }
+  }
+
   @override
   void didUpdateWidget(covariant Taskstatus oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -677,7 +707,7 @@ class _TaskCardState extends State<Taskstatus> {
       if (splits is List) widget.task["quantitySplits"] = splits;
       final people = details["assignedTo"] ?? details["AssignedTo"];
       if (people is List) widget.task["assignedTo"] = people;
-      _keepTaskOpenUntilEveryShareIsDone();
+      _applyStoredStatus(details);
       final taskDone = readGoalInt(details, _completedQtyKeys);
       if (taskDone != null) widget.task["completedQuantity"] = taskDone;
       final userId = _userId;
@@ -705,23 +735,16 @@ class _TaskCardState extends State<Taskstatus> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final statusColor = TaskUtils.getStatusColor(selectedStatus);
-    final priorityColor = TaskUtils.getPriorityColor(widget.task["priority"]);
-
     return GestureDetector(
       onTap: widget.onTap,
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          // color: Theme.of(context).colorScheme.onPrimary,
-          color: isDark
-              ? Theme.of(context).colorScheme.onSecondary
-              : Theme.of(context).colorScheme.onPrimary,
+          color: WebTheme.surfaceOf(context),
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: Theme.of(context).colorScheme.secondary,
+            color: WebTheme.lineOf(context),
             width: 1.2,
           ),
         ),
@@ -733,7 +756,7 @@ class _TaskCardState extends State<Taskstatus> {
               width: 4,
               height: 72,
               decoration: BoxDecoration(
-                color: statusColor,
+                color: WebTheme.brandOf(context),
                 borderRadius: BorderRadius.circular(10),
               ),
             ),
@@ -741,6 +764,7 @@ class _TaskCardState extends State<Taskstatus> {
 
             /// Task Info
             Expanded(
+              flex: 3,
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -749,9 +773,10 @@ class _TaskCardState extends State<Taskstatus> {
                     widget.task["task"],
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.bold,
+                      color: WebTheme.inkOf(context),
                     ),
                   ),
 
@@ -761,9 +786,10 @@ class _TaskCardState extends State<Taskstatus> {
                     const SizedBox(height: 4),
                     Text(
                       "Your quantity ${formatGoalQty(_myQuantity)}",
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
+                        color: WebTheme.inkOf(context),
                       ),
                     ),
                   ],
@@ -773,24 +799,27 @@ class _TaskCardState extends State<Taskstatus> {
                       _myQuantity > 0
                           ? "Completed Qty ${formatGoalQty(_myCompleted)} of ${formatGoalQty(_myQuantity)}"
                           : "Completed Qty ${formatGoalQty(_myCompleted)}",
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
-                        color: Color(0xFF1B7A3A),
+                        color: WebTheme.brandOf(context),
                       ),
                     ),
                   ],
                   const SizedBox(height: 5),
                   Row(
                     children: [
-                      const Icon(Icons.group, size: 14, color: Colors.grey),
+                      Icon(Icons.group, size: 14, color: WebTheme.brandOf(context)),
                       const SizedBox(width: 4),
                       Expanded(
                         child: Text(
                           _memberLabel,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontSize: 12),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: WebTheme.mutedOf(context),
+                          ),
                         ),
                       ),
                     ],
@@ -798,9 +827,10 @@ class _TaskCardState extends State<Taskstatus> {
                   const SizedBox(height: 5),
                   Text(
                     "Due: ${AppHelpers.formatDate(widget.task["dueDate"])}",
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
+                      color: WebTheme.mutedOf(context),
                     ),
                   ),
                 ],
@@ -808,26 +838,36 @@ class _TaskCardState extends State<Taskstatus> {
             ),
 
             /// Right side
-            Column(
+            Flexible(
+              flex: 2,
+              child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 140),
+              child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Container(
                       width: 8,
                       height: 8,
                       decoration: BoxDecoration(
-                        color: priorityColor,
+                        color: WebTheme.brandOf(context),
                         shape: BoxShape.circle,
                       ),
                     ),
                     const SizedBox(width: 6),
-                    Text(
-                      widget.task["priority"] ?? "",
-                      style: const TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
+                    Flexible(
+                      child: Text(
+                        widget.task["priority"] ?? "",
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: WebTheme.brandOf(context),
+                        ),
                       ),
                     ),
                   ],
@@ -847,7 +887,7 @@ class _TaskCardState extends State<Taskstatus> {
                       vertical: 2,
                     ),
                     decoration: BoxDecoration(
-                      color: statusColor.withOpacity(0.12),
+                      color: WebTheme.brand.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(20),
                       border: !_permissionChecked || !_canEditStatus
                           ? Border.all(
@@ -860,6 +900,20 @@ class _TaskCardState extends State<Taskstatus> {
                       value: selectedStatus,
                       underline: const SizedBox(),
                       isDense: true,
+                      isExpanded: true,
+                      selectedItemBuilder: (context) {
+                        return TaskStatus.values.map((status) {
+                          return Text(
+                            TaskUtils.getStatusText(status),
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: WebTheme.inkOf(context),
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          );
+                        }).toList();
+                      },
                       icon: Icon(
                         Icons.arrow_drop_down,
                         size: 18,
@@ -875,6 +929,7 @@ class _TaskCardState extends State<Taskstatus> {
                               fontWeight: FontWeight.bold,
                               color: TaskUtils.getStatusColor(status),
                             ),
+                            overflow: TextOverflow.ellipsis,
                           ),
                         );
                       }).toList(),
@@ -891,57 +946,22 @@ class _TaskCardState extends State<Taskstatus> {
                               }
                               final previous = selectedStatus;
                               int? achievedQuantity;
-                              if (value != TaskStatus.completed) {
-                                var assigned = _myQuantity;
-                                if (assigned <= 0) {
-                                  assigned = await _loadAssignedQuantity();
-                                }
-                                if (!mounted) return;
-                                final currentQuantity = assigned > 0
-                                    ? taskAchievedQty(widget.task)
-                                    : null;
-                                _setStateIfMounted(() {
-                                  selectedStatus = value;
-                                  isUpdating = true;
-                                });
-                                try {
-                                  await AdminService.updateTaskStatus(
-                                    taskCode: widget.task["taskCode"],
-                                    status: value,
-                                    achievedQuantity: currentQuantity,
-                                  );
-                                  widget.task["status"] =
-                                      TaskUtils.getStatusText(value);
-                                  await widget.onStatusSaved?.call(widget.task);
-                                } catch (e) {
-                                  if (!mounted) return;
-                                  _setStateIfMounted(() {
-                                    selectedStatus = previous;
-                                  });
-                                  final message = e
-                                      .toString()
-                                      .replaceFirst("Exception: ", "");
-                                  showAppMessage(context, message);
-                                } finally {
-                                  _setStateIfMounted(() => isUpdating = false);
-                                }
-                                return;
-                              }
-
-                              await Future<void>.delayed(
-                                const Duration(milliseconds: 300),
-                              );
-                              if (!mounted) return;
-                              final assigned = _myQuantity > 0
-                                  ? _myQuantity
-                                  : await _loadAssignedQuantity();
-                              if (!mounted) return;
-                              if (assigned > 0) {
-                                achievedQuantity = await _askAchievedQuantity(
-                                  assigned,
+                              if (value == TaskStatus.completed) {
+                                await Future<void>.delayed(
+                                  const Duration(milliseconds: 300),
                                 );
-                                if (!mounted || achievedQuantity == null) {
-                                  return;
+                                if (!mounted) return;
+                                final assigned = _myQuantity > 0
+                                    ? _myQuantity
+                                    : await _loadAssignedQuantity();
+                                if (!mounted) return;
+                                if (assigned > 0) {
+                                  achievedQuantity = await _askAchievedQuantity(
+                                    assigned,
+                                  );
+                                  if (!mounted || achievedQuantity == null) {
+                                    return;
+                                  }
                                 }
                               }
 
@@ -956,8 +976,8 @@ class _TaskCardState extends State<Taskstatus> {
                                   status: value,
                                   achievedQuantity: achievedQuantity,
                                 );
-                                widget.task["status"] =
-                                    TaskUtils.getStatusText(value);
+                                _writeViewerStatus(value);
+                                _notifyGoalRefresh();
                                 await _loadSavedCompletedQuantity();
                                 if (_userId != null) {
                                   final mine = memberShareCompleted(
@@ -986,6 +1006,8 @@ class _TaskCardState extends State<Taskstatus> {
                   ),
                 ),
               ],
+            ),
+            ),
             ),
           ],
         ),
@@ -1098,11 +1120,13 @@ class GoalCard extends StatefulWidget {
   final Map<String, dynamic> goal;
   final Function(String message, bool isError)? onDelete;
   final VoidCallback? onRefresh;
+  final bool expandMonthsInline;
   const GoalCard({
     super.key,
     required this.goal,
     this.onDelete,
     this.onRefresh,
+    this.expandMonthsInline = false,
   });
 
   @override
@@ -1115,6 +1139,8 @@ class _GoalCardState extends State<GoalCard> {
   bool isLoading = true;
   bool isSearching = false;
   bool _enriching = false;
+  Map<int, String> _userNamesById = {};
+  static Future<Map<int, String>>? _sharedUserNames;
   late final isDark = Theme.of(context).brightness == Brightness.dark;
   final TextEditingController searchController = TextEditingController();
   @override
@@ -1123,6 +1149,7 @@ class _GoalCardState extends State<GoalCard> {
     _syncProgress();
     _enrichTaskQuantities();
     loadAdminId();
+    _loadAssigneeNames();
   }
 
   @override
@@ -1158,6 +1185,24 @@ class _GoalCardState extends State<GoalCard> {
     } finally {
       _enriching = false;
     }
+  }
+
+  Future<void> _loadAssigneeNames() async {
+    if (_yearlyAssigneeNames(widget.goal).isNotEmpty) return;
+    if (yearlyAssigneeIds(widget.goal).isEmpty) return;
+    _sharedUserNames ??= SuperAdminService.getAllUsers().then((users) {
+      return {
+        for (final user in users)
+          if (user.userId > 0 && user.displayName.trim().isNotEmpty)
+            user.userId: user.displayName.trim(),
+      };
+    }).catchError((_) {
+      _sharedUserNames = null;
+      return <int, String>{};
+    });
+    final names = await _sharedUserNames;
+    if (!mounted || names == null) return;
+    setState(() => _userNamesById = names);
   }
 
   Future<void> loadAdminId() async {
@@ -1378,7 +1423,7 @@ class _GoalCardState extends State<GoalCard> {
     final isYearly =
         goalType.toLowerCase() == 'yearly' || monthlyGoals.isNotEmpty;
     final assignedTo = isYearly
-        ? _yearlyAssignedTo(widget.goal, monthlyGoals)
+        ? _yearlyAssignedTo(widget.goal)
         : _assignedToNames(widget.goal);
     final quantity = goalQuantityView(
       widget.goal,
@@ -1398,12 +1443,10 @@ class _GoalCardState extends State<GoalCard> {
       child: Container(
         margin: const EdgeInsets.symmetric(vertical: 5),
         decoration: BoxDecoration(
-          color: isDark
-              ? Theme.of(context).colorScheme.primary
-              : Theme.of(context).colorScheme.onPrimary,
+          color: WebTheme.surfaceOf(context),
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: Theme.of(context).colorScheme.secondary,
+            color: WebTheme.lineOf(context),
             width: 1.2,
           ),
         ),
@@ -1413,7 +1456,7 @@ class _GoalCardState extends State<GoalCard> {
           children: [
             InkWell(
               onTap: () async {
-                if (isYearly) {
+                if (isYearly && !widget.expandMonthsInline) {
                   await Navigator.of(context).push(
                     MaterialPageRoute(
                       builder: (_) => YearlyMonthlyGoalsPage(
@@ -1453,7 +1496,7 @@ class _GoalCardState extends State<GoalCard> {
                                 ),
                               ),
                               Icon(
-                                isYearly
+                                isYearly && !widget.expandMonthsInline
                                     ? Icons.chevron_right
                                     : isExpanded
                                         ? Icons.keyboard_arrow_up
@@ -1468,24 +1511,32 @@ class _GoalCardState extends State<GoalCard> {
                               children: [
                                 buildStars(goalPoints),
                                 const SizedBox(width: 8),
-                                Text(
-                                  "$goalPoints points",
-                                  style: Theme.of(
-                                    context,
-                                  ).textTheme.headlineSmall,
+                                Flexible(
+                                  child: Text(
+                                    "$goalPoints points",
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.headlineSmall,
+                                  ),
                                 ),
                               ],
                             ),
                           const SizedBox(height: 10),
                           Row(
                             children: [
-                              Text(
-                                "Progress",
-                                style: Theme.of(
-                                  context,
-                                ).textTheme.headlineSmall,
+                              Flexible(
+                                child: Text(
+                                  "Progress",
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: Theme.of(
+                                    context,
+                                  ).textTheme.headlineSmall,
+                                ),
                               ),
-                              const SizedBox(width: 10),
+                              const SizedBox(width: 8),
                               Expanded(
                                 child: ClipRRect(
                                   borderRadius: BorderRadius.circular(6),
@@ -1515,20 +1566,19 @@ class _GoalCardState extends State<GoalCard> {
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Row(
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 6,
                                 children: [
-                                  if (goalType.isNotEmpty) ...[
+                                  if (goalType.isNotEmpty)
                                     _badge(
                                       goalType,
                                       Theme.of(context).colorScheme.secondary,
                                     ),
-                                    const SizedBox(width: 8),
-                                  ],
                                   _badge(
                                     widget.goal["status"] ?? "",
                                     statusColor,
                                   ),
-                                  const SizedBox(width: 8),
                                   _badge(
                                     widget.goal["priority"] ?? "",
                                     priorityColor,
@@ -1564,33 +1614,18 @@ class _GoalCardState extends State<GoalCard> {
                                 ],
                               ),
                               const SizedBox(height: 10),
-                              Row(
+                              Wrap(
+                                spacing: 10,
+                                runSpacing: 6,
                                 children: [
-                                  const Icon(
+                                  _dateLabel(
                                     Icons.calendar_today,
-                                    size: 14,
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
                                     "Start: ${AppHelpers.formatDate(widget.goal["startDate"]?.toString())}",
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
-                                    ),
                                   ),
-                                  const Spacer(),
-                                  const Icon(
+                                  _dateLabel(
                                     Icons.event,
-                                    size: 14,
-                                    color: Colors.red,
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
                                     "Due: ${AppHelpers.formatDate(widget.goal["dueDate"]?.toString())}",
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
-                                    ),
+                                    iconColor: Colors.red,
                                   ),
                                 ],
                               ),
@@ -1598,7 +1633,9 @@ class _GoalCardState extends State<GoalCard> {
                                 const SizedBox(height: 10),
                                 Text(
                                   monthlyGoals.isEmpty
-                                      ? "Tap to open monthly goals"
+                                      ? "No monthly goals yet"
+                                      : widget.expandMonthsInline
+                                      ? "${monthlyGoals.length} monthly goals  •  tap to show"
                                       : "${monthlyGoals.length} monthly goals  •  tap to open",
                                   style: TextStyle(
                                     fontSize: 12,
@@ -1616,6 +1653,20 @@ class _GoalCardState extends State<GoalCard> {
                 ),
               ),
             ),
+            if (isExpanded && isYearly && widget.expandMonthsInline)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 0, 8, 8),
+                child: Column(
+                  children: [
+                    for (final month in monthlyGoals)
+                      GoalCard(
+                        goal: month,
+                        onDelete: widget.onDelete,
+                        onRefresh: widget.onRefresh,
+                      ),
+                  ],
+                ),
+              ),
             if (isExpanded && !isYearly)
               Alltasklist(
                 tasks: tasks,
@@ -1685,15 +1736,8 @@ class _GoalCardState extends State<GoalCard> {
 
   Future<void> _onGoalTaskStatusSaved(List tasks) async {
     if (!mounted) return;
-    final allDone = tasks.isNotEmpty &&
-        tasks.every((item) {
-          if (item is! Map) return false;
-          return TaskUtils.parseStatus((item["status"] ?? "").toString()) ==
-              TaskStatus.completed;
-        });
     setState(() {
       syncGoalProgress(widget.goal, tasks: tasks);
-      if (allDone) widget.goal["status"] = "Completed";
     });
     _notifyGoalRefresh();
     widget.onRefresh?.call();
@@ -1726,28 +1770,72 @@ class _GoalCardState extends State<GoalCard> {
     return AppHelpers.extractName(goal["assignTo"]?.toString() ?? "");
   }
 
-  String _yearlyAssignedTo(
-    Map<String, dynamic> yearly,
-    List<Map<String, dynamic>> months,
-  ) {
-    final names = <String>[];
-    final seen = <String>{};
+  String _yearlyAssignedTo(Map<String, dynamic> yearly) {
+    final names = _yearlyAssigneeNames(yearly);
+    if (names.isNotEmpty) return names.join(", ");
+    final resolved = <String>[];
+    for (final id in yearlyAssigneeIds(yearly)) {
+      final name = _userNamesById[id]?.trim() ?? "";
+      if (name.isEmpty) continue;
+      resolved.add(name);
+    }
+    if (resolved.isNotEmpty) return resolved.join(", ");
+    return "No members";
+  }
 
-    void addAll(Iterable<String> values) {
-      for (final name in values) {
-        final key = name.toLowerCase();
-        if (key.isEmpty || !seen.add(key)) continue;
-        names.add(name);
+  List<String> _yearlyAssigneeNames(Map<String, dynamic> yearly) {
+    final named = <int, String>{};
+    final loose = <String>[];
+
+    void collect(dynamic raw) {
+      if (raw is! List) return;
+      for (final item in raw) {
+        if (item is Map) {
+          final user = Map<String, dynamic>.from(item);
+          final id = int.tryParse(memberUserId(user));
+          final name = memberDisplayName(user)?.trim() ?? "";
+          if (name.isEmpty) continue;
+          if (id != null && id > 0) {
+            named[id] = name;
+          } else {
+            loose.add(name);
+          }
+          continue;
+        }
+        final text = item.toString().trim();
+        if (!text.contains("-")) continue;
+        final id = int.tryParse(text.split("-").first.trim());
+        final name = AppHelpers.extractName(text).trim();
+        if (name.isEmpty || name.toLowerCase() == "n/a") continue;
+        if (id != null && id > 0) {
+          named[id] = name;
+        } else {
+          loose.add(name);
+        }
       }
     }
 
-    addAll(_memberNamesOf(yearly));
-    for (final month in months) {
-      addAll(_memberNamesOf(month));
+    for (final key in const [
+      "yearlyAssignedUsers",
+      "YearlyAssignedUsers",
+      "yearlyAssignedUserIds",
+      "YearlyAssignedUserIds",
+      "assignedUsers",
+      "AssignedUsers",
+      "assignedTo",
+      "AssignedTo",
+    ]) {
+      collect(yearly[key]);
     }
 
-    if (names.isEmpty) return "0 members";
-    return "${names.length} members (${names.join(", ")})";
+    final ids = yearlyAssigneeIds(yearly);
+    if (ids.isEmpty) return {...named.values, ...loose}.toList();
+    final names = <String>[];
+    for (final id in ids) {
+      final name = named[id];
+      if (name != null && name.isNotEmpty) names.add(name);
+    }
+    return names;
   }
 
   List<String> _memberNamesOf(Map<String, dynamic> goal) {
@@ -1782,32 +1870,24 @@ class _GoalCardState extends State<GoalCard> {
 
     addName(goal["assignTo"]?.toString() ?? "");
 
-    final tasks = goal["tasks"];
-    if (tasks is List) {
-      for (final task in tasks) {
-        if (task is! Map) continue;
-        final assigned = task["assignedTo"] ?? task["AssignedTo"];
-        if (assigned is List) {
-          for (final user in assigned) {
-            if (user is Map) {
-              final named = memberDisplayName(Map<String, dynamic>.from(user));
-              if (named != null) {
-                addName(
-                  named,
-                  (user["userId"] ?? user["UserId"] ?? user["id"] ?? "")
-                      .toString(),
-                );
-              }
-            } else {
-              final text = user.toString().trim();
-              if (text.contains('-')) addName(text);
-            }
-          }
-        }
-      }
-    }
-
     return names;
+  }
+
+  Widget _dateLabel(IconData icon, String text, {Color? iconColor}) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 14, color: iconColor),
+        const SizedBox(width: 4),
+        Text(
+          text,
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
+    );
   }
 
   Widget _badge(String text, Color color) {

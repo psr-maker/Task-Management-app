@@ -1,5 +1,6 @@
 import 'package:staff_work_track/Models/getusers.dart';
 import 'package:staff_work_track/Models/rolesmodel.dart';
+import 'package:staff_work_track/core/constant/division_config.dart';
 import 'package:staff_work_track/services/auth_service.dart';
 import 'package:staff_work_track/services/superadmin_service.dart';
 import 'package:staff_work_track/utils/jwt_helper.dart';
@@ -88,12 +89,34 @@ bool canAssignUser({
   required UserModel user,
   required List<Role> roles,
   int? loginUserId,
+  String? loginRole,
 }) {
   if (loginUserId != null && user.userId == loginUserId) return true;
+  // Division heads may assign only to department managers under them.
+  if (AppRoles.isDivisionHead(loginRole)) {
+    return AppRoles.isManager(user.role);
+  }
+
   if (loginPosition == null) return false;
   final position = rolePosition(roles, user.role);
   if (position == null) return false;
   return position >= loginPosition;
+}
+
+/// Leadership roles a yearly goal can be assigned to.
+/// Lower position number is a higher role: director, division head, manager.
+bool isHierarchyLevelRole(List<Role> roles, String? roleValue) {
+  if (AppRoles.isManager(roleValue) ||
+      AppRoles.isDivisionHead(roleValue) ||
+      AppRoles.isAssistantManager(roleValue)) {
+    return true;
+  }
+  final value = (roleValue ?? '').trim();
+  if (value.isEmpty) return false;
+  final lower = value.toLowerCase();
+  if (lower == 'director' || value == AppRoles.director) return true;
+  final position = rolePosition(roles, roleValue);
+  return position != null && position >= 1 && position <= 3;
 }
 
 Future<List<UserModel>> keepAssignableUsers(List<UserModel> users) async {
@@ -114,6 +137,7 @@ Future<List<UserModel>> keepAssignableUsers(List<UserModel> users) async {
           user: user,
           roles: roles,
           loginUserId: loginUserId,
+          loginRole: loginRole,
         ),
       )
       .toList();

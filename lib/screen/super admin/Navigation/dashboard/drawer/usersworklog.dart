@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:staff_work_track/core/constant/division_config.dart';
-import 'package:staff_work_track/core/widgets/buttons.dart';
+import 'package:staff_work_track/core/responsive/app_layout.dart';
+import 'package:staff_work_track/core/widgets/worklog_date_picker.dart';
+import 'package:staff_work_track/core/widgets/worklog_web_board.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
 import 'package:staff_work_track/core/widgets/worklog_session_tile.dart';
 import 'package:staff_work_track/services/announ_service.dart';
@@ -168,144 +169,9 @@ class _UsersWorklogState extends State<UsersWorklog> {
     });
   }
 
-  void _showDateMonthPicker() {
-    int tempYear = selectedDate?.year ?? DateTime.now().year;
-    int tempMonth = selectedDate?.month ?? DateTime.now().month;
-    int tempDay = selectedDate?.day ?? DateTime.now().day;
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            // Ensure day doesn't exceed month's max days
-            final maxDays = DateTime(tempYear, tempMonth + 1, 0).day;
-
-            if (tempDay > maxDays) {
-              tempDay = maxDays;
-            }
-
-            return Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    "Select Date",
-                    style: Theme.of(context).textTheme.displaySmall,
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  // YEAR
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        "Year",
-                        style: Theme.of(context).textTheme.headlineLarge,
-                      ),
-                      DropdownButton<int>(
-                        value: tempYear,
-                        style: Theme.of(context).textTheme.headlineSmall,
-                        items: List.generate(10, (i) => DateTime.now().year - i)
-                            .map((year) {
-                              return DropdownMenuItem(
-                                value: year,
-                                child: Text("$year"),
-                              );
-                            })
-                            .toList(),
-                        onChanged: (value) {
-                          setModalState(() {
-                            tempYear = value!;
-                          });
-                        },
-                      ),
-                    ],
-                  ),
-
-                  // MONTH
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        "Month",
-                        style: Theme.of(context).textTheme.headlineLarge,
-                      ),
-                      DropdownButton<int>(
-                        value: tempMonth,
-                        style: Theme.of(context).textTheme.headlineSmall,
-                        items: List.generate(12, (i) {
-                          return DropdownMenuItem(
-                            value: i + 1,
-                            child: Text(
-                              DateFormat('MMMM').format(DateTime(2025, i + 1)),
-                            ),
-                          );
-                        }),
-                        onChanged: (value) {
-                          setModalState(() {
-                            tempMonth = value!;
-                          });
-                        },
-                      ),
-                    ],
-                  ),
-
-                  // DAY
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        "Day",
-                        style: Theme.of(context).textTheme.headlineLarge,
-                      ),
-                      DropdownButton<int>(
-                        value: tempDay,
-                        style: Theme.of(context).textTheme.headlineSmall,
-                        items: List.generate(maxDays, (i) => i + 1).map((day) {
-                          return DropdownMenuItem(
-                            value: day,
-                            child: Text("$day"),
-                          );
-                        }).toList(),
-                        onChanged: (value) {
-                          setModalState(() {
-                            tempDay = value!;
-                          });
-                        },
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  AppButton(
-                    text: "Apply",
-                    isLoading: false,
-                    onPressed: () {
-                      setState(() {
-                        selectedDate = DateTime(tempYear, tempMonth, tempDay);
-
-                        applyFilter();
-                      });
-
-                      Navigator.pop(context);
-                    },
-                    color: Theme.of(context).colorScheme.secondary,
-                    txtcolor: Theme.of(context).colorScheme.onPrimary,
-                  ),
-
-                  const SizedBox(height: 10),
-                ],
-              ),
-            );
-          },
-        );
-      },
-    );
+  void _setDate(DateTime? value) {
+    setState(() => selectedDate = value);
+    applyFilter();
   }
 
   Map<String, List<dynamic>> groupByDate(List logs) {
@@ -333,8 +199,31 @@ class _UsersWorklogState extends State<UsersWorklog> {
     return grouped;
   }
 
+  Widget _webBoard() {
+    return WorklogWebBoard(
+      title: 'Worklogs',
+      subtitle: 'Check-in and check-out across departments',
+      loading: isLoading,
+      logs: filteredLogs,
+      searchController: searchController,
+      onSearch: (value) {
+        searchQuery = value;
+        applyFilter();
+      },
+      selectedDate: selectedDate,
+      onDate: _setDate,
+      departments: filterDepartments,
+      selectedDepartment: selectedDepartment,
+      onDepartment: (value) {
+        setState(() => selectedDepartment = value);
+        applyFilter();
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (!AppLayout.isMobile(context)) return _webBoard();
     final groupedLogs = groupByDate(filteredLogs);
     return Scaffold(
       appBar: AppBar(
@@ -404,14 +293,17 @@ class _UsersWorklogState extends State<UsersWorklog> {
                   )
                   .toList(),
             ),
-          IconButton(
-            onPressed: _showDateMonthPicker,
-            icon: const Icon(Icons.calendar_today),
-          ),
         ],
       ),
       body: Column(
         children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: WorklogDateButton(date: selectedDate, onChanged: _setDate),
+            ),
+          ),
           if (widget.allowedDepartments != null &&
               widget.allowedDepartments!.isNotEmpty)
             Padding(

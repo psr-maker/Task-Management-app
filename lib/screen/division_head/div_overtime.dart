@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:staff_work_track/core/theme/web_theme.dart';
+import 'package:staff_work_track/core/widgets/list_download_button.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
+import 'package:staff_work_track/core/widgets/request_workspace.dart';
 import 'package:staff_work_track/core/widgets/web_ui.dart';
 import 'package:staff_work_track/services/admin_service.dart';
 import 'package:staff_work_track/services/overtime_service.dart';
@@ -123,6 +126,7 @@ class _DivOvertimeState extends State<DivOvertime> {
     final selected = selectedDepartment == dept;
     final label = dept.replaceAll(" Department", "");
     final secondary = Theme.of(context).colorScheme.secondary;
+    final dark = WebTheme.isDark(context);
 
     return Padding(
       padding: const EdgeInsets.only(right: 8),
@@ -133,10 +137,18 @@ class _DivOvertimeState extends State<DivOvertime> {
           height: 34,
           padding: const EdgeInsets.symmetric(horizontal: 12),
           decoration: BoxDecoration(
-            color: selected ? secondary : Colors.white,
+            color: selected
+                ? secondary
+                : dark
+                    ? WebTheme.surfaceOf(context)
+                    : Colors.white,
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color: selected ? secondary : const Color(0xFFD0D5D2),
+              color: selected
+                  ? secondary
+                  : dark
+                      ? WebTheme.lineOf(context)
+                      : const Color(0xFFD0D5D2),
             ),
           ),
           alignment: Alignment.center,
@@ -150,7 +162,11 @@ class _DivOvertimeState extends State<DivOvertime> {
               Text(
                 label,
                 style: TextStyle(
-                  color: selected ? Colors.white : secondary,
+                  color: selected
+                      ? Colors.white
+                      : dark
+                          ? WebTheme.inkOf(context)
+                          : secondary,
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
                 ),
@@ -185,8 +201,48 @@ class _DivOvertimeState extends State<DivOvertime> {
     return Colors.orange;
   }
 
+  Widget _webOvertime() {
+    return Scaffold(
+      backgroundColor: WebTheme.canvasOf(context),
+      body: RequestWorkspace(
+        title: 'Overtime',
+        subtitle: 'Approved overtime by department',
+        loading: isLoading,
+        filters: departments,
+        selectedFilter: selectedDepartment,
+        onFilter: _selectDepartment,
+        downloadTitle: 'Overtime',
+        emptyTitle: 'No overtime',
+        emptyMessage: 'No approved overtime for $selectedDepartment',
+        stats: [
+          WorkspaceStat(
+            label: 'Records',
+            value: '${overtimes.length}',
+            icon: Icons.schedule_rounded,
+            color: WebTheme.brandOf(context),
+          ),
+        ],
+        columns: const ['Staff', 'Date', 'Time', 'Hours', 'Reason'],
+        records: [
+          for (final item in overtimes)
+            WorkspaceRecord(
+              status: _statusOf(item),
+              values: [
+                (_field(item, ['staffName', 'name']) ?? 'Unknown').toString(),
+                _formatDate(_field(item, ['date', 'workDate'])),
+                '${_formatTime(_field(item, ['fromTime', 'startTime']))} – ${_formatTime(_field(item, ['toTime', 'endTime']))}',
+                _formatHours(_field(item, ['totalHours', 'totalhours'])),
+                (_field(item, ['reason']) ?? '').toString(),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (WebPushedChrome.isWeb(context)) return _webOvertime();
     return Scaffold(
       backgroundColor: WebPushedChrome.background(context),
       appBar: AppBar(
@@ -195,6 +251,24 @@ class _DivOvertimeState extends State<DivOvertime> {
           icon: const Icon(Icons.arrow_back_ios),
           onPressed: () => Navigator.pop(context),
         ),
+        actions: [
+          ListDownloadButton(
+            title: 'Overtime',
+            onAppBar: true,
+            headers: const ['Staff', 'Date', 'Time', 'Hours', 'Reason', 'Status'],
+            rows: () => [
+              for (final item in overtimes)
+                [
+                  (_field(item, ['staffName', 'name']) ?? 'Unknown').toString(),
+                  _formatDate(_field(item, ['date', 'workDate'])),
+                  '${_formatTime(_field(item, ['fromTime', 'startTime']))} – ${_formatTime(_field(item, ['toTime', 'endTime']))}',
+                  _formatHours(_field(item, ['totalHours', 'totalhours'])),
+                  (_field(item, ['reason']) ?? '').toString(),
+                  _statusOf(item),
+                ],
+            ],
+          ),
+        ],
       ),
       body: WebPushedChrome.body(
         context,
@@ -257,7 +331,9 @@ class _DivOvertimeState extends State<DivOvertime> {
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: Theme.of(context).colorScheme.secondary.withValues(alpha: 0.45),
+          color: WebTheme.isDark(context)
+              ? WebTheme.lineOf(context)
+              : Theme.of(context).colorScheme.secondary.withValues(alpha: 0.45),
         ),
       ),
       child: Padding(

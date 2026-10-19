@@ -10,7 +10,14 @@ import 'package:staff_work_track/widgets/adaptive_goal_cards.dart';
 
 class PendingTab extends StatefulWidget {
   final int adminId;
-  const PendingTab({super.key, required this.adminId});
+  final String Function(Map task)? statusOf;
+  final Future<void> Function(Map<String, dynamic> task)? onStatusSaved;
+  const PendingTab({
+    super.key,
+    required this.adminId,
+    this.statusOf,
+    this.onStatusSaved,
+  });
 
   @override
   State<PendingTab> createState() => _PendingTabState();
@@ -44,9 +51,10 @@ class _PendingTabState extends State<PendingTab> {
 
         // Filter only pending and paused tasks
         final tasks = snapshot.data!.where((task) {
-          final normalizedStatus = AppHelpers.normalize(
-            viewerTaskStatus(task, widget.adminId),
-          );
+          final normalizedStatus = widget.statusOf?.call(task) ??
+              AppHelpers.normalize(
+                viewerTaskStatus(task, widget.adminId),
+              );
           return normalizedStatus == "pending" ||
               normalizedStatus == "paused" ||
               normalizedStatus == "notstarted";
@@ -64,6 +72,7 @@ class _PendingTabState extends State<PendingTab> {
               final task = tasks[index];
               return Taskstatus(
                 task: task,
+                onStatusSaved: widget.onStatusSaved,
                 onTap: () {
                   Navigator.push(
                     context,

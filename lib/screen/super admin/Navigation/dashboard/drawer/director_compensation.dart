@@ -2,12 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:staff_work_track/Models/getusers.dart';
 import 'package:staff_work_track/core/constant/division_config.dart';
 import 'package:staff_work_track/core/theme/web_theme.dart';
+import 'package:staff_work_track/core/widgets/list_download_button.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
 import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
+import 'package:staff_work_track/core/widgets/request_workspace.dart';
 import 'package:staff_work_track/core/widgets/web_ui.dart';
 import 'package:staff_work_track/screen/admin/Navigation/dashbord/drawer/dept_compensation.dart/add_compen.dart';
+import 'package:staff_work_track/services/auth_service.dart';
 import 'package:staff_work_track/services/overtime_service.dart';
 import 'package:staff_work_track/services/superadmin_service.dart';
+import 'package:staff_work_track/utils/jwt_helper.dart';
 import 'package:staff_work_track/utils/time_utils.dart';
 
 class DirectorCompensation extends StatefulWidget {
@@ -55,8 +59,25 @@ class _DirectorCompensationState extends State<DirectorCompensation> {
     return _asInt(_field(item, ["staffId", "userId", "employeeId"]));
   }
 
+  int? _managerId(Map<String, dynamic> item) {
+    return _asInt(_field(item, ["managerId"]));
+  }
+
   int? _extraWorkId(Map<String, dynamic> item) {
     return _asInt(_field(item, ["id", "extraWorkId", "compensationId"]));
+  }
+
+  String _rejectNote(Map<String, dynamic> item) {
+    final staff = (_field(item, ['staffRemarks', 'staffRemark']) ?? '')
+        .toString()
+        .trim();
+    final manager = (_field(item, ['managerRemarks', 'rejectionReason']) ?? '')
+        .toString()
+        .trim();
+    final parts = <String>[];
+    if (staff.isNotEmpty && staff != 'null') parts.add('Staff: $staff');
+    if (manager.isNotEmpty && manager != 'null') parts.add('Manager: $manager');
+    return parts.isEmpty ? '—' : parts.join(' · ');
   }
 
   String _status(Map<String, dynamic> item) {
@@ -132,7 +153,9 @@ class _DirectorCompensationState extends State<DirectorCompensation> {
       case "accepted":
         return (text: "Staff Accepted", color: Colors.blueAccent);
       case "staffrejected":
+        return (text: "Staff Rejected", color: Colors.redAccent);
       case "managerrejected":
+        return (text: "Manager Rejected", color: Colors.redAccent);
       case "rejected":
         return (text: "Rejected", color: Colors.redAccent);
       default:
@@ -193,28 +216,20 @@ class _DirectorCompensationState extends State<DirectorCompensation> {
         addDepartment(user.department);
       }
 
-      List<Map<String, dynamic>> works = [];
-      if (names.isNotEmpty) {
-        try {
-          works = await OvertimeService.getExtraWorkByDepartments(
-            names,
-            asDirector: true,
-          );
-        } catch (_) {
-          for (final department in names) {
-            try {
-              final items = await OvertimeService.getExtraWorkByDepartments(
-                [department],
-                asDirector: true,
-              );
-              works.addAll(items);
-            } catch (_) {}
-          }
-        }
-      }
+      final token = await AuthService.getToken();
+      final myId = int.tryParse(
+        token == null ? '' : (JwtHelper.getuid(token) ?? ''),
+      );
+      final works = await OvertimeService.getDepartmentExtraWork();
 
       users = loadedUsers;
-      final leaderWorks = works.where(_isLeaderWork).toList();
+      final leaderWorks = works.where((item) {
+        final managerId = _managerId(item);
+        if (myId != null && managerId != null && managerId != myId) {
+          return false;
+        }
+        return _isLeaderWork(item);
+      }).toList();
       for (final item in leaderWorks) {
         addDepartment(_departmentOf(item));
       }
@@ -287,8 +302,77 @@ class _DirectorCompensationState extends State<DirectorCompensation> {
     }
   }
 
+  Widget _webCompensation() {
+    final items = _groupedWorks.values.expand((list) => list).toList();
+    final filters = ['All', ...departments];
+    return Scaffold(
+      backgroundColor: WebTheme.canvasOf(context),
+      body: RequestWorkspace(
+        title: 'Compensation Work',
+        subtitle: 'Compensation work by department',
+        loading: isLoading,
+        scrollable: true,
+        plainStatus: true,
+        filters: filters,
+        selectedFilter: selectedDepartment,
+        onFilter: (value) => setState(() => selectedDepartment = value),
+        downloadTitle: 'Compensation',
+        emptyTitle: 'No compensation',
+        emptyMessage: selectedDepartment == 'All'
+            ? 'No compensation found'
+            : 'No compensation found for $selectedDepartment',
+        trailing: FilledButton.icon(
+          onPressed: _openApply,
+          icon: const Icon(Icons.add, size: 18),
+          label: const Text('Add'),
+          style: FilledButton.styleFrom(
+            backgroundColor: WebTheme.brand,
+            foregroundColor: Colors.white,
+          ),
+        ),
+        stats: [
+          WorkspaceStat(label: 'Records', value: '${items.length}', icon: Icons.more_time_rounded, color: WebTheme.brand),
+        ],
+        columns: const [
+          'Work date',
+          'Task',
+          'Work type',
+          'Requested to',
+          'Time',
+          'Hours',
+          'Reason',
+          'Rejected remarks',
+        ],
+        records: [
+          for (final item in items)
+            WorkspaceRecord(
+              status: _statusInfo(item).text,
+              approvedColor: WebTheme.brand,
+              values: [
+                _formatDate(_field(item, ['workDate', 'date'])),
+                (_field(item, ['taskName', 'task', 'title']) ?? '—').toString(),
+                _formatWorkType((_field(item, ['workType']) ?? '').toString()),
+                (_field(item, ['staffName', 'name']) ?? 'Unknown').toString(),
+                '${_formatTime(_field(item, ['startTime']))} - ${_formatTime(_field(item, ['endTime']))}',
+                '${_formatHours(_field(item, ['expectedHours', 'totalHours', 'totalhours']))} hours',
+                (_field(item, ['reason']) ?? '').toString(),
+                _rejectNote(item),
+              ],
+              actions: _status(item).toLowerCase() == 'accepted' && _isLeaderWork(item)
+                  ? [
+                      workspaceAction('Reject', () => _reject(item), color: WebTheme.danger),
+                      workspaceAction('Approve', () => _approve(item), filled: true),
+                    ]
+                  : const [],
+            ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (WebPushedChrome.isWeb(context)) return _webCompensation();
     final grouped = _groupedWorks;
     return Scaffold(
       backgroundColor: WebPushedChrome.background(context),
@@ -301,6 +385,35 @@ class _DirectorCompensationState extends State<DirectorCompensation> {
           onPressed: () => Navigator.pop(context),
         ),
         actions: [
+          ListDownloadButton(
+            title: 'Compensation',
+            onAppBar: true,
+            headers: const [
+              'Work date',
+              'Task',
+              'Work type',
+              'Requested to',
+              'Time',
+              'Hours',
+              'Reason',
+              'Rejected remarks',
+              'Status',
+            ],
+            rows: () => [
+              for (final item in _visibleWorks)
+                [
+                  _formatDate(_field(item, ['workDate', 'date'])),
+                  (_field(item, ['taskName', 'task', 'title']) ?? '—').toString(),
+                  _formatWorkType((_field(item, ['workType']) ?? '').toString()),
+                  (_field(item, ['staffName', 'name']) ?? 'Unknown').toString(),
+                  '${_formatTime(_field(item, ['startTime']))} - ${_formatTime(_field(item, ['endTime']))}',
+                  '${_formatHours(_field(item, ['expectedHours', 'totalHours', 'totalhours']))} hours',
+                  (_field(item, ['reason']) ?? '').toString(),
+                  _rejectNote(item),
+                  _statusInfo(item).text,
+                ],
+            ],
+          ),
           IconButton(
             icon: const Icon(Icons.add_rounded),
             onPressed: _openApply,

@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:staff_work_track/core/theme/theme_provider.dart';
 import 'package:staff_work_track/core/responsive/app_layout.dart';
 import 'package:staff_work_track/core/theme/web_theme.dart';
 import 'package:staff_work_track/core/widgets/auth_page_frame.dart';
@@ -123,6 +125,8 @@ class _OtpverifyState extends State<Otpverify> {
         }
       }
       showTopMessage("OTP verified successfully", isError: false);
+      if (!mounted) return;
+      context.read<ThemeProvider>().applyRole(role);
       await Future.delayed(const Duration(seconds: 1));
       if (!mounted) return;
       if (role == "1") {

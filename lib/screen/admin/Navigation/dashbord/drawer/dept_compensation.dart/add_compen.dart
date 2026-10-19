@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:staff_work_track/Models/getusers.dart';
 import 'package:staff_work_track/core/constant/division_config.dart';
+import 'package:staff_work_track/core/theme/web_theme.dart';
 import 'package:staff_work_track/core/widgets/buttons.dart';
+import 'package:staff_work_track/core/widgets/web_ui.dart';
 import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
 import 'package:staff_work_track/services/admin_service.dart';
 import 'package:staff_work_track/services/auth_service.dart';
@@ -14,11 +16,13 @@ import 'package:staff_work_track/widgets/customfieldwidget.dart';
 class CreateExtraWorkPage extends StatefulWidget {
   final String department;
   final bool forLeaders;
+  final String? scopeDepartment;
 
   const CreateExtraWorkPage({
     super.key,
     required this.department,
     this.forLeaders = false,
+    this.scopeDepartment,
   });
 
   @override
@@ -95,7 +99,9 @@ class _CreateExtraWorkPageState extends State<CreateExtraWorkPage> {
             return a.name.toLowerCase().compareTo(b.name.toLowerCase());
           });
       } else if (forDivisionHead) {
-        result = await _managersForDivisionHead();
+        result = await AdminService.managersUnderDivisionHead(
+          ownDepartment: widget.scopeDepartment ?? widget.department,
+        );
       } else {
         result = await AdminService.getEmployeesByDepartment(
           widget.department,
@@ -130,46 +136,6 @@ class _CreateExtraWorkPageState extends State<CreateExtraWorkPage> {
         isLoadingStaff = false;
       });
     }
-  }
-
-  Future<List<UserModel>> _managersForDivisionHead() async {
-    final departments = <String>[];
-
-    void addDepartment(String name) {
-      final value = name.trim();
-      if (value.isEmpty) return;
-      if (departments.any(
-        (item) => DivisionConfig.isAllowedDepartment(value, [item]),
-      )) {
-        return;
-      }
-      departments.add(value);
-    }
-
-    final token = await AuthService.getToken();
-    if (token != null) {
-      addDepartment(JwtHelper.getDepartment(token) ?? "");
-    }
-    addDepartment(widget.department);
-    final subs = await AdminService.getMySubDepartments();
-    for (final name in subs) {
-      addDepartment(name);
-    }
-
-    List<UserModel> users;
-    try {
-      users = await SuperAdminService.getAllUsers();
-    } catch (_) {
-      users = await AdminService.getEmployeesByDepartments(departments);
-    }
-
-    final managers = users.where((user) {
-      if (!AppRoles.isManager(user.role)) return false;
-      if (user.status.trim().toLowerCase() == "inactive") return false;
-      return DivisionConfig.isAllowedDepartment(user.department, departments);
-    }).toList()
-      ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
-    return managers;
   }
 
   Future<void> _loadTasksForStaff(int staffId) async {
@@ -269,19 +235,6 @@ class _CreateExtraWorkPageState extends State<CreateExtraWorkPage> {
     final time = await showTimePicker(
       context: context,
       initialTime: startTime ?? TimeOfDay.now(),
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: ColorScheme.light(
-              primary: Theme.of(context).colorScheme.secondary,
-              onPrimary: Colors.white,
-              surface: Colors.white,
-              onSurface: Colors.black,
-            ),
-          ),
-          child: child!,
-        );
-      },
     );
 
     if (time != null) {
@@ -297,19 +250,6 @@ class _CreateExtraWorkPageState extends State<CreateExtraWorkPage> {
     final time = await showTimePicker(
       context: context,
       initialTime: endTime ?? TimeOfDay.now(),
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: ColorScheme.light(
-              primary: Theme.of(context).colorScheme.secondary,
-              onPrimary: Colors.white,
-              surface: Colors.white,
-              onSurface: Colors.black,
-            ),
-          ),
-          child: child!,
-        );
-      },
     );
 
     if (time != null) {
@@ -467,8 +407,12 @@ class _CreateExtraWorkPageState extends State<CreateExtraWorkPage> {
 
   @override
   Widget build(BuildContext context) {
+    final web = WebPushedChrome.isWeb(context);
     return Scaffold(
-      appBar: AppBar(
+      backgroundColor: WebPushedChrome.background(context),
+      appBar: web
+          ? null
+          : AppBar(
         title: Text(
           widget.forLeaders ? 'Compensation Work' : 'Create Compensation Work',
         ),
@@ -477,7 +421,11 @@ class _CreateExtraWorkPageState extends State<CreateExtraWorkPage> {
           icon: const Icon(Icons.arrow_back_ios),
         ),
       ),
-      body: Stack(
+      body: WebFormPage.adapt(
+        context,
+        title: 'Add compensation',
+        subtitle: 'Send extra work for approval',
+        child: Stack(
         children: [
           Form(
             key: _formKey,
@@ -570,8 +518,8 @@ class _CreateExtraWorkPageState extends State<CreateExtraWorkPage> {
                               Text(
                                 department,
                                 overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  color: Colors.black,
+                                style: TextStyle(
+                                  color: WebTheme.inkOf(context),
                                   fontSize: 13,
                                   fontWeight: FontWeight.w500,
                                 ),
@@ -812,8 +760,8 @@ class _CreateExtraWorkPageState extends State<CreateExtraWorkPage> {
                   text: 'Send Request',
                   isLoading: isSubmitting,
                   onPressed: isSubmitting ? null : _submit,
-                  color: Theme.of(context).colorScheme.secondary,
-                  txtcolor: Theme.of(context).colorScheme.onPrimary,
+                  color: WebTheme.lineOf(context),
+                  txtcolor: Theme.of(context).colorScheme.onSecondary,
                 ),
               ],
             ),
@@ -829,14 +777,13 @@ class _CreateExtraWorkPageState extends State<CreateExtraWorkPage> {
                 context,
                 message: _topMessage!,
                 isError: _isErrorMessage,
-                backgroundColor: _isErrorMessage
-                    ? Colors.red
-                    : Theme.of(context).colorScheme.onPrimary,
-                textColor: Theme.of(context).colorScheme.secondary,
-                iconColor: Theme.of(context).colorScheme.secondary,
+                backgroundColor: _isErrorMessage ? Colors.red : WebTheme.brand,
+                textColor: Colors.white,
+                iconColor: Colors.white,
               ),
             ),
         ],
+      ),
       ),
     );
   }
@@ -856,14 +803,14 @@ class _CreateExtraWorkPageState extends State<CreateExtraWorkPage> {
       prefixIcon: Icon(icon, size: 15),
 
       filled: true,
-      fillColor: Colors.transparent,
+      fillColor: WebTheme.surfaceOf(context),
 
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
 
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(15),
         borderSide: BorderSide(
-          color: Theme.of(context).colorScheme.secondary,
+          color: WebTheme.lineOf(context),
           width: 1,
         ),
       ),
@@ -871,7 +818,7 @@ class _CreateExtraWorkPageState extends State<CreateExtraWorkPage> {
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(15),
         borderSide: BorderSide(
-          color: Theme.of(context).colorScheme.secondary,
+          color: WebTheme.lineOf(context),
           width: 1,
         ),
       ),
@@ -879,7 +826,7 @@ class _CreateExtraWorkPageState extends State<CreateExtraWorkPage> {
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(15),
         borderSide: BorderSide(
-          color: Theme.of(context).colorScheme.secondary,
+          color: WebTheme.lineOf(context),
           width: 1.4,
         ),
       ),

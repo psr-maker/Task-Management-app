@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:staff_work_track/Models/getusers.dart';
+import 'package:staff_work_track/core/providers/data_refresh_provider.dart';
 import 'package:staff_work_track/Models/userstask.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/Task/task_assign_users.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/Task/goalntask_create.dart';
 import 'package:staff_work_track/services/superadmin_service.dart';
+import 'package:staff_work_track/core/responsive/app_layout.dart';
 import 'package:staff_work_track/core/widgets/buttons.dart';
+import 'package:staff_work_track/core/widgets/web_ui.dart';
 import 'package:staff_work_track/core/widgets/form_popup.dart';
 import 'package:staff_work_track/widgets/customfieldwidget.dart';
 import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
@@ -203,11 +207,16 @@ class _EditTaskState extends State<EditTask> {
   }
 
   Future<void> _assignUsers() async {
-    final result = await Navigator.push(
+    final assignPage = AssignUsersPage(
+      selectedUsers: assignedUsers,
+      users: [],
+    );
+    final result = await openFormPage<List<UserModel>>(
       context,
-      MaterialPageRoute(
-        builder: (_) => AssignUsersPage(selectedUsers: assignedUsers, users: [],),
-      ),
+      AppLayout.isMobile(context)
+          ? assignPage
+          : SizedBox(height: 640, child: assignPage),
+      maxWidth: 560,
     );
 
     if (result != null && result is List<UserModel>) {
@@ -386,15 +395,23 @@ class _EditTaskState extends State<EditTask> {
   @override
   Widget build(BuildContext context) {
     final goalCode = widget.task.goalCode;
+    final web = WebPushedChrome.isWeb(context);
     return Scaffold(
-      appBar: AppBar(
+      backgroundColor: WebPushedChrome.background(context),
+      appBar: web
+          ? null
+          : AppBar(
         title: const Text("Edit Task"),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios),
           onPressed: () => Navigator.pop(context),
         ),
       ),
-      body: Stack(
+      body: WebFormPage.adapt(
+        context,
+        title: 'Edit task',
+        subtitle: 'Update the task, dates, and assignment',
+        child: Stack(
         children: [
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 15),
@@ -598,9 +615,9 @@ class _EditTaskState extends State<EditTask> {
                             description: descriController.text.trim(),
                             priority: selectedPriority!,
                             dueDate: dueDate!,
+                            performanceType: selectedPerformanceType,
                             quantity:
-                                widget.task.performanceType.toLowerCase() ==
-                                    "qty"
+                                selectedPerformanceType.toLowerCase() == "qty"
                                 ? int.tryParse(quantityController.text.trim())
                                 : null,
                             startTime: startTimeController.text.isNotEmpty
@@ -670,7 +687,10 @@ class _EditTaskState extends State<EditTask> {
                             "Task updated successfully",
                             isError: false,
                           );
+                          context.read<DataRefreshNotifier>().refreshTasks();
+                          context.read<DataRefreshNotifier>().refreshGoals();
                           await Future.delayed(const Duration(seconds: 1));
+                          if (!mounted) return;
                           Navigator.pop(context, true);
                         } else {
                           showTopMessage("Failed to update task");
@@ -699,6 +719,7 @@ class _EditTaskState extends State<EditTask> {
               ),
             ),
         ],
+      ),
       ),
     );
   }

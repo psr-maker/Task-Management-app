@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:staff_work_track/core/theme/web_theme.dart';
 import 'package:staff_work_track/core/widgets/load_error.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
-import 'package:staff_work_track/screen/super%20admin/Navigation/Reports/department/dept.dart';
+import 'package:staff_work_track/screen/super%20admin/Navigation/Reports/department/department_dashboard.dart';
 import 'package:staff_work_track/services/reports_service.dart';
 
 class DepartmentListPage extends StatefulWidget {
@@ -15,6 +16,7 @@ class _DepartmentListPageState extends State<DepartmentListPage> {
   late Future<List<String>> departmentsFuture;
   final TextEditingController searchController = TextEditingController();
   List<String> allDepartments = [];
+
   @override
   void initState() {
     super.initState();
@@ -22,6 +24,12 @@ class _DepartmentListPageState extends State<DepartmentListPage> {
       allDepartments = list;
       return list;
     });
+  }
+
+  @override
+  void dispose() {
+    searchController.dispose();
+    super.dispose();
   }
 
   @override
@@ -37,67 +45,148 @@ class _DepartmentListPageState extends State<DepartmentListPage> {
           return const AppLoadError();
         }
 
-        // Filter based on search text
         final searchText = searchController.text.toLowerCase();
         final filteredDepartments = allDepartments
             .where((dept) => dept.toLowerCase().contains(searchText))
             .toList();
 
-        if (filteredDepartments.isEmpty) {
-          return const Center(child: Text("No Departments Found"));
-        }
-        return Padding(
-          padding: const EdgeInsets.all(10),
-          child: Column(
-            children: [
-              TextField(
-                controller: searchController,
-                style: Theme.of(context).textTheme.titleMedium,
-                decoration: InputDecoration(
-                  hintText: "Search Department...",
-                  hintStyle: Theme.of(context).textTheme.labelMedium,
-                  border: InputBorder.none,
-                  enabledBorder: InputBorder.none,
-                  focusedBorder: InputBorder.none,
-                ),
-                onChanged: (_) => setState(() {}),
-              ),
-              Expanded(
-                child: ListView.builder(
-                  itemCount: filteredDepartments.length,
-                  itemBuilder: (context, index) {
-                    final dept = filteredDepartments[index];
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 14),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(16),
-                        color: Theme.of(context).colorScheme.background,
+        return Column(
+          children: [
+            _searchField(context, 'Search department'),
+            const SizedBox(height: 12),
+            Expanded(
+              child: filteredDepartments.isEmpty
+                  ? Center(
+                      child: Text(
+                        'No departments found',
+                        style: TextStyle(color: WebTheme.mutedOf(context)),
                       ),
-                      child: ListTile(
-                        leading: const Icon(Icons.apartment),
-                        title: Text(
-                          dept,
-                          style: Theme.of(context).textTheme.labelMedium,
-                        ),
-                        trailing: const Icon(Icons.arrow_forward_ios),
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) =>
-                                  DepartmentReportsTab(department: dept),
-                            ),
-                          );
-                        },
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
+                    )
+                  : ListView.separated(
+                      itemCount: filteredDepartments.length,
+                      separatorBuilder: (_, _) => const SizedBox(height: 10),
+                      itemBuilder: (context, index) {
+                        final dept = filteredDepartments[index];
+                        return _ReportTile(
+                          title: dept,
+                          subtitle: 'Department dashboard',
+                          icon: Icons.apartment_rounded,
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    DepartmentDashboardPage(department: dept),
+                              ),
+                            );
+                          },
+                        );
+                      },
+                    ),
+            ),
+          ],
         );
       },
+    );
+  }
+
+  Widget _searchField(BuildContext context, String hint) {
+    final border = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(14),
+      borderSide: BorderSide(color: WebTheme.lineOf(context)),
+    );
+    return TextField(
+      controller: searchController,
+      onChanged: (_) => setState(() {}),
+      decoration: InputDecoration(
+        isDense: true,
+        hintText: hint,
+        hintStyle: TextStyle(fontSize: 13, color: WebTheme.mutedOf(context)),
+        prefixIcon: Icon(Icons.search, size: 18, color: WebTheme.mutedOf(context)),
+        filled: true,
+        fillColor: WebTheme.surfaceOf(context),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        border: border,
+        enabledBorder: border,
+        focusedBorder: border.copyWith(
+          borderSide: BorderSide(color: WebTheme.brand),
+        ),
+      ),
+    );
+  }
+}
+
+class _ReportTile extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  const _ReportTile({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: WebTheme.surfaceOf(context),
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: WebTheme.lineOf(context)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: WebTheme.brandSoftOf(context),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: WebTheme.brand, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: WebTheme.inkOf(context),
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: WebTheme.mutedOf(context),
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right_rounded, color: WebTheme.mutedOf(context)),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

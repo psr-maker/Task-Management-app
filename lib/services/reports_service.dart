@@ -209,14 +209,25 @@ class ReportsService {
     int userId,
     int year,
   ) async {
+    final token = await AuthService.getToken();
     final response = await http.get(
       Uri.parse("$baseUrl/Reports/monthly-productivity/$userId?year=$year"),
+      headers: {
+        if (token != null && token.isNotEmpty) "Authorization": "Bearer $token",
+      },
     );
 
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      final monthly = data is Map ? data["monthlyData"] : null;
-      if (monthly is List) return monthly;
+      if (data is List) return data;
+      if (data is Map) {
+        final monthly =
+            data["monthlyData"] ??
+            data["MonthlyData"] ??
+            data["data"] ??
+            data["Data"];
+        if (monthly is List) return monthly;
+      }
       return [];
     } else {
       throw Exception("Failed to load monthly productivity");
@@ -294,6 +305,8 @@ class ReportsService {
     final departmentData = <Map<String, dynamic>>[];
     final overdueTasksList = <Map<String, dynamic>>[];
     final overdueGoalsList = <Map<String, dynamic>>[];
+    final topPerformers = <Map<String, dynamic>>[];
+    final lowPerformers = <Map<String, dynamic>>[];
 
     for (var i = 0; i < departments.length; i++) {
       final data = results[i];
@@ -348,6 +361,22 @@ class ReportsService {
       overdueGoalsList.addAll(
         List<Map<String, dynamic>>.from(data["overdueGoalsList"] ?? []),
       );
+      topPerformers.addAll(
+        _performers(data, departments[i], const [
+          "topPerformers",
+          "topPerformer",
+          "TopPerformers",
+          "TopPerformer",
+        ]),
+      );
+      lowPerformers.addAll(
+        _performers(data, departments[i], const [
+          "lowPerformers",
+          "lowPerformer",
+          "LowPerformers",
+          "LowPerformer",
+        ]),
+      );
     }
 
     return {
@@ -373,7 +402,46 @@ class ReportsService {
       "departmentData": departmentData,
       "overdueTasksList": overdueTasksList,
       "overdueGoalsList": overdueGoalsList,
+      "topPerformers": topPerformers,
+      "lowPerformers": lowPerformers,
     };
+  }
+
+  static List<Map<String, dynamic>> _performers(
+    Map<String, dynamic> data,
+    String department,
+    List<String> keys,
+  ) {
+    dynamic raw;
+    for (final key in keys) {
+      if (data[key] is List) {
+        raw = data[key];
+        break;
+      }
+    }
+    if (raw is! List) return [];
+    final people = <Map<String, dynamic>>[];
+    for (final item in raw) {
+      if (item is! Map) continue;
+      final person = Map<String, dynamic>.from(item);
+      final name = person["employeeName"] ??
+          person["EmployeeName"] ??
+          person["name"] ??
+          person["Name"] ??
+          person["user"] ??
+          person["User"];
+      person.putIfAbsent("employeeName", () => name ?? "Staff");
+      person.putIfAbsent(
+        "performance",
+        () => person["score"] ?? person["Score"] ?? person["totalScore"],
+      );
+      final dept = (person["department"] ?? person["Department"] ?? "")
+          .toString()
+          .trim();
+      if (dept.isEmpty) person["department"] = department;
+      people.add(person);
+    }
+    return people;
   }
 
   static List<dynamic> _reportList(Map decoded, List<String> keys) {
@@ -432,6 +500,19 @@ class ReportsService {
       "permissionList": _reportList(decoded, [
         "permissionList",
         "PermissionList",
+      ]),
+      "compensationList": _reportList(decoded, [
+        "compensationList",
+        "CompensationList",
+        "extraWorkList",
+        "extraWorks",
+        "ExtraWorks",
+      ]),
+      "overtimeList": _reportList(decoded, [
+        "overtimeList",
+        "OvertimeList",
+        "overtimes",
+        "Overtimes",
       ]),
     };
   }

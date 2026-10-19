@@ -112,6 +112,30 @@ class TaskTiming {
   }
 }
 
+class CompanyTiming {
+  final TaskTiming tasks;
+  final TaskTiming goals;
+
+  const CompanyTiming({required this.tasks, required this.goals});
+
+  static const empty = CompanyTiming(tasks: TaskTiming.empty, goals: TaskTiming.empty);
+
+  static Future<CompanyTiming> load({int? year}) async {
+    try {
+      final report = await ReportsService.getFullReport();
+      final tasks = report['tasks'];
+      final goals = report['goals'];
+      return CompanyTiming(
+        tasks: tasks is List ? TaskTiming.fromTasks(tasks, year: year) : TaskTiming.empty,
+        goals: goals is List ? TaskTiming.fromTasks(goals, year: year) : TaskTiming.empty,
+      );
+    } catch (error) {
+      debugPrint('Task timing: $error');
+      return empty;
+    }
+  }
+}
+
 bool _inYear(Map<String, dynamic> item, int? year) {
   if (year == null) return true;
   final due = _parseDate(item['dueDate'] ?? item['due_Date'] ?? item['DueDate']);

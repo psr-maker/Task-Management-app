@@ -1,23 +1,27 @@
 import 'package:flutter/material.dart';
 import 'package:staff_work_track/core/widgets/load_error.dart';
 import 'package:staff_work_track/core/responsive/app_layout.dart';
+import 'package:staff_work_track/core/theme/web_theme.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
 import 'package:staff_work_track/screen/admin/Navigation/employee/employee.dart';
 import 'package:staff_work_track/screen/admin/Navigation/my%20work/Task%20status%20tab/allgoals.dart';
 import 'package:staff_work_track/screen/division_head/div_users.dart';
+import 'package:staff_work_track/screen/super%20admin/Navigation/Reports/department/department_dashboard.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/Reports/department/dept.dart';
+import 'package:staff_work_track/screen/super%20admin/Navigation/Reports/users/emplist.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/Task/taskdetail.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/users/Users.dart';
 import 'package:staff_work_track/services/admin_service.dart';
 import 'package:staff_work_track/services/reports_service.dart';
 import 'package:staff_work_track/services/superadmin_service.dart';
 import 'package:staff_work_track/utils/app_helper.dart';
+import 'package:staff_work_track/utils/goal_assignment.dart';
 import 'package:staff_work_track/widgets/StatCard.dart';
 import 'package:staff_work_track/widgets/adaptive_goal_cards.dart';
 
 enum DashboardListKind { staff, departments, goals, tasks }
 
-enum WorkStatusFilter { all, completed, pending, overdue, onTime, delayed }
+enum WorkStatusFilter { all, completed, pending, overdue, dueSoon, onTime, delayed }
 
 void openDashboardList(
   BuildContext context, {
@@ -28,13 +32,17 @@ void openDashboardList(
   List<String>? departments,
   int? userId,
   bool companyDepartments = false,
+  bool openReports = false,
 }) {
   final page = switch (kind) {
-    DashboardListKind.staff => _staffPage(department, departments),
+    DashboardListKind.staff => openReports && (department == null || department.trim().isEmpty)
+        ? const CompanyUserReportsPage()
+        : _staffPage(department, departments),
     DashboardListKind.departments => DepartmentBrowsePage(
         title: title,
         departments: departments,
         companyWide: companyDepartments,
+        openDashboard: openReports,
       ),
     DashboardListKind.goals || DashboardListKind.tasks => WorkListPage(
         title: title,
@@ -66,16 +74,74 @@ Widget _staffPage(String? department, List<String>? departments) {
   return const Usersview(showAppBar: true);
 }
 
+class CompanyUserReportsPage extends StatelessWidget {
+  const CompanyUserReportsPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final isWeb = !AppLayout.isMobile(context);
+    return Scaffold(
+      backgroundColor: isWeb ? WebTheme.canvasOf(context) : null,
+      appBar: isWeb
+          ? null
+          : AppBar(
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back_ios),
+                onPressed: () => Navigator.pop(context),
+              ),
+              title: const Text('Total users'),
+            ),
+      body: Padding(
+        padding: isWeb
+            ? AppLayout.pagePadding(context)
+            : const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (isWeb) ...[
+              TextButton.icon(
+                onPressed: () => Navigator.pop(context),
+                icon: const Icon(Icons.arrow_back_rounded),
+                label: const Text('Back to dashboard'),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Total users',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                  color: WebTheme.inkOf(context),
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Select a person to open their dashboard',
+                style: TextStyle(fontSize: 13, color: WebTheme.mutedOf(context)),
+              ),
+              const SizedBox(height: 14),
+            ],
+            const Expanded(
+              child: EmployeeReportsList(backToLabel: 'Back to users'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class DepartmentBrowsePage extends StatefulWidget {
   final String title;
   final List<String>? departments;
   final bool companyWide;
+  final bool openDashboard;
 
   const DepartmentBrowsePage({
     super.key,
     required this.title,
     this.departments,
     this.companyWide = false,
+    this.openDashboard = false,
   });
 
   @override
@@ -161,8 +227,9 @@ class _DepartmentBrowsePageState extends State<DepartmentBrowsePage> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) =>
-                            DepartmentReportsTab(department: department),
+                        builder: (_) => widget.openDashboard
+                            ? DepartmentDashboardPage(department: department)
+                            : DepartmentReportsTab(department: department),
                       ),
                     );
                   },
@@ -207,8 +274,36 @@ class _WorkListPageState extends State<WorkListPage> {
     _future = _load();
   }
 
-  Future<List<Map<String, dynamic>>> _load() async {
-    final scoped = widget.departments
+  Future<List<Map<String, dynamic>>> _load() {
+    return loadWorkItems(
+      kind: widget.kind,
+      filter: widget.filter,
+      department: widget.department,
+      departments: widget.departments,
+      userId: widget.userId,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final noun = widget.kind == DashboardListKind.goals ? 'goals' : 'tasks';
+    return _workListBody(
+      context,
+      noun: noun,
+      future: _future,
+      page: widget,
+    );
+  }
+}
+
+Future<List<Map<String, dynamic>>> loadWorkItems({
+  required DashboardListKind kind,
+  required WorkStatusFilter filter,
+  String? department,
+  List<String>? departments,
+  int? userId,
+}) async {
+    final scoped = departments
             ?.map((item) => item.trim())
             .where((item) => item.isNotEmpty)
             .toList() ??
@@ -227,22 +322,21 @@ class _WorkListPageState extends State<WorkListPage> {
         }),
       );
       reports.addAll(results);
-    } else if (widget.department != null &&
-        widget.department!.trim().isNotEmpty) {
+    } else if (department != null && department.trim().isNotEmpty) {
       reports.add(
-        await ReportsService.getFullReport(department: widget.department),
+        await ReportsService.getFullReport(department: department),
       );
-    } else if (widget.userId != null) {
-      reports.add(await ReportsService.getFullReport(userId: widget.userId));
+    } else if (userId != null) {
+      reports.add(await ReportsService.getFullReport(userId: userId));
     } else {
       reports.add(await ReportsService.getFullReport());
     }
 
-    final people = widget.kind == DashboardListKind.goals
+    final people = kind == DashboardListKind.goals
         ? await _peopleByGoalCode(
-            department: widget.department,
+            department: department,
             departments: scoped,
-            userId: widget.userId,
+            userId: userId,
           )
         : const <String, Map>{};
 
@@ -250,13 +344,13 @@ class _WorkListPageState extends State<WorkListPage> {
     final items = <Map<String, dynamic>>[];
 
     void addItem(Map<String, dynamic> item) {
-      final id = _itemKey(item, widget.kind);
+      final id = _itemKey(item, kind);
       if (!seen.add(id)) return;
-      if (_matches(item, widget.filter)) items.add(item);
+      if (_matches(item, filter)) items.add(item);
     }
 
     for (final report in reports) {
-      if (widget.kind == DashboardListKind.goals) {
+      if (kind == DashboardListKind.goals) {
         final raw = report['goals'];
         if (raw is! List) continue;
         final goals = <Map<String, dynamic>>[];
@@ -277,12 +371,33 @@ class _WorkListPageState extends State<WorkListPage> {
           attachTasksToGoals(goals, flatTasks);
         }
         for (final goal in goals) {
-          addItem(goal);
-          final months = goal['monthlyGoals'];
-          if (months is List) {
-            for (final month in months) {
-              if (month is Map) addItem(Map<String, dynamic>.from(month));
+          if (userId == null) {
+            addItem(goal);
+            final months = goal['monthlyGoals'];
+            if (months is List) {
+              for (final month in months) {
+                if (month is Map) addItem(Map<String, dynamic>.from(month));
+              }
             }
+            continue;
+          }
+          if (isYearlyGoal(goal)) {
+            if (showYearlyGoalTo(goal, userId, listedForUser: true)) {
+              goal["goalType"] = "Yearly";
+              addItem(goal);
+              continue;
+            }
+            final months = goal['monthlyGoals'];
+            if (months is! List) continue;
+            for (final month in months) {
+              if (month is! Map) continue;
+              final card = Map<String, dynamic>.from(month);
+              if (showMonthGoalTo(card, userId)) addItem(card);
+            }
+            continue;
+          }
+          if (showMonthGoalTo(goal, userId, listedForUser: true)) {
+            addItem(goal);
           }
         }
       } else {
@@ -306,21 +421,24 @@ class _WorkListPageState extends State<WorkListPage> {
       }
     }
     return items;
-  }
+}
 
-  @override
-  Widget build(BuildContext context) {
-    final noun = widget.kind == DashboardListKind.goals ? 'goals' : 'tasks';
-    return Scaffold(
+Widget _workListBody(
+  BuildContext context, {
+  required String noun,
+  required Future<List<Map<String, dynamic>>> future,
+  required WorkListPage page,
+}) {
+  return Scaffold(
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios),
           onPressed: () => Navigator.pop(context),
         ),
-        title: Text(widget.title),
+        title: Text(page.title),
       ),
       body: FutureBuilder<List<Map<String, dynamic>>>(
-        future: _future,
+        future: future,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: RotatingFlower());
@@ -347,7 +465,7 @@ class _WorkListPageState extends State<WorkListPage> {
                     itemCount: items.length,
                     itemBuilder: (context, index) {
                       final item = items[index];
-                      if (widget.kind == DashboardListKind.goals) {
+                      if (page.kind == DashboardListKind.goals) {
                         return GoalCard(goal: item);
                       }
                       return Taskstatus(
@@ -371,8 +489,7 @@ class _WorkListPageState extends State<WorkListPage> {
           );
         },
       ),
-    );
-  }
+  );
 }
 
 String _itemKey(Map<String, dynamic> item, DashboardListKind kind) {
@@ -535,6 +652,8 @@ bool _matches(Map<String, dynamic> item, WorkStatusFilter filter) {
       return !_isOverdue(item);
     case WorkStatusFilter.overdue:
       return _isOverdue(item);
+    case WorkStatusFilter.dueSoon:
+      return _isDueSoon(item);
     case WorkStatusFilter.onTime:
       return _isCompleted(item) && !_isLate(item);
     case WorkStatusFilter.delayed:
@@ -555,6 +674,15 @@ bool _isOverdue(Map<String, dynamic> item) {
   if (due == null) return false;
   final today = _dateOnly(DateTime.now())!;
   return due.isBefore(today);
+}
+
+bool _isDueSoon(Map<String, dynamic> item) {
+  if (_isCompleted(item) || _isOverdue(item)) return false;
+  final due = _dateOnly(_parseDate(item['dueDate']));
+  if (due == null) return false;
+  final today = _dateOnly(DateTime.now())!;
+  final last = today.add(const Duration(days: 7));
+  return !due.isBefore(today) && !due.isAfter(last);
 }
 
 bool _isLate(Map<String, dynamic> item) {

@@ -1,11 +1,17 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:staff_work_track/common/filter_model.dart';
 import 'package:staff_work_track/core/constant/division_config.dart';
+import 'package:staff_work_track/core/providers/data_refresh_provider.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
+import 'package:staff_work_track/screen/admin/Navigation/my%20work/Task%20status%20tab/admintask_list.dart';
 import 'package:staff_work_track/services/admin_service.dart';
 import 'package:staff_work_track/services/auth_service.dart';
 import 'package:staff_work_track/services/superadmin_service.dart';
 import 'package:staff_work_track/utils/jwt_helper.dart';
+import 'package:staff_work_track/utils/goal_assignment.dart';
 import 'package:staff_work_track/utils/goal_quantity.dart';
 import 'package:staff_work_track/utils/goal_task_enrich.dart';
 import 'package:staff_work_track/widgets/StatCard.dart';
@@ -16,6 +22,9 @@ class Allgoals extends StatefulWidget {
   final TaskFilterModel? filter;
   final String goalType;
   final bool onlyMine;
+  final bool boardStyle;
+  final bool expandYearlyInline;
+  final bool showLooseTasks;
   final Function(String, bool)? onDelete;
 
   const Allgoals({
@@ -24,6 +33,9 @@ class Allgoals extends StatefulWidget {
     this.filter,
     this.goalType = "All",
     this.onlyMine = false,
+    this.boardStyle = false,
+    this.expandYearlyInline = false,
+    this.showLooseTasks = false,
     this.onDelete,
   });
 
@@ -33,12 +45,52 @@ class Allgoals extends StatefulWidget {
 
 class _AllgoalsState extends State<Allgoals> {
   List<_GoalNode> goals = [];
+  List<Map<String, dynamic>> looseTasks = [];
+  Map<int, String> _departmentByUser = {};
   bool isLoading = true;
+  DataRefreshNotifier? _refresh;
+  DateTime? _seenGoalRefresh;
+  DateTime? _seenTaskRefresh;
+  Timer? _reloadTimer;
 
   @override
   void initState() {
     super.initState();
     loadGoals(showLoader: true);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final next = context.read<DataRefreshNotifier>();
+    if (!identical(_refresh, next)) {
+      _refresh?.removeListener(_onDataRefresh);
+      _refresh = next;
+      _seenGoalRefresh = next.lastGoalRefresh;
+      _seenTaskRefresh = next.lastTaskRefresh;
+      next.addListener(_onDataRefresh);
+    }
+  }
+
+  void _onDataRefresh() {
+    final refresh = _refresh;
+    if (refresh == null || !mounted) return;
+    final goalAt = refresh.lastGoalRefresh;
+    final taskAt = refresh.lastTaskRefresh;
+    if (goalAt == _seenGoalRefresh && taskAt == _seenTaskRefresh) return;
+    _seenGoalRefresh = goalAt;
+    _seenTaskRefresh = taskAt;
+    _reloadTimer?.cancel();
+    _reloadTimer = Timer(const Duration(milliseconds: 250), () {
+      if (mounted) loadGoals();
+    });
+  }
+
+  @override
+  void dispose() {
+    _reloadTimer?.cancel();
+    _refresh?.removeListener(_onDataRefresh);
+    super.dispose();
   }
 
   Future<List<dynamic>> _fetchGoals() async {
@@ -86,10 +138,11 @@ class _AllgoalsState extends State<Allgoals> {
 
     final merged = _mergeGoalLists(chunks);
     _applySavedQuantities(merged, _quantityByCode(withTasks));
-    await _attachRelatedTasks(
+    looseTasks = await _attachRelatedTasks(
       merged,
       withTasks: withTasks,
       fetchUserTasks: withTasks.isEmpty,
+      fetchCompanyTasks: widget.showLooseTasks,
     );
     return merged;
   }
@@ -115,11 +168,16 @@ class _AllgoalsState extends State<Allgoals> {
     }
 
     final byCode = _quantityByCode(detailed);
-    final goals = mine.map((raw) {
-      final goal = _normalizeGoal(raw);
+    final merged = _mergeGoalLists([mine, detailed]);
+    final goals = _goalsVisibleTo(
+      merged,
+      userId,
+      listedMonthKeys: _listedMonthKeys(mine),
+      listedYearlyKeys: _listedYearlyKeys(mine),
+    );
+    for (final goal in goals) {
       _keepLoginUserTasks(goal, byCode, userId);
-      return goal;
-    }).where((goal) => goal.isNotEmpty).toList();
+    }
 
     await _attachRelatedTasks(
       goals,
@@ -130,11 +188,12 @@ class _AllgoalsState extends State<Allgoals> {
     return goals;
   }
 
-  Future<void> _attachRelatedTasks(
+  Future<List<Map<String, dynamic>>> _attachRelatedTasks(
     List goals, {
     List<dynamic> withTasks = const [],
     int? userId,
     bool fetchUserTasks = false,
+    bool fetchCompanyTasks = false,
   }) async {
     final flat = <Map<String, dynamic>>[];
 
@@ -175,13 +234,51 @@ class _AllgoalsState extends State<Allgoals> {
       }
     }
 
-    if (flat.isNotEmpty) attachTasksToGoals(goals, flat);
+    if (fetchCompanyTasks) {
+      try {
+        final all = await SuperAdminService.getAllTasks();
+        final raw =
+            all["tasks"] ??
+            all["Tasks"] ??
+            all["result"] ??
+            all["Result"] ??
+            all["data"] ??
+            all["Data"];
+        if (raw is List) {
+          for (final item in raw) {
+            if (item is Map) flat.add(Map<String, dynamic>.from(item));
+          }
+        }
+      } catch (e) {
+        debugPrint(e.toString());
+      }
+    }
+
+    if (flat.isEmpty) return [];
+    return attachTasksToGoals(goals, flat);
+  }
+
+  Future<void> _loadDepartmentDirectory() async {
+    try {
+      final users = await SuperAdminService.getAllUsers();
+      final directory = <int, String>{};
+      for (final user in users) {
+        final department = user.department.trim();
+        if (user.userId <= 0 || department.isEmpty) continue;
+        directory[user.userId] = department;
+      }
+      _departmentByUser = directory;
+    } catch (e) {
+      debugPrint(e.toString());
+    }
   }
 
   Future<void> loadGoals({bool showLoader = false}) async {
     try {
       if (showLoader && mounted) setState(() => isLoading = true);
+      final directory = _loadDepartmentDirectory();
       final data = await _fetchGoals();
+      await directory;
       if (!mounted) return;
       final tree = _buildGoalTree(data);
       await Future.wait(tree.map((node) => enrichGoalTaskQuantities(node.goal)));
@@ -197,54 +294,156 @@ class _AllgoalsState extends State<Allgoals> {
     }
   }
 
-  List<_GoalNode> get filteredGoals {
+  String? get _selectedDepartment {
+    final value = widget.filter?.department?.trim() ?? '';
+    return value.isEmpty ? null : value;
+  }
+
+  bool _textMatch(Map<String, dynamic> goal) {
     String normalize(String value) {
       return value.toLowerCase().replaceAll(" ", "").replaceAll("_", "");
     }
 
-    bool matches(Map<String, dynamic> goal) {
-      if (widget.searchQuery.isNotEmpty &&
-          !(goal["title"] ?? "").toString().toLowerCase().contains(
-            widget.searchQuery.toLowerCase(),
-          )) {
-        return false;
+    final query = widget.searchQuery.trim().toLowerCase();
+    if (query.isNotEmpty) {
+      final title = (goal["title"] ?? "").toString().toLowerCase();
+      final tasks = goal["tasks"];
+      var taskHit = false;
+      if (tasks is List) {
+        for (final task in tasks) {
+          if (task is! Map) continue;
+          final name = (task["task"] ?? task["title"] ?? task["Task"] ?? "")
+              .toString()
+              .toLowerCase();
+          if (name.contains(query)) {
+            taskHit = true;
+            break;
+          }
+        }
       }
-
-      if (widget.filter?.status != null && widget.filter!.status!.isNotEmpty) {
-        final goalStatus = normalize((goal["status"] ?? "").toString());
-        final filterStatus = normalize(widget.filter!.status!);
-        if (goalStatus != filterStatus) return false;
-      }
-
-      if (widget.filter?.priority != null &&
-          (goal["priority"] ?? "").toString().toLowerCase() !=
-              widget.filter!.priority!.toLowerCase()) {
-        return false;
-      }
-
-      if (widget.filter?.department != null &&
-          (goal["department"] ?? "").toString().toLowerCase() !=
-              widget.filter!.department!.toLowerCase()) {
-        return false;
-      }
-
-      return true;
+      if (!title.contains(query) && !taskHit) return false;
     }
 
+    if (widget.filter?.status != null && widget.filter!.status!.isNotEmpty) {
+      final goalStatus = normalize((goal["status"] ?? "").toString());
+      final filterStatus = normalize(widget.filter!.status!);
+      if (goalStatus != filterStatus) return false;
+    }
+
+    if (widget.filter?.priority != null &&
+        (goal["priority"] ?? "").toString().toLowerCase() !=
+            widget.filter!.priority!.toLowerCase()) {
+      return false;
+    }
+
+    return true;
+  }
+
+  bool _inSelectedDepartment(Map goal, {Set<String> inherited = const {}}) {
+    final selected = _selectedDepartment;
+    if (selected == null) return true;
+    final names = {...inherited, ..._goalDepartments(goal, _departmentByUser)};
+    return names.any(
+      (name) => DivisionConfig.isAllowedDepartment(name, [selected]),
+    );
+  }
+
+  List<_GoalNode> get filteredGoals {
     final result = <_GoalNode>[];
     for (final node in goals) {
-      final isYearly = _goalType(node.goal) == 'yearly';
+      final isYearly = node.months.isNotEmpty || isYearlyGoal(node.goal);
       if (widget.goalType == 'Yearly' && !isYearly) continue;
-      if (widget.goalType == 'Monthly' && isYearly) continue;
 
-      final monthMatches = node.months.where(matches).toList();
-      if (isYearly) {
-        final showParent = matches(node.goal);
-        if (!showParent && monthMatches.isEmpty) continue;
-        final months = showParent ? node.months : monthMatches;
-        result.add(_GoalNode(_withMonths(node.goal, months), months));
-      } else if (matches(node.goal)) {
-        result.add(node);
+      if (!isYearly) {
+        if (_textMatch(node.goal) && _inSelectedDepartment(node.goal)) {
+          result.add(node);
+        }
+        continue;
+      }
+
+      final parentText = _textMatch(node.goal);
+      final parentDepartments = _goalDepartments(node.goal, _departmentByUser);
+      final candidateMonths = parentText && widget.goalType != 'Monthly'
+          ? node.months
+          : node.months.where(_textMatch).toList();
+      final visibleMonths = <Map<String, dynamic>>[];
+      for (final month in candidateMonths) {
+        final monthDepartments = _goalDepartments(month, _departmentByUser);
+        final inherited =
+            monthDepartments.isEmpty ? parentDepartments : const <String>{};
+        if (_inSelectedDepartment(month, inherited: inherited)) {
+          visibleMonths.add(month);
+        }
+      }
+
+      if (widget.goalType == 'Monthly') {
+        for (final month in visibleMonths) {
+          result.add(_GoalNode(month));
+        }
+        continue;
+      }
+
+      final parentInDepartment = _inSelectedDepartment(node.goal);
+      if (visibleMonths.isEmpty && (!parentText || !parentInDepartment)) {
+        continue;
+      }
+      result.add(_GoalNode(_withMonths(node.goal, visibleMonths), visibleMonths));
+    }
+    return result;
+  }
+
+  List<Map<String, dynamic>> get listedTasks {
+    if (!widget.showLooseTasks) return [];
+    final query = widget.searchQuery.trim().toLowerCase();
+    final seen = <String>{};
+    final result = <Map<String, dynamic>>[];
+
+    void take(dynamic raw, Set<String> inherited) {
+      if (raw is! Map) return;
+      final task = Map<String, dynamic>.from(raw);
+      if (!_inSelectedDepartment(task, inherited: inherited)) return;
+      if (query.isNotEmpty) {
+        final name = (task['task'] ?? task['title'] ?? task['Task'] ?? '')
+            .toString()
+            .toLowerCase();
+        final code = (task['taskCode'] ?? task['TaskCode'] ?? '')
+            .toString()
+            .toLowerCase();
+        if (!name.contains(query) && !code.contains(query)) return;
+      }
+      final code = (task['taskCode'] ?? task['TaskCode'] ?? '').toString().trim();
+      final title = (task['task'] ?? task['title'] ?? task['Task'] ?? '')
+          .toString();
+      final key = code.isEmpty ? title : code.toLowerCase();
+      if (!seen.add(key)) return;
+      result.add(task);
+    }
+
+    void walk(Map<String, dynamic> goal, Set<String> inherited) {
+      final own = _goalDepartments(goal, _departmentByUser);
+      final department = own.isEmpty ? inherited : own;
+      final tasks = goal['tasks'] ?? goal['Tasks'];
+      if (tasks is List) {
+        for (final item in tasks) {
+          take(item, department);
+        }
+      }
+      final months = goal['monthlyGoals'] ?? goal['MonthlyGoals'];
+      if (months is List) {
+        for (final month in months) {
+          if (month is Map) {
+            walk(Map<String, dynamic>.from(month), department);
+          }
+        }
+      }
+    }
+
+    for (final node in filteredGoals) {
+      walk(node.goal, const {});
+    }
+    if (widget.goalType == 'All') {
+      for (final task in looseTasks) {
+        take(task, const {});
       }
     }
     return result;
@@ -257,6 +456,7 @@ class _AllgoalsState extends State<Allgoals> {
       goal: goal,
       onDelete: widget.onDelete,
       onRefresh: () => loadGoals(),
+      expandMonthsInline: widget.expandYearlyInline,
     );
   }
 
@@ -264,6 +464,85 @@ class _AllgoalsState extends State<Allgoals> {
   Widget build(BuildContext context) {
     if (isLoading) {
       return const Center(child: RotatingFlower());
+    }
+
+    if (widget.boardStyle) {
+      if (filteredGoals.isEmpty) {
+        return Center(
+          child: Text(
+            widget.goalType == 'Yearly'
+                ? "No yearly goals found"
+                : widget.goalType == 'Monthly'
+                    ? "No monthly goals found"
+                    : "No goals found",
+            style: Theme.of(context).textTheme.headlineSmall,
+          ),
+        );
+      }
+      return ListView.builder(
+        padding: const EdgeInsets.fromLTRB(8, 4, 8, 12),
+        itemCount: filteredGoals.length,
+        itemBuilder: (context, index) => _goalCard(filteredGoals[index].goal),
+      );
+    }
+
+    if (widget.expandYearlyInline || widget.showLooseTasks) {
+      final goals = filteredGoals;
+      final tasks = listedTasks;
+      if (goals.isEmpty && tasks.isEmpty) {
+        return Center(
+          child: Text(
+            widget.goalType == 'Yearly'
+                ? "No yearly goals found"
+                : widget.goalType == 'Monthly'
+                ? "No monthly goals found"
+                : "No goals found",
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+          ),
+        );
+      }
+      return ListView(
+        padding: const EdgeInsets.only(bottom: 16),
+        children: [
+          if (goals.isEmpty)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Text(
+                widget.goalType == 'Yearly'
+                    ? "No yearly goals found"
+                    : widget.goalType == 'Monthly'
+                    ? "No monthly goals found"
+                    : "No goals found",
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+            )
+          else
+            AdaptiveGoalCards(
+              shrinkWrap: true,
+              itemCount: goals.length,
+              itemBuilder: (context, index) => _goalCard(goals[index].goal),
+            ),
+          if (widget.showLooseTasks) ...[
+            const SizedBox(height: 20),
+            Text(
+              "Tasks : ${tasks.length}",
+              style: Theme.of(context).textTheme.headlineLarge,
+            ),
+            const SizedBox(height: 10),
+            if (tasks.isEmpty)
+              Text(
+                "No tasks found",
+                style: Theme.of(context).textTheme.titleLarge,
+              )
+            else
+              Alltasklist(
+                tasks: tasks,
+                searchQuery: '',
+                onTaskDataUpdated: () => loadGoals(),
+              ),
+          ],
+        ],
+      );
     }
 
     return Column(
@@ -366,6 +645,13 @@ Map<String, dynamic> _normalizeGoal(dynamic raw) {
   goal["goalType"] = goal["goalType"] ?? goal["GoalType"] ?? "";
   goal["status"] = goal["status"] ?? goal["Status"] ?? "";
   goal["priority"] = goal["priority"] ?? goal["Priority"] ?? "";
+  goal["department"] =
+      (goal["department"] ??
+              goal["Department"] ??
+              goal["departmentName"] ??
+              goal["DepartmentName"] ??
+              "")
+          .toString();
   goal["createdByName"] = goal["createdByName"] ?? goal["assignBy"] ?? "";
   goal["parentGoalId"] = goal["parentGoalId"] ?? goal["ParentGoalId"];
   goal["startDate"] = goal["startDate"]?.toString();
@@ -474,6 +760,101 @@ String _goalType(Map<String, dynamic> goal) {
   return (goal["goalType"] ?? goal["GoalType"] ?? "").toString().toLowerCase();
 }
 
+const _goalPeopleKeys = [
+  "yearlyAssignedUsers",
+  "YearlyAssignedUsers",
+  "yearlyAssignedUserIds",
+  "YearlyAssignedUserIds",
+  "assignedUserIds",
+  "AssignedUserIds",
+  "assignedUsers",
+  "AssignedUsers",
+  "assignedTo",
+  "AssignedTo",
+  "assignments",
+  "goalAssignments",
+];
+
+/// Departments stored on the goal, or taken from the people assigned to it.
+Set<String> _goalDepartments(Map goal, Map<int, String> byUser) {
+  final names = <String>{};
+
+  void addName(String raw) {
+    final text = raw.trim();
+    final lower = text.toLowerCase();
+    if (text.isEmpty || lower == "null" || lower == "n/a") return;
+    names.add(text);
+  }
+
+  void addPerson(dynamic raw) {
+    if (raw is List) {
+      for (final item in raw) {
+        addPerson(item);
+      }
+      return;
+    }
+    if (raw is Map) {
+      final map = Map<String, dynamic>.from(raw);
+      for (final key in const [
+        "department",
+        "Department",
+        "departmentName",
+        "DepartmentName",
+        "dept",
+        "Dept",
+      ]) {
+        final value = map[key];
+        if (value != null) addName(value.toString());
+      }
+      final id = readPersonId(map);
+      final known = id == null ? null : byUser[id];
+      if (known != null) addName(known);
+      return;
+    }
+    final id = readPersonId(raw);
+    final known = id == null ? null : byUser[id];
+    if (known != null) addName(known);
+  }
+
+  for (final key in const [
+    "department",
+    "Department",
+    "departmentName",
+    "DepartmentName",
+    "dept",
+    "Dept",
+  ]) {
+    final value = goal[key];
+    if (value is String) addName(value);
+    if (value is List || value is Map) addPerson(value);
+  }
+  for (final key in _goalPeopleKeys) {
+    addPerson(goal[key]);
+  }
+  final tasks = goal["tasks"] ?? goal["Tasks"];
+  if (tasks is List) {
+    for (final task in tasks) {
+      if (task is! Map) continue;
+      for (final key in const [
+        "department",
+        "Department",
+        "departmentName",
+        "DepartmentName",
+      ]) {
+        final value = task[key];
+        if (value != null) addName(value.toString());
+      }
+      addPerson(
+        task["assignedTo"] ??
+            task["AssignedTo"] ??
+            task["assignedUsers"] ??
+            task["AssignedUsers"],
+      );
+    }
+  }
+  return names;
+}
+
 String _goalKey(Map<String, dynamic> goal) {
   final code = _goalCode(goal);
   if (code.isNotEmpty) return "code:$code";
@@ -490,6 +871,41 @@ int _taskCount(Map<String, dynamic> goal) {
 int _monthCount(Map<String, dynamic> goal) {
   final months = goal["monthlyGoals"];
   return months is List ? months.length : 0;
+}
+
+const _assignmentKeys = [
+  "yearlyAssignedUserIds",
+  "YearlyAssignedUserIds",
+  "yearlyAssignedUsers",
+  "YearlyAssignedUsers",
+  "assignedUserIds",
+  "AssignedUserIds",
+  "assignedUsers",
+  "AssignedUsers",
+  "assignedTo",
+  "AssignedTo",
+  "createdBy",
+  "CreatedBy",
+  "createdById",
+  "CreatedById",
+  "createdByName",
+  "assignBy",
+];
+
+void _keepAssignment(Map<String, dynamic> into, Map<String, dynamic> from) {
+  for (final key in _assignmentKeys) {
+    final current = into[key];
+    final empty = current == null ||
+        (current is String &&
+            (current.trim().isEmpty || current.trim().toLowerCase() == "n/a")) ||
+        (current is List && current.isEmpty);
+    if (!empty) continue;
+    final incoming = from[key];
+    if (incoming == null) continue;
+    if (incoming is String && incoming.trim().isEmpty) continue;
+    if (incoming is List && incoming.isEmpty) continue;
+    into[key] = incoming;
+  }
 }
 
 void _keepQuantity(Map<String, dynamic> into, Map<String, dynamic> from) {
@@ -550,6 +966,7 @@ List<dynamic> _mergeGoalLists(List<List<dynamic>> chunks) {
           ...goal,
           "parentGoalId": goal["parentGoalId"] ?? existing["parentGoalId"],
         };
+        _keepAssignment(kept, existing);
         _keepQuantity(kept, existing);
         kept["monthlyGoals"] = _mergeMonths(
           _monthList(kept),
@@ -558,6 +975,7 @@ List<dynamic> _mergeGoalLists(List<List<dynamic>> chunks) {
         map[key] = kept;
       } else {
         existing["parentGoalId"] ??= goal["parentGoalId"];
+        _keepAssignment(existing, goal);
         existing["monthlyGoals"] = _mergeMonths(
           _monthList(existing),
           _monthList(goal),
@@ -571,6 +989,145 @@ List<dynamic> _mergeGoalLists(List<List<dynamic>> chunks) {
 
 List<Map<String, dynamic>> goalsForCards(List<dynamic> raw) {
   return _buildGoalTree(raw).map((node) => node.goal).toList();
+}
+
+Set<String> _listedMonthKeys(List<dynamic> raw) {
+  final keys = <String>{};
+
+  void take(dynamic item) {
+    final goal = _normalizeGoal(item);
+    if (goal.isEmpty) return;
+    if (!isYearlyGoal(goal)) {
+      keys.add(_goalKey(goal));
+      return;
+    }
+    final months = goal["monthlyGoals"];
+    if (months is! List) return;
+    for (final month in months) {
+      take(month);
+    }
+  }
+
+  for (final item in raw) {
+    take(item);
+  }
+  return keys;
+}
+
+Set<String> _listedYearlyKeys(List<dynamic> raw) {
+  final keys = <String>{};
+  for (final item in raw) {
+    final goal = _normalizeGoal(item);
+    if (goal.isEmpty || !isYearlyGoal(goal)) continue;
+    keys.add(_goalKey(goal));
+  }
+  return keys;
+}
+
+/// Yearly assignees get the yearly goal and every month under it.
+/// Other people get only the months assigned to them, without the yearly goal.
+List<Map<String, dynamic>> _goalsVisibleTo(
+  List<dynamic> raw,
+  int userId, {
+  Set<String> listedMonthKeys = const {},
+  Set<String> listedYearlyKeys = const {},
+}) {
+  final goals = <Map<String, dynamic>>[];
+  final seen = <String>{};
+  final normalized = raw
+      .map(_normalizeGoal)
+      .where((goal) => goal.isNotEmpty)
+      .toList();
+  final yearlyById = <String, Map<String, dynamic>>{};
+
+  for (final goal in normalized) {
+    if (!isYearlyGoal(goal)) continue;
+    final id = _goalId(goal);
+    if (id.isEmpty || id == "null") continue;
+    yearlyById.putIfAbsent(id, () => goal);
+  }
+
+  bool yearlyVisible(Map<String, dynamic> goal) {
+    return showYearlyGoalTo(
+      goal,
+      userId,
+      listedForUser: listedYearlyKeys.contains(_goalKey(goal)),
+    );
+  }
+
+  void add(Map<String, dynamic> goal) {
+    if (goal.isEmpty) return;
+    if (!seen.add(_goalKey(goal))) return;
+    goals.add(goal);
+  }
+
+  void attachMonth(Map<String, dynamic> yearly, Map<String, dynamic> month) {
+    final card = _asMonthlyGoal(_normalizeGoal(month));
+    if (card.isEmpty) return;
+    final months = yearly["monthlyGoals"];
+    final list = months is List
+        ? months.whereType<Map<String, dynamic>>().toList()
+        : <Map<String, dynamic>>[];
+    final key = _goalKey(card);
+    if (list.any((item) => _goalKey(item) == key)) return;
+    list.add(card);
+    yearly["monthlyGoals"] = list;
+  }
+
+  for (final goal in normalized) {
+    if (isYearlyGoal(goal)) continue;
+    final parent = yearlyById[_parentGoalId(goal)];
+    if (parent == null || !yearlyVisible(parent)) continue;
+    attachMonth(parent, goal);
+  }
+
+  for (final goal in normalized) {
+    if (isYearlyGoal(goal)) {
+      if (!yearlyVisible(goal)) {
+        final months = goal["monthlyGoals"];
+        if (months is! List) continue;
+        for (final month in months) {
+          if (month is! Map) continue;
+          final card = _asMonthlyGoal(_normalizeGoal(month));
+          if (showMonthGoalTo(
+            card,
+            userId,
+            listedForUser: listedMonthKeys.contains(_goalKey(card)),
+          )) {
+            add(card);
+          }
+        }
+        continue;
+      }
+      goal["goalType"] = "Yearly";
+      add(goal);
+      continue;
+    }
+
+    final parent = yearlyById[_parentGoalId(goal)];
+    if (parent != null && yearlyVisible(parent)) continue;
+    if (showMonthGoalTo(
+      goal,
+      userId,
+      listedForUser: listedMonthKeys.contains(_goalKey(goal)),
+    )) {
+      add(_asMonthlyGoal(goal));
+    }
+  }
+  return goals;
+}
+
+List<Map<String, dynamic>> goalsVisibleToUser(
+  List<dynamic> raw, {
+  required int userId,
+  List<dynamic> listedForUser = const [],
+}) {
+  return _goalsVisibleTo(
+    raw,
+    userId,
+    listedMonthKeys: _listedMonthKeys(listedForUser),
+    listedYearlyKeys: _listedYearlyKeys(listedForUser),
+  );
 }
 
 String taskGoalCode(Map task) {

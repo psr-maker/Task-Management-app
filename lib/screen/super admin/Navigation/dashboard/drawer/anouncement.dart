@@ -4,8 +4,10 @@ import 'package:staff_work_track/core/widgets/load_error.dart';
 import 'package:staff_work_track/Models/announcement.dart';
 import 'package:staff_work_track/core/constant/apiurl.dart';
 import 'package:staff_work_track/core/responsive/app_layout.dart';
+import 'package:staff_work_track/core/responsive/responsive_body.dart';
 import 'package:staff_work_track/core/theme/web_theme.dart';
 import 'package:staff_work_track/core/widgets/empty_state.dart';
+import 'package:staff_work_track/core/widgets/form_popup.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
 import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
 import 'package:staff_work_track/screen/staff/navigation/fullimg.dart';
@@ -59,32 +61,43 @@ class _AnounceState extends State<Anounce> {
     });
   }
 
+  Future<void> _openComposer() async {
+    final result = await openFormPage(
+      context,
+      const PostAnnouncementPage(),
+      maxWidth: 640,
+    );
+    if (result == true && mounted) {
+      setState(() {
+        futureAnnouncements = AnnouncementService.fetchAnnouncements();
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final web = !AppLayout.isMobile(context);
     return Scaffold(
       backgroundColor: WebTheme.canvasOf(context),
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios),
-          onPressed: () => Navigator.pop(context),
+        automaticallyImplyLeading: false,
+        backgroundColor: WebTheme.brand,
+        foregroundColor: Colors.white,
+        iconTheme: const IconThemeData(color: Colors.white),
+        leading: web
+            ? null
+            : IconButton(
+                icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
+                onPressed: () => Navigator.pop(context),
+              ),
+        title: const Text(
+          "Announcements",
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
         ),
-        title: const Text("Announcements"),
         actions: [
           IconButton(
-            icon: const Icon(Icons.add),
-            onPressed: () async {
-              final result = await Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const PostAnnouncementPage()),
-              );
-
-              if (result == true) {
-                setState(() {
-                  futureAnnouncements =
-                      AnnouncementService.fetchAnnouncements();
-                });
-              }
-            },
+            icon: const Icon(Icons.add, color: Colors.white),
+            onPressed: _openComposer,
           ),
         ],
       ),
@@ -116,10 +129,10 @@ class _AnounceState extends State<Anounce> {
                   final announcements = snapshot.data ?? [];
 
                   return Expanded(
-                    child: ListView.separated(
+                    child: ResponsiveWrapList(
                       padding: AppLayout.pagePadding(context),
+                      columnsForWidth: _webColumns,
                       itemCount: announcements.length,
-                      separatorBuilder: (_, _) => const SizedBox(height: 12),
                       itemBuilder: (context, index) {
                         final item = announcements[index];
                         return _announcementCard(
@@ -159,11 +172,18 @@ class _AnounceState extends State<Anounce> {
     );
   }
 
+  static int _webColumns(double width) {
+    if (width >= 1320) return 5;
+    if (width >= 1040) return 4;
+    return 3;
+  }
+
   Widget _announcementCard(
     Announcement item, {
     required VoidCallback onLongPress,
   }) {
-    final typeColor = _getTypeColor(item.fileType);
+    final typeColor = WebTheme.brandOf(context);
+    final showDelete = !AppLayout.isMobile(context);
     return Material(
       color: WebTheme.surfaceOf(context),
       borderRadius: BorderRadius.circular(16),
@@ -174,7 +194,7 @@ class _AnounceState extends State<Anounce> {
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: WebTheme.lineOf(context)),
+            border: Border.all(color: WebTheme.brandOf(context).withValues(alpha: 0.35)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -185,7 +205,7 @@ class _AnounceState extends State<Anounce> {
                     child: Text(
                       item.title,
                       style: TextStyle(
-                        color: WebTheme.inkOf(context),
+                        color: WebTheme.brandOf(context),
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
                       ),
@@ -209,6 +229,12 @@ class _AnounceState extends State<Anounce> {
                       ),
                     ),
                   ),
+                  if (showDelete)
+                    IconButton(
+                      tooltip: 'Delete',
+                      onPressed: onLongPress,
+                      icon: Icon(Icons.delete_outline, color: WebTheme.danger),
+                    ),
                 ],
               ),
               const SizedBox(height: 8),
@@ -228,12 +254,14 @@ class _AnounceState extends State<Anounce> {
                   style: TextStyle(
                     fontSize: 14,
                     height: 1.4,
-                    color: WebTheme.inkOf(context),
+                    color: WebTheme.brandOf(context),
                   ),
                 ),
               ],
-              const SizedBox(height: 12),
-              _buildMediaSection(item),
+              if (_hasMedia(item)) ...[
+                const SizedBox(height: 12),
+                _buildMediaSection(item),
+              ],
             ],
           ),
         ),
@@ -251,104 +279,154 @@ class _AnounceState extends State<Anounce> {
           padding: const EdgeInsets.symmetric(vertical: 4),
           child: Text(
             row.values.first.toString(),
-            style: const TextStyle(fontSize: 13),
+            style: TextStyle(fontSize: 13, color: WebTheme.brandOf(context)),
           ),
         );
       }).toList(),
     );
   }
 
-  Widget _buildMediaSection(Announcement item) {
-    if (item.fileType == "image" && item.filePath != null) {
-      final imageUrl =
-        "${ApiConstants.Uploaded}${item.filePath}";
-      return GestureDetector( 
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => FullScreenImageViewer(imageUrl: imageUrl),
-            ),
-          );
-        },
-        child: Hero(
-          tag: imageUrl,
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(18),
-            child: Image.network(
-              imageUrl,
-              height: 200,
-              width: double.infinity,
-              fit: BoxFit.cover,
-            ),
-          ),
-        ),
-      );
-    }
+  bool _hasMedia(Announcement item) {
+    final path = item.filePath?.trim() ?? '';
+    final data = item.jsonData?.trim() ?? '';
+    return path.isNotEmpty || data.isNotEmpty;
+  }
 
-    if (item.fileType == "pdf" && item.filePath != null) {
-      return GestureDetector(
-        onTap: () async {
-          final pdfurl =
-              "${ApiConstants.Uploaded}${item.filePath.toString()}";
-          await launchUrl(
-            Uri.parse(pdfurl),
-            mode: LaunchMode.externalApplication,
-          );
-        },
-        child: Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: WebTheme.brandSoftOf(context),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: WebTheme.lineOf(context)),
-          ),
-          child: Row(
-            children: [
-              const Icon(Icons.picture_as_pdf, color: WebTheme.danger),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  item.fileName ?? item.filePath!.split('/').last,
-                  style: TextStyle(
-                    color: WebTheme.inkOf(context),
-                    fontWeight: FontWeight.w600,
-                    fontSize: 13,
+  String _kind(Announcement item) {
+    final hint =
+        '${item.fileType} ${item.fileName ?? ''} ${item.filePath ?? ''}'
+            .toLowerCase();
+    if (hint.contains('image') ||
+        hint.contains('.png') ||
+        hint.contains('.jpg') ||
+        hint.contains('.jpeg') ||
+        hint.contains('.webp') ||
+        hint.contains('.gif')) {
+      return 'image';
+    }
+    if (hint.contains('pdf')) return 'pdf';
+    if (hint.contains('excel') ||
+        hint.contains('xls') ||
+        hint.contains('csv') ||
+        (item.jsonData?.trim().isNotEmpty ?? false)) {
+      return 'excel';
+    }
+    return item.fileType.toLowerCase();
+  }
+
+  Widget _fileRow(
+    Announcement item, {
+    required IconData icon,
+    required Color color,
+  }) {
+    return GestureDetector(
+      onTap: () async {
+        final path = item.filePath;
+        if (path == null || path.trim().isEmpty) return;
+        await launchUrl(
+          Uri.parse('${ApiConstants.Uploaded}$path'),
+          mode: LaunchMode.externalApplication,
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: WebTheme.brandSoftOf(context),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: WebTheme.brandOf(context).withValues(alpha: 0.28)),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: color),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                item.fileName ?? item.filePath!.split('/').last,
+                style: TextStyle(
+                  color: WebTheme.brandOf(context),
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                ),
+              ),
+            ),
+            Icon(Icons.open_in_new, color: WebTheme.brandOf(context), size: 18),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMediaSection(Announcement item) {
+    final kind = _kind(item);
+    final path = item.filePath?.trim() ?? '';
+    final pieces = <Widget>[];
+    if (kind == 'image' && path.isNotEmpty) {
+      final imageUrl = '${ApiConstants.Uploaded}$path';
+      pieces.add(
+        GestureDetector(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => FullScreenImageViewer(imageUrl: imageUrl),
+              ),
+            );
+          },
+          child: Hero(
+            tag: imageUrl,
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: WebTheme.brandOf(context), width: 1.4),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: Image.network(
+                  imageUrl,
+                  height: 200,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, _, _) => _fileRow(
+                    item,
+                    icon: Icons.image_outlined,
+                    color: WebTheme.brandOf(context),
                   ),
                 ),
               ),
-              Icon(Icons.open_in_new, color: WebTheme.mutedOf(context)),
-            ],
+            ),
           ),
         ),
       );
+    } else if (path.isNotEmpty) {
+      final icon = kind == 'pdf'
+          ? Icons.picture_as_pdf
+          : kind == 'excel'
+              ? Icons.table_chart
+              : Icons.insert_drive_file_outlined;
+      pieces.add(_fileRow(item, icon: icon, color: WebTheme.brandOf(context)));
     }
-
-    if (item.fileType == "excel" && item.jsonData != null) {
-      return Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: WebTheme.brandSoftOf(context),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: WebTheme.lineOf(context)),
+    if (kind == 'excel' && (item.jsonData?.trim().isNotEmpty ?? false)) {
+      pieces.add(
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: WebTheme.brandSoftOf(context),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: WebTheme.brandOf(context).withValues(alpha: 0.28)),
+          ),
+          child: _buildSimpleList(item.jsonData!),
         ),
-        child: _buildSimpleList(item.jsonData!),
       );
     }
-
-    return const SizedBox();
-  }
-
-  Color _getTypeColor(String type) {
-    switch (type) {
-      case "image":
-        return Colors.blue;
-      case "pdf":
-        return Colors.red;
-      case "excel":
-        return Colors.green;
-      default:
-        return Colors.grey;
-    }
+    if (pieces.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (var i = 0; i < pieces.length; i++) ...[
+          if (i > 0) const SizedBox(height: 10),
+          pieces[i],
+        ],
+      ],
+    );
   }
 }

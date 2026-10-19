@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:staff_work_track/Models/getusers.dart';
 import 'package:staff_work_track/core/constant/division_config.dart';
 import 'package:staff_work_track/core/widgets/buttons.dart';
+import 'package:staff_work_track/core/widgets/web_ui.dart';
 import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
 import 'package:staff_work_track/services/admin_service.dart';
 import 'package:staff_work_track/services/auth_service.dart';
@@ -391,9 +392,15 @@ class _EditGoalPageState extends State<EditGoalPage> {
 
   @override
   Widget build(BuildContext context) {
+    final web = WebPushedChrome.isWeb(context);
     return Scaffold(
-      appBar: AppBar(title: const Text("Edit Goal")),
-      body: SingleChildScrollView(
+      backgroundColor: WebPushedChrome.background(context),
+      appBar: web ? null : AppBar(title: const Text("Edit Goal")),
+      body: WebFormPage.adapt(
+        context,
+        title: 'Edit goal',
+        subtitle: 'Update the goal details',
+        child: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Stack(
           children: [
@@ -526,6 +533,7 @@ class _EditGoalPageState extends State<EditGoalPage> {
               ),
           ],
         ),
+      ),
       ),
     );
   }

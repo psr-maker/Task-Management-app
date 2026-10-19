@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:staff_work_track/core/theme/web_theme.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
 import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
+import 'package:staff_work_track/core/widgets/request_workspace.dart';
 import 'package:staff_work_track/core/widgets/status_badge.dart';
 import 'package:staff_work_track/core/widgets/web_ui.dart';
 import 'package:staff_work_track/services/admin_service.dart';
@@ -211,7 +212,7 @@ class _LeavelistState extends State<Leavelist>
   Color statusColor(String status) {
     switch (status.toLowerCase()) {
       case "approved":
-        return Colors.green;
+        return WebTheme.brandOf(context);
       case "rejected":
         return Colors.red;
       default:
@@ -236,6 +237,41 @@ class _LeavelistState extends State<Leavelist>
 
   String formatTime(String? time) {
     return TimeUtils.formatTime12(time, empty: "-");
+  }
+
+  String _shown(dynamic value) {
+    final text = (value ?? '').toString().trim();
+    return text.isEmpty || text == 'null' ? '—' : text;
+  }
+
+  String _rejectWhy(dynamic item) {
+    final status = (item['status'] ?? '').toString().toLowerCase();
+    if (status != 'rejected') return '—';
+    return _shown(item['rejectionReason']);
+  }
+
+  String _leaveCategory(dynamic item) {
+    return _shown(item['leaveTyp'] ?? item['leavecategory'] ?? item['leaveCategory']);
+  }
+
+  String _leaveDay(dynamic item) {
+    return _shown(item['leaveType'] ?? item['type']);
+  }
+
+  ButtonStyle _tabStyle() {
+    return ButtonStyle(
+      backgroundColor: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.selected)) return WebTheme.brand;
+        return WebTheme.surfaceOf(context);
+      }),
+      foregroundColor: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.selected)) return Colors.white;
+        return WebTheme.inkOf(context);
+      }),
+      side: WidgetStateProperty.all(
+        BorderSide(color: WebTheme.brandOf(context).withValues(alpha: 0.45)),
+      ),
+    );
   }
 
   Widget _webFilters() {
@@ -272,10 +308,117 @@ class _LeavelistState extends State<Leavelist>
     );
   }
 
+  Widget _webLeave() {
+    final statusFilters = activeTab == 'Leave' ? tabs : permissionTabs;
+    final selected = statusFilters[_tabController.index.clamp(0, statusFilters.length - 1)];
+    return Scaffold(
+      backgroundColor: WebTheme.canvasOf(context),
+      body: RequestWorkspace(
+        title: 'Leave & Permission',
+        subtitle: 'Your requests and their status',
+        loading: isLoading,
+        scrollable: true,
+        filters: statusFilters,
+        selectedFilter: selected,
+        onFilter: (value) {
+          _tabController.index = statusFilters.indexOf(value);
+          filterItems();
+        },
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SegmentedButton<String>(
+              style: _tabStyle(),
+              segments: const [
+                ButtonSegment(value: 'Leave', label: Text('Leave')),
+                ButtonSegment(value: 'Permission', label: Text('Permission')),
+              ],
+              selected: {activeTab == 'Permission' ? 'Permission' : 'Leave'},
+              onSelectionChanged: (value) {
+                setState(() {
+                  activeTab = value.first;
+                  _tabController.index = 0;
+                });
+                loadItems();
+              },
+            ),
+            if (activeTab == 'Leave') ...[
+              const SizedBox(width: 8),
+              FilledButton.icon(
+                onPressed: () async {
+                  final result = await Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const Leaveapply()),
+                  );
+                  if (result == true) loadItems();
+                },
+                icon: const Icon(Icons.add, size: 18),
+                label: const Text('Apply'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: WebTheme.brand,
+                  foregroundColor: Colors.white,
+                ),
+              ),
+            ],
+          ],
+        ),
+        columns: activeTab == 'Permission'
+            ? const [
+                'Designation',
+                'From time',
+                'To time',
+                'Total hours',
+                'Reason',
+                'Applied on',
+                'Apply date',
+              ]
+            : const [
+                'Designation',
+                'Contact number',
+                'Leave type',
+                'Day',
+                'Applied on',
+                'Leave date',
+                'Reason',
+                'Reject reason',
+              ],
+        emptyTitle: activeTab == 'Leave' ? 'No leave found' : 'No permission found',
+        records: [
+          for (final item in filteredItems)
+            WorkspaceRecord(
+              status: (item['status'] ?? '').toString(),
+              approvedColor: WebTheme.brandOf(context),
+              values: activeTab == 'Permission'
+                  ? [
+                      _shown(item['designation']),
+                      formatTime((item['fromTime'] ?? item['FromTime'])?.toString()),
+                      formatTime((item['toTime'] ?? item['ToTime'])?.toString()),
+                      '${item['totalHours'] ?? '—'} hours',
+                      _shown(item['reason']),
+                      _shown(AppHelpers.formatDate(item['submittedDate']?.toString())),
+                      formatDate((item['date'] ?? item['fromDate'])?.toString()),
+                    ]
+                  : [
+                      _shown(item['designation']),
+                      _shown(item['contactNumber']),
+                      _leaveCategory(item),
+                      _leaveDay(item),
+                      _shown(AppHelpers.formatDate(item['submittedDate']?.toString())),
+                      formatDate((item['fromDate'] ?? item['date'])?.toString()),
+                      _shown(item['reason']),
+                      _rejectWhy(item),
+                    ],
+            ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final groupedData = groupByMonth(filteredItems);
     final web = WebPushedChrome.isWeb(context);
+    if (web) return _webLeave();
     return Scaffold(
       backgroundColor: WebPushedChrome.background(context),
       appBar: AppBar(
@@ -336,7 +479,10 @@ class _LeavelistState extends State<Leavelist>
                           child: Center(
                             child: Text(
                               'Leave',
-                              style: Theme.of(context).textTheme.labelLarge,
+                              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                                color: activeTab == 'Leave' ? Colors.white : Colors.white70,
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
                           ),
                         ),
@@ -365,7 +511,10 @@ class _LeavelistState extends State<Leavelist>
                           child: Center(
                             child: Text(
                               'Permission',
-                              style: Theme.of(context).textTheme.labelLarge,
+                              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                                color: activeTab == 'Permission' ? Colors.white : Colors.white70,
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
                           ),
                         ),
@@ -652,6 +801,11 @@ class _LeavelistState extends State<Leavelist>
                           : "-",
                     ),
                     infoRow("Reason", e["reason"]),
+                    infoRow(
+                      "Applied on",
+                      AppHelpers.formatDate(e["submittedDate"]?.toString()),
+                    ),
+                    infoRow("Apply date", formatDate(e["date"] ?? e["fromDate"])),
                   ] else ...[
                     infoRow("Name", e["name"]),
                     infoRow("Designation", e["designation"]),
