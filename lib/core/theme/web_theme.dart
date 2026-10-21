@@ -107,14 +107,11 @@ class RolePalette {
   static RolePalette forRole(String? role) {
     final value = (role ?? '').trim();
     if (value.isEmpty) return manager;
-    final lower = value.toLowerCase();
-    if (value == '1' || lower.contains('director')) return director;
+    if (AppRoles.isDirector(value)) return director;
     if (AppRoles.isDivisionHead(value)) return divisionHead;
-    if (value == '50' || lower.contains('5s') || lower.contains('five')) {
-      return fiveS;
-    }
+    if (AppRoles.isFiveS(value)) return fiveS;
     if (AppRoles.isAssistantManager(value)) return assistant;
-    if (value == '3' || AppRoles.isManager(value)) return manager;
+    if (AppRoles.isManager(value)) return manager;
     return staff;
   }
 }

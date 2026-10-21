@@ -243,7 +243,7 @@ class _BehaviourScoreDisplayState extends State<BehaviourScoreDisplay> {
       body: RequestWorkspace(
         title: 'Attitude & Behaviour',
         subtitle: widget.scoreLeaders
-            ? 'Scores for managers and division heads'
+            ? 'Scores for ${AppRoles.nameForPosition(AppRoles.managerPosition, fallback: 'managers')} and ${AppRoles.nameForPosition(AppRoles.divisionHeadPosition, fallback: 'division heads')}'
             : 'Monthly behaviour scores',
         loading: isLoading,
         emptyTitle: 'No scores',
@@ -597,7 +597,7 @@ class _BehaviourScoreDisplayState extends State<BehaviourScoreDisplay> {
       return "No behaviour scores for ${_monthName(selectedMonth!)}";
     }
     if (widget.scoreLeaders) {
-      return "No scores for department managers or division heads";
+      return "No scores for ${AppRoles.nameForPosition(AppRoles.managerPosition, fallback: 'managers')} or ${AppRoles.nameForPosition(AppRoles.divisionHeadPosition, fallback: 'division heads')}";
     }
     return "No behaviour scores available";
   }

@@ -69,7 +69,7 @@ class _AssignUsersPageState extends State<AssignUsersPage> {
         roles = [];
       }
 
-      loginRolePosition = rolePosition(roles, loginRole) ?? _resolveLoginPosition();
+      loginRolePosition = rolePosition(roles, loginRole);
       await _resolveLoginDepartment();
       await _loadUsersForPosition();
     } catch (e) {
@@ -77,20 +77,6 @@ class _AssignUsersPageState extends State<AssignUsersPage> {
     } finally {
       if (mounted) setState(() => isLoading = false);
     }
-  }
-
-  int? _resolveLoginPosition() {
-    final fromRoles = _getRolePosition(loginRole);
-    if (fromRoles != null && fromRoles > 0) return fromRoles;
-
-    final parsed = int.tryParse((loginRole ?? '').trim());
-    if (parsed != null) return parsed;
-
-    if (AppRoles.isManager(loginRole)) return 3;
-    if (AppRoles.isDivisionHead(loginRole)) return 2;
-    final lower = (loginRole ?? '').toLowerCase();
-    if (lower == 'director' || loginRole == AppRoles.director) return 1;
-    return null;
   }
 
   Future<void> _resolveLoginDepartment() async {
@@ -136,7 +122,7 @@ class _AssignUsersPageState extends State<AssignUsersPage> {
   Future<List<UserModel>> _ensureLoginUser(List<UserModel> users) async {
     if (loginUserId == null) return users;
     // Division heads assign only managers — do not force-add themselves.
-    if (AppRoles.isDivisionHead(loginRole)) return users;
+    if (AppRoles.isDivisionHead(loginRole, roles)) return users;
     if (users.any((user) => user.userId == loginUserId)) return users;
 
     try {
@@ -239,25 +225,6 @@ class _AssignUsersPageState extends State<AssignUsersPage> {
       unique[user.userId] = user;
     }
     return unique.values.toList();
-  }
-
-  int? _getRolePosition(String? roleValue) {
-    if (roleValue == null || roleValue.isEmpty) return null;
-
-    final roleId = int.tryParse(roleValue);
-    if (roleId != null) {
-      for (final role in roles) {
-        if (role.id == roleId) return role.position;
-      }
-    }
-
-    for (final role in roles) {
-      if (role.name.toLowerCase() == roleValue.toLowerCase()) {
-        return role.position;
-      }
-    }
-
-    return null;
   }
 
   @override

@@ -22,6 +22,8 @@ import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/setti
 import 'package:staff_work_track/screen/staff/navigation/dashboard/staff_warnings.dart';
 import 'package:staff_work_track/Models/warning_model.dart';
 import 'package:staff_work_track/services/announ_service.dart';
+import 'package:staff_work_track/services/auth_service.dart';
+import 'package:staff_work_track/utils/jwt_helper.dart';
 import 'package:staff_work_track/services/dashboard_service.dart';
 import 'package:staff_work_track/services/reports_service.dart';
 import 'package:staff_work_track/services/superadmin_service.dart';
@@ -46,6 +48,7 @@ class _OverallReportsTabState extends State<SuperAdminDashboard> {
   int dueSoonTaskCount = 0;
   List<({String department, int count})> departmentWarnings = [];
   List<String> companyDepartments = [];
+  String _roleTitle = '';
   void _openList(
     DashboardListKind kind,
     String title, {
@@ -71,9 +74,30 @@ class _OverallReportsTabState extends State<SuperAdminDashboard> {
       selectedYear = DateTime(now.year - 1);
       selectedMonth = 12;
     }
+    _roleTitle = AppRoles.nameForPosition(AppRoles.directorPosition);
+    _loadRoleTitle();
     _fetchWarnings();
     _loadDueSoon();
     dashboard = loadDashboard();
+  }
+
+  Future<void> _loadRoleTitle() async {
+    try {
+      final roles = await SuperAdminService.getRoles();
+      final token = await AuthService.getToken();
+      final role = token == null ? null : JwtHelper.getRole(token);
+      if (!mounted) return;
+      final name = AppRoles.displayName(
+        role,
+        roles: roles,
+        fallback: AppRoles.nameForPosition(
+          AppRoles.directorPosition,
+          roles: roles,
+        ),
+      );
+      if (name.isEmpty) return;
+      setState(() => _roleTitle = name);
+    } catch (_) {}
   }
 
   Future<void> _pickYear() async {
@@ -441,21 +465,21 @@ class _OverallReportsTabState extends State<SuperAdminDashboard> {
       iconTheme: const IconThemeData(color: Colors.white),
       toolbarHeight: 64,
       titleSpacing: 0,
-      title: const Column(
+      title: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
-            'Director',
+            _roleTitle,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: TextStyle(
+            style: const TextStyle(
               color: Colors.white,
               fontSize: 16,
               fontWeight: FontWeight.w800,
             ),
           ),
-          Text(
+          const Text(
             'Company overview',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
@@ -539,7 +563,7 @@ class _OverallReportsTabState extends State<SuperAdminDashboard> {
 
   Widget _buildDrawer(BuildContext context) {
     return AppMenuDrawer(
-      title: 'Super Admin',
+      title: _roleTitle,
       subtitle: 'Admin Panel',
       icon: Icons.admin_panel_settings_rounded,
       items: _sidebarMenu(),

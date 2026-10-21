@@ -234,7 +234,7 @@ class _AuditLogPageState extends State<AuditLogPage> {
   }
 
   void _navigateToUserDetails(BuildContext context, UserModel user) {
-    if (user.role == "1") {
+    if (AppRoles.isDirector(user.role)) {
       Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => EmployeeDetail(employee: user)),

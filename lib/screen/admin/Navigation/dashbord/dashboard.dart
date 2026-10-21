@@ -25,7 +25,9 @@ import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/drawe
 import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/drawer/auditlog.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/drawer/points.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/settings/settings.dart';
+import 'package:staff_work_track/core/constant/division_config.dart';
 import 'package:staff_work_track/core/theme/web_theme.dart';
+import 'package:staff_work_track/services/superadmin_service.dart';
 import 'package:staff_work_track/services/announ_service.dart';
 import 'package:staff_work_track/services/reports_service.dart';
 
@@ -80,6 +82,7 @@ class _AdminState extends State<AdminDashboard> {
   List<Map<String, dynamic>> overdueTaskList = [];
   List<Map<String, dynamic>> overdueGoalList = [];
   bool isManagerView = true;
+  String _roleTitle = '';
 
   List<Map<String, dynamic>> _reportList(
     Map<String, dynamic> data,
@@ -118,6 +121,8 @@ class _AdminState extends State<AdminDashboard> {
   @override
   void initState() {
     super.initState();
+    _roleTitle = AppRoles.displayName(widget.role);
+    _loadRoleTitle();
     _LiveProfile.register(_showMyProfile);
     _fetchReport();
     loadData();
@@ -129,6 +134,16 @@ class _AdminState extends State<AdminDashboard> {
   void dispose() {
     _LiveProfile.unregister(_showMyProfile);
     super.dispose();
+  }
+
+  Future<void> _loadRoleTitle() async {
+    try {
+      final roles = await SuperAdminService.getRoles();
+      if (!mounted) return;
+      final name = AppRoles.displayName(widget.role, roles: roles);
+      if (name.isEmpty) return;
+      setState(() => _roleTitle = name);
+    } catch (_) {}
   }
 
   void _showMyProfile() {
@@ -438,11 +453,11 @@ class _AdminState extends State<AdminDashboard> {
               fontWeight: FontWeight.w800,
             ),
           ),
-          const Text(
-            'Manager',
+          Text(
+            _roleTitle,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: TextStyle(color: Colors.white70, fontSize: 11),
+            style: const TextStyle(color: Colors.white70, fontSize: 11),
           ),
         ],
       ),
@@ -522,10 +537,10 @@ class _AdminState extends State<AdminDashboard> {
 
     final bool isAccountsManager =
         widget.department.trim() == "Accounts Department" &&
-        widget.role.toString() == "3";
+        AppRoles.isManager(widget.role);
     final bool isHRManager =
         widget.department.trim() == "HR Department" &&
-        widget.role.toString() == "3";
+        AppRoles.isManager(widget.role);
 
     return [
       if (widget.onBack != null)
@@ -643,10 +658,10 @@ class _AdminState extends State<AdminDashboard> {
 
   Widget _buildDrawer(BuildContext context) {
     final subtitle = widget.department.trim().isEmpty
-        ? 'Manager Panel'
+        ? 'Department overview'
         : widget.department.trim();
     return AppMenuDrawer(
-      title: 'Manager',
+      title: _roleTitle,
       subtitle: subtitle,
       icon: Icons.dashboard_rounded,
       items: _sidebarMenu(),

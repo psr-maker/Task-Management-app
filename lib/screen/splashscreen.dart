@@ -13,6 +13,7 @@ import 'package:staff_work_track/screen/division_head/division_head.dart';
 import 'package:staff_work_track/screen/staff/staff.dart';
 import 'package:staff_work_track/screen/super%20admin/superadmin.dart';
 import 'package:staff_work_track/services/auth_service.dart';
+import 'package:staff_work_track/services/superadmin_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -75,15 +76,17 @@ class _SplashScreenState extends State<SplashScreen>
     }
 
     final role = JwtHelper.getRole(token);
+    await SuperAdminService.ensureRolesLoaded();
+    if (!mounted) return;
     context.read<ThemeProvider>().applyRole(role);
 
-    if (role == "1") {
+    if (AppRoles.isDirector(role)) {
       _go(const SuperAdmin());
-    } else if (role == "3") {
-      _go(const Admin());
     } else if (AppRoles.isDivisionHead(role)) {
       _go(const DivisionHead());
-    } else if (role == "50") {
+    } else if (AppRoles.isManager(role)) {
+      _go(const Admin());
+    } else if (AppRoles.isFiveS(role)) {
       _go(const FiveSpoints());
     } else {
       _go(const Staff());

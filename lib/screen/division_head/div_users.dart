@@ -80,16 +80,12 @@ class _DivUsersState extends State<DivUsers> {
 
   String getRoleName(dynamic roleId) {
     if (roleId == null) return '-';
-    final raw = roleId.toString().trim();
-    if (raw.isEmpty) return '-';
-
-    final id = int.tryParse(raw);
-    if (id == null) return raw;
-
-    for (final role in roles) {
-      if (role.id == id) return role.name;
-    }
-    return raw;
+    final name = AppRoles.displayName(
+      roleId.toString(),
+      roles: roles,
+      fallback: '-',
+    );
+    return name.isEmpty ? '-' : name;
   }
 
   void _refreshUsers() {

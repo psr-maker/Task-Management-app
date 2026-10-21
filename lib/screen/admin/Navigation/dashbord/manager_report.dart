@@ -2506,14 +2506,8 @@ class _ScopedUserListState extends State<_ScopedUserList> {
   }
 
   String _roleName(String role) {
-    final raw = role.trim();
-    if (raw.isEmpty) return 'Staff';
-    final id = int.tryParse(raw);
-    if (id == null) return raw;
-    for (final item in _roles) {
-      if (item.id == id) return item.name;
-    }
-    return 'Staff';
+    final name = AppRoles.displayName(role, roles: _roles, fallback: 'Staff');
+    return name.isEmpty ? 'Staff' : name;
   }
 
   Map<String, List<UserModel>> _group(List<UserModel> users) {

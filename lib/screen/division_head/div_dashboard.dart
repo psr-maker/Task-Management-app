@@ -26,6 +26,7 @@ import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/drawe
 import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/drawer/usersworklog.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/dashboard/settings/settings.dart';
 import 'package:staff_work_track/services/admin_service.dart';
+import 'package:staff_work_track/services/superadmin_service.dart';
 import 'package:staff_work_track/services/announ_service.dart';
 import 'package:staff_work_track/services/reports_service.dart';
 import 'package:staff_work_track/utils/work_performance.dart';
@@ -56,6 +57,7 @@ class _DivDashboardState extends State<DivDashboard> {
   int overdueTaskCount = 0;
   int overdueGoalCount = 0;
   int apiWarningCount = 0;
+  String _roleTitle = '';
   List<Map<String, dynamic>> overdueTaskList = [];
   List<Map<String, dynamic>> overdueGoalList = [];
 
@@ -82,7 +84,19 @@ class _DivDashboardState extends State<DivDashboard> {
       selectedYear = DateTime(now.year - 1);
       selectedMonth = 12;
     }
+    _roleTitle = AppRoles.displayName(widget.role);
+    _loadRoleTitle();
     _loadDepartments();
+  }
+
+  Future<void> _loadRoleTitle() async {
+    try {
+      final roles = await SuperAdminService.getRoles();
+      if (!mounted) return;
+      final name = AppRoles.displayName(widget.role, roles: roles);
+      if (name.isEmpty) return;
+      setState(() => _roleTitle = name);
+    } catch (_) {}
   }
 
   Future<void> _loadDepartments() async {
@@ -464,7 +478,7 @@ class _DivDashboardState extends State<DivDashboard> {
                     month: selectedMonth,
                     summary: summary,
                     monthly: monthly,
-                    roleLabel: 'Division Head',
+                    roleLabel: _roleTitle,
                     scopedDepartments: childDepartments,
                     departmentSeries: departmentSeries,
                     onPickYear: _pickYear,
@@ -550,8 +564,8 @@ class _DivDashboardState extends State<DivDashboard> {
               fontWeight: FontWeight.w800,
             ),
           ),
-          const Text(
-            'Division Head',
+          Text(
+            _roleTitle,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(color: Colors.white70, fontSize: 11),
@@ -716,7 +730,7 @@ class _DivDashboardState extends State<DivDashboard> {
   Widget _buildDrawer(BuildContext context) {
     final department = widget.department.trim();
     return AppMenuDrawer(
-      title: 'Division Head',
+      title: _roleTitle,
       subtitle: department.isEmpty ? 'Division panel' : department,
       icon: Icons.account_tree_rounded,
       items: _sidebarMenu(),

@@ -116,8 +116,8 @@ class _AllgoalsState extends State<Allgoals> {
       final userId = int.tryParse(JwtHelper.getuid(token)?.toString() ?? '');
       final role = JwtHelper.getRole(token);
       final department = (JwtHelper.getDepartment(token) ?? '').trim();
-      final isDirector =
-          role == AppRoles.director || (role ?? '').toLowerCase() == 'director';
+      await SuperAdminService.ensureRolesLoaded();
+      final isDirector = AppRoles.isDirector(role);
 
       if (userId != null) {
         try {

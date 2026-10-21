@@ -7,8 +7,10 @@ import 'package:staff_work_track/screen/super%20admin/Navigation/Reports/users/e
 import 'package:staff_work_track/screen/super admin/Navigation/users/Employee/empdetails.dart';
 import 'package:staff_work_track/screen/super admin/Navigation/users/user_create.dart';
 import 'package:staff_work_track/screen/super%20admin/Navigation/Task/goalntask_create.dart';
+import 'package:staff_work_track/core/constant/division_config.dart';
 import 'package:staff_work_track/services/admin_service.dart';
 import 'package:staff_work_track/services/auth_service.dart';
+import 'package:staff_work_track/services/superadmin_service.dart';
 import 'package:staff_work_track/utils/jwt_helper.dart';
 import 'package:staff_work_track/core/responsive/app_layout.dart';
 import 'package:staff_work_track/core/widgets/form_popup.dart';
@@ -116,9 +118,11 @@ class _EmployeeListState extends State<EmployeeList> {
     if (token == null) return;
 
     final role = JwtHelper.getRole(token);
+    await SuperAdminService.ensureRolesLoaded();
+    if (!mounted) return;
 
     setState(() {
-      isAdmin = role == "3";
+      isAdmin = AppRoles.isManager(role);
     });
   }
 

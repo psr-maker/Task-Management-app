@@ -12,8 +12,10 @@ import 'package:staff_work_track/core/constant/division_config.dart';
 import 'package:staff_work_track/screen/admin/admin.dart';
 import 'package:staff_work_track/screen/division_head/division_head.dart';
 import 'package:staff_work_track/screen/staff/staff.dart';
+import 'package:staff_work_track/screen/super%20admin/fives/create_fives.dart';
 import 'package:staff_work_track/screen/super%20admin/superadmin.dart';
 import 'package:staff_work_track/services/auth_service.dart';
+import 'package:staff_work_track/services/superadmin_service.dart';
 import 'package:staff_work_track/core/widgets/buttons.dart';
 import 'package:staff_work_track/core/widgets/msgsnackbar.dart';
 
@@ -126,15 +128,19 @@ class _OtpverifyState extends State<Otpverify> {
       }
       showTopMessage("OTP verified successfully", isError: false);
       if (!mounted) return;
+      await SuperAdminService.ensureRolesLoaded();
+      if (!mounted) return;
       context.read<ThemeProvider>().applyRole(role);
       await Future.delayed(const Duration(seconds: 1));
       if (!mounted) return;
-      if (role == "1") {
+      if (AppRoles.isDirector(role)) {
         _go(const SuperAdmin());
-      } else if (role == "3") {
-        _go(const Admin());
       } else if (AppRoles.isDivisionHead(role)) {
         _go(const DivisionHead());
+      } else if (AppRoles.isManager(role)) {
+        _go(const Admin());
+      } else if (AppRoles.isFiveS(role)) {
+        _go(const FiveSpoints());
       } else {
         _go(const Staff());
       }

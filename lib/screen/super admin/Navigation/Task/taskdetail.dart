@@ -641,8 +641,10 @@ class _TaskDetailsState extends State<TaskDetails> {
     return GestureDetector(
       onTap: () async {
         final token = await AuthService.getToken();
-        final role = JwtHelper.getRole(token!)?.toLowerCase().trim();
-        if (role == "1") {
+        final role = JwtHelper.getRole(token!);
+        await SuperAdminService.ensureRolesLoaded();
+        if (!mounted) return;
+        if (AppRoles.isDirector(role)) {
           Navigator.push(
             context,
             MaterialPageRoute(
@@ -848,14 +850,9 @@ class _TaskDetailsState extends State<TaskDetails> {
   bool get _hasQuantity => (task?.quantity ?? 0) > 0;
 
   bool _seesEveryShareFor(String? role) {
-    if (AppRoles.isManager(role) || AppRoles.isAssistantManager(role)) {
-      return true;
-    }
-    final value = (role ?? "").toLowerCase().trim();
-    return value == "1" ||
-        value.contains("director") ||
-        value == "3" ||
-        value.contains("manager");
+    return AppRoles.isDirector(role) ||
+        AppRoles.isManager(role) ||
+        AppRoles.isAssistantManager(role);
   }
 
   bool _isCreator(String? assignedBy, int? userId) {

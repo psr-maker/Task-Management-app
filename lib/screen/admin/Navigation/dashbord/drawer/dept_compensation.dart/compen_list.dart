@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:jwt_decoder/jwt_decoder.dart';
+import 'package:staff_work_track/core/constant/division_config.dart';
 import 'package:staff_work_track/core/theme/web_theme.dart';
 import 'package:staff_work_track/core/widgets/form_popup.dart';
 import 'package:staff_work_track/core/widgets/list_download_button.dart';
@@ -815,7 +816,7 @@ class _ExtraWorkPageState extends State<ExtraWorkPage>
             if (status == 'Accepted' && _isOwnCompensation(item)) ...[
               const SizedBox(height: 18),
               Text(
-                'Waiting for division head approval',
+                'Waiting for ${AppRoles.nameForPosition(AppRoles.divisionHeadPosition, fallback: 'division head')} approval',
                 style: TextStyle(
                   color: Theme.of(context).colorScheme.secondary,
                   fontSize: 13,

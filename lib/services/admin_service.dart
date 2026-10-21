@@ -21,6 +21,7 @@ class AdminService {
     String? role,
     String? ownDepartment,
   }) async {
+    await SuperAdminService.ensureRolesLoaded();
     final own = (ownDepartment ?? '').trim();
     final names = <String>[];
 
@@ -112,14 +113,13 @@ class AdminService {
     bool isActiveManager(UserModel user) {
       if (user.userId <= 0) return false;
       if (user.status.trim().toLowerCase() == 'inactive') return false;
-      if (AppRoles.isDivisionHead(user.role)) return false;
-      if (AppRoles.isManager(user.role)) return true;
+      if (AppRoles.isDivisionHead(user.role, roles)) return false;
+      if (AppRoles.isManager(user.role, roles)) return true;
       final id = int.tryParse(user.role.trim());
       if (id == null) return false;
       for (final role in roles) {
         if (role.id != id) continue;
-        if (AppRoles.isManager(role.name)) return true;
-        if (role.position == 3) return true;
+        if (role.position == AppRoles.managerPosition) return true;
       }
       return false;
     }
@@ -236,6 +236,7 @@ class AdminService {
   static Future<List<String>> getDivisionHeadDepartments(
     List<UserModel> users,
   ) async {
+    await SuperAdminService.ensureRolesLoaded();
     final token = await AuthService.getToken();
     final divisionHeads = users
         .where((user) => AppRoles.isDivisionHead(user.role))

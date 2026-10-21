@@ -50,6 +50,7 @@ class _HrWarningsPageState extends State<HrWarningsPage> {
     _loadSender();
     _loadPeople();
     _loadWarnings();
+    _loadRoleNames();
   }
 
   @override
@@ -226,14 +227,15 @@ class _HrWarningsPageState extends State<HrWarningsPage> {
     return 'Staff ${user.userId}';
   }
 
+  Future<void> _loadRoleNames() async {
+    await SuperAdminService.ensureRolesLoaded();
+    if (mounted) setState(() {});
+  }
+
   String _roleLabel(String role) {
+    final name = AppRoles.displayName(role);
+    if (name.isNotEmpty) return name;
     final value = role.trim();
-    if (AppRoles.isDivisionHead(value)) return 'Division Head';
-    if (AppRoles.isAssistantManager(value)) return 'Assistant Manager';
-    if (value == AppRoles.director || value.toLowerCase() == 'director') {
-      return 'Director';
-    }
-    if (AppRoles.isManager(value)) return 'Manager';
     if (value.isEmpty || int.tryParse(value) != null) return 'Staff';
     return value;
   }

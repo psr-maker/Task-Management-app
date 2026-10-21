@@ -55,6 +55,16 @@ class _CreateExtraWorkPageState extends State<CreateExtraWorkPage> {
   bool isLoadingTasks = false;
   bool isSubmitting = false;
 
+  String get _managerRoleName => AppRoles.nameForPosition(
+    AppRoles.managerPosition,
+    fallback: 'Manager',
+  );
+
+  String get _headRoleName => AppRoles.nameForPosition(
+    AppRoles.divisionHeadPosition,
+    fallback: 'Division head',
+  );
+
   @override
   void initState() {
     super.initState();
@@ -122,9 +132,9 @@ class _CreateExtraWorkPageState extends State<CreateExtraWorkPage> {
 
         showTopMessage(
           widget.forLeaders
-              ? "Failed to load managers and division heads: ${e.toString()}"
+              ? "Failed to load $_managerRoleName and $_headRoleName: ${e.toString()}"
               : forDivisionHead
-              ? "Failed to load managers: ${e.toString()}"
+              ? "Failed to load $_managerRoleName: ${e.toString()}"
               : "Failed to load staff: ${e.toString()}",
           isError: true,
         );
@@ -295,9 +305,9 @@ class _CreateExtraWorkPageState extends State<CreateExtraWorkPage> {
     if (selectedStaffId == null) {
       showTopMessage(
         widget.forLeaders
-            ? "Please select a department manager or division head"
+            ? "Please select a $_managerRoleName or $_headRoleName"
             : _divisionManagers
-            ? "Please select a department manager"
+            ? "Please select a $_managerRoleName"
             : "Please select staff",
         isError: true,
       );
@@ -435,9 +445,9 @@ class _CreateExtraWorkPageState extends State<CreateExtraWorkPage> {
                 CustomFormWidgets.label(
                   context,
                   widget.forLeaders
-                      ? 'Department Manager / Division Head'
+                      ? '$_managerRoleName / $_headRoleName'
                       : _divisionManagers
-                      ? 'Department Manager'
+                      ? _managerRoleName
                       : 'Staff',
                 ),
 
@@ -452,9 +462,9 @@ class _CreateExtraWorkPageState extends State<CreateExtraWorkPage> {
                         : kMinInteractiveDimension,
                     decoration: _inputDecoration(
                       widget.forLeaders
-                          ? 'Select manager or division head'
+                          ? 'Select $_managerRoleName or $_headRoleName'
                           : _divisionManagers
-                          ? 'Select manager'
+                          ? 'Select $_managerRoleName'
                           : 'Select Staff',
                       Icons.person_outline_rounded,
                     ),
@@ -475,18 +485,18 @@ class _CreateExtraWorkPageState extends State<CreateExtraWorkPage> {
                     hint: Text(
                       isLoadingStaff
                           ? (widget.forLeaders
-                                ? 'Loading managers and division heads...'
+                                ? 'Loading $_managerRoleName and $_headRoleName...'
                                 : _divisionManagers
-                                ? 'Loading managers...'
+                                ? 'Loading $_managerRoleName...'
                                 : 'Loading staff...')
                           : staffList.isEmpty && widget.forLeaders
-                          ? 'No department managers or division heads'
+                          ? 'No $_managerRoleName or $_headRoleName'
                           : staffList.isEmpty && _divisionManagers
-                          ? 'No managers in your departments'
+                          ? 'No $_managerRoleName in your departments'
                           : widget.forLeaders
-                          ? 'Select manager or division head'
+                          ? 'Select $_managerRoleName or $_headRoleName'
                           : _divisionManagers
-                          ? 'Select manager'
+                          ? 'Select $_managerRoleName'
                           : 'Select staff',
                     ),
                     items: staffList.map((staff) {
@@ -544,9 +554,9 @@ class _CreateExtraWorkPageState extends State<CreateExtraWorkPage> {
                     validator: (value) {
                       if (value == null) {
                         return widget.forLeaders
-                            ? 'Select manager or division head'
+                            ? 'Select $_managerRoleName or $_headRoleName'
                             : _divisionManagers
-                            ? 'Select manager'
+                            ? 'Select $_managerRoleName'
                             : 'Select staff';
                       }
 
@@ -567,7 +577,7 @@ class _CreateExtraWorkPageState extends State<CreateExtraWorkPage> {
                   hint: Text(
                     selectedStaffId == null
                         ? (widget.forLeaders || _divisionManagers
-                              ? 'Select manager first'
+                              ? 'Select $_managerRoleName first'
                               : 'Select staff first')
                         : isLoadingTasks
                         ? 'Loading tasks...'

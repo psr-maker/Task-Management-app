@@ -138,7 +138,9 @@ class _StaffLeavesState extends State<StaffLeaves>
         (item["senderRole"] ?? item["role"] ?? item["Role"] ?? "")
             .toString()
             .trim();
-    if (senderRole == "2" || senderRole == "3") return false;
+    if (AppRoles.isDivisionHead(senderRole) || AppRoles.isManager(senderRole)) {
+      return false;
+    }
 
     return true;
   }
@@ -826,7 +828,10 @@ class _StaffLeavesState extends State<StaffLeaves>
                     if (status == "pending" && _canApproveOrReject(e))
                       buildPermissionActionSection(e)
                     else if (status == "pending")
-                      infoRow("Approval", "Awaiting Director approval"),
+                      infoRow(
+                        "Approval",
+                        "Awaiting ${AppRoles.nameForPosition(AppRoles.directorPosition, fallback: 'director')} approval",
+                      ),
                   ] else ...[
                     infoRow("Name", e["name"]),
                     if (widget.isDirectorView)
@@ -861,7 +866,10 @@ class _StaffLeavesState extends State<StaffLeaves>
                         _canApproveOrReject(e))
                       buildActionSection(e)
                     else if (status.toLowerCase() == "pending")
-                      infoRow("Approval", "Awaiting Director approval"),
+                      infoRow(
+                        "Approval",
+                        "Awaiting ${AppRoles.nameForPosition(AppRoles.directorPosition, fallback: 'director')} approval",
+                      ),
                     if (status == "approved")
                       infoRow(
                         "Approved Date",

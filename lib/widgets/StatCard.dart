@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:jwt_decoder/jwt_decoder.dart';
 import 'package:provider/provider.dart';
+import 'package:staff_work_track/core/constant/division_config.dart';
 import 'package:staff_work_track/core/providers/data_refresh_provider.dart';
 import 'package:staff_work_track/core/responsive/app_layout.dart';
 import 'package:staff_work_track/core/theme/web_theme.dart';
@@ -499,10 +500,11 @@ class _TaskCardState extends State<Taskstatus> {
       }
 
       final loginUserId = JwtHelper.getuid(token)?.toString().trim();
-      final userRole = JwtHelper.getRole(token)?.toLowerCase().trim();
+      final userRole = JwtHelper.getRole(token)?.trim();
       final userDepartment = JwtHelper.getDepartment(
         token,
       )?.toLowerCase().trim();
+      await SuperAdminService.ensureRolesLoaded();
 
       if (loginUserId == null || userRole == null) {
         _setStateIfMounted(() {
@@ -521,8 +523,7 @@ class _TaskCardState extends State<Taskstatus> {
         return;
       }
 
-      // Directors can edit any task (no restrictions)
-      if (userRole == "1") {
+      if (AppRoles.isDirector(userRole)) {
         _setStateIfMounted(() {
           _canEditStatus = true;
           _permissionChecked = true;
@@ -540,8 +541,7 @@ class _TaskCardState extends State<Taskstatus> {
         }
       }
 
-      // Staff can only edit if task is assigned to them
-      if (userRole != "3") {
+      if (!AppRoles.isManager(userRole)) {
         _setStateIfMounted(() {
           _canEditStatus = isAssignedToUser;
           _permissionChecked = true;

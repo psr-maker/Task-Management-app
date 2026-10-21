@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:staff_work_track/core/widgets/load_error.dart';
 import 'package:staff_work_track/Models/getusers.dart';
 import 'package:staff_work_track/Models/rolesmodel.dart';
+import 'package:staff_work_track/core/constant/division_config.dart';
 import 'package:staff_work_track/core/responsive/app_layout.dart';
 import 'package:staff_work_track/core/widgets/form_popup.dart';
 import 'package:staff_work_track/core/widgets/loading.dart';
@@ -53,24 +54,8 @@ class _UsersviewState extends State<Usersview> {
   }
 
   String _roleName(String raw) {
-    final value = raw.trim();
-    if (value.isEmpty) return '-';
-    final lower = value.toLowerCase();
-    for (final role in roles) {
-      if (role.name.trim().toLowerCase() == lower) return role.name;
-    }
-    final number = int.tryParse(value);
-    if (number != null) {
-      for (final role in roles) {
-        if (role.position == number && role.name.trim().isNotEmpty) {
-          return role.name;
-        }
-      }
-      for (final role in roles) {
-        if (role.id == number && role.name.trim().isNotEmpty) return role.name;
-      }
-    }
-    return value;
+    final name = AppRoles.displayName(raw, roles: roles, fallback: '-');
+    return name.isEmpty ? '-' : name;
   }
 
   Future<void> _loadDepartments() async {

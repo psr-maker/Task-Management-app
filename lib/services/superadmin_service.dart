@@ -8,6 +8,7 @@ import 'package:staff_work_track/Models/rolesmodel.dart';
 import 'package:staff_work_track/Models/userstask.dart';
 import 'package:staff_work_track/services/auth_service.dart';
 import 'package:staff_work_track/core/constant/apiurl.dart';
+import 'package:staff_work_track/core/constant/role_catalog.dart';
 
 class SuperAdminService {
   static const String baseUrl = ApiConstants.apiurl;
@@ -730,6 +731,13 @@ class SuperAdminService {
     return response.statusCode >= 200 && response.statusCode < 300;
   }
 
+  static Future<void> ensureRolesLoaded() async {
+    if (RoleCatalog.roles.isNotEmpty) return;
+    try {
+      await getRoles();
+    } catch (_) {}
+  }
+
   static Future<List<Role>> getRoles() async {
     final token = await AuthService.getToken();
     final url = Uri.parse('$baseUrl/Director/getall-roles');
@@ -748,7 +756,9 @@ class SuperAdminService {
           ? decoded
           : (decoded['roles'] ?? decoded['data'] ?? []);
 
-      return data.map((json) => Role.fromJson(json)).toList();
+      final roles = data.map((json) => Role.fromJson(json)).toList();
+      RoleCatalog.replace(roles);
+      return roles;
     }
 
     throw Exception(

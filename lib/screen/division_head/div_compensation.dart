@@ -8,6 +8,7 @@ import 'package:staff_work_track/core/widgets/request_workspace.dart';
 import 'package:staff_work_track/core/widgets/web_ui.dart';
 import 'package:staff_work_track/screen/admin/Navigation/dashbord/drawer/dept_compensation.dart/add_compen.dart';
 import 'package:staff_work_track/services/admin_service.dart';
+import 'package:staff_work_track/services/superadmin_service.dart';
 import 'package:staff_work_track/services/auth_service.dart';
 import 'package:staff_work_track/services/overtime_service.dart';
 import 'package:staff_work_track/utils/jwt_helper.dart';
@@ -191,6 +192,7 @@ class _DivCompensationState extends State<DivCompensation> {
   }
 
   Future<void> _loadData() async {
+    await SuperAdminService.ensureRolesLoaded();
     if (mounted) setState(() => isLoading = true);
 
     try {

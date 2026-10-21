@@ -122,7 +122,7 @@ class _DivLeaveManagementState extends State<DivLeaveManagement> {
         (item["senderRole"] ?? item["role"] ?? item["Role"] ?? "")
             .toString()
             .trim();
-    if (senderRole == AppRoles.divisionHead) return false;
+    if (AppRoles.isDivisionHead(senderRole)) return false;
 
     return true;
   }
@@ -1148,7 +1148,10 @@ class _DivLeaveManagementState extends State<DivLeaveManagement> {
                     const SizedBox(height: 10),
                     _actionButtons(item, isPermission, key),
                   ] else if (_isPending(item) && !_canApproveOrReject(item))
-                    _infoRow("Approval", "Awaiting Director approval"),
+                    _infoRow(
+                      "Approval",
+                      "Awaiting ${AppRoles.nameForPosition(AppRoles.directorPosition, fallback: 'director')} approval",
+                    ),
                 ],
               ),
             ),

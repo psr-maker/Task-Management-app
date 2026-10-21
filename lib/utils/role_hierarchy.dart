@@ -6,23 +6,7 @@ import 'package:staff_work_track/services/superadmin_service.dart';
 import 'package:staff_work_track/utils/jwt_helper.dart';
 
 int? rolePosition(List<Role> roles, String? roleValue) {
-  if (roleValue == null || roleValue.trim().isEmpty) return null;
-  final value = roleValue.trim();
-  final roleId = int.tryParse(value);
-
-  if (roleId != null) {
-    for (final role in roles) {
-      if (role.id == roleId && role.position > 0) return role.position;
-    }
-    if (roleId > 0) return roleId;
-  }
-
-  for (final role in roles) {
-    if (role.name.toLowerCase() == value.toLowerCase() && role.position > 0) {
-      return role.position;
-    }
-  }
-  return null;
+  return AppRoles.positionOf(roleValue, roles);
 }
 
 bool skipsOvertime(List<Role> roles, String? roleValue) {
@@ -93,8 +77,8 @@ bool canAssignUser({
 }) {
   if (loginUserId != null && user.userId == loginUserId) return true;
   // Division heads may assign only to department managers under them.
-  if (AppRoles.isDivisionHead(loginRole)) {
-    return AppRoles.isManager(user.role);
+  if (AppRoles.isDivisionHead(loginRole, roles)) {
+    return AppRoles.isManager(user.role, roles);
   }
 
   if (loginPosition == null) return false;
@@ -106,17 +90,10 @@ bool canAssignUser({
 /// Leadership roles a yearly goal can be assigned to.
 /// Lower position number is a higher role: director, division head, manager.
 bool isHierarchyLevelRole(List<Role> roles, String? roleValue) {
-  if (AppRoles.isManager(roleValue) ||
-      AppRoles.isDivisionHead(roleValue) ||
-      AppRoles.isAssistantManager(roleValue)) {
-    return true;
-  }
-  final value = (roleValue ?? '').trim();
-  if (value.isEmpty) return false;
-  final lower = value.toLowerCase();
-  if (lower == 'director' || value == AppRoles.director) return true;
   final position = rolePosition(roles, roleValue);
-  return position != null && position >= 1 && position <= 3;
+  return position != null &&
+      position >= AppRoles.directorPosition &&
+      position <= AppRoles.managerPosition;
 }
 
 Future<List<UserModel>> keepAssignableUsers(List<UserModel> users) async {

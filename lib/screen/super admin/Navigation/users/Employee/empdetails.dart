@@ -278,16 +278,12 @@ class _EmployeeDetailState extends State<EmployeeDetail> {
 
   String getRoleName(dynamic roleId) {
     if (roleId == null) return '-';
-    final raw = roleId.toString().trim();
-    if (raw.isEmpty) return '-';
-
-    final id = int.tryParse(raw);
-    if (id == null) return raw;
-
-    for (final role in roles) {
-      if (role.id == id) return role.name;
-    }
-    return raw;
+    final name = AppRoles.displayName(
+      roleId.toString(),
+      roles: roles,
+      fallback: '-',
+    );
+    return name.isEmpty ? '-' : name;
   }
 
   Future<void> loadEmployeeGoals({bool showLoader = false}) async {
@@ -412,9 +408,10 @@ class _EmployeeDetailState extends State<EmployeeDetail> {
       }
     }
 
-    final isDirector = loginUserRole == "1";
-    final isManager = loginUserRole == "3";
-    final isTargetDirector = employee.role.toString().trim() == "1";
+    await SuperAdminService.ensureRolesLoaded();
+    final isDirector = AppRoles.isDirector(loginUserRole);
+    final isManager = AppRoles.isManager(loginUserRole);
+    final isTargetDirector = AppRoles.isDirector(employee.role);
     final createdByMatch = loginUserId == createdById;
 
     var loginDept = (JwtHelper.getDepartment(token) ?? "")
@@ -1077,10 +1074,10 @@ class _EmployeeDetailState extends State<EmployeeDetail> {
                           tooltip: 'Audit log',
                           onPressed: () async {
                             final token = await AuthService.getToken();
-                            final role = JwtHelper.getRole(
-                              token!,
-                            )?.toLowerCase().trim();
-                            if (role == "1") {
+                            final role = JwtHelper.getRole(token!);
+                            await SuperAdminService.ensureRolesLoaded();
+                            if (!context.mounted) return;
+                            if (AppRoles.isDirector(role)) {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
@@ -1174,8 +1171,10 @@ class _EmployeeDetailState extends State<EmployeeDetail> {
               IconButton(
                 onPressed: () async {
                   final token = await AuthService.getToken();
-                  final role = JwtHelper.getRole(token!)?.toLowerCase().trim();
-                  if (role == "1") {
+                  final role = JwtHelper.getRole(token!);
+                  await SuperAdminService.ensureRolesLoaded();
+                  if (!context.mounted) return;
+                  if (AppRoles.isDirector(role)) {
                     Navigator.push(
                       context,
                       MaterialPageRoute(

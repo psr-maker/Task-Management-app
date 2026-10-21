@@ -41,6 +41,16 @@ class _AddBehaviourScoreState extends State<AddBehaviourScore> {
   bool isSubmitting = false;
 
   int get totalScore => communication + punctuality + integrity;
+
+  String get _managerRoleName => AppRoles.nameForPosition(
+    AppRoles.managerPosition,
+    fallback: 'Manager',
+  );
+
+  String get _headRoleName => AppRoles.nameForPosition(
+    AppRoles.divisionHeadPosition,
+    fallback: 'Division head',
+  );
   String? _topMessage;
   bool _isErrorMessage = true;
   bool _showTopMessage = false;
@@ -98,9 +108,9 @@ class _AddBehaviourScoreState extends State<AddBehaviourScore> {
       showAppMessage(
         context,
         widget.scoreLeaders
-            ? "Failed to load managers and division heads: $e"
+            ? "Failed to load $_managerRoleName and $_headRoleName: $e"
             : forDivisionHead
-            ? "Failed to load managers: $e"
+            ? "Failed to load $_managerRoleName: $e"
             : "Failed to load employees: $e",
       );
     }
@@ -162,9 +172,9 @@ class _AddBehaviourScoreState extends State<AddBehaviourScore> {
     if (selectedStaffId == null) {
       showTopMessage(
         widget.scoreLeaders
-            ? "Please select a department manager or division head"
+            ? "Please select a $_managerRoleName or $_headRoleName"
             : scoreDivisionManagers
-            ? "Please select a manager"
+            ? "Please select a $_managerRoleName"
             : "Please select a staff",
         isError: true,
       );
@@ -223,8 +233,8 @@ class _AddBehaviourScoreState extends State<AddBehaviourScore> {
   }
 
   String get _personLabel {
-    if (widget.scoreLeaders) return 'Manager or division head';
-    if (scoreDivisionManagers) return 'Manager';
+    if (widget.scoreLeaders) return '$_managerRoleName or $_headRoleName';
+    if (scoreDivisionManagers) return _managerRoleName;
     return 'Staff';
   }
 

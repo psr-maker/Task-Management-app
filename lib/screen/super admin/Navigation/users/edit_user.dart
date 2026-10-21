@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:staff_work_track/Models/rolesmodel.dart';
+import 'package:staff_work_track/core/constant/division_config.dart';
 import 'package:staff_work_track/core/theme/web_theme.dart';
 import 'package:staff_work_track/core/widgets/buttons.dart';
 import 'package:staff_work_track/core/widgets/web_ui.dart';
@@ -70,8 +71,10 @@ class _EditUserState extends State<EditUser> {
   }
 
   List<Role> get _availableRoles {
-    if (loginRole == "3") {
-      return roles.where((role) => role.id.toString() != "1").toList();
+    if (AppRoles.isManager(loginRole, roles)) {
+      return roles
+          .where((role) => role.position != AppRoles.directorPosition)
+          .toList();
     }
     return List<Role>.from(roles);
   }

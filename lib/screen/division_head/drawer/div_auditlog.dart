@@ -400,20 +400,7 @@ class _DivAuditLogState extends State<DivAuditLog> {
 
   String _roleName(String? value) {
     if (value == null || value.trim().isEmpty) return '';
-
-    final raw = value.trim();
-    final id = int.tryParse(raw);
-    if (id != null) {
-      for (final role in roles) {
-        if (role.id == id) return role.name;
-      }
-    }
-
-    for (final role in roles) {
-      if (role.name.toLowerCase() == raw.toLowerCase()) return role.name;
-    }
-
-    return raw;
+    return AppRoles.displayName(value, roles: roles);
   }
 
   List<AuditLogGroupModel> _groupLogs(List<AuditLogModel> logs) {

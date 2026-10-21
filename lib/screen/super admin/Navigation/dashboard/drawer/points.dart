@@ -95,23 +95,9 @@ class _ProductivityCalculationPageState extends State<ProductivityCalculationPag
                       minChildWidth: 420,
                       children: [
                         _taskCalculation(),
-                        _taskPriority(),
-                      ],
-                    ),
-
-                    SizedBox(height: 12),
-
-                    WebResponsiveRow(
-                      minChildWidth: 420,
-                      children: [
-                        _taskTime(),
                         _taskPenalty(),
                       ],
                     ),
-
-                    SizedBox(height: 12),
-
-                    _taskQuantity(),
 
                     SizedBox(height: 12),
 
@@ -123,17 +109,7 @@ class _ProductivityCalculationPageState extends State<ProductivityCalculationPag
 
                     SizedBox(height: 10),
 
-                    WebResponsiveRow(
-                      minChildWidth: 420,
-                      children: [
-                        _goalCalculation(),
-                        _goalPriority(),
-                      ],
-                    ),
-
-                    SizedBox(height: 12),
-
-                    _goalTime(),
+                    _goalCalculation(),
 
                     SizedBox(height: 25),
 
@@ -145,11 +121,23 @@ class _ProductivityCalculationPageState extends State<ProductivityCalculationPag
 
                     SizedBox(height: 25),
 
-                    _subHeader('D. Final Staff Productivity'),
+                    _subHeader('D. Warning Penalty'),
+
+                    SizedBox(height: 10),
+
+                    _warningPenalty(),
+
+                    SizedBox(height: 25),
+
+                    _subHeader('E. Final Staff Score'),
 
                     SizedBox(height: 10),
 
                     _staffFinal(),
+
+                    SizedBox(height: 25),
+
+                    _workedExample(),
 
                     SizedBox(height: 40),
 
@@ -326,7 +314,7 @@ class _ProductivityCalculationPageState extends State<ProductivityCalculationPag
       children: [
         _webIntro(
           'Staff score',
-          'Each person is scored from tasks, goals, and attitude. The mix changes when a person has only tasks or only goals.',
+          'Each person is scored for one month from reviewed tasks, completed goals, and attitude. Warnings are taken off the final score only.',
         ),
         const SizedBox(height: 14),
         _webSplit(wide, [
@@ -350,77 +338,58 @@ class _ProductivityCalculationPageState extends State<ProductivityCalculationPag
         Text('Task', style: _webHeading()),
         const SizedBox(height: 10),
         _webSplit(wide, [
-          _ruleTable('Time score', const [
-            ('Before due date', '90'),
-            ('On due date', '85'),
-            ('1 day late', '80'),
-            ('2 days late', '75'),
-            ('3 days late', '70'),
-            ('4 days late', '65'),
-            ('5 days late', '60'),
-            ('6 days late', '55'),
-            ('7 or more days late', '50'),
-          ], note: 'A task with an end time uses hours: 90 before, 85 on time, then minus 5 for each late hour. The score stays between 50 and 90.'),
-          Column(
-            children: [
-              _ruleTable('Priority added to the time score', const [
-                ('High', '+5'),
-                ('Medium', '+3'),
-                ('Normal', '+0'),
-              ]),
-              const SizedBox(height: 12),
-              _ruleTable('Removal penalty, taken off the monthly average', const [
-                ('High priority removed', '-10'),
-                ('Medium priority removed', '-5'),
-                ('Normal priority removed', '-3'),
-              ]),
-            ],
+          _formulaPanel(
+            'Monthly task average',
+            'Average of final review points',
+            'Uses reviews for this staff member in the selected month, and only tasks assigned to them. No reviews means the task score is 0.',
+          ),
+          _formulaPanel(
+            'Removal penalty',
+            'Sum of applied penalty points that month',
+            'Taken off the monthly task average. The task score cannot go below 0.',
           ),
         ]),
-        const SizedBox(height: 12),
-        _formulaPanel(
-          'Quantity',
-          'Task score × completed quantity ÷ target quantity',
-          'No target uses time + priority. Missing completed quantity is 0. At or above target keeps the full task score. Example: 90 × 6 ÷ 10 = 54.',
-        ),
         const SizedBox(height: 12),
         _formulaPanel(
           'Monthly task score',
-          'Average of task scores − removal penalties',
-          'Average = (Task 1 + Task 2 + …) ÷ tasks in the month. This score feeds the final task points.',
+          'Task average − removal penalty',
+          'This score is then converted to task points. With both tasks and goals it is worth 45. With tasks only it is worth 85.',
         ),
         const SizedBox(height: 22),
-        Text('Goal and attitude', style: _webHeading()),
+        Text('Goal, attitude, and warnings', style: _webHeading()),
         const SizedBox(height: 10),
         _webSplit(wide, [
           _formulaPanel(
-            'Goal points',
-            'Average of the goal’s tasks + priority + time',
-            'Task average = (Task 1 + Task 2 + …) ÷ tasks in the goal. Priority is +5 high, +3 medium, +0 normal.',
+            'Monthly goal score',
+            'Average of goal points',
+            'Uses goals completed in that month. No completed goals means the goal score is 0. With both tasks and goals this is worth 40. With goals only it is worth 85.',
           ),
-          _ruleTable('Goal time', const [
-            ('Before or on due date', '+5'),
-            ('1 day late', '-5'),
-            ('2 days late', '-10'),
-            ('3 days late', '-15'),
-          ], note: 'Each extra late day takes off another 5 points.'),
+          _formulaPanel(
+            'Attitude and behaviour',
+            'Behaviour total for the month',
+            'The score stays between 0 and 15. It is added after task and goal points.',
+          ),
         ]),
         const SizedBox(height: 12),
-        _formulaPanel(
-          'Attitude and behaviour',
-          'Sum of scores ÷ number of scores',
-          'Maximum contribution is 15 points.',
-        ),
+        _ruleTable('Warning penalty, taken off the final score', const [
+          ('Low', '−1'),
+          ('Medium', '−2'),
+          ('High', '−3'),
+          ('Critical', '−5'),
+        ], note: 'Only active warnings created in that month are counted. The penalties are added together.'),
         const SizedBox(height: 12),
         _finalPanel(
           'Final staff score',
           const [
-            ('Task and goal', 'Task (score ÷ 100) × 45  +  Goal (score ÷ 100) × 40  +  attitude'),
-            ('Task only', 'Task (score ÷ 100) × 85  +  attitude'),
-            ('Goal only', 'Goal (score ÷ 100) × 85  +  attitude'),
+            ('Task points', '(Monthly task score ÷ 100) × task weight'),
+            ('Goal points', '(Monthly goal score ÷ 100) × goal weight'),
+            ('Productivity', 'Task points + goal points, maximum 85'),
+            ('Total', 'Productivity + attitude − warning penalty, maximum 100'),
           ],
           'Maximum 100',
         ),
+        const SizedBox(height: 22),
+        _workedExample(),
         const SizedBox(height: 8),
       ],
     );
@@ -444,6 +413,121 @@ class _ProductivityCalculationPageState extends State<ProductivityCalculationPag
           if (i > 0) const SizedBox(width: 12),
           Expanded(child: children[i]),
         ],
+      ],
+    );
+  }
+
+  Widget _workedExample() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _subHeader('F. Worked example'),
+        const SizedBox(height: 10),
+        _card(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _label('FOLLOW ONE PERSON FOR ONE MONTH'),
+              const SizedBox(height: 12),
+              _info(
+                'The score uses only that month. A review, a completed goal, a removal, or a warning from another month is ignored.',
+              ),
+              const SizedBox(height: 14),
+              _scoreRow('1. Average the task reviews', '70'),
+              _scoreRow('2. Subtract the removal penalty', '60'),
+              _scoreRow('3. Average the completed goal points', '80'),
+              _scoreRow('4. Turn those scores into points', '27 + 32'),
+              _scoreRow('5. Add attitude', '12'),
+              _scoreRow('6. Subtract this month’s warnings', '−5'),
+              const SizedBox(height: 4),
+              _resultBox('Final score', '66 / 100'),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        _card(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _label('TASKS IN THE EXAMPLE'),
+              const SizedBox(height: 12),
+              _info(
+                'Two tasks assigned to this person were reviewed this month. Their final review points are 80 and 60.',
+              ),
+              const SizedBox(height: 14),
+              _formulaBox(
+                '80 + 60',
+                '2 reviews',
+                'Average = 70',
+              ),
+              const SizedBox(height: 14),
+              _info(
+                'A task removal this month has 10 penalty points applied. 70 − 10 = 60. If the penalty were larger than 70, the task score would stop at 0. It does not go negative.',
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        _card(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _label('GOALS IN THE EXAMPLE'),
+              const SizedBox(height: 12),
+              _info(
+                'Two goals were completed this month, with saved goal points of 90 and 70. A goal that is still open, or was completed in another month, is not included.',
+              ),
+              const SizedBox(height: 14),
+              _formulaBox(
+                '90 + 70',
+                '2 completed goals',
+                'Average = 80',
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        _card(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _label('WHY THE WEIGHTS ARE 45 AND 40'),
+              const SizedBox(height: 12),
+              _info(
+                'This person has both a task review and a completed goal, so the task score is worth 45 and the goal score is worth 40. Attitude is a separate 15. Together that is 100 before any warning.',
+              ),
+              const SizedBox(height: 14),
+              _scoreRow('Task points: (60 ÷ 100) × 45', '27'),
+              _scoreRow('Goal points: (80 ÷ 100) × 40', '32'),
+              _scoreRow('Productivity: 27 + 32', '59 / 85'),
+              const SizedBox(height: 8),
+              _info(
+                'If the same person had reviews but no completed goal, the task score would use 85 instead of 45: (60 ÷ 100) × 85 = 51. Goal points would be 0. If they had only goals, the goal score would use 85.',
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        _card(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _label('ATTITUDE AND WARNINGS'),
+              const SizedBox(height: 12),
+              _info(
+                'The behaviour total recorded for this month is 12. It is kept between 0 and 15, then added to productivity: 59 + 12 = 71.',
+              ),
+              const SizedBox(height: 14),
+              _scoreRow('One medium warning', '−2'),
+              _scoreRow('One high warning', '−3'),
+              _scoreRow('Warning total', '−5'),
+              const SizedBox(height: 8),
+              _info(
+                'Only active warnings created in this month are used. 71 − 5 = 66. The final score stays between 0 and 100. Warnings do not change the task points, goal points, or attitude. They are taken off at the end.',
+              ),
+            ],
+          ),
+        ),
       ],
     );
   }
@@ -861,8 +945,9 @@ class _ProductivityCalculationPageState extends State<ProductivityCalculationPag
           SizedBox(height: 15),
 
           Text(
-            'The weightage changes depending on whether the staff member '
-            'has tasks, goals, or both.',
+            'Task and goal share 85 points. Attitude adds up to 15. '
+            'If a person has only tasks or only goals, that part receives the full 85. '
+            'With neither, productivity is 0.',
             style: TextStyle(fontSize: 12, color: muted, height: 1.5),
           ),
 
@@ -984,67 +1069,15 @@ class _ProductivityCalculationPageState extends State<ProductivityCalculationPag
           SizedBox(height: 15),
 
           _formulaBox(
-            'Task 1 + Task 2 + Task 3 + ...',
-            'Total Tasks in Month',
+            'Final points of reviewed tasks',
+            'Number of reviews in the month',
             'Monthly Task Average',
           ),
 
           SizedBox(height: 14),
 
           _info(
-            'Each task starts from its time score and priority score. When the task has a target quantity, that score is then reduced by the completed quantity.',
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _taskPriority() {
-    return _card(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _label('TASK PRIORITY SCORE'),
-
-          SizedBox(height: 14),
-
-          _scoreRow('High Priority', '+5'),
-
-          _scoreRow('Medium Priority', '+3'),
-
-          _scoreRow('Normal Priority', '+0'),
-
-          SizedBox(height: 8),
-
-          _formulaResult('Time Score + Priority Score', 'TASK SCORE'),
-        ],
-      ),
-    );
-  }
-
-  Widget _taskTime() {
-    return _card(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _label('TASK TIME SCORE'),
-
-          SizedBox(height: 14),
-
-          _scoreRow('Before due date', '90'),
-          _scoreRow('On due date', '85'),
-          _scoreRow('1 day late', '80'),
-          _scoreRow('2 days late', '75'),
-          _scoreRow('3 days late', '70'),
-          _scoreRow('4 days late', '65'),
-          _scoreRow('5 days late', '60'),
-          _scoreRow('6 days late', '55'),
-          _scoreRow('7 or more days late', '50'),
-
-          SizedBox(height: 7),
-
-          _info(
-            'A task with an end time uses hours instead of days: 90 before the end time, 85 at the end time, then minus 5 for each late hour. The time score stays between 50 and 90.',
+            'Only tasks assigned to this staff member are included, and only reviews from the selected month. No reviews means the task score is 0.',
           ),
         ],
       ),
@@ -1060,46 +1093,16 @@ class _ProductivityCalculationPageState extends State<ProductivityCalculationPag
 
           SizedBox(height: 14),
 
-          _scoreRow('High Priority task removed', '-10'),
-          _scoreRow('Medium Priority task removed', '-5'),
-          _scoreRow('Normal Priority task removed', '-3'),
-
-          SizedBox(height: 8),
-
-          _info(
-            'Removal penalties are deducted from the monthly task average.',
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _taskQuantity() {
-    return _card(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _label('TASK QUANTITY SCORE'),
-
-          SizedBox(height: 14),
-
-          _scoreRow('No target quantity', 'Time + Priority'),
-          _scoreRow('Completed quantity missing', '0'),
-          _scoreRow('Completed at or above target', 'Full task score'),
-          _scoreRow('Completed below target', 'Task score × completed ÷ target'),
-
-          SizedBox(height: 14),
-
           _formulaBox(
-            'Task score × Completed quantity',
-            'Target quantity',
-            'Quantity score',
+            'Applied penalty points',
+            'Removals in the month',
+            'Removal penalty',
           ),
 
           SizedBox(height: 14),
 
           _info(
-            'Example: task score 90, target 10, completed 6. The score is 90 × 6 ÷ 10 = 54. The result is rounded and stays between 0 and 90.',
+            'Only removals with a penalty applied in that month are counted. The points are added together and taken off the task average. The task score cannot go below 0.',
           ),
         ],
       ),
@@ -1110,9 +1113,9 @@ class _ProductivityCalculationPageState extends State<ProductivityCalculationPag
     return _highlight(
       title: 'MONTHLY TASK SCORE',
 
-      formula: 'Monthly Task Average − Monthly Task Removal Penalty',
+      formula: 'Monthly Task Average − Removal Penalty',
 
-      result: 'This score is used to calculate Final Task Points.',
+      result: 'The result stays at 0 or above, then becomes the task points.',
     );
   }
 
@@ -1126,64 +1129,15 @@ class _ProductivityCalculationPageState extends State<ProductivityCalculationPag
           SizedBox(height: 15),
 
           _formulaBox(
-            'Task 1 + Task 2 + Task 3 + ...',
-            'Total Tasks in Goal',
-            'Goal Task Average',
-          ),
-
-          SizedBox(height: 16),
-
-          _formulaResult(
-            'Goal Task Average + Priority + Time Score',
-            'GOAL POINTS',
+            'Goal points of completed goals',
+            'Completed goals in the month',
+            'Monthly Goal Score',
           ),
 
           SizedBox(height: 12),
 
           _info(
-            'The goal points are calculated from the tasks belonging to that goal.',
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _goalPriority() {
-    return _card(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _label('GOAL PRIORITY'),
-
-          SizedBox(height: 14),
-
-          _scoreRow('High Priority', '+5'),
-          _scoreRow('Medium Priority', '+3'),
-          _scoreRow('Normal Priority', '+0'),
-        ],
-      ),
-    );
-  }
-
-  Widget _goalTime() {
-    return _card(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _label('GOAL TIME SCORE'),
-
-          SizedBox(height: 14),
-
-          _scoreRow('Before due date', '+5'),
-          _scoreRow('On due date', '+5'),
-          _scoreRow('1 day late', '-5'),
-          _scoreRow('2 days late', '-10'),
-          _scoreRow('3 days late', '-15'),
-
-          SizedBox(height: 7),
-
-          _info(
-            'Every additional late day reduces the goal time score by 5 points.',
+            'A goal counts when it is completed in the selected month. No completed goals means the goal score is 0.',
           ),
         ],
       ),
@@ -1199,15 +1153,37 @@ class _ProductivityCalculationPageState extends State<ProductivityCalculationPag
 
           SizedBox(height: 15),
 
-          _formulaBox(
-            'Staff Attitude & Behaviour Scores',
-            'Number of Staff Scores',
-            'Average Attitude & Behaviour',
-          ),
+          _resultBox('Behaviour total for the month', '0 to 15'),
 
           SizedBox(height: 15),
 
-          _resultBox('Maximum Contribution', '15 points'),
+          _info(
+            'The attitude score for that month is added after task and goal points. It cannot go above 15.',
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _warningPenalty() {
+    return _card(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _label('WARNING PENALTY'),
+
+          SizedBox(height: 14),
+
+          _scoreRow('Low', '−1'),
+          _scoreRow('Medium', '−2'),
+          _scoreRow('High', '−3'),
+          _scoreRow('Critical', '−5'),
+
+          SizedBox(height: 8),
+
+          _info(
+            'Only active warnings created in that month are counted. The penalties are added together and taken off the final score. They do not change the task, goal, or attitude points.',
+          ),
         ],
       ),
     );
@@ -1218,11 +1194,10 @@ class _ProductivityCalculationPageState extends State<ProductivityCalculationPag
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _label('FINAL STAFF PRODUCTIVITY'),
+          _label('FINAL STAFF SCORE'),
 
           SizedBox(height: 18),
 
-          // BOTH
           _finalFormula(
             'If Task + Goal exist',
             'Task: (Monthly Task Score ÷ 100) × 45',
@@ -1231,7 +1206,6 @@ class _ProductivityCalculationPageState extends State<ProductivityCalculationPag
 
           SizedBox(height: 12),
 
-          // TASK ONLY
           _finalFormula(
             'If ONLY Task exists',
             'Task: (Monthly Task Score ÷ 100) × 85',
@@ -1241,7 +1215,6 @@ class _ProductivityCalculationPageState extends State<ProductivityCalculationPag
 
           SizedBox(height: 12),
 
-          // GOAL ONLY
           _finalFormula(
             'If ONLY Goal exists',
             'Task: 0',
@@ -1252,8 +1225,16 @@ class _ProductivityCalculationPageState extends State<ProductivityCalculationPag
           SizedBox(height: 18),
 
           _calculationBox(
+            'PRODUCTIVITY',
+            'Task points + Goal points',
+            'MAXIMUM = 85',
+          ),
+
+          SizedBox(height: 12),
+
+          _calculationBox(
             'FINAL FORMULA',
-            'Final Task Points + Final Goal Points + Attitude & Behaviour',
+            'Productivity + Attitude − Warning penalty',
             'MAXIMUM = 100',
           ),
         ],
