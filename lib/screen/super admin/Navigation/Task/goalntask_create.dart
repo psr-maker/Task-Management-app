@@ -2,7 +2,6 @@
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:staff_work_track/Models/getusers.dart';
-import 'package:staff_work_track/Models/rolesmodel.dart';
 import 'package:staff_work_track/core/constant/division_config.dart';
 import 'package:staff_work_track/core/responsive/app_layout.dart';
 import 'package:staff_work_track/services/admin_service.dart';
@@ -287,13 +286,7 @@ class _CreateTaskPageState extends State<Createtask> {
           .where((user) => user.status.toLowerCase() != 'inactive')
           .toList();
       final assignable = await keepAssignableUsers(active);
-      var roles = <Role>[];
-      try {
-        roles = await SuperAdminService.getRoles();
-      } catch (_) {}
-      final yearlyUsers = assignable
-          .where((user) => isHierarchyLevelRole(roles, user.role))
-          .toList();
+      final yearlyUsers = assignable;
       final yearlyIds = yearlyUsers.map((user) => user.userId).toSet();
       if (!mounted) return;
       setState(() {
